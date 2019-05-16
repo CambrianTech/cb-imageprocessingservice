@@ -1,0 +1,11 @@
+tqdm
+aiohttp
+opencv-python-headless
+joblib
+scipy
+scikit-image
+scikit-learn
+matplotlib
+imageio
+awscli
+boto3
