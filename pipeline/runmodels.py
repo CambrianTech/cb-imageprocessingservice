@@ -1,11 +1,8 @@
-from pipeline.core import PipelineStep
-from modelutils import load_model, feed_image, feed_images
 import numpy as np
+from scipy.special import softmax
 import cv2
-
-
-def _softmax(x):
-    return np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
+from modelutils import feed_image, feed_images, load_model
+from pipeline.core import PipelineStep
 
 
 class PipelineRunModels(PipelineStep):
@@ -33,7 +30,7 @@ class PipelineRunModels(PipelineStep):
             "image": data["image"],
             "unlit": data["unlit"]
         })["output"]
-        data["semantic"] = _softmax(data["semantic_probs"])
+        data["semantic"] = softmax(data["semantic_probs"])
 
         # Normals output with latents
         input_tensor = list(self.model_normals.feed_tensors.values())[0]
