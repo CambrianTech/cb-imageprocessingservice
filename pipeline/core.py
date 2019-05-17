@@ -14,13 +14,23 @@ class PipelineStep(metaclass=ABCMeta):
     def output_keys(self) -> list:
         return {}
 
+    @property
+    def config(self) -> dict:
+        return self._pipeline.config
+
 
 class Pipeline:
-    def __init__(self):
+    def __init__(self, config={}):
         self._steps = []
+        self._config = config
 
-    def add(self, step: PipelineStep) -> Pipeline:
+    @property
+    def config(self):
+        return self._config
+
+    def add(self, step: PipelineStep):
         self._steps.append(step)
+        step._pipeline = self
         return self
 
     def validate(self, keys: list):

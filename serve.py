@@ -14,10 +14,13 @@ from pipeline.core import Pipeline
 
 @click.command()
 @click.argument("model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
-def main(model_path):
+@click.argument("fov_model_path", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("user_uploads_bucket", type=click.STRING)
+@click.argument("results_bucket", type=click.STRING)
+def main(model_path, fov_model_path, user_uploads_bucket, results_bucket):
     # Setup pipeline to run on requests
     pipeline = (Pipeline()
-                .add(PipelineGetData())
+                .add(PipelineGetData(user_uploads_bucket))
                 .add(PipelineRunModels(
                     semantic_path=join(model_path, "semantic"),
                     normals_path=join(model_path, "normals"),
@@ -27,8 +30,8 @@ def main(model_path):
                 ))
                 .add(PipelineDeterminePrimaryAngles())
                 .add(PipelineRefineResults())
-                .add(PipelineCalculateFov("sklearn_models/fov_classifier_lc128.joblib"))
-                .add(PipelineUploadResults()))
+                .add(PipelineCalculateFov(fov_model_path))
+                .add(PipelineUploadResults(results_bucket)))
 
     pipeline.validate(["image_s3_key"])
 
