@@ -114,3 +114,6 @@ logging
 logging*
 
 .vscode/
+
+.sklearn_models/
+.tensorflow_models/
