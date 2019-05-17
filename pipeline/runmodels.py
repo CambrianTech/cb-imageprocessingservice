@@ -26,11 +26,13 @@ class PipelineRunModels(PipelineStep):
         return ["image", "semantic", "semantic_probs", "normals", "elevation", "lighting", "normals_latents"]
 
     def run(self, data):
-        data["elevation"] = feed_image(self.model_normals, data["image"])
-        data["lighting"] = feed_image(self.model_normals, data["image"])
-        data["unlit"] = feed_image(self.model_normals, data["image"])
-        data["semantic_probs"] = feed_images(
-            self.model_semantic, {"image": data["image"], "unlit": data["unlit"]})["output"]
+        data["elevation"] = feed_image(self.model_elevation, data["image"])
+        data["lighting"] = feed_image(self.model_lighting, data["image"])
+        data["unlit"] = feed_image(self.model_unlit, data["image"])
+        data["semantic_probs"] = feed_images(self.model_semantic, {
+            "image": data["image"],
+            "unlit": data["unlit"]
+        })["output"]
         data["semantic"] = _softmax(data["semantic_probs"])
 
         # Normals output with latents
@@ -38,6 +40,6 @@ class PipelineRunModels(PipelineStep):
         latent_tensors = self.model_normals.graph.get_tensor_by_name(
             "generator/decoder_8/conv2d_transpose/BiasAdd:0")
         output_tensor = list(self.model_normals.feed_tensors.values())[0]
-        normals_latents, data["normals"] = self.model_normals.session.run([latent_tensors, output_tensor],feed_dict={
+        normals_latents, data["normals"] = self.model_normals.session.run([latent_tensors, output_tensor], feed_dict={
             input_tensor: [cv2.resize(data["image"], (512, 512)).astype(np.float32)/255]})
         data["normals_latents"] = normals_latents[:, :, :, :128].reshape(1, -1)

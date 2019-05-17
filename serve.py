@@ -1,15 +1,17 @@
-import click
 import asyncio
-from aiohttp import web
+from concurrent.futures import ThreadPoolExecutor
 from os.path import join
 
+import click
+from aiohttp import web
+
+from pipeline.core import Pipeline
 from pipeline.fov import PipelineCalculateFov
+from pipeline.getdata import PipelineGetData
+from pipeline.primaryangle import PipelineDeterminePrimaryAngles
 from pipeline.refine import PipelineRefineResults
 from pipeline.runmodels import PipelineRunModels
-from pipeline.primaryangle import PipelineDeterminePrimaryAngles
-from pipeline.getdata import PipelineGetData
 from pipeline.uploadresults import PipelineUploadResults
-from pipeline.core import Pipeline
 
 
 @click.command()
@@ -35,34 +37,34 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket):
 
     pipeline.validate(["image_s3_key"])
 
-    # Setup http server
-    async def handle_segment(request):
-        loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as executor:
+        # Setup http server
+        async def handle_segment(request):
+            print("Handle segment:", request)
 
-        # Get image S3 key from GET request
-        image_s3_key = request.match_info.get("id", None)
-        if image_s3_key is None:
-            raise web.HTTPBadRequest()
+            loop = asyncio.get_event_loop()
 
-        data = {"image_s3_key": image_s3_key}
+            # Get image S3 key from GET request
+            image_s3_key = request.match_info.get("id", None)
+            if image_s3_key is None:
+                raise web.HTTPBadRequest()
 
-        def process_request():
-            return pipeline.run(data)
+            data = {"image_s3_key": image_s3_key}
 
-        data = await loop.run_in_executor(None, process_request)
+            data = await loop.run_in_executor(executor, pipeline.run, data)
 
-        return web.json_response({
-            "lighting_url": data["lighting_url"],
-            "semantic_url": data["semantic_url"],
-        })
+            return web.json_response({
+                "lighting_url": data["lighting_url"],
+                "semantic_url": data["semantic_url"],
+            })
 
-    app = web.Application()
-    app.add_routes(([
-        web.get("/segment/{id}", handle_segment)
-    ]))
+        app = web.Application()
+        app.add_routes(([
+            web.get("/segment/{id}", handle_segment)
+        ]))
 
-    print("Running web app")
-    web.run_app(app)
+        print("Running web app")
+        web.run_app(app)
 
 
 if __name__ == "__main__":

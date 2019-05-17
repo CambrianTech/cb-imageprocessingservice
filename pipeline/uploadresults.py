@@ -9,7 +9,8 @@ from pipeline.core import PipelineStep
 def _upload_image_to_s3(s3_client, image: np.ndarray, bucket: str, key: str):
     success, buffer = cv2.imencode(".png", image)
 
-    assert success, "Failed to upload image to S3: cv2.imencode failed"
+    if not success:
+        raise ValueError("cv2.imencode not successful, invalid image?")
 
     image_data = BytesIO(buffer)
     s3_client.upload_fileobj(image_data, bucket, key)
@@ -33,7 +34,7 @@ class PipelineUploadResults(PipelineStep):
         key_lighting = "%s_lighting.png" % data["image_s3_key"]
 
         _upload_image_to_s3(
-            self.s3_client, data["semantic"], self.bucket_name, key_semantic)
+            self.s3_client, data["semantic_probs"][:, :, 0], self.bucket_name, key_semantic)
         _upload_image_to_s3(
             self.s3_client, data["lighting"], self.bucket_name, key_lighting)
 
