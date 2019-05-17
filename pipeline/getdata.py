@@ -6,10 +6,12 @@ from pipeline.core import PipelineStep
 
 
 def _get_image_from_s3(s3_client, bucket: str, key: str) -> np.ndarray:
-    response = s3_client.Object(bucket, key).get()
-    image_data = response["Body"].read()
-    image_arr = np.fromstring(image_data, np.uint8)
-    return cv2.imdecode(image_arr, cv2.CV_LOAD_IMAGE_COLOR)
+    data = BytesIO()
+    s3_client.download_fileobj(bucket, key, data)
+    data.seek(0)
+    
+    image_arr = np.fromstring(data.read(), np.uint8)
+    return cv2.imdecode(image_arr, cv2.IMREAD_COLOR)
 
 
 class PipelineGetData(PipelineStep):
