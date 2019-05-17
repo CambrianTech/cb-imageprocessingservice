@@ -56,6 +56,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket):
             return web.json_response({
                 "lighting_url": data["lighting_url"],
                 "semantic_url": data["semantic_url"],
+                "fov": data["fov"],
             })
 
         app = web.Application()
