@@ -3,6 +3,7 @@ from pipeline.uploadresults import PipelineUploadResults
 from pipeline.getdata import PipelineGetData
 from pipeline.fov import PipelineCalculateFov
 from pipeline.runmodels import PipelineRunModels
+from pipeline.core import Pipeline
 import numpy as np
 from os.path import join
 
@@ -92,6 +93,39 @@ class TestPipelineRunModels(unittest.TestCase):
         self.assertIn("unlit", data)
         self.assertIn("elevation", data)
         self.assertIn("lighting", data)
+        self.assertIn("normals_latents", data)
+
+
+class TestPipelineChained(unittest.TestCase):
+    def test_run_models_into_fov(self):
+        model_path = "tensorflow_models"
+
+        image = np.zeros((512, 512, 3))
+
+        data = {
+            "image": image
+        }
+
+        pipeline = (Pipeline()
+                    .add(PipelineRunModels(
+                        semantic_path=join(model_path, "semantic"),
+                        normals_path=join(model_path, "normals"),
+                        unlit_path=join(model_path, "unlit"),
+                        elevation_path=join(model_path, "elevation"),
+                        lighting_path=join(model_path, "lighting")))
+                    .add(PipelineCalculateFov(join("sklearn_models", "fov_classifier_lc128.joblib"))))
+
+        pipeline.run(data)
+
+        self.assertIs(data["image"], image)
+        self.assertIn("semantic", data)
+        self.assertIn("normals", data)
+        self.assertIn("unlit", data)
+        self.assertIn("elevation", data)
+        self.assertIn("lighting", data)
+        self.assertIn("normals_latents", data)
+        self.assertIn("fov", data)
+        self.assertTrue(0 <= data["fov"] <= 360)
 
 
 if __name__ == "__main__":
