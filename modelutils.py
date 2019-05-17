@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+import tensorflow as tf
 
 
 def feed_images(model, images: dict) -> dict:
@@ -51,8 +52,8 @@ def feed_image(model, image: np.ndarray) -> np.ndarray:
     assert len(model.feed_tensors) == 1 and len(
         model.fetch_tensors) == 1, "Tried to use feed_image with more than one input or output in the model"
 
-    input_key = next(model.feed_tensors.items())
-    output_key = next(model.fetch_tensors.items())
+    input_key = next(iter(model.feed_tensors.keys()))
+    output_key = next(iter(model.fetch_tensors.keys()))
 
     outputs = feed_images(model, {input_key: image})
 
@@ -62,8 +63,8 @@ def feed_image(model, image: np.ndarray) -> np.ndarray:
 def load_model(model_path: str):
     print("Loading model from", model_path)
     model = tf.contrib.predictor.from_saved_model(model_path)
-    input_keys = ",".join(model.feed_tensors.keys())
-    output_keys = ",".join(model.fetch_tensors.keys())
+    input_keys = ", ".join(model.feed_tensors.keys())
+    output_keys = ", ".join(model.fetch_tensors.keys())
     print("Loaded model with inputs", input_keys, "and outputs", output_keys)
     return model
 

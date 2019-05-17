@@ -2,8 +2,8 @@
 
 This service performs image processing operations such as semantic segmentation and exposes them as Http REST APIs. It can be built into a docker image by running `docker build .`. It will execute `start.sh` on startup. Furthermore unit tests can be run with eg. `python -m unittest discover tests`.
 
-# Rest API
-## GET segment/{S3 Key}/
+# REST API
+## `GET` `/segment/{S3 Key}/`
 - `{S3 Key}` is the key for the source image
 - Returns `{ "lighting_url": "https://url/to/lighting.png, "semantic_url": "https://url/to/semantic.png" }`
 
