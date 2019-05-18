@@ -2,7 +2,6 @@ from io import BytesIO
 import boto3
 import cv2
 import numpy as np
-from cambrian.utils import upload_directory_to_s3
 from pipeline.core import PipelineStep
 
 

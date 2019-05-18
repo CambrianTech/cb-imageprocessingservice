@@ -10,7 +10,7 @@ from os.path import join
 
 class TestPipelineUploadResults(unittest.TestCase):
     def test_standard(self):
-        pipeline = PipelineUploadResults("cb-imageprocessingservice")
+        pipeline = PipelineUploadResults("cb-imageprocessingservice-results")
 
         semantic = np.zeros((512, 512))
         lighting = np.zeros((512, 512))
