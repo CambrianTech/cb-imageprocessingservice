@@ -105,13 +105,15 @@ class Pipeline:
             except Exception as e:
                 print("Exception in run_in_executor for %s:" % type(step), e)
                 for result_future in result_futures:
-                    result_future.set_exception(e)
+                    if not result_future.cancelled():
+                        result_future.set_exception(e)
                 continue
                 
             print(type(step), "time: %.2fs" % (time() - step_start_time), "data count:", len(data))
 
             if dst_queue is None:
                 for result_future, datum in zip(result_futures, data):
-                    result_future.set_result(datum)
+                    if not result_future.cancelled():
+                        result_future.set_result(datum)
             else:
                 await asyncio.wait([dst_queue.put((datum, result_future)) for result_future, datum in zip(result_futures, data)])
