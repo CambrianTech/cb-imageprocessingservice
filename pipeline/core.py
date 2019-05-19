@@ -100,7 +100,14 @@ class Pipeline:
             
             # Run the data
             step_start_time = time()
-            await loop.run_in_executor(None, step.run, data[0] if not step.is_batched else data)
+            try:
+                await loop.run_in_executor(None, step.run, data[0] if not step.is_batched else data)
+            except Exception as e:
+                print("Exception in run_in_executor for %s:" % type(step), e)
+                for result_future in result_futures:
+                    result_future.set_exception(e)
+                continue
+                
             print(type(step), "time: %.2fs" % (time() - step_start_time), "data count:", len(data))
 
             if dst_queue is None:
