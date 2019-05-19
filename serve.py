@@ -20,8 +20,10 @@ from pipeline.uploadresults import PipelineUploadResults
 @click.argument("user_uploads_bucket", type=click.STRING)
 @click.argument("results_bucket", type=click.STRING)
 def main(model_path, fov_model_path, user_uploads_bucket, results_bucket):
+    print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
+    print("Creating pipeline")
     # Setup pipeline to run on requests
     pipeline = (Pipeline()
                 .add(PipelineGetData(user_uploads_bucket))
@@ -37,6 +39,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket):
                 .add(PipelineCalculateFov(fov_model_path))
                 .add(PipelineUploadResults(results_bucket)))
 
+    print("Validating pipeline")
     pipeline.validate(["image_s3_key"])
 
     # Setup http server
@@ -58,6 +61,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket):
             "fov": data["fov"],
         })
 
+    print("Creating web app")
     app = web.Application()
     app.add_routes(([
         web.get("/segment/{id}", handle_segment)
