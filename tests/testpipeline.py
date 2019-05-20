@@ -5,29 +5,30 @@ from pipeline.fov import PipelineCalculateFov
 from pipeline.runmodels import PipelineRunModels
 from pipeline.core import Pipeline
 import numpy as np
+import asyncio
 from os.path import join
 
 
 class TestPipelineUploadResults(unittest.TestCase):
     def test_standard(self):
-        pipeline = PipelineUploadResults("cb-imageprocessingservice-results")
+        step = PipelineUploadResults("cb-imageprocessingservice-results")
 
-        semantic = np.zeros((512, 512))
+        semantic_probs = np.zeros((512, 512, 2))
         lighting = np.zeros((512, 512))
 
         image_s3_key = "TestPipelineUploadResults"
 
         data = {
             "image_s3_key": "TestPipelineUploadResults",
-            "semantic": semantic,
+            "semantic_probs": semantic_probs,
             "lighting": lighting
         }
 
-        pipeline.run(data)
+        step.run(data)
 
         self.assertIs(data["image_s3_key"], image_s3_key)
-        self.assertIs(data["semantic"], semantic)
-        self.assertIs(data["lighting"], semantic)
+        self.assertIs(data["semantic_probs"], semantic_probs)
+        self.assertIs(data["lighting"], lighting)
 
         self.assertIn("semantic_url", data)
         self.assertIn("lighting_url", data)
@@ -35,7 +36,7 @@ class TestPipelineUploadResults(unittest.TestCase):
 
 class TestPipelineGetData(unittest.TestCase):
     def test_standard(self):
-        pipeline = PipelineGetData("cb-user-image-uploads")
+        step = PipelineGetData("cb-user-image-uploads")
 
         image_s3_key = "iTInnsV7hXrEKdPWJY2vO5y7LJ9uOey8"
 
@@ -43,7 +44,7 @@ class TestPipelineGetData(unittest.TestCase):
             "image_s3_key": image_s3_key
         }
 
-        pipeline.run(data)
+        step.run(data)
 
         self.assertIs(data["image_s3_key"], image_s3_key)
         self.assertIn("image", data)
@@ -51,7 +52,7 @@ class TestPipelineGetData(unittest.TestCase):
 
 class TestPipelineCalculateFov(unittest.TestCase):
     def test_standard(self):
-        pipeline = PipelineCalculateFov(
+        step = PipelineCalculateFov(
             join("sklearn_models", "fov_classifier_lc128.joblib"))
 
         normals_latents = np.zeros((1, 2048), np.float32)
@@ -60,7 +61,7 @@ class TestPipelineCalculateFov(unittest.TestCase):
             "normals_latents": normals_latents
         }
 
-        pipeline.run(data)
+        step.run(data)
 
         self.assertIs(data["normals_latents"], normals_latents)
         self.assertIn("fov", data)
@@ -71,7 +72,7 @@ class TestPipelineRunModels(unittest.TestCase):
     def test_standard(self):
         model_path = "tensorflow_models"
 
-        pipeline = PipelineRunModels(
+        step = PipelineRunModels(
             semantic_path=join(model_path, "semantic"),
             normals_path=join(model_path, "normals"),
             unlit_path=join(model_path, "unlit"),
@@ -79,13 +80,14 @@ class TestPipelineRunModels(unittest.TestCase):
             lighting_path=join(model_path, "lighting"),
         )
 
+        self.assertTrue(step.is_batched)
+
         image = np.zeros((512, 512, 3))
 
-        data = {
-            "image": image
-        }
+        data = {"image": image}
+        data_batch = [data]
 
-        pipeline.run(data)
+        step.run(data_batch)
 
         self.assertIs(data["image"], image)
         self.assertIn("semantic", data)
@@ -115,8 +117,11 @@ class TestPipelineChained(unittest.TestCase):
                         lighting_path=join(model_path, "lighting")))
                     .add(PipelineCalculateFov(join("sklearn_models", "fov_classifier_lc128.joblib"))))
 
-        pipeline.run(data)
+        # Since the pipeline does not destroy its loops on exit (which doesn't matter since that will never happen in containers),
+        # this will output some warnings about tasks still pending.
+        result_data = asyncio.get_event_loop().run_until_complete(pipeline.run(data))
 
+        self.assertIs(data, result_data)
         self.assertIs(data["image"], image)
         self.assertIn("semantic", data)
         self.assertIn("normals", data)
