@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
 from time import time
 import asyncio
+from multiprocessing import cpu_count
 
 
 class PipelineStep(metaclass=ABCMeta):
@@ -56,7 +57,7 @@ class Pipeline:
         prev_queue = self._input_queue
         for i, step in enumerate(self._steps):
             step_queue = asyncio.Queue() if i + 1 < len(self._steps) else None
-            for _ in range(1 if step.is_batched else 8):
+            for _ in range(1 if step.is_batched else cpu_count()):
                 asyncio.ensure_future(Pipeline.run_step_in_background(step, prev_queue, step_queue))
             prev_queue = step_queue
         
