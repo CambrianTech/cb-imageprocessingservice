@@ -48,7 +48,7 @@ class PipelineRunModels(PipelineStep):
         input_tensor = list(self.model_normals.feed_tensors.values())[0]
         latent_tensors = self.model_normals.graph.get_tensor_by_name(
             "generator/decoder_8/conv2d_transpose/BiasAdd:0")
-        output_tensor = list(self.model_normals.feed_tensors.values())[0]
+        output_tensor = list(self.model_normals.fetch_tensors.values())[0]
         normals_latents, normals = self.model_normals.session.run([latent_tensors, output_tensor], feed_dict={
             input_tensor: [cv2.resize(datum["image"], (512, 512)).astype(np.float32)/255 for datum in data]})
         normals_latents = normals_latents[:, :, :, :128].reshape(len(data), 1, -1)
