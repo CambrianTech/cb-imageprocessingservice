@@ -42,7 +42,7 @@ class PipelineRunModels(PipelineStep):
         semantic_results = [s["output"] for s in feed_images_batched(self.model_semantic, semantic_input)]
         for datum, result in zip(data, semantic_results):
             datum["semantic"] = result
-            datum["semantic_probs"] = softmax(result)
+            datum["semantic_probs"] = softmax(result/255, axis=-1)
 
         # Normals output with latents
         input_tensor = list(self.model_normals.feed_tensors.values())[0]
