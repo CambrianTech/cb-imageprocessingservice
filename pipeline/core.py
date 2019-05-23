@@ -30,13 +30,17 @@ class Pipeline:
     def __init__(self, config={}):
         self._steps = []
         self._input_queue = asyncio.Queue()
-        self._step_queues = {}
+        self._queues = [self._input_queue]
         self._queues_started = False
         self._config = config
 
     @property
     def config(self):
         return self._config
+
+    @property
+    def num_waiting_items(self):
+        return sum([q.qsize() for q in self._queues])
 
     def add(self, step: PipelineStep):
         if self._queues_started:
@@ -56,9 +60,14 @@ class Pipeline:
         self._queues_started = True
         prev_queue = self._input_queue
         for i, step in enumerate(self._steps):
-            step_queue = asyncio.Queue() if i + 1 < len(self._steps) else None
+            step_queue = None
+            if i + 1 < len(self._steps):
+                step_queue = asyncio.Queue()
+                self._queues.append(step_queue)
+
             for _ in range(1 if step.is_batched else cpu_count()):
                 asyncio.ensure_future(Pipeline.run_step_in_background(step, prev_queue, step_queue))
+                
             prev_queue = step_queue
         
     async def run(self, data: dict) -> dict:

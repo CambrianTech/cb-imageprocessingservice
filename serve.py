@@ -1,9 +1,15 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from os.path import join
+import os
+import json
+import datetime
+import dateutil
 
 import click
 from aiohttp import web
+import boto3
+import requests
 
 from pipeline.core import Pipeline
 from pipeline.fov import PipelineCalculateFov
@@ -12,6 +18,31 @@ from pipeline.primaryangle import PipelineDeterminePrimaryAngles
 from pipeline.refine import PipelineRefineResults
 from pipeline.runmodels import PipelineRunModels
 from pipeline.uploadresults import PipelineUploadResults
+
+
+def _get_instance_metadata():
+    metadata = {}
+
+    # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
+    try:
+        req = requests.get(
+            "http://169.254.169.254/latest/dynamic/instance-identity/document")
+        response_json = req.json()
+        metadata["region"] = response_json.get("region")
+        metadata["instance_id"] = response_json.get("instanceId")
+    except:
+        return None
+
+    # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/container-metadata.html
+    container_metadata_file_path = os.environ["ECS_CONTAINER_METADATA_FILE"]
+    if container_metadata_file_path is None:
+        return None
+
+    with open(container_metadata_file_path, "r") as container_metadata_file:
+        container_metadata = json.load(container_metadata_file)
+
+    metadata["cluster"] = container_metadata["Cluster"]
+    return metadata
 
 
 @click.command()
@@ -44,7 +75,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket):
 
     # Setup http server
     async def handle_segment(request):
-        print("Handle segment:", request)
+        print("Handle segment:", request, "(items waiting in pipeline: %d)" % pipeline.num_waiting_items)
 
         # Get image S3 key from GET request
         image_s3_key = request.match_info.get("id", None)
@@ -63,6 +94,46 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket):
 
     async def handle_healthcheck(request):
         return web.Response(text="Healthy")
+
+    print("Trying to get instance metadata")
+    metadata = _get_instance_metadata()
+    if metadata is not None:
+        print("Instance metadata:", metadata)
+
+    async def push_metrics_loop():
+        loop = asyncio.get_event_loop()
+
+        if metadata is not None:
+            cw = boto3.client("cloudwatch", region_name=metadata["region"])
+
+        def push_metrics(avg_waiting_items):
+            cw.put_metric_data(Namespace="ImageProcessingService",
+                                MetricData=[{
+                                    "MetricName": "PipelineWaitingItems",
+                                    "Dimensions": [{
+                                        "Name": "ClusterName",
+                                        "Value": metadata["cluster"]
+                                    }],
+                                    "Timestamp": datetime.datetime.now(
+                                        dateutil.tz.tzlocal()),
+                                    "Value": avg_waiting_items
+                                }])
+
+        avg_waiting_items = 0
+
+        # Publish metrics to CloudWatch every minute
+        while True:
+            for _ in range(60):
+                await asyncio.sleep(1)
+                avg_waiting_items = 0.9 * avg_waiting_items + 0.1 * pipeline.num_waiting_items
+
+            print("Waiting items: %.2f (avg: %.2f)" % (pipeline.num_waiting_items, avg_waiting_items))
+
+            if metadata is not None:
+                await loop.run_in_executor(None, push_metrics, avg_waiting_items)
+
+    print("Starting metrics loop")
+    asyncio.ensure_future(push_metrics_loop())
 
     print("Creating web app")
     app = web.Application()
