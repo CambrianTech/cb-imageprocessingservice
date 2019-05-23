@@ -61,10 +61,14 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket):
             "fov": data["fov"],
         })
 
+    async def handle_healthcheck(request):
+        return web.Response(text="Healthy")
+
     print("Creating web app")
     app = web.Application()
     app.add_routes(([
-        web.get("/segment/{id}", handle_segment)
+        web.get("/segment/{id}", handle_segment),
+        web.get("/healthcheck", handle_healthcheck)
     ]))
 
     print("Running web app")
