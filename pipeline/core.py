@@ -92,22 +92,33 @@ class Pipeline:
             datum, result_future = await src_queue.get()
             src_queue.task_done()
 
+            if result_future.cancelled():
+                continue
+
             result_futures = [result_future]
             data = [datum]
             
             if step.is_batched:
                 debounce_start_time = time()
                 wait_time = 0
+
+                # Add items from the queue while more are available.
+                # Do this by waiting a small amount of time for new data
+                # up to a maximum time.
                 while wait_time < 1.0 and len(data) < 4:
                     await asyncio.sleep(0.2)
                     try:
-                        datum, result_future = src_queue.get_nowait()
-                        result_futures.append(result_future)
-                        data.append(datum)
-                        wait_time = time() - debounce_start_time
+                        # Dequeue until we have enough for a batch
+                        # or until we run out.
+                        while len(data) < 4:
+                            datum, result_future = src_queue.get_nowait()
+                            if not result_future.cancelled():
+                                result_futures.append(result_future)
+                                data.append(datum)
                     except asyncio.QueueEmpty:
-                        break
-            
+                        pass
+                    wait_time = time() - debounce_start_time
+
             # Run the data
             step_start_time = time()
             try:
@@ -126,4 +137,4 @@ class Pipeline:
                     if not result_future.cancelled():
                         result_future.set_result(datum)
             else:
-                await asyncio.wait([dst_queue.put((datum, result_future)) for result_future, datum in zip(result_futures, data)])
+                await asyncio.wait([dst_queue.put((datum, result_future)) for result_future, datum in zip(result_futures, data) if not result_future.cancelled()])
