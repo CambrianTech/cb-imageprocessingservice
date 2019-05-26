@@ -99,7 +99,7 @@ class PipelineRefineResults(PipelineStep):
         _, thresh = cv2.threshold(kmeans_gray, 127, 255, 0)
         nmask = np.zeros(mask.shape, np.uint8)
         # Get biggest normals contour
-        _, contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         if len(contours) > 0:
             areas = [cv2.contourArea(c) for c in contours]
             max_index = np.argmax(areas)
@@ -127,7 +127,7 @@ class PipelineRefineResults(PipelineStep):
         img=cv2.copyMakeBorder(img, border, border, border, border, cv2.BORDER_CONSTANT, value=0)
 
     # Fill border holes
-        _, contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         if len(contours) > 0:
             areas = [cv2.contourArea(c) for c in contours]
             max_index = np.argmax(areas)
@@ -150,7 +150,7 @@ class PipelineRefineResults(PipelineStep):
         img = ip.crop_image(img, border)
 
         # Fill small holes
-        _, contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         if len(contours) > 0:
             for contour in contours:
