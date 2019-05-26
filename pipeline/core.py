@@ -44,7 +44,8 @@ class Pipeline:
 
     def add(self, step: PipelineStep):
         if self._queues_started:
-            raise Exception("Can not add more pipeline steps after queues were started.")
+            raise Exception(
+                "Can not add more pipeline steps after queues were started.")
 
         self._steps.append(step)
         step._pipeline = self
@@ -66,10 +67,11 @@ class Pipeline:
                 self._queues.append(step_queue)
 
             for _ in range(1 if step.is_batched else cpu_count()):
-                asyncio.ensure_future(Pipeline.run_step_in_background(step, prev_queue, step_queue))
-                
+                asyncio.ensure_future(Pipeline.run_step_in_background(
+                    step, prev_queue, step_queue))
+
             prev_queue = step_queue
-        
+
     async def run(self, data: dict) -> dict:
         if not self._queues_started:
             self._start_queues()
@@ -97,7 +99,7 @@ class Pipeline:
 
             result_futures = [result_future]
             data = [datum]
-            
+
             if step.is_batched:
                 debounce_start_time = time()
                 wait_time = 0
@@ -129,12 +131,17 @@ class Pipeline:
                     if not result_future.cancelled():
                         result_future.set_exception(e)
                 continue
-                
-            print(type(step), "time: %.2fs" % (time() - step_start_time), "data count:", len(data))
 
+            print(type(step), "time: %.2fs" %
+                  (time() - step_start_time), "data count:", len(data))
+
+            # Pass non-cancelled tasks to next step or output if there is no next step.
             if dst_queue is None:
                 for result_future, datum in zip(result_futures, data):
                     if not result_future.cancelled():
                         result_future.set_result(datum)
             else:
-                await asyncio.wait([dst_queue.put((datum, result_future)) for result_future, datum in zip(result_futures, data) if not result_future.cancelled()])
+                queue_put_futures = [dst_queue.put((datum, result_future)) for result_future, datum
+                                     in zip(result_futures, data) if not result_future.cancelled()]
+                if len(queue_put_futures) > 0:
+                    await asyncio.wait(queue_put_futures)
