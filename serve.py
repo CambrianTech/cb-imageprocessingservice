@@ -8,6 +8,7 @@ import dateutil
 
 import click
 from aiohttp import web
+import aiohttp_cors
 import boto3
 import requests
 
@@ -137,10 +138,23 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket):
 
     print("Creating web app")
     app = web.Application()
-    app.add_routes(([
-        web.get("/segment/{id}", handle_segment),
+    
+    cors = aiohttp_cors.setup(app, defaults={
+        "*": aiohttp_cors.ResourceOptions(
+            allow_credentials=True,
+            expose_headers="*",
+            allow_headers="*",
+        )
+    })
+
+    # Add public (CORS) routes
+    segment_resource = app.router.add_resource("/segment/{id}")
+    cors.add(segment_resource.add_route("GET", handle_segment))
+
+    # Add private (non-CORS) routes
+    app.add_routes([
         web.get("/healthcheck", handle_healthcheck)
-    ]))
+    ])
 
     print("Running web app")
     web.run_app(app)
