@@ -9,3 +9,24 @@ This service performs image processing operations such as semantic segmentation 
 
 # Architecture
 The system is based on a pipeline where multiple pipeline steps are performed sequentially. The steps are passed a dictionary which they can read from and write to. Initially the only key is `image_s3_key`. In the end the `lighting_url` and `semantic_url` entries are used for uploading the images to S3.
+
+# Installation
+
+## Prerequisites OSX
+Cairo 
+```brew install cairo```
+
+Virtualenv 
+```brew install virtualenv```
+
+libraries in .bash_profile or .profile:
+export PKG_CONFIG_PATH="/usr/local/opt/libffi/lib/pkgconfig"
+export LDFLAGS="-L/usr/local/opt/libffi/lib" 
+
+## Installing under Virtualenv
+Use a virtual environment and utilize the requirements.txt in this package
+```virtualenv ~/venv/shaw
+source ~/venv/shaw/bin/activate
+
+```
+
