@@ -14,16 +14,16 @@ The system is based on a pipeline where multiple pipeline steps are performed se
 
 ## Prerequisites OSX
 pygobject3 
-```brew install pygobject3
-```
 
-Virtualenv 
-```brew install virtualenv```
+```brew install pygobject3 virtualenv```
 
 ## CPU ONLY, neede for OSX
 Edit requirements.txt and change tensorflow-gpu==1.13.1 to tensorflow==1.13.1
 
 ## Installing under Virtualenv
+Virtualenv 
+```pip3 install virtualenv```
+
 Use a virtual environment and utilize the requirements.txt in this package
 
 ```virtualenv ~/venv/shaw
