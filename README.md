@@ -12,6 +12,19 @@ The system is based on a pipeline where multiple pipeline steps are performed se
 
 # Installation
 
+## Models and weights
+
+cb-imageprocessingservice
+  tensorflow_models
+    elevation
+    lighting (renamed from shadows)
+    normals
+    semantic
+    unlit
+  sklearn_models
+    fov_classifier_lc128.joblib 
+
+
 ## Prerequisites OSX
 pygobject3 
 
@@ -30,3 +43,8 @@ source ~/venv/shaw/bin/activate
 pip3 install -r requirements.txt
 ```
 
+## Running locally
+
+```
+python3 serve.py ./tensorflow_models/ ./sklearn_models/fov_classifier_lc128.joblib cb-user-image-uploads cb-imageprocessingservice-results
+```
