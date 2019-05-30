@@ -44,6 +44,10 @@ Use a virtual environment and utilize the requirements.txt in this package
 source ~/venv/shaw/bin/activate
 pip3 install -r requirements.txt
 ```
+## CB-Core
+```
+pip3 install -e PATH_TO_CB_CORE_REPO
+```
 
 ## Running locally
 
