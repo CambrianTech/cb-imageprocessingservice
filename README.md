@@ -13,20 +13,21 @@ The system is based on a pipeline where multiple pipeline steps are performed se
 # Installation
 
 ## Prerequisites OSX
-Cairo 
-```brew install cairo```
+pygobject3 
+```brew install pygobject3
+```
 
 Virtualenv 
 ```brew install virtualenv```
 
-libraries in .bash_profile or .profile:
-export PKG_CONFIG_PATH="/usr/local/opt/libffi/lib/pkgconfig"
-export LDFLAGS="-L/usr/local/opt/libffi/lib" 
+## CPU ONLY, neede for OSX
+Edit requirements.txt and change tensorflow-gpu==1.13.1 to tensorflow==1.13.1
 
 ## Installing under Virtualenv
 Use a virtual environment and utilize the requirements.txt in this package
+
 ```virtualenv ~/venv/shaw
 source ~/venv/shaw/bin/activate
-
+pip3 install -r requirements.txt
 ```
 
