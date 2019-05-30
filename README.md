@@ -13,6 +13,7 @@ The system is based on a pipeline where multiple pipeline steps are performed se
 # Installation
 
 ## Models and weights
+These are the same models and weights from the cb-deepweb repo. Move those in and maintain these names:
 ```
 cb-imageprocessingservice
   tensorflow_models
