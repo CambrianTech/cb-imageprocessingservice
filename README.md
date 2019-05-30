@@ -17,7 +17,6 @@ pygobject3
 
 ```brew install pygobject3 virtualenv```
 
-## CPU ONLY, neede for OSX
 Edit requirements.txt and change tensorflow-gpu==1.13.1 to tensorflow==1.13.1
 
 ## Installing under Virtualenv
