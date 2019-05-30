@@ -13,7 +13,7 @@ The system is based on a pipeline where multiple pipeline steps are performed se
 # Installation
 
 ## Models and weights
-
+```
 cb-imageprocessingservice
   tensorflow_models
     elevation
@@ -23,6 +23,7 @@ cb-imageprocessingservice
     unlit
   sklearn_models
     fov_classifier_lc128.joblib 
+```
 
 
 ## Prerequisites OSX
