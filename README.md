@@ -30,7 +30,7 @@ cb-imageprocessingservice
 ## Prerequisites OSX
 pygobject3 
 
-```brew install pygobject3 virtualenv```
+```brew install pygobject3```
 
 Edit requirements.txt and change tensorflow-gpu==1.13.1 to tensorflow==1.13.1
 
