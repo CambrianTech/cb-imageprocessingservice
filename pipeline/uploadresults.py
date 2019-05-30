@@ -2,6 +2,7 @@ from io import BytesIO
 import boto3
 import cv2
 import numpy as np
+import os.path
 from pipeline.core import PipelineStep
 
 
@@ -14,11 +15,19 @@ def _upload_image_to_s3(s3_client, image: np.ndarray, bucket: str, key: str):
     image_data = BytesIO(buffer)
     s3_client.upload_fileobj(image_data, bucket, key)
 
+def _upload_proxy_image(proxy_path, image: np.ndarray, bucket: str, key: str):
+    write_dir = os.path.join(proxy_path, bucket)
+    if not os.path.exists(write_dir):
+        os.makedirs(write_dir)
+    cv2.imwrite(os.path.join(write_dir, key), image)
+
 
 class PipelineUploadResults(PipelineStep):
-    def __init__(self, bucket_name):
+    def __init__(self, bucket_name, proxy_url=None, proxy_path=None):
         self.bucket_name = bucket_name
         self.s3_client = boto3.client("s3")
+        self.proxy_url = proxy_url
+        self.proxy_path = proxy_path
 
     @property
     def required_keys(self) -> list:
@@ -32,11 +41,28 @@ class PipelineUploadResults(PipelineStep):
         key_semantic = "%s_semantic.png" % data["image_s3_key"]
         key_lighting = "%s_lighting.png" % data["image_s3_key"]
 
-        _upload_image_to_s3(
-            self.s3_client, data["semantic_probs"][:, :, 0], self.bucket_name, key_semantic)
-        _upload_image_to_s3(
-            self.s3_client, data["lighting"], self.bucket_name, key_lighting)
+        mask_image = data["semantic_probs"][:, :, 0]
+        lighting_image = data["lighting"]
 
-        # TODO: Get URLs in a better way
-        data["semantic_url"] = "https://s3.amazonaws.com/%s/%s" % (self.bucket_name, key_semantic)
-        data["lighting_url"] = "https://s3.amazonaws.com/%s/%s" % (self.bucket_name, key_lighting)
+        if self.proxy_url is None:
+            _upload_image_to_s3(
+                self.s3_client, mask_image, self.bucket_name, key_semantic)
+            _upload_image_to_s3(
+                self.s3_client, lighting_image, self.bucket_name, key_lighting)
+
+            # TODO: Get URLs in a better way
+            data["semantic_url"] = "https://s3.amazonaws.com/%s/%s" % (self.bucket_name, key_semantic)
+            data["lighting_url"] = "https://s3.amazonaws.com/%s/%s" % (self.bucket_name, key_lighting)
+        else:
+            _upload_proxy_image(
+                self.proxy_path, mask_image, self.bucket_name, key_semantic)
+            _upload_proxy_image(
+                self.proxy_path, lighting_image, self.bucket_name, key_lighting)
+
+            data["semantic_url"] =  "%s/%s/%s" % (self.proxy_url, self.bucket_name, key_semantic)
+            data["lighting_url"] = "%s/%s/%s" % (self.proxy_url, self.bucket_name, key_lighting)
+
+
+        
+
+        

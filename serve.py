@@ -51,14 +51,17 @@ def _get_instance_metadata():
 @click.argument("fov_model_path", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("user_uploads_bucket", type=click.STRING)
 @click.argument("results_bucket", type=click.STRING)
-def main(model_path, fov_model_path, user_uploads_bucket, results_bucket):
+@click.argument("proxy_url", type=click.STRING, default=None, required=False)
+@click.argument("proxy_path", type=click.STRING, default=None, required=False)
+def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, proxy_url=None, proxy_path=None):
     print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
     print("Creating pipeline")
+
     # Setup pipeline to run on requests
     pipeline = (Pipeline()
-                .add(PipelineGetData(user_uploads_bucket))
+                .add(PipelineGetData(user_uploads_bucket, proxy_path))
                 .add(PipelineRunModels(
                     semantic_path=join(model_path, "semantic"),
                     normals_path=join(model_path, "normals"),
@@ -69,7 +72,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket):
                 .add(PipelineDeterminePrimaryAngles())
                 .add(PipelineRefineResults())
                 .add(PipelineCalculateFov(fov_model_path))
-                .add(PipelineUploadResults(results_bucket)))
+                .add(PipelineUploadResults(results_bucket, proxy_url, proxy_path)))
 
     print("Validating pipeline")
     pipeline.validate(["image_s3_key"])

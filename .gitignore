@@ -117,3 +117,4 @@ logging*
 
 sklearn_models/
 tensorflow_models/
+/final_mask.png
