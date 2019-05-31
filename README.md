@@ -51,4 +51,4 @@ The `serve.py` script can be run to start the http image processing server:
 
 Optionally `--images-local-dir <path>` and `--results-local-dir <path>` can be passed to read from and write to these paths instead of S3 for local testing.
 
-Example: `python3 serve.py ./tensorflow_models/ ./sklearn_models/fov_classifier_lc128.joblib cb-user-image-uploads cb-imageprocessingservice-results --images-local-dir ./images/ --results-local-dir ./results/`
+Example: `python3 serve.py ./tensorflow_models/ ./sklearn_models/fov_classifier_lc128.joblib cb-user-image-uploads cb-imageprocessingservice-results --image-local-dir ./images/ --results-local-dir ./results/`
