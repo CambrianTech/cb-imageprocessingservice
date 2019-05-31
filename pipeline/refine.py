@@ -166,7 +166,6 @@ class PipelineRefineResults(PipelineStep):
 
         mask = cv2.GaussianBlur(mask,(5,5),0)
 
-        cv2.imwrite('final_mask.png', mask)
         data["mask"] = mask
 
 
