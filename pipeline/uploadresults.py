@@ -1,4 +1,8 @@
 from io import BytesIO
+try:
+    from imageio import imsave
+except: 
+    from scipy.misc import imsave
 import boto3
 import cv2
 import numpy as np
@@ -57,8 +61,10 @@ class PipelineUploadResults(PipelineStep):
             os.makedirs(os.path.dirname(mask_path), exist_ok=True)
             os.makedirs(os.path.dirname(lighting_path), exist_ok=True)
 
-            cv2.imwrite(mask_path, mask_image)
-            cv2.imwrite(lighting_path, lighting_image)
+            print("Mask:", np.min(mask_image), np.max(mask_image), mask_image.dtype)
+
+            imsave(mask_path, mask_image)
+            imsave(lighting_path, lighting_image)
 
             data["semantic_url"] = os.path.abspath(mask_path)
             data["lighting_url"] = os.path.abspath(lighting_path)

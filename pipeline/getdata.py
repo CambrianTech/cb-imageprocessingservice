@@ -4,6 +4,10 @@ import numpy as np
 from pipeline.core import PipelineStep
 import os
 import cv2
+try:
+    from imageio import imread
+except:
+    from scipy.misc import imread
 
 def _get_image_from_s3(s3_client, bucket: str, key: str) -> np.ndarray:
     data = BytesIO()
@@ -31,4 +35,4 @@ class PipelineGetData(PipelineStep):
         if "image_local_dir" not in data:
             data["image"] = _get_image_from_s3(self.s3_client, self.bucket_name, data["image_s3_key"])
         else:
-            data["image"] = cv2.imread(os.path.join(data["image_local_dir"], self.bucket_name, data["image_s3_key"]))
+            data["image"] = imread(os.path.join(data["image_local_dir"], self.bucket_name, data["image_s3_key"]))
