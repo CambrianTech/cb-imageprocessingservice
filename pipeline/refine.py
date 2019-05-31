@@ -7,9 +7,6 @@ from scipy import ndimage, stats
 from skimage.morphology import reconstruction
 from cambrian import image_processing as ip
 
-#, geometry as geo, transformations as T, diagnostics as d
-
-
 
 class PipelineRefineResults(PipelineStep):
     @property
@@ -21,85 +18,68 @@ class PipelineRefineResults(PipelineStep):
         return ["lighting", "semantic_probs", "mask"]
 
     def run(self, data):
-        shape = (1024,1024)
+        shape = (1024, 1024)
 
         img = data["image"]
 
-        prob_mask_full = np.uint8(255*data["semantic_probs"][:,:,0])
+        prob_mask_full = np.uint8(255*data["semantic_probs"][:, :, 0])
 
-#        cv2.imwrite('prob_mask.png',prob_mask_full)
         lighting_rgb = np.uint8(data["lighting"])
         lighting = lighting_rgb[:, :, 1]
-#        cv2.imwrite('lighting.png',data["lighting"])
 
         smooth_lighting = ip.remove_grooves(lighting, prob_mask_full)
-#        cv2.imwrite('smooth_lighting.png',smooth_lighting)
 
-        blurred_mask = cv2.GaussianBlur(prob_mask_full , (31,31), 15)
-        blurred_lighting = cv2.GaussianBlur(smooth_lighting, (21,21), 11)
+        blurred_mask = cv2.GaussianBlur(prob_mask_full, (31, 31), 15)
+        blurred_lighting = cv2.GaussianBlur(smooth_lighting, (21, 21), 11)
 
-        lighting = ip.alpha_blend(smooth_lighting, blurred_lighting, blurred_mask)
+        lighting = ip.alpha_blend(
+            smooth_lighting, blurred_lighting, blurred_mask)
 
         data["lighting"] = lighting
-    
-#        cv2.imwrite('lighting.png',data["lighting"])
 
-        prob_mask=cv2.resize(prob_mask_full, shape)
-        
-#        cv2.imwrite('prob_mask.png',prob_mask)
+        prob_mask = cv2.resize(prob_mask_full, shape)
 
-        thresh, mask=cv2.threshold(prob_mask,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        prob_mask=cv2.threshold(prob_mask,thresh,255,3)[1]
-        img  = cv2.resize(img, shape)
-        
-#        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        thresh, mask = cv2.threshold(
+            prob_mask, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        prob_mask = cv2.threshold(prob_mask, thresh, 255, 3)[1]
+        img = cv2.resize(img, shape)
 
-#        det = cv2.createLineSegmentDetector()
-#        (lines) = det.detect(img_gray)
-#        print(lines)
-#        img_gray = det.drawSegments(img_gray, lines[0])
-#        cv2.imwrite('imglines.png',img_gray)
-
-        thresh_s=threshold_sauvola(prob_mask, window_size=5, k=0.2)
+        thresh_s = threshold_sauvola(prob_mask, window_size=5, k=0.2)
         a = np.abs(thresh_s)
         a *= 1/np.amax(a)
         prob_mask = a
-#        cv2.imwrite('savuola.png', 255*prob_mask)
 
-#        normals = data["normals"]
-#        cv2.imwrite('normals.png', data["normals"]*255)
+        distance = ndimage.distance_transform_edt(
+            1.0-prob_mask/np.max(prob_mask))
 
-        distance = ndimage.distance_transform_edt(1.0-prob_mask/np.max(prob_mask))
-        #d.save_diagnostics_image(args,distance, image_name, "distances", verbose=True)
         seed = np.copy(distance)/np.amax(distance)*prob_mask
-        seed[1:-1, 1:-1] = (np.copy(distance)/np.amax(distance)*prob_mask).min()
+        seed[1:-1, 1:-1] = (np.copy(distance) /
+                            np.amax(distance)*prob_mask).min()
         mask = prob_mask
-        
+
         dilated = reconstruction(seed, mask, method='dilation')
         mask = prob_mask-dilated
-#        cv2.imwrite('reconstruction.png', 255*mask)
 
-        #watershed some
-        mask[mask > 0] = 1;
-        mask = ip.refine_mask_watershed(None, cv2.bilateralFilter(img, 21,75,75), mask, None, distance=0.02, max_value=1)
+        # watershed some
+        mask[mask > 0] = 1
+        mask = ip.refine_mask_watershed(None, cv2.bilateralFilter(
+            img, 21, 75, 75), mask, None, distance=0.02, max_value=1)
 
-        mask=(255.*mask).astype('uint8')
-        mask=cv2.GaussianBlur(mask,(15,15), 0)
-        t, mask=cv2.threshold(mask,0,255,cv2.THRESH_TOZERO+cv2.THRESH_OTSU)
-        mask=cv2.threshold(mask,t,255,cv2.THRESH_BINARY)[1]
-
-#        cv2.imwrite('watershed.png', mask)
-#
-#        kmeans, labels, centers = ip.kmeans_image(255*normals, 5)
+        mask = (255.*mask).astype('uint8')
+        mask = cv2.GaussianBlur(mask, (15, 15), 0)
+        t, mask = cv2.threshold(
+            mask, 0, 255, cv2.THRESH_TOZERO+cv2.THRESH_OTSU)
+        mask = cv2.threshold(mask, t, 255, cv2.THRESH_BINARY)[1]
 
         kmeans = data["kmeans_normals"]
-#        cv2.imwrite('kmeans.png', kmeans)
 
         kmeans_gray = cv2.cvtColor(kmeans, cv2.COLOR_BGR2GRAY)
         _, thresh = cv2.threshold(kmeans_gray, 127, 255, 0)
         nmask = np.zeros(mask.shape, np.uint8)
+
         # Get biggest normals contour
-        contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(
+            thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         if len(contours) > 0:
             areas = [cv2.contourArea(c) for c in contours]
             max_index = np.argmax(areas)
@@ -111,23 +91,24 @@ class PipelineRefineResults(PipelineStep):
                 if kmeans[c_y, c_x][2] > 127:
                     nmask = ip.isolate_color(kmeans, kmeans[c_y, c_x])
 
-        nmask  = cv2.resize(nmask, shape)
-#        img[mask>0] = (255,255,0)
-#        cv2.imwrite('border_mask.png', img)
+        nmask = cv2.resize(nmask, shape)
 
         border = 50
-        border_mask=cv2.copyMakeBorder(nmask, border, border,
-                                   border, border, cv2.BORDER_REPLICATE)
-        cv2.rectangle(border_mask, (51, 51), (border_mask.shape[1] - border - 1, border_mask.shape[0] - border - 1), 0, cv2.FILLED)
+        border_mask = cv2.copyMakeBorder(nmask, border, border,
+                                         border, border, cv2.BORDER_REPLICATE)
+        cv2.rectangle(border_mask, (51, 51), (
+            border_mask.shape[1] - border - 1, border_mask.shape[0] - border - 1), 0, cv2.FILLED)
 
-        
-        mask = cv2.copyMakeBorder(mask, border, border, border, border, cv2.BORDER_CONSTANT, value=0)
+        mask = cv2.copyMakeBorder(
+            mask, border, border, border, border, cv2.BORDER_CONSTANT, value=0)
         mask = mask + border_mask
 
-        img=cv2.copyMakeBorder(img, border, border, border, border, cv2.BORDER_CONSTANT, value=0)
+        img = cv2.copyMakeBorder(
+            img, border, border, border, border, cv2.BORDER_CONSTANT, value=0)
 
-    # Fill border holes
-        contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        # Fill border holes
+        contours, hierarchy = cv2.findContours(
+            mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         if len(contours) > 0:
             areas = [cv2.contourArea(c) for c in contours]
             max_index = np.argmax(areas)
@@ -143,14 +124,15 @@ class PipelineRefineResults(PipelineStep):
                     if M["m00"] != 0:
                         cX = int(M["m10"] / M["m00"])
                         cY = int(M["m01"] / M["m00"])
-                        color = 0 if mask[cY,cX] > 0 else 255
+                        color = 0 if mask[cY, cX] > 0 else 255
                         mask = cv2.fillPoly(mask, pts=[contour], color=color)
 
         mask = ip.crop_image(mask, border)
         img = ip.crop_image(img, border)
 
         # Fill small holes
-        contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(
+            mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         if len(contours) > 0:
             for contour in contours:
@@ -161,11 +143,9 @@ class PipelineRefineResults(PipelineStep):
                     if M["m00"] != 0:
                         cX = int(M["m10"] / M["m00"])
                         cY = int(M["m01"] / M["m00"])
-                        color = 0 if mask[cY,cX] > 0 else 255
+                        color = 0 if mask[cY, cX] > 0 else 255
                         mask = cv2.fillPoly(mask, pts=[contour], color=color)
 
-        mask = cv2.GaussianBlur(mask,(5,5),0)
+        mask = cv2.GaussianBlur(mask, (5, 5), 0)
 
         data["mask"] = mask
-
-
