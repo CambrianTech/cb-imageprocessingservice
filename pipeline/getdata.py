@@ -9,13 +9,13 @@ try:
 except:
     from scipy.misc import imread
 
+
 def _get_image_from_s3(s3_client, bucket: str, key: str) -> np.ndarray:
     data = BytesIO()
     s3_client.download_fileobj(bucket, key, data)
     data.seek(0)
-    
-    image_arr = np.fromstring(data.read(), np.uint8)
-    return cv2.imdecode(image_arr, cv2.IMREAD_COLOR)
+    return imread(data)  # uint8 [0, 255]
+
 
 class PipelineGetData(PipelineStep):
     def __init__(self, bucket_name):
@@ -33,6 +33,8 @@ class PipelineGetData(PipelineStep):
     def run(self, data):
         # Get image from S3 or local folder if local dir is set.
         if "image_local_dir" not in data:
-            data["image"] = _get_image_from_s3(self.s3_client, self.bucket_name, data["image_s3_key"])
+            data["image"] = _get_image_from_s3(
+                self.s3_client, self.bucket_name, data["image_s3_key"])
         else:
-            data["image"] = imread(os.path.join(data["image_local_dir"], self.bucket_name, data["image_s3_key"]))
+            data["image"] = imread(os.path.join(
+                data["image_local_dir"], self.bucket_name, data["image_s3_key"]))

@@ -1,22 +1,21 @@
 from io import BytesIO
 try:
     from imageio import imsave
-except: 
+except:
     from scipy.misc import imsave
-import boto3
-import cv2
+import boto3.docs.method
 import numpy as np
 import os.path
 from pipeline.core import PipelineStep
 
 
 def _upload_image_to_s3(s3_client, image: np.ndarray, bucket: str, key: str):
-    success, buffer = cv2.imencode(".png", image)
+    if image.dtype == np.float32:
+        image = (255 * image).astype(np.uint8)
 
-    if not success:
-        raise ValueError("cv2.imencode not successful, invalid image?")
-
-    image_data = BytesIO(buffer)
+    image_data = BytesIO()
+    imsave(image_data, image, format=".png")
+    image_data.seek(0)
     s3_client.upload_fileobj(image_data, bucket, key)
 
 
@@ -60,6 +59,12 @@ class PipelineUploadResults(PipelineStep):
 
             os.makedirs(os.path.dirname(mask_path), exist_ok=True)
             os.makedirs(os.path.dirname(lighting_path), exist_ok=True)
+
+            # Convert dtypes if necessary
+            if mask_image.dtype == np.float32:
+                mask_image = (255 * mask_image).astype(np.uint8)
+            if lighting_image.dtype == np.float32:
+                lighting_image = (255 * lighting_image).astype(np.uint8)
 
             imsave(mask_path, mask_image)
             imsave(lighting_path, lighting_image)
