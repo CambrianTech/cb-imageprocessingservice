@@ -61,8 +61,6 @@ class PipelineUploadResults(PipelineStep):
             os.makedirs(os.path.dirname(mask_path), exist_ok=True)
             os.makedirs(os.path.dirname(lighting_path), exist_ok=True)
 
-            print("Mask:", np.min(mask_image), np.max(mask_image), mask_image.dtype)
-
             imsave(mask_path, mask_image)
             imsave(lighting_path, lighting_image)
 
