@@ -1,8 +1,9 @@
 from io import BytesIO
 import boto3
 import numpy as np
-import cv2
 from pipeline.core import PipelineStep
+import os
+import cv2
 
 def _get_image_from_s3(s3_client, bucket: str, key: str) -> np.ndarray:
     data = BytesIO()
@@ -12,14 +13,10 @@ def _get_image_from_s3(s3_client, bucket: str, key: str) -> np.ndarray:
     image_arr = np.fromstring(data.read(), np.uint8)
     return cv2.imdecode(image_arr, cv2.IMREAD_COLOR)
 
-def _get_proxy_image(s3_client, bucket: str, key: str) -> np.ndarray:
-    return cv2.imread("dummy-image.jpg")
-
 class PipelineGetData(PipelineStep):
-    def __init__(self, bucket_name, proxy_path=None):
+    def __init__(self, bucket_name):
         self.bucket_name = bucket_name
         self.s3_client = boto3.client("s3")
-        self.proxy_path = proxy_path
 
     @property
     def required_keys(self) -> list:
@@ -30,5 +27,8 @@ class PipelineGetData(PipelineStep):
         return ["image"]
 
     def run(self, data):
-
-        data["image"] = _get_image_from_s3(self.s3_client, self.bucket_name, data["image_s3_key"]) if self.proxy_path is None else _get_proxy_image(self.proxy_path, self.bucket_name, data["image_s3_key"])
+        # Get image from S3 or local folder if local dir is set.
+        if "image_local_dir" not in data:
+            data["image"] = _get_image_from_s3(self.s3_client, self.bucket_name, data["image_s3_key"])
+        else:
+            data["image"] = cv2.imread(os.path.join(data["image_local_dir"], self.bucket_name, data["image_s3_key"]))

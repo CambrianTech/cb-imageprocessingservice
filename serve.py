@@ -51,9 +51,9 @@ def _get_instance_metadata():
 @click.argument("fov_model_path", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("user_uploads_bucket", type=click.STRING)
 @click.argument("results_bucket", type=click.STRING)
-@click.argument("proxy_url", type=click.STRING, default=None, required=False)
-@click.argument("proxy_path", type=click.STRING, default=None, required=False)
-def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, proxy_url=None, proxy_path=None):
+@click.option("--image-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.option("--results-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_local_dir, results_local_dir):
     print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
@@ -61,7 +61,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, proxy_
 
     # Setup pipeline to run on requests
     pipeline = (Pipeline()
-                .add(PipelineGetData(user_uploads_bucket, proxy_path))
+                .add(PipelineGetData(user_uploads_bucket))
                 .add(PipelineRunModels(
                     semantic_path=join(model_path, "semantic"),
                     normals_path=join(model_path, "normals"),
@@ -72,14 +72,15 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, proxy_
                 .add(PipelineDeterminePrimaryAngles())
                 .add(PipelineRefineResults())
                 .add(PipelineCalculateFov(fov_model_path))
-                .add(PipelineUploadResults(results_bucket, proxy_url, proxy_path)))
+                .add(PipelineUploadResults(results_bucket)))
 
     print("Validating pipeline")
     pipeline.validate(["image_s3_key"])
 
     # Setup http server
     async def handle_segment(request):
-        print("Handle segment:", request, "(items waiting in pipeline: %d)" % pipeline.num_waiting_items)
+        print("Handle segment:", request, "(items waiting in pipeline: %d)" %
+              pipeline.num_waiting_items)
 
         # Get image S3 key from GET request
         image_s3_key = request.match_info.get("id", None)
@@ -87,6 +88,14 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, proxy_
             raise web.HTTPBadRequest()
 
         data = {"image_s3_key": image_s3_key}
+
+        # Add local directories to initial data if specified
+        if image_local_dir is not None:
+            print("WARNING: Do not use in production: image local dir set to", image_local_dir)
+            data["image_local_dir"] = image_local_dir
+        if results_local_dir is not None:
+            print("WARNING: Do not use in production: results local dir set to", results_local_dir)
+            data["results_local_dir"] = results_local_dir
 
         data = await pipeline.run(data)
 
@@ -112,16 +121,16 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, proxy_
 
         def push_metrics(avg_waiting_items):
             cw.put_metric_data(Namespace="ImageProcessingService",
-                                MetricData=[{
-                                    "MetricName": "PipelineWaitingItems",
-                                    "Dimensions": [{
-                                        "Name": "ClusterName",
-                                        "Value": metadata["cluster"]
-                                    }],
-                                    "Timestamp": datetime.datetime.now(
-                                        dateutil.tz.tzlocal()),
-                                    "Value": avg_waiting_items
-                                }])
+                               MetricData=[{
+                                   "MetricName": "PipelineWaitingItems",
+                                   "Dimensions": [{
+                                       "Name": "ClusterName",
+                                       "Value": metadata["cluster"]
+                                   }],
+                                   "Timestamp": datetime.datetime.now(
+                                       dateutil.tz.tzlocal()),
+                                   "Value": avg_waiting_items
+                               }])
 
         avg_waiting_items = 0
 
@@ -131,7 +140,8 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, proxy_
                 await asyncio.sleep(1)
                 avg_waiting_items = 0.9 * avg_waiting_items + 0.1 * pipeline.num_waiting_items
 
-            print("Waiting items: %.2f (avg: %.2f)" % (pipeline.num_waiting_items, avg_waiting_items))
+            print("Waiting items: %.2f (avg: %.2f)" %
+                  (pipeline.num_waiting_items, avg_waiting_items))
 
             if metadata is not None:
                 await loop.run_in_executor(None, push_metrics, avg_waiting_items)
@@ -141,7 +151,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, proxy_
 
     print("Creating web app")
     app = web.Application()
-    
+
     cors = aiohttp_cors.setup(app, defaults={
         "*": aiohttp_cors.ResourceOptions(
             allow_credentials=True,
