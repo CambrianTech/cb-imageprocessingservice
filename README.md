@@ -5,7 +5,7 @@ This service performs image processing operations such as semantic segmentation 
 # REST API
 ## `GET` `/segment/{S3 Key}/`
 - `{S3 Key}` is the key for the source image
-- Returns `{ "lighting_url": "https://url/to/lighting.png, "semantic_url": "https://url/to/semantic.png" }`
+- Returns `{ "lighting_url": "https://url/to/lighting.png, "semantic_url": "https://url/to/semantic.png", "fov": <fov in degrees> }`
 
 # Architecture
 The system is based on a pipeline where multiple pipeline steps are performed sequentially. The steps are passed a dictionary which they can read from and write to. Initially the only key is `image_s3_key`. In the end the `lighting_url` and `semantic_url` entries are used for uploading the images to S3.
@@ -13,7 +13,10 @@ The system is based on a pipeline where multiple pipeline steps are performed se
 # Installation
 
 ## Models and weights
-These are the same models and weights from the cb-deepweb repo. Move those in and maintain these names:
+The image processing server uses tensorflow models for CNNs as well as a scikit-learn model for estimating field of view. The models can be copied from `cb-deepweb`.
+The directory with the tensorflow models should contain the following subdirectories: `elevation`, `lighting`, `normals`, `semantic`, `unlit`.
+
+Example:
 ```
 cb-imageprocessingservice
   tensorflow_models
@@ -26,31 +29,26 @@ cb-imageprocessingservice
     fov_classifier_lc128.joblib 
 ```
 
-
 ## Prerequisites OSX
-pygobject3 
+pygobject3: `brew install pygobject3`
 
-```brew install pygobject3```
+Edit requirements.txt and change `tensorflow-gpu==1.13.1` to `tensorflow==1.13.1`, `cryptography==2.1.4` to `cryptography>=2.1.4`
 
-Edit requirements.txt and change tensorflow-gpu==1.13.1 to tensorflow==1.13.1
+## Installing prerequisites into a Virtualenv
+Virtualenv: `pip3 install virtualenv`
 
-## Installing under Virtualenv
-Virtualenv 
-```pip3 install virtualenv```
-
-Use a virtual environment and utilize the requirements.txt in this package
-
-```virtualenv ~/venv/shaw
+Use a virtual environment and utilize the requirements.txt in this package as well as the cb-core repository:
+```
+virtualenv ~/venv/shaw
 source ~/venv/shaw/bin/activate
 pip3 install -r requirements.txt
-```
-## CB-Core
-```
 pip3 install -e PATH_TO_CB_CORE_REPO
 ```
 
-## Running locally
+## Running the server
+The `serve.py` script can be run to start the http image processing server:
+`python3 serve.py <tf_models_path> <fov_model_path> <s3_images_bucket> <s3_results_bucket>`
 
-```
-python3 serve.py ./tensorflow_models/ ./sklearn_models/fov_classifier_lc128.joblib cb-user-image-uploads cb-imageprocessingservice-results
-```
+Optionally `--images-local-dir <path>` and `--results-local-dir <path>` can be passed to read from and write to these paths instead of S3 for local testing.
+
+Example: `python3 serve.py ./tensorflow_models/ ./sklearn_models/fov_classifier_lc128.joblib cb-user-image-uploads cb-imageprocessingservice-results --images-local-dir ./images/ --results-local-dir ./results/`
