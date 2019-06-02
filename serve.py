@@ -8,6 +8,7 @@ import dateutil
 
 import click
 from aiohttp import web
+import aiohttp
 import aiohttp_cors
 import boto3
 import requests
@@ -76,6 +77,21 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
 
     print("Validating pipeline")
     pipeline.validate(["image_s3_key"])
+
+    async def handle_local_upload(request):
+
+        image_s3_key = os.path.basename(str(request.rel_url))
+
+        print("Handle local file upload:", image_s3_key)
+        data = await request.read();
+
+        print("Got %d bytes" % len(data))
+
+        f = open(join(image_local_dir, image_s3_key), 'wb')
+        f.write(data)
+        f.close()
+
+        return web.json_response({})
 
     # Setup http server
     async def handle_segment(request):
@@ -163,6 +179,10 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
     # Add public (CORS) routes
     segment_resource = app.router.add_resource("/segment/{id}")
     cors.add(segment_resource.add_route("GET", handle_segment))
+
+    if image_local_dir is not None:
+        upload_resource = app.router.add_resource("/upload/{id}")
+        cors.add(upload_resource.add_route("PUT", handle_local_upload))
 
     # Add private (non-CORS) routes
     app.add_routes([

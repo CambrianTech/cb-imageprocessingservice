@@ -117,3 +117,5 @@ logging*
 
 sklearn_models/
 tensorflow_models/
+/results
+/images

@@ -36,5 +36,8 @@ class PipelineGetData(PipelineStep):
             data["image"] = _get_image_from_s3(
                 self.s3_client, self.bucket_name, data["image_s3_key"])
         else:
-            data["image"] = imread(os.path.join(
-                data["image_local_dir"], self.bucket_name, data["image_s3_key"]))
+            local_path = os.path.join(data["image_local_dir"], data["image_s3_key"])
+            print("Opening image from %s" % local_path)
+            data["image"] = imread(local_path)
+
+        data["image"] = data["image"][:,:,:3]
