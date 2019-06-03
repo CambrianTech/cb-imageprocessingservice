@@ -69,5 +69,7 @@ class PipelineUploadResults(PipelineStep):
             imsave(mask_path, mask_image)
             imsave(lighting_path, lighting_image)
 
-            data["semantic_url"] = os.path.abspath(mask_path)
-            data["lighting_url"] = os.path.abspath(lighting_path)
+            data["semantic_url"] = "http://127.0.0.1:8080/getimage/%s/%s" % (
+                self.bucket_name, key_semantic)
+            data["lighting_url"] = "http://127.0.0.1:8080/getimage/%s/%s" % (
+                self.bucket_name, key_lighting)

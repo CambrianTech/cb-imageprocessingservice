@@ -101,6 +101,8 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
 
         data = await pipeline.run(data)
 
+        print(data["lighting_url"], data["semantic_url"])
+
         return web.json_response({
             "lighting_url": data["lighting_url"],
             "semantic_url": data["semantic_url"],
@@ -126,6 +128,16 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
             image_file.write(data)
 
         return web.json_response({})
+
+    async def handle_get_image(request):
+        print("Handle get image:", request)
+
+        image_s3_key = request.match_info.get("id", None)
+        bucket = request.match_info.get("bucket", None)
+        if image_s3_key is None or bucket is None:
+            raise web.HTTPBadRequest()
+
+        return web.FileResponse(os.path.join(results_local_dir, bucket, image_s3_key))
 
     print("Trying to get instance metadata")
     metadata = _get_instance_metadata()
@@ -183,11 +195,14 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
     segment_resource = app.router.add_resource("/segment/{id}")
     cors.add(segment_resource.add_route("GET", handle_segment))
 
-    # Add endpoint to directly upload images if local
+    # Add endpoint for directly getting and uploading images if local
     # image input dir was defined
     if image_local_dir is not None:
         upload_resource = app.router.add_resource("/upload/{id}")
         cors.add(upload_resource.add_route("PUT", handle_local_upload))
+
+        get_image_resource = app.router.add_resource("/getimage/{bucket}/{id}")
+        cors.add(get_image_resource.add_route("GET", handle_get_image))
 
     # Add private (non-CORS) routes
     app.add_routes([
