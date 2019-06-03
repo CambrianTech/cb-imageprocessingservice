@@ -131,7 +131,7 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         normals = data["normals"]
         elevation = data["elevation"]
 
-        kmeans, labels, centers = ip.kmeans_image(normals, 5)
+        kmeans, labels, centers = ip.kmeans_image(255*normals, 5)
 
         data["kmeans_normals"] = kmeans
 
