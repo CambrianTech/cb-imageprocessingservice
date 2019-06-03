@@ -36,7 +36,7 @@ class PipelineUploadResults(PipelineStep):
         key_semantic = "%s_semantic.png" % data["image_s3_key"]
         key_lighting = "%s_lighting.png" % data["image_s3_key"]
 
-        mask_image = data["semantic_probs"][:, :, 0]
+        mask_image = data["mask"]
         lighting_image = data["lighting"]
 
         # Upload to S3 or write to local folder if local dir is set.

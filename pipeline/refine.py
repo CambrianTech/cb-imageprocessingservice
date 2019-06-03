@@ -15,7 +15,7 @@ class PipelineRefineResults(PipelineStep):
 
     @property
     def output_keys(self) -> list:
-        return ["lighting", "semantic_probs", "mask"]
+        return ["lighting", "mask"]
 
     def run(self, data):
         shape = (1024, 1024)
