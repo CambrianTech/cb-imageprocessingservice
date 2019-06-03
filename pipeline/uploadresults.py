@@ -53,9 +53,9 @@ class PipelineUploadResults(PipelineStep):
                 self.bucket_name, key_lighting)
         else:
             mask_path = os.path.join(
-                data["results_local_dir"], key_semantic)
+                data["results_local_dir"], self.bucket_name, key_semantic)
             lighting_path = os.path.join(
-                data["results_local_dir"], key_lighting)
+                data["results_local_dir"], self.bucket_name, key_lighting)
 
             os.makedirs(os.path.dirname(mask_path), exist_ok=True)
             os.makedirs(os.path.dirname(lighting_path), exist_ok=True)

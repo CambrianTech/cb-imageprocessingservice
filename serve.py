@@ -8,7 +8,6 @@ import dateutil
 
 import click
 from aiohttp import web
-import aiohttp
 import aiohttp_cors
 import boto3
 import requests
@@ -78,21 +77,6 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
     print("Validating pipeline")
     pipeline.validate(["image_s3_key"])
 
-    async def handle_local_upload(request):
-
-        image_s3_key = os.path.basename(str(request.rel_url))
-
-        print("Handle local file upload:", image_s3_key)
-        data = await request.read();
-
-        print("Got %d bytes" % len(data))
-
-        f = open(join(image_local_dir, image_s3_key), 'wb')
-        f.write(data)
-        f.close()
-
-        return web.json_response({})
-
     # Setup http server
     async def handle_segment(request):
         print("Handle segment:", request, "(items waiting in pipeline: %d)" %
@@ -107,10 +91,12 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
 
         # Add local directories to initial data if specified
         if image_local_dir is not None:
-            print("WARNING: Do not use in production: image local dir set to", image_local_dir)
+            print(
+                "WARNING: Do not use in production: image local dir set to", image_local_dir)
             data["image_local_dir"] = image_local_dir
         if results_local_dir is not None:
-            print("WARNING: Do not use in production: results local dir set to", results_local_dir)
+            print(
+                "WARNING: Do not use in production: results local dir set to", results_local_dir)
             data["results_local_dir"] = results_local_dir
 
         data = await pipeline.run(data)
@@ -123,6 +109,23 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
 
     async def handle_healthcheck(request):
         return web.Response(text="Healthy")
+
+    async def handle_local_upload(request):
+        print("Handle local file upload", request)
+
+        image_s3_key = request.match_info.get("id", None)
+        if image_s3_key is None:
+            raise web.HTTPBadRequest()
+
+        data = await request.read()
+
+        output_dir = join(image_local_dir, user_uploads_bucket)
+        os.makedirs(output_dir, exist_ok=True)
+
+        with open(join(output_dir, image_s3_key), "wb") as image_file:
+            image_file.write(data)
+
+        return web.json_response({})
 
     print("Trying to get instance metadata")
     metadata = _get_instance_metadata()
@@ -180,6 +183,8 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
     segment_resource = app.router.add_resource("/segment/{id}")
     cors.add(segment_resource.add_route("GET", handle_segment))
 
+    # Add endpoint to directly upload images if local
+    # image input dir was defined
     if image_local_dir is not None:
         upload_resource = app.router.add_resource("/upload/{id}")
         cors.add(upload_resource.add_route("PUT", handle_local_upload))
