@@ -120,13 +120,16 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
         if image_s3_key is None:
             raise web.HTTPBadRequest()
 
-        data = await request.read()
-
         output_dir = join(image_local_dir, user_uploads_bucket)
         os.makedirs(output_dir, exist_ok=True)
 
+        # Read 1MB chunks into the file
         with open(join(output_dir, image_s3_key), "wb") as image_file:
-            image_file.write(data)
+            while True:
+                chunk = await request.content.read(1024*1024)
+                if not chunk:
+                    break
+                image_file.write(chunk)
 
         return web.json_response({})
 
