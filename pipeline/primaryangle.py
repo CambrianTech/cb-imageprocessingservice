@@ -159,8 +159,6 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
 
         floor_surface = isolated_surfaces[floor_index]
 
-        data = {}
-
         # Calculate the camera pitch and roll from the floor normal.
         # Get the floor normal by taking the normals at the 100 pixels
         # most likely to be floor and average them.

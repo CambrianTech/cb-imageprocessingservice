@@ -101,12 +101,13 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
 
         data = await pipeline.run(data)
 
-        print(data["lighting_url"], data["semantic_url"])
-
         return web.json_response({
             "lighting_url": data["lighting_url"],
             "semantic_url": data["semantic_url"],
             "fov": data["fov"],
+            "floor_rotation": data["floor_rotation"],
+            "camera_rotation": data["camera_rotation"],
+            "camera_elevation": data["camera_elevation"],
         })
 
     async def handle_healthcheck(request):
