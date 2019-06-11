@@ -32,16 +32,14 @@ cb-imageprocessingservice
 ## Prerequisites OSX
 pygobject3: `brew install pygobject3`
 
-Edit requirements.txt and change `tensorflow-gpu==1.13.1` to `tensorflow==1.13.1`, `cryptography==2.1.4` to `cryptography>=2.1.4`
-
 ## Installing prerequisites into a Virtualenv
 Virtualenv: `pip3 install virtualenv`
 
-Use a virtual environment and utilize the requirements.txt in this package as well as the cb-core repository:
+Use a virtual environment and utilize the requirements.txt or if OSX darwin-requirements.txt in this package as well as the cb-core repository:
 ```
 virtualenv ~/venv/shaw
 source ~/venv/shaw/bin/activate
-pip3 install -r requirements.txt
+pip3 install -r REQ-TXT-FILE
 pip3 install -e PATH_TO_CB_CORE_REPO
 ```
 
