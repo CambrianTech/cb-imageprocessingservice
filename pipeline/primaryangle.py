@@ -171,13 +171,15 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
 
         strongest_floor = normals[floor_indices[:, 0], floor_indices[:, 1]]
 
-        floor_normal = (np.mean(strongest_floor, axis=0) - 127.5) / 127.5
+        floor_normal = np.mean(strongest_floor, axis=0) - 0.5
         floor_normal_len = max(0.00001, np.linalg.norm(floor_normal))
         floor_normal /= floor_normal_len
         cam_pitch = math.asin(floor_normal[1])
         cam_roll = math.asin(floor_normal[0])
         data["camera_rotation"] = [cam_pitch, 0.0, cam_roll]
-
+        
+        print("camera rotation: " + str(data["camera_rotation"]))
+        
         floor_distances = elevation[floor_indices[:,
                                                   0], floor_indices[:, 1]].flatten()
         floor_distances.sort()
@@ -190,6 +192,8 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         floor_elevation = np.clip(floor_elevation, 80.0, 170.0)  # valid range
 
         data["camera_elevation"] = floor_elevation / 100.0
+        
+        print("floor elevation: " + str(data["camera_elevation"]))
 
         # find candidate wall surfaces
         candidate_walls, primary_wall_index = get_candidate_walls(
