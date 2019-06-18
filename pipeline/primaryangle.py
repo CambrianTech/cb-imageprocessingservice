@@ -154,7 +154,7 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         floor_index, _, floor_intersection = get_matching_surface(
             reduced_mask, isolated_surfaces, floor_materials)
         
-#        print("floor index: "+str(floor_index))
+        print("floor index: "+str(floor_index))
 
         if floor_index < 0:
             print("Invalid surfaces")
@@ -165,15 +165,20 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         # Calculate the camera pitch and roll from the floor normal.
 
         result_prob = cv2.bitwise_and(mask, mask, mask=floor_intersection)
-        floor_color = floor_surface[0]
-        thresh = 5
 
-        normals_mask = cv2.inRange(normals, floor_color - thresh, floor_color + thresh)
+        floor_color = floor_surface[0]
+
+        low_thresh = np.clip(floor_color - 4.0, 0, 255)
+
+        high_thresh = np.clip(floor_color + 4.0, 0, 255)
+
+        normals_mask = cv2.inRange(normals, low_thresh, high_thresh)
+        
         floor_normal = np.mean(normals[result_prob > 127], axis=0)
 
         normals_mask[result_prob < 128] = 0
 
-        floor_normal = (floor_normal-127.5)/127.5
+        floor_normal = (floor_normal-127.5) / 127.5
 
         floor_normal_len = max(0.00001, np.linalg.norm(floor_normal))
         floor_normal /= floor_normal_len
@@ -182,13 +187,17 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         cam_roll = 0.0
         
         cam_pitch = -math.acos(floor_normal[2])
+        if np.isnan(cam_pitch):
+            cam_pitch = -0.2
+        
         cam_roll = -math.asin(floor_normal[0])
-
+        
+        if np.isnan(cam_roll):
+            cam_roll = 0.0
+        
         data["camera_rotation"] = [cam_pitch, 0.0, cam_roll]
 
         print("camera rotation: " + str(data["camera_rotation"]))
-        
-        floor_elevation = 1.3
         
         floor_elevation = np.mean(elevation[normals_mask > 0], axis=0)
 
@@ -198,9 +207,12 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         
         floor_elevation = floor_elevation_pixels / pixels_per_meter
 
-        floor_elevation = np.clip(floor_elevation, 80.0, 170.0)  # valid range
+        floor_elevation = np.clip(floor_elevation, 80.0, 170.0) / 100.0  # valid range
 
-        data["camera_elevation"] = floor_elevation / 100.0
+        if np.isnan(floor_elevation):
+            floor_elevation = 1.3
+        
+        data["camera_elevation"] = floor_elevation
 
         print("floor elevation: " + str(data["camera_elevation"]))
 
@@ -221,6 +233,9 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         if primary_wall_index >= 0:
             floor_rotation = geo.angle_between(candidate_walls[primary_wall_index][1], x_unit_normal)
 
+        if np.isnan(floor_rotation):
+            floor_rotation = 0.0
+        
         data["floor_rotation"] = floor_rotation
             
         print("floor rotation: " + str(data["floor_rotation"]))
