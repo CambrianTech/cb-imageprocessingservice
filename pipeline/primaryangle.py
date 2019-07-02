@@ -7,7 +7,7 @@ from cambrian import image_processing as ip, transformations as T, geometry as g
 # Z is UP
 rotX = T.rotation_matrix(0.00, [1, 0, 0])
 rotY = T.rotation_matrix(0.00, [0, 1, 0])
-rotZ = T.rotation_matrix(-0.06, [0, 0, 1])
+rotZ = T.rotation_matrix(0.00, [0, 0, 1])
 
 r_range = g_range = b_range = 255
 
@@ -106,7 +106,7 @@ def get_candidate_walls(floor_normal, isolated_surfaces, maxAngle=20):
             print("%d) candidate wall normal = %s, angle diff = %.2f, color = %s, score=%f"
                   % (wall_count, normal, angle_diff, surface[0], score))
 
-    wall_count = wall_count + 1
+            wall_count = wall_count + 1
 
     if len(candidate_walls) == 0:
         best_wall_index = 0
