@@ -144,7 +144,15 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
         return web.FileResponse(os.path.join(results_local_dir, bucket, image_s3_key))
 
     print("Trying to get instance metadata")
-    metadata = _get_instance_metadata()
+    
+    metadata = None
+    
+    if results_local_dir is None:
+        metadata = _get_instance_metadata()
+    else:
+        metadata = None
+        print("Working locally. Metadata set to None")
+
     if metadata is not None:
         print("Instance metadata:", metadata)
 
