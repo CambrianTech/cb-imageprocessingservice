@@ -190,7 +190,7 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         if np.isnan(cam_pitch):
             cam_pitch = -0.2
         
-        cam_roll = -math.asin(floor_normal[0])
+        cam_roll = math.asin(floor_normal[0])
         
         if np.isnan(cam_roll):
             cam_roll = 0.0
