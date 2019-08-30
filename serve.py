@@ -105,10 +105,6 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
             "lighting_url": data["lighting_url"],
             "semantic_url": data["semantic_url"],
             "data_url": data["data_url"],
-            "fov": data["fov"],
-            "floor_rotation": data["floor_rotation"],
-            "camera_rotation": data["camera_rotation"],
-            "camera_elevation": data["camera_elevation"],
         })
 
     async def handle_healthcheck(request):
