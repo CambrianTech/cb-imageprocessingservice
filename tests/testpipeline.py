@@ -138,7 +138,8 @@ class TestPipelineSuperpixels(unittest.TestCase):
     def test_standard(self):
         step = PipelineSuperpixels()
 
-        image = np.zeros((512, 512, 3))
+        image = np.concatenate([np.zeros((512, 256, 3), dtype=np.uint8),
+                                255 * np.ones((512, 256, 3), dtype=np.uint8)], axis=1)
 
         data = {"image": image}
 

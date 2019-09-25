@@ -14,6 +14,7 @@ class PipelineSuperpixels(PipelineStep):
         return ["superpixels"]
 
     def run(self, data):
-        image = data["image"].astype(np.float32)
-        superpixels = cv2.ximgproc.createSuperpixelSLIC(image).getLabels()
-        data["superpixels"] = superpixels
+        image = data["image"]
+        superpixels = cv2.ximgproc.createSuperpixelSLIC(image)
+        superpixels.iterate(10)
+        data["superpixels"] = superpixels.getLabels()
