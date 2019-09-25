@@ -21,7 +21,7 @@ class PipelineSuperpixels(PipelineStep):
         superpixels.enforceLabelConnectivity()
 
         superpixel_image = superpixels.getLabels()
-        
+
         # Convert 32 bit to 4x 8bit (https://stackoverflow.com/a/25298780)
         bytes_dtype = np.dtype(("i4", [("bytes", "u1", 4)]))
         superpixel_image = superpixel_image.view(dtype=bytes_dtype)["bytes"]
