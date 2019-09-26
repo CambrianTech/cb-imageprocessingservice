@@ -28,7 +28,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libzmq3-dev \
         pkg-config \
         software-properties-common \
-        unzip
+        unzip \
+        libsm6 \
+        libxext6 \
+        libxrender-dev
 
 RUN [ "${ARCH}" = ppc64le ] || (apt-get update && \
         apt-get install nvinfer-runtime-trt-repo-ubuntu1804-5.0.2-ga-cuda${CUDA} \
