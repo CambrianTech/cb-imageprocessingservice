@@ -14,7 +14,7 @@ class PipelineSuperpixels(PipelineStep):
         return ["superpixels"]
 
     def run(self, data):
-        image = data["image"]
+        image = cv2.resize(data["image"], (1024, 1024))
 
         superpixels = cv2.ximgproc.createSuperpixelLSC(image)
         superpixels.iterate()
