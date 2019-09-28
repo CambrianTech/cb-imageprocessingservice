@@ -107,6 +107,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
             "lighting_url": data["lighting_url"],
             "semantic_url": data["semantic_url"],
             "superpixels_url": data["superpixels_url"],
+            "superpixel_contours_url": data["superpixel_contours_url"],
             "fov": data["fov"],
             "floor_rotation": data["floor_rotation"],
             "camera_rotation": data["camera_rotation"],

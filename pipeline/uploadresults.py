@@ -6,6 +6,7 @@ except:
 import boto3.docs.method
 import numpy as np
 import os.path
+import zlib
 from pipeline.core import PipelineStep
 
 
@@ -19,6 +20,21 @@ def _upload_image_to_s3(s3_client, image: np.ndarray, bucket: str, key: str):
     s3_client.upload_fileobj(image_data, bucket, key)
 
 
+def _encode_superpixel_contours(superpixel_contours: dict) -> bytes:
+    s = ""
+    for label, contour in superpixel_contours.items():
+        s += "%s;%s\n" % (label, ",".join("%s %s" %
+                                          (p[0], p[1]) for p in contour))
+    return zlib.compress(s.encode("utf-8"), level=9)
+
+
+def _upload_superpixel_contours_to_s3(s3_client, superpixel_contours_data: bytes, bucket: str, key: str):
+    data = BytesIO()
+    data.write(superpixel_contours_data)
+    data.seek(0)
+    s3_client.upload_fileobj(data, bucket, key)
+
+
 class PipelineUploadResults(PipelineStep):
     def __init__(self, bucket_name):
         self.bucket_name = bucket_name
@@ -26,20 +42,24 @@ class PipelineUploadResults(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["semantic", "lighting", "superpixels"]
+        return ["semantic", "lighting", "superpixel_image", "superpixel_contours"]
 
     @property
     def output_keys(self) -> list:
-        return ["semantic_url", "lighting_url", "superpixels_url"]
+        return ["semantic_url", "lighting_url", "superpixels_url", "superpixel_contours_url"]
 
     def run(self, data):
         key_semantic = "%s_semantic.png" % data["image_s3_key"]
         key_lighting = "%s_lighting.png" % data["image_s3_key"]
-        key_superpixels = "%s_superpixels.png" % data["image_s3_key"]
+        key_superpixel_image = "%s_superpixels.png" % data["image_s3_key"]
+        key_superpixel_contours = "%s_superpixel_contours.txt.z" % data["image_s3_key"]
 
         mask_image = data["mask"]
         lighting_image = data["lighting"]
-        superpixels_image = data["superpixels"]
+        superpixel_image = data["superpixel_image"]
+        superpixel_contours = data["superpixel_contours"]
+        superpixel_contours_data = _encode_superpixel_contours(
+            superpixel_contours)
 
         # Upload to S3 or write to local folder if local dir is set.
         if "results_local_dir" not in data:
@@ -48,7 +68,9 @@ class PipelineUploadResults(PipelineStep):
             _upload_image_to_s3(
                 self.s3_client, lighting_image, self.bucket_name, key_lighting)
             _upload_image_to_s3(
-                self.s3_client, superpixels_image, self.bucket_name, key_superpixels)
+                self.s3_client, superpixel_image, self.bucket_name, key_superpixel_image)
+            _upload_superpixel_contours_to_s3(
+                self.s3_client, superpixel_contours_data, self.bucket_name, key_superpixel_contours)
 
             # TODO: Get URLs in a better way
             data["semantic_url"] = "https://s3.amazonaws.com/%s/%s" % (
@@ -56,18 +78,24 @@ class PipelineUploadResults(PipelineStep):
             data["lighting_url"] = "https://s3.amazonaws.com/%s/%s" % (
                 self.bucket_name, key_lighting)
             data["superpixels_url"] = "https://s3.amazonaws.com/%s/%s" % (
-                self.bucket_name, key_superpixels)
+                self.bucket_name, key_superpixel_image)
+            data["superpixel_contours_url"] = "https://s3.amazonaws.com/%s/%s" % (
+                self.bucket_name, key_superpixel_contours)
         else:
             mask_path = os.path.join(
                 data["results_local_dir"], self.bucket_name, key_semantic)
             lighting_path = os.path.join(
                 data["results_local_dir"], self.bucket_name, key_lighting)
             superpixels_path = os.path.join(
-                data["results_local_dir"], self.bucket_name, key_superpixels)
+                data["results_local_dir"], self.bucket_name, key_superpixel_image)
+            superpixel_contours_path = os.path.join(
+                data["results_local_dir"], self.bucket_name, key_superpixel_contours)
 
             os.makedirs(os.path.dirname(mask_path), exist_ok=True)
             os.makedirs(os.path.dirname(lighting_path), exist_ok=True)
-            os.makedirs(os.path.dirname(superpixels_path), exist_ok=True)
+            os.makedirs(os.path.dirname(superpixel_image), exist_ok=True)
+            os.makedirs(os.path.dirname(
+                superpixel_contours_path), exist_ok=True)
 
             # Convert dtypes if necessary
             if mask_image.dtype == np.float32:
@@ -77,11 +105,16 @@ class PipelineUploadResults(PipelineStep):
 
             imsave(mask_path, mask_image)
             imsave(lighting_path, lighting_image)
-            imsave(superpixels_path, superpixels_image)
+            imsave(superpixels_path, superpixel_image)
+
+            with open(superpixel_contours_path, "wb") as superpixel_contours_file:
+                superpixel_contours_file.write(superpixel_contours_data)
 
             data["semantic_url"] = "http://127.0.0.1:8080/getimage/%s/%s" % (
                 self.bucket_name, key_semantic)
             data["lighting_url"] = "http://127.0.0.1:8080/getimage/%s/%s" % (
                 self.bucket_name, key_lighting)
             data["superpixels_url"] = "http://127.0.0.1:8080/getimage/%s/%s" % (
-                self.bucket_name, key_superpixels)
+                self.bucket_name, key_superpixel_image)
+            data["superpixel_contours_url"] = "http://127.0.0.1:8080/getimage/%s/%s" % (
+                self.bucket_name, key_superpixel_contours)
