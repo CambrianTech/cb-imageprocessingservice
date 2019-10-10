@@ -181,7 +181,7 @@ class PipelineRefineResults(PipelineStep):
 
         edges = 255*np.uint8(edges>0)
         edges[edges_hed>0] = 255
-#        edges[edges_normals>0] = 255
+        edges[edges_normals>0] = 255
 
         cv2.imwrite('edges.png',255*np.uint8(edges>0))
 
@@ -193,7 +193,7 @@ class PipelineRefineResults(PipelineStep):
         # cv2.imwrite("big_mask.png", big_mask)
 
         isolated = np.uint8(prob_mask_full>thresholds[2])
-        #cv2.imwrite("isolated_pre.png", 255*isolated)
+        cv2.imwrite("isolated_pre.png", 255*isolated)
 
         isolated = 255*(ip.refine_mask_watershed(None, edges, isolated, None, distance=0.01, max_value=1))
 
@@ -211,7 +211,7 @@ class PipelineRefineResults(PipelineStep):
 
         markers = 255*np.uint8(edges == 0)
         isolated = cv2.erode(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (25,25)))
-        # cv2.imwrite("isolated_post.png", isolated)
+        cv2.imwrite("isolated_post.png", isolated)
         markers[isolated>0] = 255
         markers = cv2.erode(markers, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
 
@@ -236,7 +236,7 @@ class PipelineRefineResults(PipelineStep):
 
         watershed_mask = 255*np.uint8(watershed_mask > 127)
         watershed_mask[big_mask>0] = 0
-        #cv2.imwrite("watershed_minusbig.png", watershed_mask)
+        cv2.imwrite("watershed_minusbig.png", watershed_mask)
         nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(watershed_mask, connectivity=8)
         sizes = stats[:, -1]
         sizes[0] = 0
@@ -267,10 +267,9 @@ class PipelineRefineResults(PipelineStep):
                     # compute the center of the contour
 
                     cv2.drawContours(final_mask, [contour], 0, color, -1, cv2.LINE_AA)
-                    cv2.drawContours(final_mask, [contour], 0, color, 1, cv2.LINE_AA)
-
+        final_mask = cv2.GaussianBlur(final_mask, (3, 3), 0)
         final_mask = 255*(ip.refine_mask_watershed(None, img, final_mask, None, distance=0.02, max_value=1))
-#        final_mask = cv2.GaussianBlur(final_mask, (5, 5), 0)
+#
 
         data["mask"] = final_mask
 
