@@ -16,7 +16,7 @@ class PipelineSuperpixels(PipelineStep):
     def run(self, data):
         image = cv2.resize(data["image"], (1024, 1024))
 
-        superpixels = cv2.ximgproc.createSuperpixelLSC(image)
+        superpixels = cv2.ximgproc.createSuperpixelLSC(image, region_size=20)
         superpixels.iterate()
         superpixels.enforceLabelConnectivity()
 
