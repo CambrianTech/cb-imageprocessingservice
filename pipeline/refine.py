@@ -132,15 +132,15 @@ class PipelineRefineResults(PipelineStep):
 
         normals_up = kmeans[:,:,2]
         normals_up=cv2.threshold((normals_up).astype('uint8'),127,255,cv2.THRESH_TOZERO)[1]
-
 #        cv2.imwrite('normals_up.png',normals_up)
 
+        e1 = cv2.getTickCount()
         protoPath = os.path.sep.join(["hed_model", "deploy.prototxt"])
         modelPath = os.path.sep.join(["hed_model", "hed_pretrained_bsds.caffemodel"])
         net = cv2.dnn.readNetFromCaffe(protoPath, modelPath)
         cv2.dnn_registerLayer("Crop", CropLayer)
 
-        e1 = cv2.getTickCount()
+
         blob = cv2.dnn.blobFromImage(img, scalefactor=1.0, size=(1024,1024),
                                      mean=(104.00698793, 116.66876762, 122.67891434),
                                      swapRB=False, crop=True)
@@ -148,11 +148,12 @@ class PipelineRefineResults(PipelineStep):
         hed = net.forward()
         
         cv2.dnn_unregisterLayer("Crop")
-
+        hed_32 = np.int32(255 * hed[0, 0])
         hed = (255 * hed[0, 0]).astype("uint8")
+        
         e2 = cv2.getTickCount()
         t = (e2 - e1)/cv2.getTickFrequency()
-        print( t )
+        print("hed took " + str(t) + " seconds")
 
 #        cv2.imwrite("hed.png", hed)
 
@@ -164,10 +165,11 @@ class PipelineRefineResults(PipelineStep):
 
 #        cv2.imwrite('prob_mask_full.png',prob_mask_full)
 
-        edges = canny(img_bw, 3, 1, 25)
+#        edges = canny(img_bw, 3, 1, 25)
+        edges = cv2.Canny(img_bw,100,200)
         edges = cv2.dilate(255*np.uint8(edges>0), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
-#        cv2.imwrite('edges_o.png',255*np.uint8(edges>0))
-        edges_hed = canny(hed, 2, 1, 25)
+        cv2.imwrite('edges_o.png',255*np.uint8(edges>0))
+        edges_hed = cv2.Canny(hed,100,200)
         edges_hed[:, 1020:1024] = edges_hed[:, 1015:1019]
         edges_hed[1020:1024, :] = edges_hed[1015:1019, :]
         edges_hed = cv2.dilate(255*np.uint8(edges_hed>0), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
@@ -175,16 +177,15 @@ class PipelineRefineResults(PipelineStep):
         cv2.imwrite('edges_hed.png',edges_hed)
 
         normals_up = filters.rank.median(normals_up, disk(5))
-        edges_normals = canny(normals_up, 2, 1, 25)
+        edges_normals = cv2.Canny(normals_up,100,200)
         edges_normals = cv2.dilate(255*np.uint8(edges_normals>0), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
-#        cv2.imwrite('edges_normals.png',255*np.uint8(edges_normals>0))
+        cv2.imwrite('edges_normals.png',255*np.uint8(edges_normals>0))
 
         edges = 255*np.uint8(edges>0)
         edges[edges_hed>0] = 255
         edges[edges_normals>0] = 255
-
         cv2.imwrite('edges.png',255*np.uint8(edges>0))
-
+        
         thresholds = threshold_multiotsu(prob_mask_full, classes = 4)
         big_mask = 1-np.uint8(prob_mask_full>.01*255)
 #        cv2.imwrite("big_mask_pre.png", 255*big_mask)
@@ -209,34 +210,57 @@ class PipelineRefineResults(PipelineStep):
             if sizes[i] >= 64*64:
                   isolated[output == i] = 255
 
-        markers = 255*np.uint8(edges == 0)
-        isolated = cv2.erode(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (25,25)))
-        cv2.imwrite("isolated_post.png", isolated)
-        markers[isolated>0] = 255
-        markers = cv2.erode(markers, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
+        isolated_small = cv2.erode(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (75,75)))
+        isolated[edges>0] = 0
+        markers = isolated
+        markers[edges==0] = 255
+#        cv2.imwrite("isolated_post.png", isolated_small)
+#
+        markers = cv2.erode(markers, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+        markers[isolated_small>0] = 255
 
-
-        #cv2.imwrite('markers.png',markers)
+#        cv2.imwrite('markers.png',markers)
 
         #regions = np.digitize(hed, bins=thresholds)
         # cv2.imwrite('regions.png', 255*label2rgb(regions, image=img, kind='overlay'))
-
-        markers =ndimage.label(markers)[0]
-
-        cv2.imwrite('markers_l.png',255*np.uint8(markers))
-
-        labels = watershed(hed, markers)
         trim_mask = np.zeros(prob_mask_full.shape)
         trim_mask[prob_mask_full> np.mean(prob_mask_full)] = prob_mask_full[prob_mask_full>np.mean(prob_mask_full)]
         trim_mask[big_mask>0] = 0
-        cv2.imwrite('trim_mask.png', trim_mask)
-        watershed_mask = label2rgb(labels, image=trim_mask, kind='avg')
+        trim_mask = np.uint8(trim_mask)
+#        print(trim_mask)
+#        cv2.imwrite('trim_mask.png', trim_mask)
 
-        #cv2.imwrite('watershed.png', watershed_mask)
+        e1 = cv2.getTickCount()
+        markers = ndimage.label(markers)
+#        print(markers)
+        markers = markers[0]
+        ret = len(np.unique(markers))
+#        ret, markers = cv2.connectedComponents(markers)
+#        print(ret)
+#        markers = markers + 1
+#        cv2.imwrite('markers_l.png',255*np.uint8(markers))
+        hed_rgb = cv2.cvtColor(hed, cv2.COLOR_GRAY2RGB)
+
+#        labels = cv2.watershed(hed_rgb, markers)
+        labels = watershed(hed, markers)
+
+        watershed_mask = np.zeros(prob_mask_full.shape)
+
+        for i in range(0, ret-1):
+            a =  labels == i
+            m = np.mean(trim_mask[a])
+            watershed_mask[a] = m
+
+        e2 = cv2.getTickCount()
+        t = (e2 - e1)/cv2.getTickFrequency()
+        print("watershed took " + str(t) + " seconds")
+
+        cv2.imwrite('watershed.png', watershed_mask)
+
 
         watershed_mask = 255*np.uint8(watershed_mask > 127)
         watershed_mask[big_mask>0] = 0
-        cv2.imwrite("watershed_minusbig.png", watershed_mask)
+#       ftriz cv2.imwrite("watershed_minusbig.png", watershed_mask)
         nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(watershed_mask, connectivity=8)
         sizes = stats[:, -1]
         sizes[0] = 0
@@ -267,8 +291,13 @@ class PipelineRefineResults(PipelineStep):
                     # compute the center of the contour
 
                     cv2.drawContours(final_mask, [contour], 0, color, -1, cv2.LINE_AA)
-        final_mask = cv2.GaussianBlur(final_mask, (3, 3), 0)
+
+   
+#                                mask = cv2.threshold(mask, t, 255, cv2.THRESH_BINARY)[1]
+#        final_mask = cv2.GaussianBlur(final_mask, (3, 3), 0)
         final_mask = 255*(ip.refine_mask_watershed(None, img, final_mask, None, distance=0.02, max_value=1))
+        final_mask = cv2.GaussianBlur(final_mask, (15, 15), 0)
+        _, final_mask = cv2.threshold(final_mask, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 #
 
         data["mask"] = final_mask
