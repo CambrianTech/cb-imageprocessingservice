@@ -21,6 +21,12 @@ from skimage.future import graph
 
 from skimage.feature import peak_local_max
 
+IM_LOGGING_ENABLED = False
+
+def _log_image(name, image):
+    if IM_LOGGING_ENABLED:
+        cv2.imwrite(name, image)
+
 def _weight_mean_color(graph, src, dst, n):
     """Callback to handle merging nodes by recomputing mean color.
         
@@ -168,23 +174,23 @@ class PipelineRefineResults(PipelineStep):
 #        edges = canny(img_bw, 3, 1, 25)
         edges = cv2.Canny(img_bw,100,200)
         edges = cv2.dilate(255*np.uint8(edges>0), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
-        cv2.imwrite('edges_o.png',255*np.uint8(edges>0))
+        _log_image('edges_o.png',255*np.uint8(edges>0))
         edges_hed = cv2.Canny(hed,100,200)
         edges_hed[:, 1020:1024] = edges_hed[:, 1015:1019]
         edges_hed[1020:1024, :] = edges_hed[1015:1019, :]
         edges_hed = cv2.dilate(255*np.uint8(edges_hed>0), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
 
-        cv2.imwrite('edges_hed.png',edges_hed)
+        _log_image('edges_hed.png',edges_hed)
 
         normals_up = filters.rank.median(normals_up, disk(5))
         edges_normals = cv2.Canny(normals_up,100,200)
         edges_normals = cv2.dilate(255*np.uint8(edges_normals>0), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
-        cv2.imwrite('edges_normals.png',255*np.uint8(edges_normals>0))
+        _log_image('edges_normals.png',255*np.uint8(edges_normals>0))
 
         edges = 255*np.uint8(edges>0)
         edges[edges_hed>0] = 255
         edges[edges_normals>0] = 255
-        cv2.imwrite('edges.png',255*np.uint8(edges>0))
+        _log_image('edges.png',255*np.uint8(edges>0))
         
         thresholds = threshold_multiotsu(prob_mask_full, classes = 4)
         big_mask = 1-np.uint8(prob_mask_full>.01*255)
@@ -194,7 +200,7 @@ class PipelineRefineResults(PipelineStep):
         # cv2.imwrite("big_mask.png", big_mask)
 
         isolated = np.uint8(prob_mask_full>thresholds[2])
-        cv2.imwrite("isolated_pre.png", 255*isolated)
+        _log_image("isolated_pre.png", 255*isolated)
 
         isolated = 255*(ip.refine_mask_watershed(None, edges, isolated, None, distance=0.01, max_value=1))
 
@@ -255,7 +261,7 @@ class PipelineRefineResults(PipelineStep):
         t = (e2 - e1)/cv2.getTickFrequency()
         print("watershed took " + str(t) + " seconds")
 
-        cv2.imwrite('watershed.png', watershed_mask)
+        _log_image('watershed.png', watershed_mask)
 
 
         watershed_mask = 255*np.uint8(watershed_mask > 127)
@@ -302,7 +308,7 @@ class PipelineRefineResults(PipelineStep):
 
         data["mask"] = final_mask
 
-        cv2.imwrite('final_mask.png', data["mask"])
+        _log_image('final_mask.png', data["mask"])
 
 #        Remove hard edges from lighting
 
@@ -315,7 +321,7 @@ class PipelineRefineResults(PipelineStep):
     
         data["lighting"] = lighting
 
-        cv2.imwrite('lighting.png', lighting)
+        _log_image('lighting.png', lighting)
 
 
 
