@@ -33,8 +33,8 @@ class PipelineUploadResults(PipelineStep):
         return ["semantic_url", "lighting_url"]
 
     def run(self, data):
-        key_semantic = "%s_semantic.png" % data["image_s3_key"]
-        key_lighting = "%s_lighting.png" % data["image_s3_key"]
+        key_semantic = "%s/mask" % data["image_s3_key"]
+        key_lighting = "%s/lighting" % data["image_s3_key"]
 
         mask_image = data["mask"]
         lighting_image = data["lighting"]
