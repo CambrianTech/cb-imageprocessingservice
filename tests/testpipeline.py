@@ -3,6 +3,7 @@ from pipeline.uploadresults import PipelineUploadResults
 from pipeline.getdata import PipelineGetData
 from pipeline.fov import PipelineCalculateFov
 from pipeline.runmodels import PipelineRunModels
+from pipeline.superpixels import PipelineSuperpixels
 from pipeline.core import Pipeline
 import numpy as np
 import asyncio
@@ -131,6 +132,21 @@ class TestPipelineChained(unittest.TestCase):
         self.assertIn("normals_latents", data)
         self.assertIn("fov", data)
         self.assertTrue(0 <= data["fov"] <= 360)
+
+
+class TestPipelineSuperpixels(unittest.TestCase):
+    def test_standard(self):
+        step = PipelineSuperpixels()
+
+        image = np.concatenate([np.zeros((512, 256, 3), dtype=np.uint8),
+                                255 * np.ones((512, 256, 3), dtype=np.uint8)], axis=1)
+
+        data = {"image": image}
+
+        step.run(data)
+
+        self.assertIs(data["image"], image)
+        self.assertIn("superpixels", data)
 
 
 if __name__ == "__main__":

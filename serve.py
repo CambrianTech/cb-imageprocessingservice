@@ -18,6 +18,7 @@ from pipeline.getdata import PipelineGetData
 from pipeline.primaryangle import PipelineDeterminePrimaryAngles
 from pipeline.refine import PipelineRefineResults
 from pipeline.runmodels import PipelineRunModels
+from pipeline.superpixels import PipelineSuperpixels
 from pipeline.uploadresults import PipelineUploadResults
 
 
@@ -72,6 +73,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
                 .add(PipelineDeterminePrimaryAngles())
                 .add(PipelineRefineResults())
                 .add(PipelineCalculateFov(fov_model_path))
+                .add(PipelineSuperpixels())
                 .add(PipelineUploadResults(results_bucket)))
 
     print("Validating pipeline")
@@ -104,6 +106,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
         return web.json_response({
             "lighting_url": data["lighting_url"],
             "semantic_url": data["semantic_url"],
+            "superpixels_url": data["superpixels_url"],
             "fov": data["fov"],
             "floor_rotation": data["floor_rotation"],
             "camera_rotation": data["camera_rotation"],
