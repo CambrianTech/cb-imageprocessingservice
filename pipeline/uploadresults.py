@@ -30,7 +30,6 @@ def _upload_json_to_s3(s3_client, json_dict: dict, bucket: str, key: str):
 class PipelineUploadResults(PipelineStep):
     def __init__(self, bucket_name):
         self.bucket_name = bucket_name
-#        self.bucket_name = "hart-develop-2vlai3b8"
         self.s3_client = boto3.client("s3")
 
     @property
@@ -111,6 +110,5 @@ class PipelineUploadResults(PipelineStep):
                 self.bucket_name, key_lighting)
             data["data_url"] = "http://127.0.0.1:8080/getimage/%s/%s" % (
                 self.bucket_name, key_data)
-            print("Data url is: " + data["data_url"])
             data["superpixels_url"] = "http://127.0.0.1:8080/getimage/%s/%s" % (
                 self.bucket_name, key_superpixels)
