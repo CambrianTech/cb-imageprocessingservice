@@ -12,7 +12,7 @@ except:
 
 def _get_image_from_s3(s3_client, bucket: str, key: str) -> np.ndarray:
     data = BytesIO()
-    s3_client.download_fileobj(bucket, key, data)
+    s3_client.download_fileobj(bucket, "%s/background" % key, data)
     data.seek(0)
     return imread(data)  # uint8 [0, 255]
 
