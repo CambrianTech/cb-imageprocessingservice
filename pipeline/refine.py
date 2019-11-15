@@ -27,49 +27,6 @@ def _log_image(name, image):
     if IM_LOGGING_ENABLED:
         cv2.imwrite(name, image)
 
-def _weight_mean_color(graph, src, dst, n):
-    """Callback to handle merging nodes by recomputing mean color.
-        
-        The method expects that the mean color of `dst` is already computed.
-        
-        Parameters
-        ----------
-        graph : RAG
-        The graph under consideration.
-        src, dst : int
-        The vertices in `graph` to be merged.
-        n : int
-        A neighbor of `src` or `dst` or both.
-        
-        Returns
-        -------
-        data : dict
-        A dictionary with the `"weight"` attribute set as the absolute
-        difference of the mean color between node `dst` and `n`.
-        """
-    
-    diff = graph.node[dst]['mean color'] - graph.node[n]['mean color']
-    diff = np.linalg.norm(diff)
-    return {'weight': diff}
-
-
-def merge_mean_color(graph, src, dst):
-    """Callback called before merging two nodes of a mean color distance graph.
-        
-        This method computes the mean color of `dst`.
-        
-        Parameters
-        ----------
-        graph : RAG
-        The graph under consideration.
-        src, dst : int
-        The vertices in `graph` to be merged.
-        """
-    graph.node[dst]['total color'] += graph.node[src]['total color']
-    graph.node[dst]['pixel count'] += graph.node[src]['pixel count']
-    graph.node[dst]['mean color'] = (graph.node[dst]['total color'] /
-                                     graph.node[dst]['pixel count'])
-
 
 class CropLayer(object):
     def __init__(self, params, blobs):
@@ -156,20 +113,12 @@ class PipelineRefineResults(PipelineStep):
         cv2.dnn_unregisterLayer("Crop")
         hed_32 = np.int32(255 * hed[0, 0])
         hed = (255 * hed[0, 0]).astype("uint8")
-        
-        e2 = cv2.getTickCount()
-        t = (e2 - e1)/cv2.getTickFrequency()
-        print("hed took " + str(t) + " seconds")
-
-#        cv2.imwrite("hed.png", hed)
 
         prob_mask_full = np.uint8(255*data["semantic_probs"][:, :, 0])
         # Sometimes there are border artifacts masks
         prob_mask_full[:, 510:512] = prob_mask_full[:, 508:510]
         prob_mask_full[510:512, :] = prob_mask_full[508:510, :]
         prob_mask_full = cv2.resize(prob_mask_full, shape)
-
-#        cv2.imwrite('prob_mask_full.png',prob_mask_full)
 
 #        edges = canny(img_bw, 3, 1, 25)
         edges = cv2.Canny(img_bw,100,200)
@@ -207,9 +156,9 @@ class PipelineRefineResults(PipelineStep):
         nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(isolated, connectivity=8)
         sizes = stats[:, -1]
         sizes[0] = 0
-        print(sizes)
+
         max_label = np.argmax(sizes)
-        print(max_label)
+
         isolated = np.zeros(isolated.shape)
 
         for i in range(0, nb_components):
@@ -233,46 +182,38 @@ class PipelineRefineResults(PipelineStep):
         trim_mask[prob_mask_full> np.mean(prob_mask_full)] = prob_mask_full[prob_mask_full>np.mean(prob_mask_full)]
         trim_mask[big_mask>0] = 0
         trim_mask = np.uint8(trim_mask)
-#        print(trim_mask)
-#        cv2.imwrite('trim_mask.png', trim_mask)
+       # cv2.imwrite('trim_mask.png', trim_mask)
 
-        e1 = cv2.getTickCount()
         markers = ndimage.label(markers)
-#        print(markers)
         markers = markers[0]
         ret = len(np.unique(markers))
 #        ret, markers = cv2.connectedComponents(markers)
 #        print(ret)
 #        markers = markers + 1
 #        cv2.imwrite('markers_l.png',255*np.uint8(markers))
-        hed_rgb = cv2.cvtColor(hed, cv2.COLOR_GRAY2RGB)
+#         hed_rgb = cv2.cvtColor(hed, cv2.COLOR_GRAY2RGB)
 
 #        labels = cv2.watershed(hed_rgb, markers)
         labels = watershed(hed, markers)
 
         watershed_mask = np.zeros(prob_mask_full.shape)
 
-        for i in range(0, ret-1):
-            a =  labels == i
+        for i in range(1, ret-1):
+            a = labels == i
             m = np.mean(trim_mask[a])
             watershed_mask[a] = m
 
-        e2 = cv2.getTickCount()
-        t = (e2 - e1)/cv2.getTickFrequency()
-        print("watershed took " + str(t) + " seconds")
-
         _log_image('watershed.png', watershed_mask)
-
 
         watershed_mask = 255*np.uint8(watershed_mask > 127)
         watershed_mask[big_mask>0] = 0
-#       ftriz cv2.imwrite("watershed_minusbig.png", watershed_mask)
+
         nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(watershed_mask, connectivity=8)
         sizes = stats[:, -1]
         sizes[0] = 0
-        print(sizes)
-        max_label = np.argmax(sizes)
-        print(max_label)
+
+        # max_label = np.argmax(sizes)
+
         watershed_mask = np.zeros(isolated.shape)
 
         for i in range(0, nb_components):
@@ -298,8 +239,6 @@ class PipelineRefineResults(PipelineStep):
 
                     cv2.drawContours(final_mask, [contour], 0, color, -1, cv2.LINE_AA)
 
-   
-#                                mask = cv2.threshold(mask, t, 255, cv2.THRESH_BINARY)[1]
 #        final_mask = cv2.GaussianBlur(final_mask, (3, 3), 0)
         final_mask = 255*(ip.refine_mask_watershed(None, img, final_mask, None, distance=0.02, max_value=1))
         final_mask = cv2.GaussianBlur(final_mask, (15, 15), 0)
@@ -318,7 +257,7 @@ class PipelineRefineResults(PipelineStep):
         blurred_lighting = cv2.GaussianBlur(smooth_lighting, (21, 21), 11)
 
         lighting = ip.alpha_blend(smooth_lighting, blurred_lighting, blurred_mask)
-    
+
         data["lighting"] = lighting
 
         _log_image('lighting.png', lighting)
