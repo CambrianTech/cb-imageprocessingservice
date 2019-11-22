@@ -3,9 +3,45 @@ from scipy.special import softmax
 import cv2
 from modelutils import feed_image_batched, feed_images_batched, load_model
 from pipeline.core import PipelineStep
+import os
+
+
+class CropLayer(object):
+    def __init__(self, params, blobs):
+        # initialize our starting and ending (x, y)-coordinates of
+        # the crop
+        self.startX = 0
+        self.startY = 0
+        self.endX = 0
+        self.endY = 0
+    
+    def getMemoryShapes(self, inputs):
+        # the crop layer will receive two inputs -- we need to crop
+        # the first input blob to match the shape of the second one,
+        # keeping the batch size and number of channels
+        (inputShape, targetShape) = (inputs[0], inputs[1])
+        (batchSize, numChannels) = (inputShape[0], inputShape[1])
+        (H, W) = (targetShape[2], targetShape[3])
+        
+        # compute the starting and ending crop coordinates
+        self.startX = int((inputShape[3] - targetShape[3]) / 2)
+        self.startY = int((inputShape[2] - targetShape[2]) / 2)
+        self.endX = self.startX + W
+        self.endY = self.startY + H
+        
+        # return the shape of the volume (we'll perform the actual
+        # crop during the forward pass
+        return [[batchSize, numChannels, H, W]]
+    
+    def forward(self, inputs):
+        # use the derived (x, y)-coordinates to perform the crop
+        return [inputs[0][:, :, self.startY:self.endY,
+                          self.startX:self.endX]]
 
 
 class PipelineRunModels(PipelineStep):
+    layer_registered = False
+
     def __init__(self, semantic_path: str, normals_path: str, unlit_path: str,
                  elevation_path: str, lighting_path: str):
         self.model_semantic = load_model(semantic_path)
@@ -13,6 +49,14 @@ class PipelineRunModels(PipelineStep):
         self.model_unlit = load_model(unlit_path)
         self.model_elevation = load_model(elevation_path)
         self.model_lighting = load_model(lighting_path)
+
+        proto_path = os.path.sep.join(["hed_model", "deploy.prototxt"])
+        model_path = os.path.sep.join(["hed_model", "hed_pretrained_bsds.caffemodel"])
+        self.net = cv2.dnn.readNetFromCaffe(proto_path, model_path)
+
+        if not PipelineRunModels.layer_registered:
+            PipelineRefineResults.layer_registered = True
+            cv2.dnn_registerLayer("Crop", CropLayer)
 
     @property
     def required_keys(self) -> list:
@@ -56,3 +100,15 @@ class PipelineRunModels(PipelineStep):
         for datum, nl, n in zip(data, normals_latents, normals):
             datum["normals"] = n
             datum["normals_latents"] = nl
+
+        # OpenCV Model for HED
+        images = [cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), (1024, 1024)) for img in images]
+
+        blob = cv2.dnn.blobFromImages(images, scalefactor=1.0, size=(1024,1024),
+                                      mean=(104.00698793, 116.66876762, 122.67891434),
+                                      swapRB=False, crop=True)
+        self.net.setInput(blob)
+        heds = self.net.forward()
+
+        for datum, hed in zip(data, heds):
+            datum["hed"] = hed
