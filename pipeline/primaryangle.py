@@ -66,8 +66,7 @@ def get_matching_surface(reduced_mask, isolated_surfaces, isolated_values, ignor
 
     if surface_index == -1 and max_angle != 180.0:
         return get_matching_surface(reduced_mask, isolated_surfaces, isolated_values, ignore_indices, max_angle=180.0)
-    print(best_angle)
-    print("Floor is %.2f degrees from UP" % geo.radians_to_degrees(best_angle))
+    # print("Floor is %.2f degrees from UP" % geo.radians_to_degrees(best_angle))
     return surface_index, most_pixels, best_intersection
 
 
@@ -103,8 +102,8 @@ def get_candidate_walls(floor_normal, isolated_surfaces, maxAngle=20):
                 best_wall_index = wall_count
                 best_score = total_pixels
 
-            print("%d) candidate wall normal = %s, angle diff = %.2f, color = %s, score=%f"
-                  % (wall_count, normal, angle_diff, surface[0], score))
+            # print("%d) candidate wall normal = %s, angle diff = %.2f, color = %s, score=%f"
+            #       % (wall_count, normal, angle_diff, surface[0], score))
 
             wall_count = wall_count + 1
 
@@ -154,7 +153,7 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         floor_index, _, floor_intersection = get_matching_surface(
             reduced_mask, isolated_surfaces, floor_materials)
         
-        print("floor index: "+str(floor_index))
+        # print("floor index: "+str(floor_index))
 
         if floor_index < 0:
             print("Invalid surfaces")
