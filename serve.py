@@ -68,7 +68,8 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
                     normals_path=join(model_path, "normals"),
                     unlit_path=join(model_path, "unlit"),
                     elevation_path=join(model_path, "elevation"),
-                    lighting_path=join(model_path, "lighting")
+                    lighting_path=join(model_path, "lighting"),
+                    hed_path=join("hed_model", "HED_pretrained_bsds.npz")
                 ))
                 .add(PipelineDeterminePrimaryAngles())
                 .add(PipelineRefineResults())

@@ -6,12 +6,10 @@ from modelutils import feed_image_batched, feed_images_batched, load_model
 from pipeline.core import PipelineStep
 import os
 from tensorpack import *
-from tensorpack.dataflow import dataset
 from tensorpack.tfutils import gradproc, optimizer
 from tensorpack.tfutils.summary import add_moving_summary, add_param_summary
-from tensorpack.utils.gpu import get_num_gpu
-from tensorpack.utils import logger
 
+# HED from Tensorpack examples: https://github.com/tensorpack/tensorpack/tree/master/examples/HED
 
 def class_balanced_sigmoid_cross_entropy(logits, label, name='cross_entropy_loss'):
     """
@@ -33,7 +31,8 @@ def class_balanced_sigmoid_cross_entropy(logits, label, name='cross_entropy_loss
         beta = count_neg / (count_neg + count_pos)
 
         pos_weight = beta / (1 - beta)
-        cost = tf.nn.weighted_cross_entropy_with_logits(logits=logits, targets=y, pos_weight=pos_weight)
+        cost = tf.nn.weighted_cross_entropy_with_logits(
+            logits=logits, targets=y, pos_weight=pos_weight)
         cost = tf.reduce_mean(cost * (1 - beta))
         zero = tf.equal(count_pos, 0.0)
     return tf.where(zero, 0.0, cost, name=name)
@@ -81,7 +80,8 @@ def CaffeBilinearUpSample(x, shape):
     weight_var = tf.constant(w, tf.float32,
                              shape=(filter_shape, filter_shape, ch, ch),
                              name='bilinear_upsample_filter')
-    x = tf.pad(x, [[0, 0], [0, 0], [shape - 1, shape - 1], [shape - 1, shape - 1]], mode='SYMMETRIC')
+    x = tf.pad(x, [[0, 0], [0, 0], [shape - 1, shape - 1],
+                   [shape - 1, shape - 1]], mode='SYMMETRIC')
     out_shape = tf.shape(x) * tf.constant([1, 1, shape, shape], tf.int32)
     deconv = tf.nn.conv2d_transpose(x, weight_var, out_shape,
                                     [1, 1, shape, shape], 'SAME', data_format='NCHW')
@@ -165,7 +165,8 @@ class Model(ModelDesc):
 
         wd_w = tf.train.exponential_decay(2e-4, get_global_step_var(),
                                           80000, 0.7, True)
-        wd_cost = tf.multiply(wd_w, regularize_cost('.*/W', tf.nn.l2_loss), name='wd_cost')
+        wd_cost = tf.multiply(wd_w, regularize_cost(
+            '.*/W', tf.nn.l2_loss), name='wd_cost')
         costs.append(wd_cost)
 
         add_param_summary(('.*/W', ['histogram']))   # monitor W
@@ -174,30 +175,28 @@ class Model(ModelDesc):
         return total_cost
 
     def optimizer(self):
-        lr = tf.get_variable('learning_rate', initializer=3e-5, trainable=False)
+        lr = tf.get_variable(
+            'learning_rate', initializer=3e-5, trainable=False)
         opt = tf.train.AdamOptimizer(lr, epsilon=1e-3)
         return optimizer.apply_grad_processors(
             opt, [gradproc.ScaleGradient(
                 [('convfcweight.*', 0.1), ('conv5_.*', 5)])])
 
-class PipelineRunModels(PipelineStep):
 
+class PipelineRunModels(PipelineStep):
     def __init__(self, semantic_path: str, normals_path: str, unlit_path: str,
-                 elevation_path: str, lighting_path: str):
+                 elevation_path: str, lighting_path: str, hed_path: str):
         self.model_semantic = load_model(semantic_path)
         self.model_normals = load_model(normals_path)
         self.model_unlit = load_model(unlit_path)
         self.model_elevation = load_model(elevation_path)
         self.model_lighting = load_model(lighting_path)
-
-        model_path = os.path.sep.join(["hed_model", "HED_pretrained_bsds.npz"])
-        pred_config = PredictConfig(
+        self.model_hed = OfflinePredictor(PredictConfig(
             model=Model(),
-            session_init=SmartInit(model_path),
+            session_init=SmartInit(hed_path),
             input_names=['image'],
-            output_names=['output' + str(k) for k in range(1, 7)])
-        self.model_hed = OfflinePredictor(pred_config)
-
+            output_names=['output%d' % k for k in range(1, 7)]
+        ))
 
     @property
     def required_keys(self) -> list:
@@ -213,7 +212,7 @@ class PipelineRunModels(PipelineStep):
 
     def run(self, data):
         images = [datum["image"] for datum in data]
-        
+
         def _run_single(model, key):
             results = feed_image_batched(model, images)
             for datum, result in zip(data, results):
@@ -222,9 +221,11 @@ class PipelineRunModels(PipelineStep):
         _run_single(self.model_elevation, "elevation")
         _run_single(self.model_lighting, "lighting")
         _run_single(self.model_unlit, "unlit")
-        
-        semantic_input = [{ "image": datum["image"], "unlit": datum["unlit"] } for datum in data]
-        semantic_results = [s["output"] for s in feed_images_batched(self.model_semantic, semantic_input)]
+
+        semantic_input = [{"image": datum["image"],
+                           "unlit": datum["unlit"]} for datum in data]
+        semantic_results = [s["output"] for s in feed_images_batched(
+            self.model_semantic, semantic_input)]
         for datum, result in zip(data, semantic_results):
             datum["semantic"] = result
             datum["semantic_probs"] = softmax(result/255, axis=-1)
@@ -236,14 +237,16 @@ class PipelineRunModels(PipelineStep):
         output_tensor = list(self.model_normals.fetch_tensors.values())[0]
         normals_latents, normals = self.model_normals.session.run([latent_tensors, output_tensor], feed_dict={
             input_tensor: [cv2.resize(datum["image"], (512, 512)).astype(np.float32)/255 for datum in data]})
-        normals_latents = normals_latents[:, :, :, :128].reshape(len(data), 1, -1)
+        normals_latents = normals_latents[:,
+                                          :, :, :128].reshape(len(data), 1, -1)
 
         for datum, nl, n in zip(data, normals_latents, normals):
             datum["normals"] = n
             datum["normals_latents"] = nl
 
-        images = [cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), (1024, 1024)).astype('float32') for img in images]
+        images = [cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), (1024, 1024)).astype(
+            'float32') for img in images]
         outputs = self.model_hed(images)
 
         for datum, hed in zip(data, outputs[5]):
-            datum["hed"] = (255 * hed[:,:,0]).astype("uint8")
+            datum["hed"] = (255 * hed[:, :, 0]).astype("uint8")
