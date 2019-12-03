@@ -1,23 +1,13 @@
 from pipeline.core import PipelineStep
 import cv2
 import numpy as np
-import os
-from skimage.filters import threshold_sauvola
-from scipy import ndimage, stats
-from skimage.morphology import reconstruction
+from scipy import ndimage
 from cambrian import image_processing as ip
-from skimage.transform import match_histograms
-from skimage import filters
 from skimage.morphology import watershed, disk
-from skimage.color import rgb2gray, gray2rgb, label2rgb
-from skimage.segmentation import mark_boundaries
 from skimage import filters
-from skimage.feature import canny
-from skimage import measure
-from skimage.segmentation import random_walker
 from skimage.filters import threshold_multiotsu
-from skimage.future import graph
-from skimage.feature import peak_local_max
+
+
 
 IM_LOGGING_ENABLED = False
 
@@ -43,9 +33,8 @@ class PipelineRefineResults(PipelineStep):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         img = cv2.resize(img, shape)
-        img_epf = cv2.edgePreservingFilter(
-            img, flags=1, sigma_s=50, sigma_r=0.2)
-        img_bw = cv2.cvtColor(img_epf, cv2.COLOR_BGR2GRAY)
+
+        img_bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         lighting_rgb = np.uint8(data["lighting"])
         lighting_rgb = cv2.resize(lighting_rgb, shape)
@@ -82,6 +71,7 @@ class PipelineRefineResults(PipelineStep):
         _log_image('edges_hed.png', edges_hed)
 
         normals_up = filters.rank.median(normals_up, disk(5))
+
         edges_normals = cv2.Canny(normals_up, 100, 200)
         edges_normals = cv2.dilate(
             255*np.uint8(edges_normals > 0), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
@@ -116,7 +106,8 @@ class PipelineRefineResults(PipelineStep):
                 isolated[output == i] = 255
 
         isolated_small = cv2.erode(
-            isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (75, 75)))
+            isolated, cv2.getStructuringElement(cv2.MORPH_RECT, (75, 75)))
+
         isolated[edges > 0] = 0
         markers = isolated
         markers[edges == 0] = 255
@@ -134,16 +125,15 @@ class PipelineRefineResults(PipelineStep):
         markers = ndimage.label(markers)
 
         markers = markers[0]
-        ret = len(np.unique(markers))
 
         labels = watershed(hed, markers)
 
         watershed_mask = np.zeros(prob_mask_full.shape)
 
-        for i in range(0, ret-1):
-            a = labels == i
-            m = np.mean(trim_mask[a])
-            watershed_mask[a] = m
+        avgs = ndimage.mean(trim_mask, labels=labels, index=np.unique(labels))
+
+        for i in range(0, len(np.unique(labels))):
+            watershed_mask[labels == i+1] = avgs[i]
 
         _log_image('watershed.png', watershed_mask)
 
@@ -154,8 +144,6 @@ class PipelineRefineResults(PipelineStep):
             watershed_mask, connectivity=8)
         sizes = stats[:, -1]
         sizes[0] = 0
-
-        max_label = np.argmax(sizes)
 
         watershed_mask = np.zeros(isolated.shape)
 
