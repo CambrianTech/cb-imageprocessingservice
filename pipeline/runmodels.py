@@ -5,11 +5,13 @@ import tensorflow as tf
 from modelutils import feed_image_batched, feed_images_batched, load_model
 from pipeline.core import PipelineStep
 import os
+from time import time
 from tensorpack import *
 from tensorpack.tfutils import gradproc, optimizer
 from tensorpack.tfutils.summary import add_moving_summary, add_param_summary
 
 # HED from Tensorpack examples: https://github.com/tensorpack/tensorpack/tree/master/examples/HED
+
 
 def class_balanced_sigmoid_cross_entropy(logits, label, name='cross_entropy_loss'):
     """
@@ -218,10 +220,19 @@ class PipelineRunModels(PipelineStep):
             for datum, result in zip(data, results):
                 datum[key] = result
 
+        t = time()
         _run_single(self.model_elevation, "elevation")
-        _run_single(self.model_lighting, "lighting")
-        _run_single(self.model_unlit, "unlit")
+        print("Elevation model took %.2f seconds" % (time() - t))
 
+        t = time()
+        _run_single(self.model_lighting, "lighting")
+        print("Lighting model took %.2f seconds" % (time() - t))
+
+        t = time()
+        _run_single(self.model_unlit, "unlit")
+        print("Unlit model took %.2f seconds" % (time() - t))
+
+        t = time()
         semantic_input = [{"image": datum["image"],
                            "unlit": datum["unlit"]} for datum in data]
         semantic_results = [s["output"] for s in feed_images_batched(
@@ -229,8 +240,10 @@ class PipelineRunModels(PipelineStep):
         for datum, result in zip(data, semantic_results):
             datum["semantic"] = result
             datum["semantic_probs"] = softmax(result/255, axis=-1)
+        print("Semantic model took %.2f seconds" % (time() - t))
 
         # Normals output with latents
+        t = time()
         input_tensor = list(self.model_normals.feed_tensors.values())[0]
         latent_tensors = self.model_normals.graph.get_tensor_by_name(
             "generator/decoder_8/conv2d_transpose/BiasAdd:0")
@@ -243,10 +256,15 @@ class PipelineRunModels(PipelineStep):
         for datum, nl, n in zip(data, normals_latents, normals):
             datum["normals"] = n
             datum["normals_latents"] = nl
+        print("Normals model took %.2f seconds" % (time() - t))
 
+        t = time()
         images = [cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), (1024, 1024)).astype(
             'float32') for img in images]
-        outputs = self.model_hed(images)
+        print("HED resize took %.2f seconds" % (time() - t))
 
+        t = time()
+        outputs = self.model_hed(images)
         for datum, hed in zip(data, outputs[5]):
             datum["hed"] = (255 * hed[:, :, 0]).astype("uint8")
+        print("HED model took %.2f seconds" % (time() - t))
