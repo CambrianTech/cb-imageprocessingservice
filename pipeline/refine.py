@@ -58,6 +58,8 @@ class PipelineRefineResults(PipelineStep):
         prob_mask_full[510:512, :] = prob_mask_full[508:510, :]
         prob_mask_full = cv2.resize(prob_mask_full, shape)
 
+        _log_image('prob_mask_full.png', prob_mask_full)
+
         edges = cv2.Canny(img_bw, 100, 200)
         edges = cv2.dilate(255*np.uint8(edges > 0),
                            cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
@@ -159,21 +161,15 @@ class PipelineRefineResults(PipelineStep):
         if len(contours) > 0:
             for contour in contours:
                 area = cv2.contourArea(contour)
-                M = cv2.moments(contour)
-                if M["m00"] != 0:
-                    cX = int(M["m10"] / M["m00"])
-                    cY = int(M["m01"] / M["m00"])
-                    color = watershed_mask[cY, cX]/255
-                    if area < 32*32 and watershed_mask[cY, cX] == 0:
-                        color = 1
-
-                    # compute the center of the contour
-                    cv2.drawContours(
-                        final_mask, [contour], 0, color, -1, cv2.LINE_AA)
+                test_mask = cv2.drawContours(final_mask, [contour], 0, 1, -1, cv2.LINE_AA)
+                nz = cv2.countNonZero(watershed_mask[test_mask > 0])/255
+                if nz > 9 or area < 32*32:
+                    final_mask[test_mask > 0] = 1
 
         final_mask = 255*(ip.refine_mask_watershed(None, img,
                                                    final_mask, None, distance=0.02, max_value=1))
         final_mask = cv2.GaussianBlur(final_mask, (15, 15), 0)
+
         _, final_mask = cv2.threshold(
             final_mask, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
