@@ -96,19 +96,21 @@ class PipelineRefineResults(PipelineStep):
         isolated = 255*(ip.refine_mask_watershed(None, edges,
                                                  isolated, None, distance=0.01, max_value=1))
 
-        nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(
+        nb_components, isolated_cc, stats, centroids = cv2.connectedComponentsWithStats(
             isolated, connectivity=8)
         sizes = stats[:, -1]
-        sizes[0] = 0
 
         isolated = np.zeros(isolated.shape)
 
-        for i in range(0, nb_components):
-            if sizes[i] >= 64*64:
-                isolated[output == i] = 255
+        for i in range(1, nb_components):
+            if sizes[i] > 64*64:
+                isolated[isolated_cc == i] = 255
 
+        _log_image("isolated.png", isolated)
         isolated_small = cv2.erode(
             isolated, cv2.getStructuringElement(cv2.MORPH_RECT, (75, 75)))
+
+        _log_image("isolated_small.png", isolated_small)
 
         isolated[edges > 0] = 0
         markers = isolated
@@ -130,16 +132,21 @@ class PipelineRefineResults(PipelineStep):
 
         labels = watershed(hed, markers)
 
-        watershed_mask = np.zeros(prob_mask_full.shape)
+        watershed_mask = np.uint8(isolated_cc == 1)
 
         avgs = ndimage.mean(trim_mask, labels=labels, index=np.unique(labels))
 
         for i in range(0, len(np.unique(labels))):
-            watershed_mask[labels == i+1] = avgs[i]
 
-        _log_image('watershed.png', watershed_mask)
+            if avgs[i] > 127:
+                watershed_mask[labels == i+1] = 1
+                continue
 
-        watershed_mask = 255*np.uint8(watershed_mask > 127)
+            if cv2.countNonZero(isolated_small[labels == i+1]) > 64:
+                watershed_mask[labels == i+1] = 1
+
+        _log_image('watershed.png', 255*watershed_mask)
+
         watershed_mask[big_mask > 0] = 0
 
         nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(
@@ -147,24 +154,29 @@ class PipelineRefineResults(PipelineStep):
         sizes = stats[:, -1]
         sizes[0] = 0
 
-        watershed_mask = np.zeros(isolated.shape)
+        watershed_mask = np.zeros(watershed_mask.shape)
 
         for i in range(0, nb_components):
-            if sizes[i] >= 64*64:
+            if sizes[i] >= 128*128:
                 watershed_mask[output == i] = 255
+        _log_image('final_watershed.png', watershed_mask)
 
         # Fill small holes
         contours, hierarchy = cv2.findContours(watershed_mask.astype(
-            'uint8'), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        final_mask = np.zeros(shape)
+            'uint8'), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
 
+        final_mask = np.zeros(shape)
         if len(contours) > 0:
-            for contour in contours:
-                area = cv2.contourArea(contour)
-                test_mask = cv2.drawContours(final_mask, [contour], 0, 1, -1, cv2.LINE_AA)
-                nz = cv2.countNonZero(watershed_mask[test_mask > 0])/255
-                if nz > 9 or area < 32*32:
-                    final_mask[test_mask > 0] = 1
+            for i in range(0, len(contours)):
+                if hierarchy[0][i][3] == -1:
+                    cv2.drawContours(final_mask, [contours[i]], 0, 1, -1, cv2.LINE_AA)
+                    continue
+                area = cv2.contourArea(contours[i])
+                if area < 32 * 32:
+                    cv2.drawContours(final_mask, [contours[i]], 0, 1, -1)
+                    continue
+                cv2.drawContours(final_mask, [contours[i]], 0, 0, -1)
+
 
         final_mask = 255*(ip.refine_mask_watershed(None, img,
                                                    final_mask, None, distance=0.02, max_value=1))
@@ -175,6 +187,8 @@ class PipelineRefineResults(PipelineStep):
 
         data["mask"] = final_mask
 
+        img[final_mask > 0 ] = (0, 255, 255)
+        _log_image('img.png', img)
         _log_image('final_mask.png', data["mask"])
 
         # Remove hard edges from lighting
