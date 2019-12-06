@@ -8,7 +8,6 @@ from skimage import filters
 from skimage.filters import threshold_multiotsu
 
 
-
 IM_LOGGING_ENABLED = False
 
 
@@ -167,16 +166,13 @@ class PipelineRefineResults(PipelineStep):
 
         final_mask = np.zeros(shape)
         if len(contours) > 0:
-            for i in range(0, len(contours)):
-                if hierarchy[0][i][3] == -1:
-                    cv2.drawContours(final_mask, [contours[i]], 0, 1, -1, cv2.LINE_AA)
-                    continue
-                area = cv2.contourArea(contours[i])
-                if area < 32 * 32:
-                    cv2.drawContours(final_mask, [contours[i]], 0, 1, -1)
-                    continue
-                cv2.drawContours(final_mask, [contours[i]], 0, 0, -1)
-
+            for contour in contours:
+                area = cv2.contourArea(contour)
+                test_mask = cv2.drawContours(
+                    final_mask, [contour], 0, 1, -1, cv2.LINE_AA)
+                nz = cv2.countNonZero(watershed_mask[test_mask > 0]) / 255
+                if nz > 9 or area < 32 * 32:
+                    final_mask[test_mask > 0] = 1
 
         final_mask = 255*(ip.refine_mask_watershed(None, img,
                                                    final_mask, None, distance=0.02, max_value=1))
@@ -187,7 +183,7 @@ class PipelineRefineResults(PipelineStep):
 
         data["mask"] = final_mask
 
-        img[final_mask > 0 ] = (0, 255, 255)
+        img[final_mask > 0] = (0, 255, 255)
         _log_image('img.png', img)
         _log_image('final_mask.png', data["mask"])
 
