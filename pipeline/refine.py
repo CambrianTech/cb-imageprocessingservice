@@ -8,7 +8,6 @@ from skimage import filters
 from skimage.filters import threshold_multiotsu
 
 
-
 IM_LOGGING_ENABLED = False
 
 
@@ -161,7 +160,8 @@ class PipelineRefineResults(PipelineStep):
         if len(contours) > 0:
             for contour in contours:
                 area = cv2.contourArea(contour)
-                test_mask = cv2.drawContours(final_mask, [contour], 0, 1, -1, cv2.LINE_AA)
+                test_mask = cv2.drawContours(
+                    final_mask, [contour], 0, 1, -1, cv2.LINE_AA)
                 nz = cv2.countNonZero(watershed_mask[test_mask > 0])/255
                 if nz > 9 or area < 32*32:
                     final_mask[test_mask > 0] = 1

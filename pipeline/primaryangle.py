@@ -11,7 +11,7 @@ rotZ = T.rotation_matrix(0.00, [0, 0, 1])
 
 r_range = g_range = b_range = 255
 
-RIGHT_ANGLE = (math.pi/2.0)  # 90 degrees
+RIGHT_ANGLE = math.pi / 2.0  # 90 degrees
 
 
 def scale_component(color, range=255.0):
@@ -66,13 +66,13 @@ def get_matching_surface(reduced_mask, isolated_surfaces, isolated_values, ignor
 
     if surface_index == -1 and max_angle != 180.0:
         return get_matching_surface(reduced_mask, isolated_surfaces, isolated_values, ignore_indices, max_angle=180.0)
-    # print("Floor is %.2f degrees from UP" % geo.radians_to_degrees(best_angle))
+
     return surface_index, most_pixels, best_intersection
 
 
-def get_candidate_walls(floor_normal, isolated_surfaces, maxAngle=20):
+def get_candidate_walls(floor_normal, isolated_surfaces, max_angle=20):
     candidate_walls = []
-    max_diff = geo.degrees_to_radians(maxAngle)
+    max_diff = geo.degrees_to_radians(max_angle)
 
     kernel = np.ones((3, 3), np.uint8)
     best_score = 0
@@ -102,9 +102,6 @@ def get_candidate_walls(floor_normal, isolated_surfaces, maxAngle=20):
                 best_wall_index = wall_count
                 best_score = total_pixels
 
-            # print("%d) candidate wall normal = %s, angle diff = %.2f, color = %s, score=%f"
-            #       % (wall_count, normal, angle_diff, surface[0], score))
-
             wall_count = wall_count + 1
 
     if len(candidate_walls) == 0:
@@ -115,7 +112,6 @@ def get_candidate_walls(floor_normal, isolated_surfaces, maxAngle=20):
 
 
 class PipelineDeterminePrimaryAngles(PipelineStep):
-
     @property
     def required_keys(self) -> list:
         return ["semantic_probs", "normals", "elevation"]
@@ -125,7 +121,6 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         return ["kmeans_normals", "camera_rotation", "camera_elevation", "floor_rotation"]
 
     def run(self, data):
-
         mask = np.uint8(255*data["semantic_probs"][:, :, 0])
         normals = np.uint8(255*data["normals"])
         elevation = data["elevation"]
@@ -143,7 +138,6 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         isolated_surfaces = []
         for color in centers:
             normal = get_normal_from_rgb(color)
-#            print(normal)
             color_mask = ip.isolate_color(reduced_normals, color)
             isolated_surfaces.append((color, normal, color_mask))
 
@@ -152,8 +146,6 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         # find floor
         floor_index, _, floor_intersection = get_matching_surface(
             reduced_mask, isolated_surfaces, floor_materials)
-        
-        # print("floor index: "+str(floor_index))
 
         if floor_index < 0:
             print("Invalid surfaces")
@@ -168,11 +160,10 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         floor_color = floor_surface[0]
 
         low_thresh = np.clip(floor_color - 4.0, 0, 255)
-
         high_thresh = np.clip(floor_color + 4.0, 0, 255)
 
         normals_mask = cv2.inRange(normals, low_thresh, high_thresh)
-        
+
         floor_normal = np.mean(normals[result_prob > 127], axis=0)
 
         normals_mask[result_prob < 128] = 0
@@ -184,36 +175,36 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
 
         cam_pitch = 0.0
         cam_roll = 0.0
-        
+
         cam_pitch = -math.acos(floor_normal[2])
         if np.isnan(cam_pitch):
             cam_pitch = -0.2
-        
+
         cam_roll = -math.asin(floor_normal[0])
-        
+
         if np.isnan(cam_roll):
             cam_roll = 0.0
-        
+
         data["camera_rotation"] = [cam_pitch, 0.0, cam_roll]
 
-        print("camera rotation: " + str(data["camera_rotation"]))
-        
-        floor_elevation = np.mean(elevation[normals_mask > 0], axis=0)
+        print("camera rotation:", data["camera_rotation"])
 
+        floor_elevation = np.mean(elevation[normals_mask > 0], axis=0)
         floor_elevation_pixels = 127.5 - floor_elevation
-        
+
         pixels_per_meter = 127.5 / 300.0
-        
+
         floor_elevation = floor_elevation_pixels / pixels_per_meter
 
-        floor_elevation = np.clip(floor_elevation, 80.0, 170.0) / 100.0  # valid range
+        floor_elevation = np.clip(
+            floor_elevation, 80.0, 170.0) / 100.0  # valid range
 
         if np.isnan(floor_elevation):
             floor_elevation = 1.3
-        
+
         data["camera_elevation"] = floor_elevation
 
-        print("floor elevation: " + str(data["camera_elevation"]))
+        print("floor elevation:", data["camera_elevation"])
 
         # find candidate wall surfaces
         candidate_walls, primary_wall_index = get_candidate_walls(
@@ -223,18 +214,14 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         floor_rotation = 0.0
 
         x_unit_normal = [1, 0, 0]
-        y_unit_normal = [0, 1, 0]
-        z_unit_normal = [0, 0, 1]
-
-#        floor_angle_x = math.pi - \
-#            geo.angle_between(floor_surface[1], y_unit_normal)
 
         if primary_wall_index >= 0:
-            floor_rotation = geo.angle_between(candidate_walls[primary_wall_index][1], x_unit_normal)
+            floor_rotation = geo.angle_between(
+                candidate_walls[primary_wall_index][1], x_unit_normal)
 
         if np.isnan(floor_rotation):
             floor_rotation = 0.0
-        
+
         data["floor_rotation"] = floor_rotation
-            
-        print("floor rotation: " + str(data["floor_rotation"]))
+
+        print("floor rotation:", data["floor_rotation"])
