@@ -6,6 +6,7 @@ phases:
       docker: 18
   pre_build:
     commands:
+      - if [ $CPU_ONLY ]; then $DOCKERFILE_PATH="Dockerfile"; else $DOCKERFILE_PATH="Dockerfile-CPU"; fi
       - REPOSITORY_URI=$ECR_REPOSITORY_URI
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
@@ -15,7 +16,7 @@ phases:
     commands:
       - echo Build started on `date`
       - echo Building docker image
-      - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
+      - docker build -t $REPOSITORY_URI:$IMAGE_TAG -f $DOCKERFILE_PATH .
       - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:latest
   post_build:
     commands:
