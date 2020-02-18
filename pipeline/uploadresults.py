@@ -30,6 +30,7 @@ def _upload_json_to_s3(s3_client, json_dict: dict, bucket: str, key: str):
 
 class PipelineUploadResults(PipelineStep):
     def __init__(self, bucket_name):
+        super().__init__()
         self.bucket_name = bucket_name
         self.s3_client = boto3.client("s3")
 

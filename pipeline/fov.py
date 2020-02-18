@@ -4,6 +4,7 @@ import joblib
 
 class PipelineCalculateFov(PipelineStep):
     def __init__(self, fov_model_path):
+        super().__init__()
         self.classifier = joblib.load(fov_model_path)
 
     @property

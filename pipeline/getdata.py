@@ -19,6 +19,7 @@ def _get_image_from_s3(s3_client, bucket: str, key: str) -> np.ndarray:
 
 class PipelineGetData(PipelineStep):
     def __init__(self, bucket_name):
+        super().__init__()
         self.bucket_name = bucket_name
         self.s3_client = boto3.client("s3")
 

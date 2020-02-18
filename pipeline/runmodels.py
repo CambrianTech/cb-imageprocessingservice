@@ -188,6 +188,7 @@ class Model(ModelDesc):
 class PipelineRunModels(PipelineStep):
     def __init__(self, semantic_path: str, normals_path: str, unlit_path: str,
                  elevation_path: str, lighting_path: str, hed_path: str):
+        super().__init__()
         self.model_semantic = load_model(semantic_path)
         self.model_normals = load_model(normals_path)
         self.model_unlit = load_model(unlit_path)
