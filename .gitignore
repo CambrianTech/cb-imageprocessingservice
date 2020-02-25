@@ -119,3 +119,6 @@ sklearn_models/
 tensorflow_models/
 /results
 /images
+
+# Plane-RCNN
+/planercnn/planercnn/example_images

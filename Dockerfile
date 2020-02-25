@@ -1,7 +1,7 @@
 ARG UBUNTU_VERSION=18.04
 
 ARG ARCH
-ARG CUDA=10.0
+ARG CUDA=9.2
 FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}-base-ubuntu${UBUNTU_VERSION} as base
 
 # ARCH and CUDA are specified again because the FROM directive resets ARGs
@@ -90,6 +90,11 @@ RUN apt-get update && apt-get install --no-install-recommends -y libglib2.0-0 &&
 
 RUN pip3 install -r requirements.txt --no-cache-dir
 RUN pip3 install /cb-core/ --no-cache-dir
+RUN pip3 install /planercnn/ --no-cache-dir
+
+# Compile plane rcnn custom kernels
+RUN cd planercnn/planercnn && cd nms/src/cuda/ && nvcc -c -o nms_kernel.cu.o nms_kernel.cu -x cu -Xcompiler -fPIC -arch=[arch] && cd ../../ && python build.py && cd ../
+RUN cd planercnn/planercnn && cd roialign/roialign/src/cuda/ && nvcc -c -o crop_and_resize_kernel.cu.o crop_and_resize_kernel.cu -x cu -Xcompiler -fPIC -arch=[arch] && cd ../../ && python build.py && cd ../
 
 EXPOSE 8080
 
