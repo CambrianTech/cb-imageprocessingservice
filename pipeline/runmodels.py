@@ -2,12 +2,13 @@ import numpy as np
 from scipy.special import softmax
 import cv2
 import tensorflow as tf
-from modelutils import feed_image_batched, feed_images_batched, load_model
+from modelutils import feed_image_batched, feed_images_batched, load_model, get_session_config
 from pipeline.core import PipelineStep
 import os
 from time import time
 from tensorpack import *
 from tensorpack.tfutils import gradproc, optimizer
+from tensorpack.tfutils.sesscreate import NewSessionCreator
 from tensorpack.tfutils.summary import add_moving_summary, add_param_summary
 
 # HED from Tensorpack examples: https://github.com/tensorpack/tensorpack/tree/master/examples/HED
@@ -189,16 +190,22 @@ class PipelineRunModels(PipelineStep):
     def __init__(self, semantic_path: str, normals_path: str, unlit_path: str,
                  elevation_path: str, lighting_path: str, hed_path: str):
         super().__init__()
+
+        # See https://github.com/tensorpack/tensorpack/issues/497
+        _ = tf.Session(config=get_session_config())
+
         self.model_semantic = load_model(semantic_path)
         self.model_normals = load_model(normals_path)
         self.model_unlit = load_model(unlit_path)
         self.model_elevation = load_model(elevation_path)
         self.model_lighting = load_model(lighting_path)
+
         self.model_hed = OfflinePredictor(PredictConfig(
             model=Model(),
             session_init=SmartInit(hed_path),
             input_names=['image'],
-            output_names=['output%d' % k for k in range(1, 7)]
+            output_names=['output%d' % k for k in range(1, 7)],
+            session_creator=NewSessionCreator(config=get_session_config())
         ))
 
     @property

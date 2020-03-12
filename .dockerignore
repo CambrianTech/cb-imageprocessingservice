@@ -18,5 +18,6 @@ coverage.xml
 *.log
 .git
 
+planercnn
 sklearn_models
 tensorflow_models

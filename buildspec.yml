@@ -4,6 +4,19 @@ phases:
   install:
     runtime-versions:
       docker: 18
+    commands:
+      # Fix for CodePipeline not being able to clone submodules (https://stackoverflow.com/a/53077616/4332314)
+      - mkdir -p ~/.ssh
+      - echo "$GITHUB_SSH_KEY" > ~/.ssh/id_rsa
+      - chmod 600 ~/.ssh/id_rsa
+      - ssh-keygen -F github.com || ssh-keyscan github.com >>~/.ssh/known_hosts
+      - git config --global url."git@github.com:".insteadOf "https://github.com/"
+      - git init
+      - git remote add origin $GITHUB_URI
+      - git fetch
+      - git checkout -t origin/$GITHUB_BRANCH
+      - git submodule init
+      - git submodule update --recursive
   pre_build:
     commands:
       - if [ $CPU_ONLY ]; then $DOCKERFILE_PATH="Dockerfile"; else $DOCKERFILE_PATH="Dockerfile-CPU"; fi

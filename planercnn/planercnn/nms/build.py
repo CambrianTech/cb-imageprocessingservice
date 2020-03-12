@@ -6,14 +6,15 @@ from torch.utils.ffi import create_extension
 sources = ['src/nms.c']
 headers = ['src/nms.h']
 defines = []
-with_cuda = False
+with_cuda = True
 
-if torch.cuda.is_available():
+if with_cuda:
     print('Including CUDA code.')
     sources += ['src/nms_cuda.c']
     headers += ['src/nms_cuda.h']
     defines += [('WITH_CUDA', None)]
-    with_cuda = True
+
+print("WITH CUDA:", with_cuda)
 
 this_file = os.path.dirname(os.path.realpath(__file__))
 print(this_file)

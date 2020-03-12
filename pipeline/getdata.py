@@ -42,3 +42,12 @@ class PipelineGetData(PipelineStep):
             data["image"] = imread(local_path)
 
         data["image"] = data["image"][:, :, :3]
+
+        # TODO: Get this from http request
+        image = data["image"]
+        data["camera"] = np.array([
+            image.shape[0], image.shape[1], # fx, fy
+            image.shape[0] / 2, image.shape[1] / 2, # cx, cy
+            image.shape[0], image.shape[1]], # image width, height
+            dtype=np.float32
+        )

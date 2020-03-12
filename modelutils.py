@@ -2,6 +2,14 @@ import numpy as np
 import cv2
 import tensorflow as tf
 
+
+def get_session_config(use_gpu=True, dynamic_gpu_memory=True) -> tf.ConfigProto:
+    # Allow GPU memory growth so tensorflow doesn't allocate all memory
+    config = tf.ConfigProto(device_count={ "GPU": 1 if use_gpu else 0 })
+    config.gpu_options.allow_growth = dynamic_gpu_memory
+    return config
+
+
 def feed_images_batched(model, images_batch: list) -> list:
     inputs = {}
 
@@ -121,9 +129,12 @@ def feed_image(model, image: np.ndarray) -> np.ndarray:
     return outputs[output_key]
 
 
-def load_model(model_path: str):
+def load_model(model_path: str, session_config=None):
+    if session_config is None:
+        session_config = get_session_config()
+
     print("Loading model from", model_path)
-    model = tf.contrib.predictor.from_saved_model(model_path)
+    model = tf.contrib.predictor.from_saved_model(model_path, config=session_config)
     input_keys = ", ".join(model.feed_tensors.keys())
     output_keys = ", ".join(model.fetch_tensors.keys())
     print("Loaded model with inputs", input_keys, "and outputs", output_keys)

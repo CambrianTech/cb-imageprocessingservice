@@ -22,6 +22,7 @@ from pipeline.refine import PipelineRefineResults
 from pipeline.runmodels import PipelineRunModels
 from pipeline.superpixels import PipelineSuperpixels
 from pipeline.uploadresults import PipelineUploadResults
+from pipeline.remote import PipelineRemotePlaneDetector
 
 
 def _get_instance_metadata():
@@ -54,9 +55,10 @@ def _get_instance_metadata():
 @click.argument("fov_model_path", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("user_uploads_bucket", type=click.STRING)
 @click.argument("results_bucket", type=click.STRING)
+@click.argument("plane_url", type=click.STRING)
 @click.option("--image-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--results-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
-def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_local_dir, results_local_dir):
+def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_url, image_local_dir, results_local_dir):
     print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
@@ -77,6 +79,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
         PipelineRefineResults(),
         PipelineCalculateFov(fov_model_path),
         PipelineSuperpixels(),
+        PipelineRemotePlaneDetector(plane_url),
         PipelineUploadResults(results_bucket)
     ]
 

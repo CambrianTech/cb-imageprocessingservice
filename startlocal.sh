@@ -1,0 +1,2 @@
+sudo docker run --gpus all -p 8081:8081 -dt planes
+sudo docker run --gpus all -e PLANES_ADDRESS="http://localhost:8081/" -e USER_UPLOADS_BUCKET=cb-user-image-uploads -e RESULTS_BUCKET=cb-user-image-uploads -p 8080:8080 -dt imageproc
