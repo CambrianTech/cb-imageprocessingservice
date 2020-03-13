@@ -2,13 +2,12 @@ import numpy as np
 from scipy.special import softmax
 import cv2
 import tensorflow as tf
-from modelutils import feed_image_batched, feed_images_batched, load_model, get_session_config
+from modelutils import feed_image_batched, feed_images_batched, load_model
 from pipeline.core import PipelineStep
 import os
 from time import time
 from tensorpack import *
 from tensorpack.tfutils import gradproc, optimizer
-from tensorpack.tfutils.sesscreate import NewSessionCreator
 from tensorpack.tfutils.summary import add_moving_summary, add_param_summary
 
 # HED from Tensorpack examples: https://github.com/tensorpack/tensorpack/tree/master/examples/HED
@@ -186,26 +185,20 @@ class Model(ModelDesc):
                 [('convfcweight.*', 0.1), ('conv5_.*', 5)])])
 
 
+
 class PipelineRunModels(PipelineStep):
     def __init__(self, semantic_path: str, normals_path: str, unlit_path: str,
                  elevation_path: str, lighting_path: str, hed_path: str):
-        super().__init__()
-
-        # See https://github.com/tensorpack/tensorpack/issues/497
-        _ = tf.Session(config=get_session_config())
-
         self.model_semantic = load_model(semantic_path)
         self.model_normals = load_model(normals_path)
         self.model_unlit = load_model(unlit_path)
         self.model_elevation = load_model(elevation_path)
         self.model_lighting = load_model(lighting_path)
-
         self.model_hed = OfflinePredictor(PredictConfig(
             model=Model(),
             session_init=SmartInit(hed_path),
             input_names=['image'],
-            output_names=['output%d' % k for k in range(1, 7)],
-            session_creator=NewSessionCreator(config=get_session_config())
+            output_names=['output%d' % k for k in range(1, 7)]
         ))
 
     @property
@@ -214,7 +207,7 @@ class PipelineRunModels(PipelineStep):
 
     @property
     def output_keys(self) -> list:
-        return ["image", "semantic", "semantic_probs", "normals", "elevation", "lighting", "normals_latents", "hed"]
+        return ["image", "semantic", "semantic_probs", "lighting", "hed", "unlit"]
 
     @property
     def is_batched(self) -> bool:
@@ -227,11 +220,6 @@ class PipelineRunModels(PipelineStep):
             results = feed_image_batched(model, images)
             for datum, result in zip(data, results):
                 datum[key] = result
-
-        t = time()
-        _run_single(self.model_elevation, "elevation")
-        print("Elevation model took %.2f seconds" % (time() - t))
-
         t = time()
         _run_single(self.model_lighting, "lighting")
         print("Lighting model took %.2f seconds" % (time() - t))
@@ -250,25 +238,23 @@ class PipelineRunModels(PipelineStep):
             datum["semantic_probs"] = softmax(result/255, axis=-1)
         print("Semantic model took %.2f seconds" % (time() - t))
 
-        # Normals output with latents
         t = time()
-        input_tensor = list(self.model_normals.feed_tensors.values())[0]
-        latent_tensors = self.model_normals.graph.get_tensor_by_name(
-            "generator/decoder_8/conv2d_transpose/BiasAdd:0")
-        output_tensor = list(self.model_normals.fetch_tensors.values())[0]
-        normals_latents, normals = self.model_normals.session.run([latent_tensors, output_tensor], feed_dict={
-            input_tensor: [cv2.resize(datum["image"], (512, 512)).astype(np.float32)/255 for datum in data]})
-        normals_latents = normals_latents[:,
-                                          :, :, :128].reshape(len(data), 1, -1)
 
-        for datum, nl, n in zip(data, normals_latents, normals):
-            datum["normals"] = n
-            datum["normals_latents"] = nl
-        print("Normals model took %.2f seconds" % (time() - t))
+        for i in range(len(images)):
+            w, h, _ = images[i].shape
+            if w < 1024 and h < 1024:
+                h = int((h // 16) * 16)
+                w = int((w//16) * 16)
+            else :
+                if w >= h:
+                    h = int((1024 / w * h // 16) * 16)
+                    w = 1024
+                else:
+                    w = int((1024 / h * w // 16) * 16)
+                    h = 1024
+            images[i] = cv2.resize(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB), (h, w)).astype(
+            'float32')
 
-        t = time()
-        images = [cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), (1024, 1024)).astype(
-            'float32') for img in images]
         print("HED resize took %.2f seconds" % (time() - t))
 
         t = time()

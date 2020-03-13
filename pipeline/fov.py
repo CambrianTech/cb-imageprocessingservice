@@ -9,7 +9,7 @@ class PipelineCalculateFov(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["normals_latents"]
+        return []
 
     @property
     def output_keys(self) -> list:

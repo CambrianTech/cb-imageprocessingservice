@@ -16,7 +16,6 @@ def _log_image(name, image):
         cv2.imwrite(name, image)
 
 
-
 class PipelineRefineResults(PipelineStep):
     @property
     def required_keys(self) -> list:
@@ -24,31 +23,21 @@ class PipelineRefineResults(PipelineStep):
 
     @property
     def output_keys(self) -> list:
-        return ["mask"]
+        return ["mask", "lighting"]
 
     def run(self, data):
 
-        img = data["image"]
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-        w, h, _ = img.shape
-        if w < 1024 and h < 1024:
-            h = int((h // 16) * 16)
-            w = int((w // 16) * 16)
-        else:
-            if w >= h:
-                h = int((1024 / w * h // 16) * 16)
-                w = 1024
-            else:
-                w = int((1024 / h * w // 16) * 16)
-                h = 1024
-        shape = (h,w)
-        img = cv2.resize(img, shape)
-
-        img_bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
         hed = data["hed"]
         _log_image('hed.png', hed)
+
+        w, h = hed.shape
+        shape = (h,w)
+
+        img = data["image"]
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = cv2.resize(img, shape)
+        img_bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
 
         prob_mask_full = np.uint8(255*data["semantic_probs"][:, :, 0])
 
@@ -168,3 +157,21 @@ class PipelineRefineResults(PipelineStep):
         data["mask"] = final_mask
 
         _log_image('final_mask.png', data["mask"])
+
+        lighting_rgb = np.uint8(data["lighting"])
+        lighting_rgb = cv2.resize(lighting_rgb, shape)
+        lighting = lighting_rgb[:, :, 1]
+
+        # Remove hard edges from lighting
+        smooth_lighting = ip.remove_grooves(lighting, data["mask"])
+
+        blurred_mask = cv2.GaussianBlur(data["mask"], (31, 31), 15)
+
+        blurred_lighting = cv2.GaussianBlur(smooth_lighting, (21, 21), 11)
+
+        lighting = ip.alpha_blend(
+            smooth_lighting, blurred_lighting, blurred_mask)
+
+        data["lighting"] = lighting
+
+        _log_image('lighting.png', lighting)
