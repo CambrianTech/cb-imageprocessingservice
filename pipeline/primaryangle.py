@@ -114,114 +114,26 @@ def get_candidate_walls(floor_normal, isolated_surfaces, max_angle=20):
 class PipelineDeterminePrimaryAngles(PipelineStep):
     @property
     def required_keys(self) -> list:
-        return ["semantic_probs", "normals", "elevation"]
+        return ["semantic_probs"]
 
     @property
     def output_keys(self) -> list:
-        return ["kmeans_normals", "camera_rotation", "camera_elevation", "floor_rotation"]
+        return ["camera_rotation", "camera_elevation", "floor_rotation"]
 
     def run(self, data):
-        mask = np.uint8(255*data["semantic_probs"][:, :, 0])
-        normals = np.uint8(255*data["normals"])
-        elevation = data["elevation"]
 
-        kmeans, labels, centers = ip.kmeans_image(normals, 5)
-
-        data["kmeans_normals"] = kmeans
-
-        reduced_normals = kmeans
-        reduced_mask = mask.copy()
-        reduced_mask[reduced_mask > 127] = 255
-        reduced_mask[reduced_mask < 255] = 0
-
-        # build surfaces
-        isolated_surfaces = []
-        for color in centers:
-            normal = get_normal_from_rgb(color)
-            color_mask = ip.isolate_color(reduced_normals, color)
-            isolated_surfaces.append((color, normal, color_mask))
-
-        floor_materials = [255]  # floor, rug
-
-        # find floor
-        floor_index, _, floor_intersection = get_matching_surface(
-            reduced_mask, isolated_surfaces, floor_materials)
-
-        if floor_index < 0:
-            print("Invalid surfaces")
-            return None
-
-        floor_surface = isolated_surfaces[floor_index]
-
-        # Calculate the camera pitch and roll from the floor normal.
-
-        result_prob = cv2.bitwise_and(mask, mask, mask=floor_intersection)
-
-        floor_color = floor_surface[0]
-
-        low_thresh = np.clip(floor_color - 4.0, 0, 255)
-        high_thresh = np.clip(floor_color + 4.0, 0, 255)
-
-        normals_mask = cv2.inRange(normals, low_thresh, high_thresh)
-
-        floor_normal = np.mean(normals[result_prob > 127], axis=0)
-
-        normals_mask[result_prob < 128] = 0
-
-        floor_normal = (floor_normal-127.5) / 127.5
-
-        floor_normal_len = max(0.00001, np.linalg.norm(floor_normal))
-        floor_normal /= floor_normal_len
-
-        cam_pitch = 0.0
+        cam_pitch = -0.2
+        cam_yaw = 0.0
         cam_roll = 0.0
 
-        cam_pitch = -math.acos(floor_normal[2])
-        if np.isnan(cam_pitch):
-            cam_pitch = -0.2
-
-        cam_roll = -math.asin(floor_normal[0])
-
-        if np.isnan(cam_roll):
-            cam_roll = 0.0
-
-        data["camera_rotation"] = [cam_pitch, 0.0, cam_roll]
+        data["camera_rotation"] = [cam_pitch, cam_yaw, cam_roll]
 
         print("camera rotation:", data["camera_rotation"])
 
-        floor_elevation = np.mean(elevation[normals_mask > 0], axis=0)
-        floor_elevation_pixels = 127.5 - floor_elevation
-
-        pixels_per_meter = 127.5 / 300.0
-
-        floor_elevation = floor_elevation_pixels / pixels_per_meter
-
-        floor_elevation = np.clip(
-            floor_elevation, 80.0, 170.0) / 100.0  # valid range
-
-        if np.isnan(floor_elevation):
-            floor_elevation = 1.3
-
-        data["camera_elevation"] = floor_elevation
+        data["camera_elevation"] = 1.3
 
         print("floor elevation:", data["camera_elevation"])
 
-        # find candidate wall surfaces
-        candidate_walls, primary_wall_index = get_candidate_walls(
-            floor_surface[1], isolated_surfaces)
-
-        # calculate floor rotation:
-        floor_rotation = 0.0
-
-        x_unit_normal = [1, 0, 0]
-
-        if primary_wall_index >= 0:
-            floor_rotation = geo.angle_between(
-                candidate_walls[primary_wall_index][1], x_unit_normal)
-
-        if np.isnan(floor_rotation):
-            floor_rotation = 0.0
-
-        data["floor_rotation"] = floor_rotation
+        data["floor_rotation"] = 0.0
 
         print("floor rotation:", data["floor_rotation"])

@@ -16,6 +16,6 @@ class PipelineCalculateFov(PipelineStep):
         return ["fov"]
 
     def run(self, data):
-        # Pass latents to sklearn model and store the predicted fov.
-        fov_class = self.classifier.predict(data["normals_latents"])[0]
-        data["fov"] = 60.0 if fov_class == 0 else 85.0
+        # Setfov.
+
+        data["fov"] = 60.0
