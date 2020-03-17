@@ -5,6 +5,8 @@ import os
 import json
 import datetime
 import dateutil
+from time import time
+import typing
 
 import click
 from aiohttp import web
@@ -12,7 +14,7 @@ import aiohttp_cors
 import boto3
 import requests
 
-from pipeline.core import Pipeline
+from pipeline.core import schedule_and_wait, merge_future_dicts, num_waiting_items
 from pipeline.fov import PipelineCalculateFov
 from pipeline.getdata import PipelineGetData
 from pipeline.primaryangle import PipelineDeterminePrimaryAngles
@@ -20,6 +22,7 @@ from pipeline.refine import PipelineRefineResults
 from pipeline.runmodels import PipelineRunModels
 from pipeline.superpixels import PipelineSuperpixels
 from pipeline.uploadresults import PipelineUploadResults
+from pipeline.remote import PipelineRemotePlaneDetector
 
 
 def _get_instance_metadata():
@@ -52,38 +55,50 @@ def _get_instance_metadata():
 @click.argument("fov_model_path", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("user_uploads_bucket", type=click.STRING)
 @click.argument("results_bucket", type=click.STRING)
+@click.argument("plane_url", type=click.STRING)
 @click.option("--image-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--results-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
-def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_local_dir, results_local_dir):
+def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_url, image_local_dir, results_local_dir):
     print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
     print("Creating pipeline")
 
-    # Setup pipeline to run on requests
-    pipeline = (Pipeline()
-                .add(PipelineGetData(user_uploads_bucket))
-                .add(PipelineRunModels(
-                    semantic_path=join(model_path, "semantic"),
-                    normals_path=join(model_path, "normals"),
-                    unlit_path=join(model_path, "unlit"),
-                    elevation_path=join(model_path, "elevation"),
-                    lighting_path=join(model_path, "lighting"),
-                    hed_path=join("hed_model", "HED_pretrained_bsds.npz")
-                ))
-                .add(PipelineDeterminePrimaryAngles())
-                .add(PipelineRefineResults())
-                .add(PipelineCalculateFov(fov_model_path))
-                .add(PipelineSuperpixels())
-                .add(PipelineUploadResults(results_bucket)))
+    # Create the steps we want to use in the pipelines
+    steps = [
+        PipelineGetData(user_uploads_bucket),
+        PipelineRunModels(
+            semantic_path=join(model_path, "semantic"),
+            normals_path=join(model_path, "normals"),
+            unlit_path=join(model_path, "unlit"),
+            elevation_path=join(model_path, "elevation"),
+            lighting_path=join(model_path, "lighting"),
+            hed_path=join("hed_model", "HED_pretrained_bsds.npz")
+        ),
+        PipelineDeterminePrimaryAngles(),
+        PipelineRefineResults(),
+        PipelineCalculateFov(fov_model_path),
+        PipelineSuperpixels(),
+        PipelineRemotePlaneDetector(plane_url),
+        PipelineUploadResults(results_bucket)
+    ]
 
-    print("Validating pipeline")
-    pipeline.validate(["image_s3_key"])
+    # Start the processing workers for all steps
+    for step in steps:
+        step.start()
+
+    # Pipeline for segmenting floors, generating lighting and predicting fov.
+    async def flooring_pipeline(input_dict: typing.Dict):
+        total_start_time = time()
+        for step in steps:
+            input_dict = await schedule_and_wait(step.schedule, input_dict)
+        print("Total pipeline time: %.2fs" % (time() - total_start_time))
+        return input_dict
 
     # Setup http server
     async def handle_segment(request):
         print("Handle segment:", request, "(items waiting in pipeline: %d)" %
-              pipeline.num_waiting_items)
+              num_waiting_items(steps))
 
         # Get image S3 key from GET request
         image_s3_key = request.match_info.get("id", None)
@@ -102,7 +117,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
                 "WARNING: Do not use in production: results local dir set to", results_local_dir)
             data["results_local_dir"] = results_local_dir
 
-        data = await pipeline.run(data)
+        data = await flooring_pipeline(data)
 
         return web.json_response({
             "lighting_url": data["lighting_url"],
@@ -131,7 +146,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
                 if not chunk:
                     break
                 image_file.write(chunk)
-                
+
         return web.json_response({})
 
     async def handle_get_image(request):
@@ -145,9 +160,9 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
         return web.FileResponse(os.path.join(results_local_dir, bucket, image_s3_key))
 
     print("Trying to get instance metadata")
-    
+
     metadata = None
-    
+
     if results_local_dir is None:
         metadata = _get_instance_metadata()
     else:
@@ -182,10 +197,10 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
         while True:
             for _ in range(60):
                 await asyncio.sleep(1)
-                avg_waiting_items = 0.9 * avg_waiting_items + 0.1 * pipeline.num_waiting_items
+                avg_waiting_items = 0.9 * avg_waiting_items + 0.1 * num_waiting_items(steps)
 
             print("Waiting items: %.2f (avg: %.2f)" %
-                  (pipeline.num_waiting_items, avg_waiting_items))
+                  (num_waiting_items(steps), avg_waiting_items))
 
             if metadata is not None:
                 await loop.run_in_executor(None, push_metrics, avg_waiting_items)
