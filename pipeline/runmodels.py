@@ -187,25 +187,19 @@ class Model(ModelDesc):
 
 
 class PipelineRunModels(PipelineStep):
-    def __init__(self, semantic_path: str, normals_path: str, unlit_path: str,
-                 elevation_path: str, lighting_path: str, hed_path: str):
+    def __init__(self, semantic_path: str, hed_path: str):
         super().__init__()
 
-        # See https://github.com/tensorpack/tensorpack/issues/497
-        _ = tf.Session(config=get_session_config())
+        _ = tf.Session(config=get_session_config(use_gpu=True))
 
-        self.model_semantic = load_model(semantic_path)
-        self.model_normals = load_model(normals_path)
-        self.model_unlit = load_model(unlit_path)
-        self.model_elevation = load_model(elevation_path)
-        self.model_lighting = load_model(lighting_path)
+        self.model_semantic = load_model(semantic_path, session_config=get_session_config(use_gpu=True))
 
         self.model_hed = OfflinePredictor(PredictConfig(
             model=Model(),
             session_init=SmartInit(hed_path),
             input_names=['image'],
             output_names=['output%d' % k for k in range(1, 7)],
-            session_creator=NewSessionCreator(config=get_session_config())
+            session_creator=NewSessionCreator(config=get_session_config(use_gpu=True))
         ))
 
     @property
@@ -214,7 +208,7 @@ class PipelineRunModels(PipelineStep):
 
     @property
     def output_keys(self) -> list:
-        return ["image", "semantic", "semantic_probs", "lighting", "hed", "unlit"]
+        return ["image", "semantic", "semantic_probs", "hed", "unlit", "lighting"]
 
     @property
     def is_batched(self) -> bool:
@@ -223,27 +217,16 @@ class PipelineRunModels(PipelineStep):
     def run(self, data):
         images = [datum["image"] for datum in data]
 
-        def _run_single(model, key):
-            results = feed_image_batched(model, images)
-            for datum, result in zip(data, results):
-                datum[key] = result
-
-        t = time()
-        _run_single(self.model_lighting, "lighting")
-        print("Lighting model took %.2f seconds" % (time() - t))
-
-        t = time()
-        _run_single(self.model_unlit, "unlit")
-        print("Unlit model took %.2f seconds" % (time() - t))
-
         t = time()
         semantic_input = [{"image": datum["image"],
                            "unlit": datum["unlit"]} for datum in data]
+
         semantic_results = [s["output"] for s in feed_images_batched(
             self.model_semantic, semantic_input)]
         for datum, result in zip(data, semantic_results):
             datum["semantic"] = result
             datum["semantic_probs"] = softmax(result/255, axis=-1)
+
         print("Semantic model took %.2f seconds" % (time() - t))
 
         t = time()

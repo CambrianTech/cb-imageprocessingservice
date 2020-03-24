@@ -1,4 +1,5 @@
 import asyncio
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from os.path import join
 import os
@@ -22,7 +23,7 @@ from pipeline.refine import PipelineRefineResults
 from pipeline.runmodels import PipelineRunModels
 from pipeline.superpixels import PipelineSuperpixels
 from pipeline.uploadresults import PipelineUploadResults
-from pipeline.remote import PipelineRemotePlaneDetector
+from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 
 
 def _get_instance_metadata():
@@ -62,17 +63,18 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
     print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
+    print("Starting CPU networks process")
+    cpu_networks_port = 8082
+    subprocess.Popen(["python3", "runcpunetworks.py", model_path, str(cpu_networks_port)])
+
     print("Creating pipeline")
 
     # Create the steps we want to use in the pipelines
     steps = [
         PipelineGetData(user_uploads_bucket),
+        PipelineRemoteNetworks("http://localhost:%d" % cpu_networks_port),
         PipelineRunModels(
             semantic_path=join(model_path, "semantic"),
-            normals_path=join(model_path, "normals"),
-            unlit_path=join(model_path, "unlit"),
-            elevation_path=join(model_path, "elevation"),
-            lighting_path=join(model_path, "lighting"),
             hed_path=join("hed_model", "HED_pretrained_bsds.npz")
         ),
         PipelineDeterminePrimaryAngles(),
