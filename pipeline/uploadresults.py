@@ -48,8 +48,13 @@ class PipelineUploadResults(PipelineStep):
         key_data = "%s/data.json" % data["image_s3_key"]
         key_superpixels = "%s/superpixels.png" % data["image_s3_key"]
 
-        json_dict = {"cameraPosition": [0.0, data["camera_elevation"], 0.0],
-                     "cameraRotation": data["camera_rotation"], "floorRotation": data["floor_rotation"], "fov": data["fov"]}
+        json_dict = {
+            "cameraPosition": [0.0, data["camera_elevation"], 0.0],
+            "cameraRotation": data["camera_rotation"],
+            "floorRotation": data["floor_rotation"],
+            "fov": data["fov"],
+            "planes": data["planes"]["detections"].tolist() # [num planes, 9]
+        }
 
         mask_image = data["mask"]
         lighting_image = data["lighting"]
@@ -66,7 +71,12 @@ class PipelineUploadResults(PipelineStep):
             _upload_image_to_s3(
                 self.s3_client, superpixels_image, self.bucket_name, key_superpixels)
 
+            for i, plane_mask in enumerate(data["planes"]["masks"]):
+                _upload_image_to_s3(self.s3_client, plane_mask, self.bucket_name, "%s/plane_masks/mask_%d.png" % (data["image_s3_key"], i))
+
             # TODO: Get URLs in a better way
+            data["plane_mask_url"] = "https://s3.amazonaws.com/%s/%s" % (
+                self.bucket_name, "plane_masks")
             data["semantic_url"] = "https://s3.amazonaws.com/%s/%s" % (
                 self.bucket_name, key_semantic)
             data["lighting_url"] = "https://s3.amazonaws.com/%s/%s" % (
