@@ -36,7 +36,7 @@ class PipelineUploadResults(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["semantic", "lighting", "superpixels"]
+        return ["semantic", "lighting", "superpixels", "planes"]
 
     @property
     def output_keys(self) -> list:
@@ -47,13 +47,21 @@ class PipelineUploadResults(PipelineStep):
         key_lighting = "%s/lighting.png" % data["image_s3_key"]
         key_data = "%s/data.json" % data["image_s3_key"]
         key_superpixels = "%s/superpixels.png" % data["image_s3_key"]
+        
+        # Use AWS S3 url by default, or local server if one was set.
+        base_url = "http://127.0.0.1:8080/getimage" if "results_local_dir" in data else "https://s3.amazonaws.com"
+        def _make_url(path):
+            return "%s/%s/%s" % (base_url, self.bucket_name, path)
 
         json_dict = {
             "cameraPosition": [0.0, data["camera_elevation"], 0.0],
             "cameraRotation": data["camera_rotation"],
             "floorRotation": data["floor_rotation"],
             "fov": data["fov"],
-            "planes": data["planes"]["detections"].tolist() # [num planes, 9]
+            "planes": [{
+                "data": plane_data, # [9]
+                "mask_url": _make_url("%s/plane_masks/mask_%d.png" % (data["image_s3_key"], i))
+            } for i, plane_data in enumerate(data["planes"]["detections"].tolist())]
         }
 
         mask_image = data["mask"]
@@ -73,27 +81,14 @@ class PipelineUploadResults(PipelineStep):
 
             for i, plane_mask in enumerate(data["planes"]["masks"]):
                 _upload_image_to_s3(self.s3_client, plane_mask, self.bucket_name, "%s/plane_masks/mask_%d.png" % (data["image_s3_key"], i))
-
-            # TODO: Get URLs in a better way
-            data["plane_mask_url"] = "https://s3.amazonaws.com/%s/%s" % (
-                self.bucket_name, "plane_masks")
-            data["semantic_url"] = "https://s3.amazonaws.com/%s/%s" % (
-                self.bucket_name, key_semantic)
-            data["lighting_url"] = "https://s3.amazonaws.com/%s/%s" % (
-                self.bucket_name, key_lighting)
-            data["data_url"] = "https://s3.amazonaws.com/%s/%s" % (
-                self.bucket_name, key_data)
-            data["superpixels_url"] = "https://s3.amazonaws.com/%s/%s" % (
-                self.bucket_name, key_superpixels)
         else:
-            mask_path = os.path.join(
-                data["results_local_dir"], self.bucket_name, key_semantic)
-            lighting_path = os.path.join(
-                data["results_local_dir"], self.bucket_name, key_lighting)
-            data_path = os.path.join(
-                data["results_local_dir"], self.bucket_name, key_data)
-            superpixels_path = os.path.join(
-                data["results_local_dir"], self.bucket_name, key_superpixels)
+            def _make_local_url(path):
+                return os.path.join(data["results_local_dir"], self.bucket_name, path)
+
+            mask_path = _make_local_url(key_semantic)
+            lighting_path = _make_local_url(key_lighting)
+            data_path = _make_local_url(key_data)
+            superpixels_path = _make_local_url(key_superpixels)
 
             os.makedirs(os.path.dirname(mask_path), exist_ok=True)
             os.makedirs(os.path.dirname(lighting_path), exist_ok=True)
@@ -114,11 +109,14 @@ class PipelineUploadResults(PipelineStep):
 
             imsave(superpixels_path, superpixels_image)
 
-            data["semantic_url"] = "http://127.0.0.1:8080/getimage/%s/%s" % (
-                self.bucket_name, key_semantic)
-            data["lighting_url"] = "http://127.0.0.1:8080/getimage/%s/%s" % (
-                self.bucket_name, key_lighting)
-            data["data_url"] = "http://127.0.0.1:8080/getimage/%s/%s" % (
-                self.bucket_name, key_data)
-            data["superpixels_url"] = "http://127.0.0.1:8080/getimage/%s/%s" % (
-                self.bucket_name, key_superpixels)
+            for i, plane_mask in enumerate(data["planes"]["masks"]):
+                plane_path = _make_local_url("%s/plane_masks/mask_%d.png" % (data["image_s3_key"], i))
+                os.makedirs(os.path.dirname(plane_path), exist_ok=True)
+                if plane_mask.dtype == np.float32:
+                    plane_mask = (255 * plane_mask).astype(np.uint8)
+                imsave(plane_path, plane_mask)
+
+        data["semantic_url"] = _make_url(key_semantic)
+        data["lighting_url"] = _make_url(key_lighting)
+        data["data_url"] = _make_url(key_data)
+        data["superpixels_url"] = _make_url(key_superpixels)
