@@ -4,23 +4,10 @@ phases:
   install:
     runtime-versions:
       docker: 18
-    commands:
-      # Fix for CodePipeline not being able to clone submodules (https://stackoverflow.com/a/53077616/4332314)
-      - mkdir -p ~/.ssh
-      - echo "$GITHUB_SSH_KEY" > ~/.ssh/id_rsa
-      - chmod 600 ~/.ssh/id_rsa
-      - ssh-keygen -F github.com || ssh-keyscan github.com >>~/.ssh/known_hosts
-      - git config --global url."git@github.com:".insteadOf "https://github.com/"
-      - git init
-      - git remote add origin $GITHUB_URI
-      - git fetch
-      - git checkout -t origin/$GITHUB_BRANCH
-      - git submodule init
-      - git submodule update --recursive
   pre_build:
     commands:
       - if [ $CPU_ONLY ]; then $DOCKERFILE_PATH="Dockerfile"; else $DOCKERFILE_PATH="Dockerfile-CPU"; fi
-      - REPOSITORY_URI=$ECR_REPOSITORY_URI
+      
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
       - echo Logging in to Amazon ECR...
@@ -28,16 +15,29 @@ phases:
   build:
     commands:
       - echo Build started on `date`
-      - echo Building docker image
-      - docker build -t $REPOSITORY_URI:$IMAGE_TAG -f $DOCKERFILE_PATH .
-      - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:latest
+
+      - echo Building main docker image
+      - docker build -t $MAIN_REPOSITORY_URI:$IMAGE_TAG -f $DOCKERFILE_PATH .
+      - docker tag $MAIN_REPOSITORY_URI:$IMAGE_TAG $MAIN_REPOSITORY_URI:latest
+
+      - cd planercnn
+      - echo Building planes docker image
+      - docker build -t $PLANES_REPOSITORY_URI:$IMAGE_TAG -f $DOCKERFILE_PATH .
+      - docker tag $PLANES_REPOSITORY_URI:$IMAGE_TAG $PLANES_REPOSITORY_URI:latest
+      - cd ..
   post_build:
     commands:
       - echo Build completed on `date`
-      - python3 writeartifacts.py $CODEBUILD_SRC_DIR/imagedefinitions.json $REPOSITORY_URI:$IMAGE_TAG
-      - echo Pushing docker image
-      - docker push $REPOSITORY_URI:latest
-      - docker push $REPOSITORY_URI:$IMAGE_TAG
+
+      - python3 writeartifacts.py $CODEBUILD_SRC_DIR/imagedefinitions.json $MAIN_REPOSITORY_URI:$IMAGE_TAG
+
+      - echo Pushing main docker image
+      - docker push $MAIN_REPOSITORY_URI:latest
+      - docker push $MAIN_REPOSITORY_URI:$IMAGE_TAG
+
+      - echo Pushing planes docker image
+      - docker push $PLANES_REPOSITORY_URI:latest
+      - docker push $PLANES_REPOSITORY_URI:$IMAGE_TAG
 artifacts:
   name: ECSImageDefinitions
   base-directory: $CODEBUILD_SRC_DIR

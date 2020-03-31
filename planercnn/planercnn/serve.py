@@ -45,7 +45,8 @@ def main():
     print("Loading detector")
     options = parse_args()
     config = InferenceConfig(options)
-    detector = PlaneRCNNDetector(options, config, modelType="final")
+    with torch.no_grad():
+        detector = PlaneRCNNDetector(options, config, modelType="final")
 
     routes = web.RouteTableDef()
 
