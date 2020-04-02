@@ -23,9 +23,66 @@ def _upload_image_to_s3(s3_client, image: np.ndarray, bucket: str, key: str):
 
 def _upload_json_to_s3(s3_client, json_dict: dict, bucket: str, key: str):
     json_data = BytesIO()
-    json_data.write(json.dumps(json_dict, indent=5).encode())
+    json_data.write(json.dumps(json_dict, indent=4).encode())
     json_data.seek(0)
     s3_client.upload_fileobj(json_data, bucket, key)
+
+
+def _make_data_dict(data, make_url):
+    return {
+        "formatVersion": 1,
+        "cameraPosition": [0.0, data["camera_elevation"], 0.0],
+        "cameraRotation": data["camera_rotation"],
+        "floorRotation": data["floor_rotation"],
+        "fov": data["fov"],
+        "planes": [{
+            "data": plane_data, # [9]
+            "mask_url": make_url("%s/plane_masks/mask_%d.png" % (data["image_s3_key"], i))
+        } for i, plane_data in enumerate(data["planes"]["detection"].tolist())]
+    }
+
+
+def _encode_plane_surface(plane_index, plane_data, mask_url):
+    return {
+        "id": "plane-%d" % plane_index,
+        "type": "unknown",
+        "name": "Plane %d" % plane_index,
+        "position": [],
+        "rotation": [],
+        "extent": [],
+        "rawData": plane_data,
+        "images": {
+            "mask": mask_url
+        }
+    }
+
+
+def _make_data_v2_dict(data, lighting_url, superpixels_url, semantic_url, make_plane_mask_url):
+    all_plane_data = data["planes"]["detection"].tolist()
+
+    return {
+        "formatVersion": 2,
+        "name": "Room %s" % data["image_s3_key"],
+        "id": "room-%s" % data["image_s3_key"],
+        "floorRotation": data["floor_rotation"],
+        "images": {
+            "lighting": lighting_url,
+            "superpixels": superpixels_url,
+            "semantic": semantic_url
+        },
+        "camera": {
+            "fov": data["fov"],
+            "position": [0.0, data["camera_elevation"], 0.0],
+            "rotation": data["camera_rotation"]
+        },
+        "geometry": {
+            "surfaces": [
+                _encode_plane_surface(i, plane_data, make_plane_mask_url(i))
+                for i, plane_data in enumerate(all_plane_data)
+            ]
+        },
+        "assets": []
+    }
 
 
 class PipelineUploadResults(PipelineStep):
@@ -46,23 +103,18 @@ class PipelineUploadResults(PipelineStep):
         key_semantic = "%s/mask.png" % data["image_s3_key"]
         key_lighting = "%s/lighting.png" % data["image_s3_key"]
         key_data = "%s/data.json" % data["image_s3_key"]
+        key_data_v2 = "%s/data_v2.json" % data["image_s3_key"]
         key_superpixels = "%s/superpixels.png" % data["image_s3_key"]
         
         # Use AWS S3 url by default, or local server if one was set.
         base_url = "http://127.0.0.1:8080/getimage" if "results_local_dir" in data else "https://s3.amazonaws.com"
         def _make_url(path):
             return "%s/%s/%s" % (base_url, self.bucket_name, path)
+        def _make_plane_mask_url(plane_index):
+            return _make_url("%s/plane_masks/mask_%d.png" % (data["image_s3_key"], plane_index))
 
-        json_dict = {
-            "cameraPosition": [0.0, data["camera_elevation"], 0.0],
-            "cameraRotation": data["camera_rotation"],
-            "floorRotation": data["floor_rotation"],
-            "fov": data["fov"],
-            "planes": [{
-                "data": plane_data, # [9]
-                "mask_url": _make_url("%s/plane_masks/mask_%d.png" % (data["image_s3_key"], i))
-            } for i, plane_data in enumerate(data["planes"]["detection"].tolist())]
-        }
+        json_dict = _make_data_dict(data, _make_url)
+        data_v2_dict = _make_data_v2_dict(data, _make_url(key_lighting), _make_url(key_superpixels), _make_url(key_semantic), _make_plane_mask_url)
 
         mask_image = data["mask"]
         lighting_image = data["lighting"]
@@ -76,6 +128,8 @@ class PipelineUploadResults(PipelineStep):
                 self.s3_client, lighting_image, self.bucket_name, key_lighting)
             _upload_json_to_s3(
                 self.s3_client, json_dict, self.bucket_name, key_data)
+            _upload_json_to_s3(
+                self.s3_client, data_v2_dict, self.bucket_name, key_data_v2)
             _upload_image_to_s3(
                 self.s3_client, superpixels_image, self.bucket_name, key_superpixels)
 
@@ -88,11 +142,13 @@ class PipelineUploadResults(PipelineStep):
             mask_path = _make_local_url(key_semantic)
             lighting_path = _make_local_url(key_lighting)
             data_path = _make_local_url(key_data)
+            data_v2_path = _make_local_url(key_data_v2)
             superpixels_path = _make_local_url(key_superpixels)
 
             os.makedirs(os.path.dirname(mask_path), exist_ok=True)
             os.makedirs(os.path.dirname(lighting_path), exist_ok=True)
             os.makedirs(os.path.dirname(data_path), exist_ok=True)
+            os.makedirs(os.path.dirname(data_v2_path), exist_ok=True)
             os.makedirs(os.path.dirname(superpixels_path), exist_ok=True)
 
             # Convert dtypes if necessary
@@ -105,7 +161,9 @@ class PipelineUploadResults(PipelineStep):
             imsave(lighting_path, lighting_image)
 
             with open(data_path, 'w') as outfile:
-                json.dump(json_dict, outfile, indent=5)
+                json.dump(json_dict, outfile, indent=4)
+            with open(data_v2_path, 'w') as outfile:
+                json.dump(data_v2_dict, outfile, indent=4)
 
             imsave(superpixels_path, superpixels_image)
 
@@ -119,4 +177,5 @@ class PipelineUploadResults(PipelineStep):
         data["semantic_url"] = _make_url(key_semantic)
         data["lighting_url"] = _make_url(key_lighting)
         data["data_url"] = _make_url(key_data)
+        data["data_v2_url"] = _make_url(key_data_v2)
         data["superpixels_url"] = _make_url(key_superpixels)

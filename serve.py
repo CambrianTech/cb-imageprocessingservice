@@ -125,6 +125,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
             "lighting_url": data["lighting_url"],
             "semantic_url": data["semantic_url"],
             "data_url": data["data_url"],
+            "data_v2_url": data["data_v2_url"],
             "superpixels_url": data["superpixels_url"],
         })
 
