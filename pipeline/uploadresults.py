@@ -61,7 +61,7 @@ class PipelineUploadResults(PipelineStep):
             "planes": [{
                 "data": plane_data, # [9]
                 "mask_url": _make_url("%s/plane_masks/mask_%d.png" % (data["image_s3_key"], i))
-            } for i, plane_data in enumerate(data["planes"]["detections"].tolist())]
+            } for i, plane_data in enumerate(data["planes"]["detection"].tolist())]
         }
 
         mask_image = data["mask"]
