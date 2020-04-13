@@ -93,41 +93,56 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
     async def flooring_pipeline(input_dict: typing.Dict):
         total_start_time = time()
         for step in steps:
+            if not isinstance(step, PipelineRemotePlaneDetector):
+                input_dict = await schedule_and_wait(step.schedule, input_dict)
+        print("Flooring total pipeline time: %.2fs" % (time() - total_start_time))
+        return input_dict
+        
+    # Pipeline for finding planes, generating lighting and predicting fov.
+    async def planes_pipeline(input_dict: typing.Dict):
+        total_start_time = time()
+        for step in steps:
             input_dict = await schedule_and_wait(step.schedule, input_dict)
-        print("Total pipeline time: %.2fs" % (time() - total_start_time))
+        print("Planes total pipeline time: %.2fs" % (time() - total_start_time))
         return input_dict
 
     # Setup http server
-    async def handle_segment(request):
-        print("Handle segment:", request, "(items waiting in pipeline: %d)" %
-              num_waiting_items(steps))
+    def get_pipeline_handler(pipeline_fn):
+        async def handle(request):
+            print("Handle segment:", request, "(items waiting in pipeline: %d)" %
+                num_waiting_items(steps))
 
-        # Get image S3 key from GET request
-        image_s3_key = request.match_info.get("id", None)
-        if image_s3_key is None:
-            raise web.HTTPBadRequest()
+            # Get image S3 key from GET request
+            image_s3_key = request.match_info.get("id", None)
+            if image_s3_key is None:
+                raise web.HTTPBadRequest()
 
-        data = {"image_s3_key": image_s3_key}
+            data = {"image_s3_key": image_s3_key}
 
-        # Add local directories to initial data if specified
-        if image_local_dir is not None:
-            print(
-                "WARNING: Do not use in production: image local dir set to", image_local_dir)
-            data["image_local_dir"] = image_local_dir
-        if results_local_dir is not None:
-            print(
-                "WARNING: Do not use in production: results local dir set to", results_local_dir)
-            data["results_local_dir"] = results_local_dir
+            # Add local directories to initial data if specified
+            if image_local_dir is not None:
+                print(
+                    "WARNING: Do not use in production: image local dir set to", image_local_dir)
+                data["image_local_dir"] = image_local_dir
+            if results_local_dir is not None:
+                print(
+                    "WARNING: Do not use in production: results local dir set to", results_local_dir)
+                data["results_local_dir"] = results_local_dir
 
-        data = await flooring_pipeline(data)
+            data = await pipeline_fn(data)
 
-        return web.json_response({
-            "lighting_url": data["lighting_url"],
-            "semantic_url": data["semantic_url"],
-            "data_url": data["data_url"],
-            "data_v2_url": data["data_v2_url"],
-            "superpixels_url": data["superpixels_url"],
-        })
+            response_dict = {
+                "lighting_url": data["lighting_url"],
+                "semantic_url": data["semantic_url"],
+                "data_url": data["data_url"],
+                "superpixels_url": data["superpixels_url"],
+            }
+
+            if "data_v2_url" in data:
+                response_dict["data_v2_url"] = data["data_v2_url"]
+
+            return web.json_response(response_dict)
+        return handle
 
     async def handle_healthcheck(request):
         return web.Response(text="Healthy")
@@ -224,7 +239,9 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
 
     # Add public (CORS) routes
     segment_resource = app.router.add_resource("/segment/{id}")
-    cors.add(segment_resource.add_route("GET", handle_segment))
+    planes_resource = app.router.add_resource("/planes/{id}")
+    cors.add(segment_resource.add_route("GET", get_pipeline_handler(flooring_pipeline)))
+    cors.add(planes_resource.add_route("GET", get_pipeline_handler(planes_pipeline)))
 
     # Add endpoint for directly getting and uploading images if local
     # image input dir was defined
