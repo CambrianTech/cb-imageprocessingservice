@@ -216,11 +216,14 @@ class PipelineUploadResults(PipelineStep):
             all_plane_world_points = []
             transformed_masks = []
             for plane_mask, plane_data in zip(data["planes"]["masks"], data["planes"]["detection"]):
+                if plane_mask.dtype == np.float32:
+                    plane_mask = (255 * plane_mask).astype(np.uint8)
+
                 plane_image_extents = {
-                    "minY": plane_data[0] / 480,
-                    "minX": plane_data[1] / 640,
-                    "maxY": plane_data[2] / 480,
-                    "maxX": plane_data[3] / 640
+                    "minY": plane_data[0],
+                    "minX": plane_data[1],
+                    "maxY": plane_data[2],
+                    "maxX": plane_data[3]
                 }
 
                 plane_parameters = np.array(plane_data[6:9], dtype=np.float32)
