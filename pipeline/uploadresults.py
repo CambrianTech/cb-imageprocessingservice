@@ -129,14 +129,21 @@ def _encode_plane_surface(plane_index, plane_data, world_to_mask, world_points, 
         "maxX": plane_data[3]
     }
 
+    points = np.array(world_points, dtype=np.float32)
+    position = np.mean(world_points, axis=0)
+    points -= position
+
     return {
         "id": "plane-%d" % plane_index,
         "type": "unknown",
         "name": "Plane %d" % plane_index,
+        "position": position.tolist(),
         "normal": plane_normal.tolist(),
         "offset": plane_offset,
         "imageExtents": plane_image_extents,
         "worldToMask": world_to_mask,
+        "points": points.tolist(),
+        "worldPoints": world_points,
         "images": {
             "mask": mask_url
         }
