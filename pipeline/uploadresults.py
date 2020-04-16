@@ -123,10 +123,10 @@ def _encode_plane_surface(plane_index, plane_data, world_to_mask, world_points, 
     plane_normal = plane_parameters / plane_offset
 
     plane_image_extents = {
-        "minY": plane_data[0] / 480,
-        "minX": plane_data[1] / 640,
-        "maxY": plane_data[2] / 480,
-        "maxX": plane_data[3] / 640
+        "minY": plane_data[0],
+        "minX": plane_data[1],
+        "maxY": plane_data[2],
+        "maxX": plane_data[3]
     }
 
     return {
@@ -236,8 +236,8 @@ class PipelineUploadResults(PipelineStep):
                 i = 0 if c[0] >= c[1] else 1
                 f = c[i] / np.tan(np.radians(data["fov"]) / 2)
 
-                transformed_plane_mask, _, aff, plane_world_points = _transform_plane_mask(plane_mask, plane_image_extents, np.array(
-                    plane_mask.shape, dtype=np.float32), f, plane_parameters, plane_normal, (512, 512))
+                transformed_plane_mask, _, aff, plane_world_points = _transform_plane_mask(plane_mask, plane_image_extents,
+                    np.array([640, 480], dtype=np.float32), f, plane_parameters, plane_normal, (512, 512))
                 transformed_masks.append(transformed_plane_mask)
                 all_world_to_mask.append(aff)
                 all_plane_world_points.append(plane_world_points)
