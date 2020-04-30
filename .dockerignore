@@ -21,3 +21,5 @@ coverage.xml
 planercnn
 sklearn_models
 tensorflow_models
+images
+results
