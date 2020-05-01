@@ -51,10 +51,13 @@ def _encode_plane_surface(plane_index, plane_data, mask_url):
     plane_offset = np.maximum(1e-4, np.linalg.norm(plane_parameters))
     plane_normal = plane_parameters / plane_offset
 
+    # Extract plane's screen-space extents. Plane-rcnn originally
+    # added black bars on top and bottom. We cut those out so we need
+    # to subtract 80 (= (640 - 480) / 2) from the Y coordinates.
     plane_image_extents = {
-        "minY": plane_data[0],
+        "minY": plane_data[0] - 80,
         "minX": plane_data[1],
-        "maxY": plane_data[2],
+        "maxY": plane_data[2] - 80,
         "maxX": plane_data[3]
     }
 
@@ -156,6 +159,8 @@ class PipelineUploadResults(PipelineStep):
 
             if "planes" in data:
                 for i, plane_mask in enumerate(data["planes"]["masks"]):
+                    # Cut off plane-rcnn's black bars (80 = (640 - 480) / 2).
+                    plane_mask = plane_mask[80:-80]
                     _upload_image_to_s3(self.s3_client, plane_mask, self.bucket_name,
                                         "%s/plane_masks/mask_%d.png" % (data["image_s3_key"], i))
         else:
@@ -192,6 +197,9 @@ class PipelineUploadResults(PipelineStep):
 
             if "planes" in data:
                 for i, plane_mask in enumerate(data["planes"]["masks"]):
+                    # Cut off plane-rcnn's black bars (80 = (640 - 480) / 2).
+                    plane_mask = plane_mask[80:-80]
+
                     plane_path = _make_local_url(
                         "%s/plane_masks/mask_%d.png" % (data["image_s3_key"], i))
                     os.makedirs(os.path.dirname(plane_path), exist_ok=True)
