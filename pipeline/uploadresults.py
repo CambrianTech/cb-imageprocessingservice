@@ -3,11 +3,10 @@ try:
     from imageio import imsave
 except:
     from scipy.misc import imsave
-import boto3.docs.method
+import boto3
 import numpy as np
-import os.path
+import os
 import json
-import cv2
 
 from pipeline.core import PipelineStep
 
@@ -24,9 +23,16 @@ def _upload_image_to_s3(s3_client, image: np.ndarray, bucket: str, key: str):
 
 def _upload_json_to_s3(s3_client, json_dict: dict, bucket: str, key: str):
     json_data = BytesIO()
-    json_data.write(json.dumps(json_dict, indent=4).encode())
+    json_data.write(json.dumps(json_dict, indent=4).encode("utf-8"))
     json_data.seek(0)
     s3_client.upload_fileobj(json_data, bucket, key)
+
+
+def _upload_text_to_s3(s3_client, text: str, bucket: str, key: str):
+    text_data = BytesIO()
+    text_data.write(text.encode("utf-8"))
+    text_data.seek(0)
+    s3_client.upload_fileobj(text_data, bucket, key)
 
 
 def _make_data_dict(data, make_url):
@@ -123,6 +129,7 @@ class PipelineUploadResults(PipelineStep):
         key_data = "%s/data.json" % data["image_s3_key"]
         key_data_v2 = "%s/data_v2.json" % data["image_s3_key"]
         key_superpixels = "%s/superpixels.png" % data["image_s3_key"]
+        key_planes_ply = "%s/planes.ply" % data["image_s3_key"]
 
         # Use AWS S3 url by default, or local server if one was set.
         base_url = "http://127.0.0.1:8080/getimage" if "results_local_dir" in data else "https://s3.amazonaws.com"
@@ -158,6 +165,9 @@ class PipelineUploadResults(PipelineStep):
                 self.s3_client, superpixels_image, self.bucket_name, key_superpixels)
 
             if "planes" in data:
+                _upload_text_to_s3(
+                    self.s3_client, data["planes"]["ply"], self.bucket_name, key_planes_ply)
+
                 for i, plane_mask in enumerate(data["planes"]["masks"]):
                     # Cut off plane-rcnn's black bars (80 = (640 - 480) / 2).
                     plane_mask = plane_mask[80:-80]
@@ -172,6 +182,7 @@ class PipelineUploadResults(PipelineStep):
             data_path = _make_local_url(key_data)
             data_v2_path = _make_local_url(key_data_v2)
             superpixels_path = _make_local_url(key_superpixels)
+            planes_ply_path = _make_local_url(key_planes_ply)
 
             os.makedirs(os.path.dirname(mask_path), exist_ok=True)
             os.makedirs(os.path.dirname(lighting_path), exist_ok=True)
@@ -188,14 +199,17 @@ class PipelineUploadResults(PipelineStep):
             imsave(mask_path, mask_image)
             imsave(lighting_path, lighting_image)
 
-            with open(data_path, 'w') as outfile:
-                json.dump(json_dict, outfile, indent=4)
-            with open(data_v2_path, 'w') as outfile:
-                json.dump(data_v2_dict, outfile, indent=4)
+            with open(data_path, "w", encoding="utf-8") as out_file:
+                json.dump(json_dict, out_file, indent=4)
+            with open(data_v2_path, "w", encoding="utf-8") as out_file:
+                json.dump(data_v2_dict, out_file, indent=4)
 
             imsave(superpixels_path, superpixels_image)
 
             if "planes" in data:
+                with open(planes_ply_path, "w", encoding="utf-8") as out_file:
+                    out_file.write(data["planes"]["ply"])
+
                 for i, plane_mask in enumerate(data["planes"]["masks"]):
                     # Cut off plane-rcnn's black bars (80 = (640 - 480) / 2).
                     plane_mask = plane_mask[80:-80]
