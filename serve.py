@@ -247,7 +247,6 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
 
     # Add endpoint for directly getting and uploading images if local
     # image input dir was defined
-    print("img local dir", str(image_local_dir))
     if image_local_dir is not None:
         upload_resource = app.router.add_resource("/upload/{id}")
         cors.add(upload_resource.add_route("PUT", handle_local_upload))

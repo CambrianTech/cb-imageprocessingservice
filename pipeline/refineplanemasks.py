@@ -28,15 +28,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
     def run(self, data):
 
         hed = data["hed"]
-        # _log_image('hed.png', hed)
-
+        
         w, h = hed.shape
         shape = (h,w)
-
-        # img = data["image"]
-        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        # img = cv2.resize(img, shape)
-        # img_bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         plane_masks = data["planes"]["masks"][:, 80:560]
 
@@ -54,7 +48,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         markers = np.uint8(edges_hed == 0)
 
-        markers = filters.rank.median(markers, disk(5))
+        markers = filters.rank.median(markers, disk(2))
 
         markers = ndimage.label(markers)
         markers = markers[0]
