@@ -28,7 +28,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
     def run(self, data):
 
         hed = data["hed"]
-        
+
         w, h = hed.shape
         shape = (h,w)
 
@@ -98,7 +98,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
             if label_mask_max > 0.4:
                 clean_masks[label_mask_i][label_mask] = 1
 
-            print("label", label, label_mask_i, label_mask_max)
+            # print("label", label, label_mask_i, label_mask_max)
 
             for d in range(number_planes):
                 data["planes"]["masks"][:, 80:560][d] = cv2.resize(clean_masks[d], (plane_shape[1], plane_shape[0]))
