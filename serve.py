@@ -22,6 +22,7 @@ from pipeline.primaryangle import PipelineDeterminePrimaryAngles
 from pipeline.refine import PipelineRefineResults
 from pipeline.runmodels import PipelineRunModels
 from pipeline.superpixels import PipelineSuperpixels
+from pipeline.refineplanemasks import PipelineRefinePlaneMasks
 from pipeline.uploadresults import PipelineUploadResults
 from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 
@@ -82,6 +83,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
         PipelineCalculateFov(fov_model_path),
         PipelineSuperpixels(),
         PipelineRemotePlaneDetector(plane_url),
+        PipelineRefinePlaneMasks(results_bucket),
         PipelineUploadResults(results_bucket)
     ]
 
@@ -245,6 +247,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
 
     # Add endpoint for directly getting and uploading images if local
     # image input dir was defined
+    print("img local dir", str(image_local_dir))
     if image_local_dir is not None:
         upload_resource = app.router.add_resource("/upload/{id}")
         cors.add(upload_resource.add_route("PUT", handle_local_upload))
