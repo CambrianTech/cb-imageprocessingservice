@@ -4,10 +4,9 @@ from pipeline.getdata import PipelineGetData
 from pipeline.fov import PipelineCalculateFov
 from pipeline.runmodels import PipelineRunModels
 from pipeline.superpixels import PipelineSuperpixels
-from pipeline.core import Pipeline
 import numpy as np
 import asyncio
-from os.path import join
+from pathlib import Path
 
 
 class TestPipelineUploadResults(unittest.TestCase):
@@ -54,7 +53,8 @@ class TestPipelineGetData(unittest.TestCase):
 class TestPipelineCalculateFov(unittest.TestCase):
     def test_standard(self):
         step = PipelineCalculateFov(
-            join("sklearn_models", "fov_classifier_lc128.joblib"))
+            Path("sklearn_models") / "fov_classifier_lc128.joblib"
+        )
 
         normals_latents = np.zeros((1, 2048), np.float32)
 
@@ -71,14 +71,12 @@ class TestPipelineCalculateFov(unittest.TestCase):
 
 class TestPipelineRunModels(unittest.TestCase):
     def test_standard(self):
-        model_path = "tensorflow_models"
+        hed_path = Path("hed_model") / "HED_pretrained_bsds.npz"
+        semantic_path = Path("tensorflow_models") / "semantic"
 
         step = PipelineRunModels(
-            semantic_path=join(model_path, "semantic"),
-            normals_path=join(model_path, "normals"),
-            unlit_path=join(model_path, "unlit"),
-            elevation_path=join(model_path, "elevation"),
-            lighting_path=join(model_path, "lighting"),
+            semantic_path=semantic_path,
+            hed_path=hed_path
         )
 
         self.assertTrue(step.is_batched)
@@ -99,47 +97,14 @@ class TestPipelineRunModels(unittest.TestCase):
         self.assertIn("normals_latents", data)
 
 
-class TestPipelineChained(unittest.TestCase):
-    def test_run_models_into_fov(self):
-        model_path = "tensorflow_models"
-
-        image = np.zeros((512, 512, 3))
-
-        data = {
-            "image": image
-        }
-
-        pipeline = (Pipeline()
-                    .add(PipelineRunModels(
-                        semantic_path=join(model_path, "semantic"),
-                        normals_path=join(model_path, "normals"),
-                        unlit_path=join(model_path, "unlit"),
-                        elevation_path=join(model_path, "elevation"),
-                        lighting_path=join(model_path, "lighting")))
-                    .add(PipelineCalculateFov(join("sklearn_models", "fov_classifier_lc128.joblib"))))
-
-        # Since the pipeline does not destroy its loops on exit (which doesn't matter since that will never happen in containers),
-        # this will output some warnings about tasks still pending.
-        result_data = asyncio.get_event_loop().run_until_complete(pipeline.run(data))
-
-        self.assertIs(data, result_data)
-        self.assertIs(data["image"], image)
-        self.assertIn("semantic", data)
-        self.assertIn("normals", data)
-        self.assertIn("unlit", data)
-        self.assertIn("elevation", data)
-        self.assertIn("lighting", data)
-        self.assertIn("normals_latents", data)
-        self.assertIn("fov", data)
-        self.assertTrue(0 <= data["fov"] <= 360)
-
-
 class TestPipelineSuperpixels(unittest.TestCase):
     def test_standard(self):
         step = PipelineSuperpixels()
 
-        image = np.concatenate([np.zeros((512, 256, 3), dtype=np.uint8),
-                                255 * np.ones((512, 256, 3), dtype=np.uint8)], axis=1)
+        image = np.concatenate([
+            np.zeros((512, 256, 3), dtype=np.uint8),
+            255 * np.ones((512, 256, 3), dtype=np.uint8)
+        ], axis=1)
 
         data = {"image": image}
 
