@@ -92,7 +92,8 @@ class PipelineRemotePlaneDetector(PipelineStep):
 
         for datum, plane_rcnn_output in zip(data, plane_rcnn_outputs):
             index_mask, alpha_mask = combine_plane_masks(
-                plane_rcnn_output["planes"]["masks"])
+                plane_rcnn_output["masks"]
+            )
 
             datum["planes_index_mask"] = index_mask
             datum["planes_alpha_mask"] = alpha_mask
