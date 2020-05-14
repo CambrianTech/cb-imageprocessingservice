@@ -84,7 +84,7 @@ def _encode_plane_surface(plane_index, plane_data, mask_url):
     }
 
 
-def _make_data_v2_dict(data, lighting_url, superpixels_url, semantic_url, make_plane_mask_url):
+def _make_data_v2_dict(data, lighting_url, superpixels_url, semantic_url, planes_index_mask_url, planes_alpha_mask_url, make_plane_mask_url):
     all_plane_data = data["planes"]["detection"].tolist(
     ) if "planes" in data else []
 
@@ -96,7 +96,9 @@ def _make_data_v2_dict(data, lighting_url, superpixels_url, semantic_url, make_p
         "images": {
             "lighting": lighting_url,
             "superpixels": superpixels_url,
-            "semantic": semantic_url
+            "semantic": semantic_url,
+            "planes_index_mask": planes_index_mask_url,
+            "planes_alpha_mask": planes_alpha_mask_url
         },
         "camera": {
             "fov": data["fov"],
@@ -169,6 +171,8 @@ class PipelineUploadResults(PipelineStep):
                                           _make_url(key_lighting),
                                           _make_url(key_superpixels),
                                           _make_url(key_semantic),
+                                          _make_url(key_planes_index_mask),
+                                          _make_url(key_planes_alpha_mask),
                                           _make_plane_mask_url)
 
         # Upload to S3 or write to local folder if local dir is set.
