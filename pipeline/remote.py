@@ -53,13 +53,24 @@ class PipelineRemotePlaneDetector(PipelineStep):
     def is_batched(self) -> bool:
         return True
 
-    def run(self, data: dict) -> None:
+    def run(self, data):
         t = time()
         plane_rcnn_outputs = _remote_plane_detect(self.address, data)
         print("Remote planes took %.2f seconds" % (time() - t))
 
         for datum, plane_rcnn_output in zip(data, plane_rcnn_outputs):
             datum["planes"] = plane_rcnn_output
+
+            # Plane-rcnn originally added black bars on top and bottom.
+            # We cut those out so we need to subtract 80
+            # (= (640 - 480) / 2) from the Y coordinates.
+
+            # Plane masks
+            datum["planes"]["masks"] = datum["planes"]["masks"][:, 80:-80]
+
+            # Extents
+            datum["planes"]["detection"][0] -= 80  # min y
+            datum["planes"]["detection"][2] -= 80  # max y
 
 
 class PipelineRemoteNetworks(PipelineStep):

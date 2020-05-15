@@ -5,10 +5,6 @@ from pipeline.core import PipelineStep
 def combine_plane_masks(plane_masks: np.ndarray) -> np.ndarray:
     num_planes = len(plane_masks)
 
-    # Cut off black bars that are present
-    # from plane-rcnn.
-    plane_masks = plane_masks[:, 80:-80]
-
     # Start at 1 with plane indices here.
     # Later we subtract 1 so that -1 means no plane, and
     # actual plane indices start at 0.

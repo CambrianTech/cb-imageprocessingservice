@@ -24,8 +24,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         w, h = hed.shape
         shape = (h, w)
 
-        data["planes"]["masks"] = data["planes"]["masks"][:, 80:560]
-
         plane_masks = data["planes"]["masks"]
 
         number_planes = len(plane_masks)
