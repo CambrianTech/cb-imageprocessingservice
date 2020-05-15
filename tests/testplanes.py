@@ -1,9 +1,8 @@
 import unittest
-from pipeline.remote import combine_plane_masks
+from pipeline.combineplanemasks import combine_plane_masks
 from pipeline.uploadresults import get_compressed_index_mask
 import numpy as np
 import zlib
-
 
 
 class TestPlanePostProcessing(unittest.TestCase):
@@ -67,7 +66,7 @@ class TestPlanePostProcessing(unittest.TestCase):
         plane_masks[1, plane_height // 2:, :10] = 255
 
         index_mask, _ = combine_plane_masks(plane_masks)
-        
+
         # Compress index mask
         compressed_index_mask = get_compressed_index_mask(index_mask)
 
@@ -77,10 +76,13 @@ class TestPlanePostProcessing(unittest.TestCase):
         decompress = zlib.decompressobj()
         decompressed_index_mask = decompress.decompress(compressed_index_mask)
 
-        int16_index_mask = np.frombuffer(decompressed_index_mask, dtype=np.int16)
-        int16_index_mask = int16_index_mask.reshape((unpadded_plane_height, plane_width))
+        int16_index_mask = np.frombuffer(
+            decompressed_index_mask, dtype=np.int16)
+        int16_index_mask = int16_index_mask.reshape(
+            (unpadded_plane_height, plane_width))
 
         self.assertTrue(np.all(index_mask == int16_index_mask))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -23,6 +23,7 @@ from pipeline.refine import PipelineRefineResults
 from pipeline.runmodels import PipelineRunModels
 from pipeline.superpixels import PipelineSuperpixels
 from pipeline.refineplanemasks import PipelineRefinePlaneMasks
+from pipeline.combineplanemasks import PipelineCombinePlaneMasks
 from pipeline.uploadresults import PipelineUploadResults
 from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 
@@ -66,7 +67,8 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
 
     print("Starting CPU networks process")
     cpu_networks_port = 8082
-    subprocess.Popen(["python3", "runcpunetworks.py", model_path, str(cpu_networks_port)])
+    subprocess.Popen(["python3", "runcpunetworks.py",
+                      model_path, str(cpu_networks_port)])
 
     print("Creating pipeline")
 
@@ -84,6 +86,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
         PipelineSuperpixels(),
         PipelineRemotePlaneDetector(plane_url),
         PipelineRefinePlaneMasks(results_bucket),
+        PipelineCombinePlaneMasks(),
         PipelineUploadResults(results_bucket)
     ]
 
@@ -92,27 +95,32 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
         step.start()
 
     # Pipeline for segmenting floors, generating lighting and predicting fov.
+    # Don't run any of the plane steps.
     async def flooring_pipeline(input_dict: typing.Dict):
         total_start_time = time()
         for step in steps:
-            if not isinstance(step, PipelineRemotePlaneDetector):
+            if (not isinstance(step, PipelineRemotePlaneDetector) and
+                not isinstance(step, PipelineRefinePlaneMasks) and
+                not isinstance(step, PipelineCombinePlaneMasks)):
                 input_dict = await schedule_and_wait(step.schedule, input_dict)
-        print("Flooring total pipeline time: %.2fs" % (time() - total_start_time))
+        print("Flooring total pipeline time: %.2fs" %
+              (time() - total_start_time))
         return input_dict
-        
+
     # Pipeline for finding planes, generating lighting and predicting fov.
     async def planes_pipeline(input_dict: typing.Dict):
         total_start_time = time()
         for step in steps:
             input_dict = await schedule_and_wait(step.schedule, input_dict)
-        print("Planes total pipeline time: %.2fs" % (time() - total_start_time))
+        print("Planes total pipeline time: %.2fs" %
+              (time() - total_start_time))
         return input_dict
 
     # Setup http server
     def get_pipeline_handler(pipeline_fn):
         async def handle(request):
             print("Handle segment:", request, "(items waiting in pipeline: %d)" %
-                num_waiting_items(steps))
+                  num_waiting_items(steps))
 
             # Get image S3 key from GET request
             image_s3_key = request.match_info.get("id", None)
@@ -217,7 +225,8 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
         while True:
             for _ in range(60):
                 await asyncio.sleep(1)
-                avg_waiting_items = 0.9 * avg_waiting_items + 0.1 * num_waiting_items(steps)
+                avg_waiting_items = 0.9 * avg_waiting_items + \
+                    0.1 * num_waiting_items(steps)
 
             print("Waiting items: %.2f (avg: %.2f)" %
                   (num_waiting_items(steps), avg_waiting_items))
@@ -242,8 +251,10 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
     # Add public (CORS) routes
     segment_resource = app.router.add_resource("/segment/{id}")
     planes_resource = app.router.add_resource("/planes/{id}")
-    cors.add(segment_resource.add_route("GET", get_pipeline_handler(flooring_pipeline)))
-    cors.add(planes_resource.add_route("GET", get_pipeline_handler(planes_pipeline)))
+    cors.add(segment_resource.add_route(
+        "GET", get_pipeline_handler(flooring_pipeline)))
+    cors.add(planes_resource.add_route(
+        "GET", get_pipeline_handler(planes_pipeline)))
 
     # Add endpoint for directly getting and uploading images if local
     # image input dir was defined
