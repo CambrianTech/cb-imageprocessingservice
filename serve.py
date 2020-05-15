@@ -22,6 +22,7 @@ from pipeline.primaryangle import PipelineDeterminePrimaryAngles
 from pipeline.refine import PipelineRefineResults
 from pipeline.runmodels import PipelineRunModels
 from pipeline.superpixels import PipelineSuperpixels
+from pipeline.refineplanemasks import PipelineRefinePlaneMasks
 from pipeline.uploadresults import PipelineUploadResults
 from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 
@@ -82,6 +83,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
         PipelineCalculateFov(fov_model_path),
         PipelineSuperpixels(),
         PipelineRemotePlaneDetector(plane_url),
+        PipelineRefinePlaneMasks(results_bucket),
         PipelineUploadResults(results_bucket)
     ]
 
