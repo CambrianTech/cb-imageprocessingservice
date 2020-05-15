@@ -8,13 +8,6 @@ from skimage import filters
 from skimage.filters import threshold_multiotsu
 import os
 
-IM_LOGGING_ENABLED = False
-
-
-def _log_image(name, image):
-    if IM_LOGGING_ENABLED:
-        cv2.imwrite(name, image)
-
 
 class PipelineRefinePlaneMasks(PipelineStep):
     @property
@@ -26,16 +19,12 @@ class PipelineRefinePlaneMasks(PipelineStep):
         return []
 
     def run(self, data):
-        results_dir = data["results_local_dir"]
-
         hed = data["hed"]
 
-        _log_image(os.path.join(results_dir, 'hed' + '.png'), hed)
-
         w, h = hed.shape
-        shape = (h,w)
+        shape = (h, w)
 
-        data["planes"]["masks"] =  data["planes"]["masks"][:, 80:560]
+        data["planes"]["masks"] = data["planes"]["masks"][:, 80:560]
 
         plane_masks = data["planes"]["masks"]
 
@@ -66,7 +55,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
         clean_masks = np.uint8(resized_masks)
 
         for d in range(number_planes):
-            detection_features.append(ndimage.mean(resized_masks[d], labels=labels, index=ulabels))
+            detection_features.append(ndimage.mean(
+                resized_masks[d], labels=labels, index=ulabels))
 
         for label in range(1, nlabels + 1):
             label_mask_i = 0
@@ -103,30 +93,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
             if label_mask_max > 0.4:
                 clean_masks[label_mask_i][label_mask] = 1
 
-            # print("label", label, label_mask_i, label_mask_max)
-
         for d in range(number_planes):
-            data["planes"]["masks"][d] = cv2.resize(clean_masks[d], (plane_shape[1], plane_shape[0]))
+            data["planes"]["masks"][d] = cv2.resize(
+                clean_masks[d], (plane_shape[1], plane_shape[0]))
             rect = cv2.boundingRect(np.uint8(data["planes"]["masks"][d]))
-            data["planes"]["detection"][:, 0:4][d] = [rect[1], rect[0], rect[1] + rect[3], rect[0] + rect[2]]
-            # print(data["planes"]["detection"][:, 0:4][d])
-
-        #
-        # for d in range(number_planes):
-        #     mask = resized_masks[d]
-        #     blank = np.zeros_like(mask)
-        #
-        #     for label in range(1, nlabels + 1):
-        #         label_mask = label == labels
-        #         mean = np.mean(mask[label_mask])
-        #         if(mean > .5):
-        #             blank[label_mask] = 1
-
-            # plane_masks[d] = cv2.resize(np.uint8(blank), (plane_shape[1], plane_shape[0]))
-            # _log_image(os.path.join(data["results_local_dir"],'masks'+str(d)+'.png'), (255*plane_masks[d]))
-
-        # data["planes"]["masks"][:, 80:560] = plane_masks
-
-
-
-
+            data["planes"]["detection"][:, 0:4][d] = [
+                rect[1], rect[0], rect[1] + rect[3], rect[0] + rect[2]]
