@@ -94,8 +94,10 @@ def _make_data_v2_dict(data, lighting_url, superpixels_url, semantic_url, planes
             "lighting": lighting_url,
             "superpixels": superpixels_url,
             "semantic": semantic_url,
-            "planes_index_mask": planes_index_mask_url,
             "planes_alpha_mask": planes_alpha_mask_url
+        },
+        "compressed": {
+            "planes_index_mask": planes_index_mask_url,
         },
         "camera": {
             "fov": data["fov"],
