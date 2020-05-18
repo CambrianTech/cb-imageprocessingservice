@@ -9,9 +9,8 @@ class TestPlanePostProcessing(unittest.TestCase):
     def test_combine_plane_masks(self):
         # Setup plane masks
         num_planes = 2
-        plane_height = 640
+        plane_height = 480
         plane_width = 640
-        unpadded_plane_height = 480
 
         plane_masks = np.zeros(
             (num_planes, plane_height, plane_width),
@@ -26,9 +25,9 @@ class TestPlanePostProcessing(unittest.TestCase):
 
         # Check shapes
         self.assertSequenceEqual(
-            index_mask.shape, (unpadded_plane_height, plane_width))
+            index_mask.shape, (plane_height, plane_width))
         self.assertSequenceEqual(
-            alpha_mask.shape, (unpadded_plane_height, plane_width))
+            alpha_mask.shape, (plane_height, plane_width))
 
         # Check dtypes
         self.assertEqual(index_mask.dtype, np.int16)
@@ -36,26 +35,25 @@ class TestPlanePostProcessing(unittest.TestCase):
 
         # Check index values
         self.assertTrue(
-            np.all(index_mask[:unpadded_plane_height // 2] == 0))
+            np.all(index_mask[:plane_height // 2] == 0))
         self.assertTrue(
-            np.all(index_mask[unpadded_plane_height // 2:, :10] == 1))
+            np.all(index_mask[plane_height // 2:, :10] == 1))
         self.assertTrue(
-            np.all(index_mask[unpadded_plane_height // 2:, 10:] == -1))
+            np.all(index_mask[plane_height // 2:, 10:] == -1))
 
         # Check alpha values
         self.assertTrue(
-            np.all(alpha_mask[:unpadded_plane_height // 2] == 1))
+            np.all(alpha_mask[:plane_height // 2] == 1))
         self.assertTrue(
-            np.all(alpha_mask[unpadded_plane_height // 2:, :10] == 1))
+            np.all(alpha_mask[plane_height // 2:, :10] == 1))
         self.assertTrue(
-            np.all(alpha_mask[unpadded_plane_height // 2:, 10:] == 0))
+            np.all(alpha_mask[plane_height // 2:, 10:] == 0))
 
     def test_compressed_index_mask(self):
         # Setup plane masks and combine
         num_planes = 2
-        plane_height = 640
+        plane_height = 480
         plane_width = 640
-        unpadded_plane_height = 480
 
         plane_masks = np.zeros(
             (num_planes, plane_height, plane_width),
@@ -79,7 +77,7 @@ class TestPlanePostProcessing(unittest.TestCase):
         int16_index_mask = np.frombuffer(
             decompressed_index_mask, dtype=np.int16)
         int16_index_mask = int16_index_mask.reshape(
-            (unpadded_plane_height, plane_width))
+            (plane_height, plane_width))
 
         self.assertTrue(np.all(index_mask == int16_index_mask))
 
