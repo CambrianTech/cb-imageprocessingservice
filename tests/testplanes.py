@@ -74,12 +74,26 @@ class TestPlanePostProcessing(unittest.TestCase):
         decompress = zlib.decompressobj()
         decompressed_index_mask = decompress.decompress(compressed_index_mask)
 
-        int16_index_mask = np.frombuffer(
+        int16_index_mask_flat = np.frombuffer(
             decompressed_index_mask, dtype=np.int16)
-        int16_index_mask = int16_index_mask.reshape(
+        int16_index_mask = int16_index_mask_flat.reshape(
             (plane_height, plane_width))
 
         self.assertTrue(np.all(index_mask == int16_index_mask))
+
+        # Test if making the index mask by hand yields same results.
+        # This is what we do in JS.
+        hand_built_index_mask = []
+        for x in range(plane_width):
+            col = []
+            for y in range(plane_height):
+                col.append(int16_index_mask_flat[y * plane_width + x])
+            hand_built_index_mask.append(col)
+
+        for x in range(plane_width):
+            for y in range(plane_height):
+                self.assertEqual(hand_built_index_mask[x][y], int16_index_mask[y, x],
+                                 "Hand-made and numpy index mask not equal for x=%d y=%d" % (x, y))
 
 
 if __name__ == "__main__":
