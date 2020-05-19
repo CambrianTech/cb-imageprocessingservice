@@ -213,7 +213,7 @@ class PipelineUploadResults(PipelineStep):
             data_v2_path = _make_local_url(key_data_v2)
             superpixels_path = _make_local_url(key_superpixels)
             planes_index_mask_path = _make_local_url(key_planes_index_mask)
-            key_planes_alpha_mask = _make_local_url(key_planes_alpha_mask)
+            planes_alpha_mask_path = _make_local_url(key_planes_alpha_mask)
 
             os.makedirs(os.path.dirname(mask_path), exist_ok=True)
             os.makedirs(os.path.dirname(lighting_path), exist_ok=True)
@@ -241,7 +241,7 @@ class PipelineUploadResults(PipelineStep):
                 alpha_mask = data["planes_alpha_mask"]
                 if alpha_mask.dtype == np.float32:
                     alpha_mask = (255 * alpha_mask).astype(np.uint8)
-                imsave(alpha_mask)
+                imsave(planes_alpha_mask_path, alpha_mask)
 
             if "planes_index_mask" in data:
                 compressed_index_mask = get_compressed_index_mask(
