@@ -69,8 +69,8 @@ class PipelineRemotePlaneDetector(PipelineStep):
             datum["planes"]["masks"] = datum["planes"]["masks"][:, 80:-80]
 
             # Extents
-            datum["planes"]["detection"][0] -= 80  # min y
-            datum["planes"]["detection"][2] -= 80  # max y
+            datum["planes"]["detection"][:, 0] -= 80  # min y
+            datum["planes"]["detection"][:, 2] -= 80  # max y
 
 
 class PipelineRemoteNetworks(PipelineStep):

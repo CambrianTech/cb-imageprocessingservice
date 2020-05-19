@@ -93,7 +93,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         for d in range(number_planes):
             data["planes"]["masks"][d] = cv2.resize(
-                clean_masks[d], (plane_shape[1], plane_shape[0]))
+                clean_masks[d], (plane_shape[1], plane_shape[0])
+            )
             rect = cv2.boundingRect(np.uint8(data["planes"]["masks"][d]))
-            data["planes"]["detection"][:, 0:4][d] = [
-                rect[1], rect[0], rect[1] + rect[3], rect[0] + rect[2]]
+            data["planes"]["detection"][d, 0:4] = [
+                rect[1], rect[0], rect[1] + rect[3], rect[0] + rect[2]
+            ]

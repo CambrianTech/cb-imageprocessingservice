@@ -74,6 +74,7 @@ def _encode_plane_surface(plane_index, plane_data, mask_url):
         "name": "Plane %d" % plane_index,
         "normal": plane_normal.tolist(),
         "offset": plane_offset,
+        "rawParams": plane_parameters.tolist(),
         "imageExtents": plane_image_extents,
         "images": {
             "mask": mask_url
