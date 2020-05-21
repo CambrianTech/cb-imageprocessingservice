@@ -17,6 +17,7 @@ def main(model_path, port):
     print("Loading models from", model_path)
     model_unlit = load_model(os.path.join(model_path, "unlit"), session_config=get_session_config(use_gpu=False))
     model_lighting = load_model(os.path.join(model_path, "lighting"), session_config=get_session_config(use_gpu=False))
+    model_normals = load_model(os.path.join(model_path, "normals"), session_config=get_session_config(use_gpu=False))
 
     routes = web.RouteTableDef()
 
@@ -32,10 +33,12 @@ def main(model_path, port):
 
             unlit = feed_image_batched(model_unlit, images)
             lighting = feed_image_batched(model_lighting, images)
+            normals = feed_image_batched(model_normals, images)
 
             return web.Response(body=pickle.dumps({
                 "unlit": unlit,
-                "lighting": lighting
+                "lighting": lighting,
+                "normals": normals
             }))
         except Exception as e:
            print("Error:", e)

@@ -19,7 +19,7 @@ def _log_image(name, image):
 class PipelineRefineResults(PipelineStep):
     @property
     def required_keys(self) -> list:
-        return ["image", "semantic_probs", "hed"]
+        return ["image", "semantic_probs", "hed", "normals"]
 
     @property
     def output_keys(self) -> list:
@@ -29,12 +29,12 @@ class PipelineRefineResults(PipelineStep):
 
         hed = data["hed"]
         _log_image('hed.png', hed)
-
+        normals = np.uint8(data["normals"])
+        _log_image('normals.png', normals)
         w, h = hed.shape
         shape = (h,w)
 
         img = data["image"]
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = cv2.resize(img, shape)
         img_bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 

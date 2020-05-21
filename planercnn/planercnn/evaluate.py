@@ -125,6 +125,7 @@ class PlaneRCNNDetector():
                 new_input_dict['image_2'] = (sample[13].cuda() + self.config.MEAN_PIXEL_TENSOR.view((-1, 1, 1))) / 255.0 - 0.5
                 detections = detection_dict['detection']
                 detection_masks = detection_dict['masks']
+
                 depth_np = detection_dict['depth_np']
                 image = new_input_dict['image']
                 image_2 = new_input_dict['image_2']
@@ -153,13 +154,14 @@ class PlaneRCNNDetector():
 
                 masks_small = all_masks[1:]
                 all_masks = torch.nn.functional.interpolate(all_masks.unsqueeze(1), size=(480, 640), mode='bilinear').squeeze(1)
+                detection_dict['masks'][:, 80:560] = all_masks[1:]
                 all_masks = (all_masks.max(0, keepdim=True)[1] == torch.arange(len(all_masks)).cuda().long().view((-1, 1, 1))).float()
                 masks = all_masks[1:]
                 detection_masks = torch.zeros(detection_dict['masks'].shape).cuda()
                 detection_masks[:, 80:560] = masks
 
 
-                detection_dict['masks'] = detection_masks
+                # detection_dict['masks'] = detection_masks
                 detection_dict['depth_ori'] = detection_dict['depth'].clone()
                 detection_dict['mask'][:, 80:560] = (masks.max(0, keepdim=True)[0] > (1 - masks.sum(0, keepdim=True))).float()
 
@@ -284,8 +286,7 @@ class PlaneRecoverDetector():
             masks = torch.from_numpy(masks).float().cuda()
             XYZ_pred, detection_mask, plane_XYZ = calcXYZModule(self.config, camera, detections, masks, torch.zeros((1, 640, 640)).cuda(), return_individual=True)
             depth = XYZ_pred[1:2]
-            print(planes)
-            print(np.unique(segmentation))
+
             for mask_index, mask in enumerate(masks.detach().cpu().numpy()):
                 cv2.imwrite('test/mask_' + str(mask_index) + '.png', drawMaskImage(mask))
                 continue
