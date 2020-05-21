@@ -187,8 +187,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
             _, resized_masks[d] = cv2.threshold(
                 b, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            img[b > 0] = np.round(255 * np.random.rand(3, ))
-        _log_image('segmentation_mask' + '.png', img)
+        #     img[b > 0] = np.round(255 * np.random.rand(3, ))
+        # _log_image('segmentation_mask' + '.png', img)
 
         data["planes"]["masks"] = np.zeros_like(resized_masks)
         for d in range(number_planes):
