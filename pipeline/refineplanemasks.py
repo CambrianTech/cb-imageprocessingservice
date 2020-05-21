@@ -119,8 +119,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         for d in range(number_planes):
             markers[core_masks[d] > 0] = 255
-        markers[core_edges > 0] = 0
         markers[frangi_black > 127] = 255
+        markers[core_edges > 0] = 0
 
         markers = filters.rank.median(markers, disk(1))
 
