@@ -6,6 +6,7 @@ from cambrian import image_processing as ip
 from skimage.morphology import watershed, disk
 from skimage import filters, img_as_float
 from skimage.filters import threshold_multiotsu, frangi
+import pickle
 import os
 
 IM_LOGGING_ENABLED = False
@@ -23,7 +24,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
     def output_keys(self) -> list:
         return []
 
+
     def run(self, data):
+
         hed = data["hed"]
         prob_mask_full = np.uint8(255*data["semantic_probs"][:, :, 0])
         plane_masks = data["planes"]["masks"]
@@ -187,8 +190,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
             _, resized_masks[d] = cv2.threshold(
                 b, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        #     img[b > 0] = np.round(255 * np.random.rand(3, ))
-        # _log_image('segmentation_mask' + '.png', img)
 
         data["planes"]["masks"] = np.zeros_like(resized_masks)
         for d in range(number_planes):
