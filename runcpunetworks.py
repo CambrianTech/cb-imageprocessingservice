@@ -15,7 +15,6 @@ def main(model_path, port):
     max_size = 100 * 1024 * 1024  # Max size to receive
 
     print("Loading models from", model_path)
-    model_unlit = load_model(os.path.join(model_path, "unlit"), session_config=get_session_config(use_gpu=False))
     model_lighting = load_model(os.path.join(model_path, "lighting"), session_config=get_session_config(use_gpu=False))
     model_normals = load_model(os.path.join(model_path, "normals"), session_config=get_session_config(use_gpu=False))
 
@@ -31,12 +30,10 @@ def main(model_path, port):
             # Dimensions: [B, H, W, C]
             images = pickle.loads(data)
 
-            unlit = feed_image_batched(model_unlit, images)
             lighting = feed_image_batched(model_lighting, images)
             normals = feed_image_batched(model_normals, images)
 
             return web.Response(body=pickle.dumps({
-                "unlit": unlit,
                 "lighting": lighting,
                 "normals": normals
             }))

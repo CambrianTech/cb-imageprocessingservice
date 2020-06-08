@@ -76,15 +76,15 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
     steps = [
         PipelineGetData(user_uploads_bucket),
         PipelineRemoteNetworks("http://localhost:%d" % cpu_networks_port),
+        PipelineCalculateFov(fov_model_path),
+        PipelineRemotePlaneDetector(plane_url),
         PipelineRunModels(
             semantic_path=join(model_path, "semantic"),
             hed_path=join("hed_model", "HED_pretrained_bsds.npz")
         ),
         PipelineDeterminePrimaryAngles(),
         PipelineRefineResults(),
-        PipelineCalculateFov(fov_model_path),
         PipelineSuperpixels(),
-        PipelineRemotePlaneDetector(plane_url),
         PipelineRefinePlaneMasks(results_bucket),
         PipelineCombinePlaneMasks(),
         PipelineUploadResults(results_bucket)
@@ -93,19 +93,6 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
     # Start the processing workers for all steps
     for step in steps:
         step.start()
-
-    # Pipeline for segmenting floors, generating lighting and predicting fov.
-    # Don't run any of the plane steps.
-    async def flooring_pipeline(input_dict: typing.Dict):
-        total_start_time = time()
-        for step in steps:
-            if (not isinstance(step, PipelineRemotePlaneDetector) and
-                not isinstance(step, PipelineRefinePlaneMasks) and
-                not isinstance(step, PipelineCombinePlaneMasks)):
-                input_dict = await schedule_and_wait(step.schedule, input_dict)
-        print("Flooring total pipeline time: %.2fs" %
-              (time() - total_start_time))
-        return input_dict
 
     # Pipeline for finding planes, generating lighting and predicting fov.
     async def planes_pipeline(input_dict: typing.Dict):
@@ -252,7 +239,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
     segment_resource = app.router.add_resource("/segment/{id}")
     planes_resource = app.router.add_resource("/planes/{id}")
     cors.add(segment_resource.add_route(
-        "GET", get_pipeline_handler(flooring_pipeline)))
+        "GET", get_pipeline_handler(planes_pipeline)))
     cors.add(planes_resource.add_route(
         "GET", get_pipeline_handler(planes_pipeline)))
 

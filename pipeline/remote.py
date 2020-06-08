@@ -84,7 +84,7 @@ class PipelineRemoteNetworks(PipelineStep):
 
     @property
     def output_keys(self) -> list:
-        return ["unlit", "lighting", "normals"]
+        return ["lighting", "normals"]
 
     @property
     def is_batched(self) -> bool:
@@ -95,8 +95,7 @@ class PipelineRemoteNetworks(PipelineStep):
         response_dict = _remote_networks(self.address, data)
         print("Remote networks took %.2f seconds" % (time() - t))
 
-        for datum, unlit, lighting, normals in zip(data, response_dict["unlit"], response_dict["lighting"], response_dict["normals"]):
-            datum["unlit"] = unlit
+        for datum, lighting, normals in zip(data, response_dict["lighting"], response_dict["normals"]):
             datum["lighting"] = lighting
             datum["normals"] = normals
 

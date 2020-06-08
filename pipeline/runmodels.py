@@ -11,6 +11,8 @@ from tensorpack.tfutils import gradproc, optimizer
 from tensorpack.tfutils.sesscreate import NewSessionCreator
 from tensorpack.tfutils.summary import add_moving_summary, add_param_summary
 
+from .combineplanemasks import combine_plane_masks
+
 # HED from Tensorpack examples: https://github.com/tensorpack/tensorpack/tree/master/examples/HED
 
 
@@ -192,14 +194,16 @@ class PipelineRunModels(PipelineStep):
 
         _ = tf.Session(config=get_session_config(use_gpu=True))
 
-        self.model_semantic = load_model(semantic_path, session_config=get_session_config(use_gpu=True))
+        self.model_semantic = load_model(
+            semantic_path, session_config=get_session_config(use_gpu=True))
 
         self.model_hed = OfflinePredictor(PredictConfig(
             model=Model(),
             session_init=SmartInit(hed_path),
             input_names=['image'],
             output_names=['output%d' % k for k in range(1, 7)],
-            session_creator=NewSessionCreator(config=get_session_config(use_gpu=True))
+            session_creator=NewSessionCreator(
+                config=get_session_config(use_gpu=True))
         ))
 
     @property
@@ -208,7 +212,7 @@ class PipelineRunModels(PipelineStep):
 
     @property
     def output_keys(self) -> list:
-        return ["image", "semantic", "semantic_probs", "hed", "unlit", "lighting"]
+        return ["image", "semantic", "semantic_probs", "hed", "lighting", "planes"]
 
     @property
     def is_batched(self) -> bool:
@@ -218,8 +222,11 @@ class PipelineRunModels(PipelineStep):
         images = [datum["image"] for datum in data]
 
         t = time()
-        semantic_input = [{"image": datum["image"],
-                           "unlit": datum["unlit"]} for datum in data]
+
+        semantic_input = [{
+            "image": datum["image"],
+            "plane_alpha_mask": combine_plane_masks(datum["planes"]["masks"])[1]
+        } for datum in data]
 
         semantic_results = [s["output"] for s in feed_images_batched(
             self.model_semantic, semantic_input)]
@@ -236,7 +243,7 @@ class PipelineRunModels(PipelineStep):
             if w < 1024 and h < 1024:
                 h = int((h // 16) * 16)
                 w = int((w//16) * 16)
-            else :
+            else:
                 if w >= h:
                     h = int((1024 / w * h // 16) * 16)
                     w = 1024
@@ -244,7 +251,7 @@ class PipelineRunModels(PipelineStep):
                     w = int((1024 / h * w // 16) * 16)
                     h = 1024
             images[i] = cv2.resize(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB), (h, w)).astype(
-            'float32')
+                'float32')
 
         print("HED resize took %.2f seconds" % (time() - t))
 
