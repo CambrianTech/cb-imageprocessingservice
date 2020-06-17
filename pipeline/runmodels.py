@@ -11,7 +11,7 @@ from tensorpack.tfutils import gradproc, optimizer
 from tensorpack.tfutils.sesscreate import NewSessionCreator
 from tensorpack.tfutils.summary import add_moving_summary, add_param_summary
 
-from .combineplanemasks import combine_plane_masks
+from .combineplanemasks import combine_plane_masks, combine_plane_clusters
 
 # HED from Tensorpack examples: https://github.com/tensorpack/tensorpack/tree/master/examples/HED
 
@@ -223,10 +223,23 @@ class PipelineRunModels(PipelineStep):
 
         t = time()
 
-        semantic_input = [{
-            "image": datum["image"],
-            "plane_alpha_mask": combine_plane_masks(datum["planes"]["masks"])[1]
-        } for datum in data]
+        def dict_from_datum(datum):
+            masks = datum["planes"]["masks"]
+            clusters = datum["planes"]["detection"][:, 4]
+            clusters = clusters.astype(np.int32)
+
+            plane_mask = combine_plane_masks(masks)[1]
+            cluster_mask = combine_plane_clusters(masks, clusters)
+
+            return {
+                "image": datum["image"],
+                "plane_alpha_mask": plane_mask,
+                "plane_cluster_mask_a": cluster_mask[..., :3],
+                "plane_cluster_mask_b": cluster_mask[..., 3:6],
+                "plane_cluster_mask_c": cluster_mask[..., 6:9],
+            }
+
+        semantic_input = list(map(dict_from_datum, data))
 
         semantic_results = [s["output"] for s in feed_images_batched(
             self.model_semantic, semantic_input)]

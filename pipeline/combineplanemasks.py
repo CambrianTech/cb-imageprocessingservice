@@ -30,6 +30,27 @@ def combine_plane_masks(plane_masks: np.ndarray) -> np.ndarray:
     return index_mask, alpha_mask
 
 
+def combine_plane_clusters(plane_masks: np.ndarray, clusters: np.ndarray) -> np.ndarray:
+    # plane_masks: [N, H, W]
+    # clusters: [N, C]
+    # output: [H, W, C]
+
+    num_clusters = 9
+
+    if plane_masks.dtype == np.uint8:
+        plane_masks = plane_masks.astype(np.float32) / 255
+
+    alpha_mask = np.sum(plane_masks, axis=0, dtype=np.float32)
+
+    cluster_mask = np.zeros(
+        [*alpha_mask.shape[:2], num_clusters], dtype=np.float32)
+
+    for mask, cluster in zip(plane_masks, clusters):
+        cluster_mask[..., cluster] = mask
+
+    return cluster_mask
+
+
 class PipelineCombinePlaneMasks(PipelineStep):
     @property
     def required_keys(self) -> list:
@@ -45,7 +66,8 @@ class PipelineCombinePlaneMasks(PipelineStep):
 
     def run(self, data):
         for datum in data:
-            index_mask, alpha_mask = combine_plane_masks(datum["planes"]["masks"])
+            index_mask, alpha_mask = combine_plane_masks(
+                datum["planes"]["masks"])
 
             datum["planes_index_mask"] = index_mask
             datum["planes_alpha_mask"] = alpha_mask
