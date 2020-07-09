@@ -233,10 +233,10 @@ class PipelineRunModels(PipelineStep):
 
             return {
                 "image": datum["image"],
-                "plane_alpha_mask": plane_mask,
-                "plane_cluster_mask_a": cluster_mask[..., :3],
-                "plane_cluster_mask_b": cluster_mask[..., 3:6],
-                "plane_cluster_mask_c": cluster_mask[..., 6:9],
+                "plane_alpha_mask": (255 * plane_mask).astype(np.uint8),
+                "plane_cluster_mask_a": (255 * cluster_mask[..., :3]).astype(np.uint8),
+                "plane_cluster_mask_b": (255 * cluster_mask[..., 3:6]).astype(np.uint8),
+                "plane_cluster_mask_c": (255 * cluster_mask[..., 6:9]).astype(np.uint8),
             }
 
         semantic_input = list(map(dict_from_datum, data))
