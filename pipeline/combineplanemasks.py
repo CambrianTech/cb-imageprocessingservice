@@ -46,7 +46,8 @@ def combine_plane_clusters(plane_masks: np.ndarray, clusters: np.ndarray) -> np.
         [*alpha_mask.shape[:2], num_clusters], dtype=np.float32)
 
     for mask, cluster in zip(plane_masks, clusters):
-        cluster_mask[..., cluster] = mask
+        cluster_mask[..., cluster] = np.minimum(
+            cluster_mask[..., cluster] + mask, 1)
 
     return cluster_mask
 
