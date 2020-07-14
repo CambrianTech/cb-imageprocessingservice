@@ -11,6 +11,7 @@ import zlib
 
 from pipeline.core import PipelineStep
 
+surface_types = ["unknown", "floor", "wall", "horizontal", "vertical"]
 
 def _upload_image_to_s3(s3_client, image: np.ndarray, bucket: str, key: str):
     if image.dtype == np.float32:
@@ -68,9 +69,12 @@ def _encode_plane_surface(plane_index, plane_data, mask_url):
         "maxX": plane_data[3]
     }
 
+    plane_type = np.uint8(plane_data[9])
+
+
     return {
         "id": "plane-%d" % plane_index,
-        "type": "unknown",
+        "type": surface_types[plane_type],
         "name": "Plane %d" % plane_index,
         "normal": plane_normal.tolist(),
         "offset": plane_offset,
