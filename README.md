@@ -50,3 +50,10 @@ The `serve.py` script can be run to start the http image processing server:
 Optionally `--images-local-dir <path>` and `--results-local-dir <path>` can be passed to read from and write to these paths instead of S3 for local testing.
 
 Example: `python3 serve.py ./tensorflow_models/ ./sklearn_models/fov_classifier_lc128.joblib cb-user-image-uploads cb-imageprocessingservice-results --image-local-dir ./images/ --results-local-dir ./results/`
+
+## Developing locally
+install docker and cuda docker
+- run buildlocal.sh to build the plane and backend image
+- run startlocal.sh to start the two containers and connect them together etc.
+
+you can put images into the images folder on the backend server (use docker cp to copy files from or to the container), and then you can run localhost:8081/segment/<name of image> to segment those, and results will be in the results folder on the container (use docker cp to copy those out again)
