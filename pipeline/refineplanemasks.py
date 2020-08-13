@@ -5,12 +5,15 @@ from scipy import ndimage
 from skimage.feature import peak_local_max
 from skimage.morphology import watershed, disk
 from cambrian import image_processing as ip
-from skimage import filters, img_as_float
+from skimage import filters, color
+from skimage.morphology.extrema import local_minima
+from skimage.future import graph
 from skimage.filters import threshold_multiotsu, frangi
 import os
 import pickle
 
-IM_LOGGING_ENABLED = False
+IM_LOGGING_ENABLED = True
+print("logging enabled")
 
 
 def _log_image(name, image):
@@ -20,7 +23,7 @@ def _log_image(name, image):
 
 def _log_ply(image, masks, plane_XYZ, file_path='logging/3D.ply', write_occlusion=False, mult=1.0):
     if IM_LOGGING_ENABLED:
-        image = cv2.resize(image, (mult * 160, mult * 120))
+        # image = cv2.resize(image, (mult * 160, mult * 120))
         width = image.shape[1]
         height = image.shape[0]
         faces = []
@@ -239,24 +242,42 @@ class PipelineRefinePlaneMasks(PipelineStep):
         return []
 
     def run(self, data):
+        # with open('results/data.pickle', 'wb') as handle:
+        #     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         img = data["image"]
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        # img_bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img_sobel = filters.sobel(color.rgb2gray(img))
+        img_sobel = cv2.resize(img_sobel, (640, 480))
         img_rs = cv2.resize(img, (640, 480))
+
         hed = data["hed"]
 
         w, h = hed.shape
         # shape = (h, w)
         edges_hed = cv2.Canny(hed, 10, 250)
-
         _log_image('edges_hed.png', edges_hed)
+        hed_min = local_minima(hed)
+        hed_min = cv2.resize(np.uint8(hed_min), (640, 480))
+        _log_image('hed_min.png', 255. * hed_min)
+
         hed = cv2.resize(hed, (640, 480))
         edges_hed = cv2.resize(edges_hed, (640, 480))
-        edges_hed = cv2.dilate(255 * np.uint8(edges_hed > 0),
-                               cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+        # edges_hed = cv2.dilate(255 * np.uint8(edges_hed > 0),
+        #                        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+
+        normals = np.uint8(data["normals"])
+        normals = cv2.resize(normals, (640, 480))
+
+        _log_image("normals_nn.png", normals)
+
+
 
         planes_data = data["planes"]
+
+        # for key, value in planes_data.items():
+        #     print(key, value.shape, value.dtype)
+
 
         detection_parameters = np.array(data["planes"]["detection"], dtype=np.float32)
         plane_parameters = np.array(detection_parameters[:, 6:9], dtype=np.float32)
@@ -265,17 +286,16 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         plane_clusters = np.array(detection_parameters[:, 4], dtype=np.int32)
         roi = np.array(detection_parameters[:, :4], dtype=np.int32)
-        roi = np.minimum(roi, 639)
-        roi[:,0] = np.minimum(roi[:,0], 479)
-        roi[:,2] = np.minimum(roi[:,2], 479)
-        # print("roi", roi)
+        a=32
 
+        roi[:,0] = np.clip(roi[:,0]-a,0,479)
+        roi[:,1] = np.clip(roi[:,1]-a,0,639)
+        roi[:,2] = np.clip(roi[:,2]+a,0, 479)
+        roi[:,3] = np.clip(roi[:,3]+a,0, 639)
         plane_masks = planes_data["masks"]
         number_planes = len(plane_masks)
         print("number of planes: ", number_planes)
 
-        depth_or = planes_data["depth_np"][0][80:-80, :]
-        max_depth = np.amax(depth_or)
         plane_XYZ = planes_data["plane_XYZ"][:,:,80:-80,:].transpose(0,2,3,1)
 
         _log_ply(img_rs, data["planes"]["masks"], plane_XYZ, mult=1,file_path='logging/3D1.ply')
@@ -296,8 +316,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         print("floor indices are: ", floor_indices, horiz_indices)
 
         floor_index = floor_indices[0]
-
-        plane_masks[floor_index] = np.sqrt(floor_mask * 3. / 2. / 255. * plane_masks[floor_index])
 
         floor_normal = plane_normals[floor_index]
         wall_indices, vert_indices, vert_angs = find_wall_indices(wall_mask, plane_masks, plane_normals[floor_index],
@@ -320,7 +338,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     plane_parameters[i] = plane_normals[i] * np.sum(
                         plane_masks[i] * np.dot(plane_XYZ[i], plane_normals[i])) / np.sum(plane_masks[i])
 
-        plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=640, height=480, max_depth=10)
+        plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, camera=planes_data["camera"], width=640, height=480, max_depth=10)
 
         for i in np.unique(plane_clusters):
 
@@ -339,27 +357,195 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     if len(p)>0 and (np.mean(p) < 0.3):
                         plane_parameters[k] = plane_parameters[j]
 
-        plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=640, height=480, max_depth=10)
+        plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, camera=planes_data["camera"], width=640, height=480, max_depth=10)
+
+        not_plane = np.sum(plane_masks, axis=0)
+        not_plane = np.amax(not_plane) - not_plane
+        not_plane_mask = np.int32(np.ones_like(plane_masks[0]))
+        not_plane_mask[hed > 0] = 0
+        not_plane_mask[wall_mask > 255 / 3.] = 0
+        not_plane_mask[floor_mask > 255 / 3.] = 0
+
+        core_labels = np.int32(np.zeros_like(plane_masks[0]))
+
+        for i in range(number_planes):
+            box = roi[i]
+            print(box)
+            # mask was upsampled so expand roi to deal with border issues
+            thresh_o = filters.threshold_multiotsu(plane_masks[i][box[0]: box[2], box[1]: box[3]], classes=4)
+            print(thresh_o)
+            not_plane_mask[plane_masks[i] > min(.05, thresh_o[0])] = 0
+
+            mask = np.ones_like(plane_masks[i])
+            mask[box[0]: box[2], box[1]: box[3]] = 0
+
+            plane_masks[i][mask > 0] = 0
+
+            core_mask = plane_masks[i] > thresh_o[2]
+            components, output, stats, centroids = cv2.connectedComponentsWithStats(np.uint8(core_mask), connectivity=4)
+
+            sizes = stats[:, -1]
+            sizes[0] = 0
+            largest = np.argmax(sizes)
+            core_labels[output == largest] = i + 1
+        _log_image('img.png', img_rs)
+        _log_image('not_plane_mask.png', not_plane_mask)
+
+        components, output, stats, centroids = cv2.connectedComponentsWithStats(np.uint8(not_plane_mask),
+                                                                                connectivity=4)
+        sizes = stats[:, -1]
+        sizes[0] = 0
+        large = np.nonzero(sizes > 16)[0]
+        print(large)
+        for l in large:
+            core_labels[output == l] = np.amax(core_labels) + 1
+
+        # detect lines in image
+        length_threshold = 16
+        distance_threshold = 1.41421356
+        canny_th1 = 50.0
+        canny_th2 = 50.0
+        canny_aperture_size = 5
+        do_merge = False
+        fld = cv2.ximgproc.createFastLineDetector(length_threshold,
+                                                  distance_threshold, canny_th1, canny_th2, canny_aperture_size,
+                                                  do_merge)
+        lines1 = fld.detect(cv2.cvtColor(img_rs, cv2.COLOR_BGR2GRAY))
+
+        # detect lines in normals
+        length_threshold = 32
+        distance_threshold = 1.41421356
+        canny_th1 = 50.0
+        canny_th2 = 250.0
+        canny_aperture_size = 3
+        do_merge = True
+        fld = cv2.ximgproc.createFastLineDetector(length_threshold,
+                                                  distance_threshold, canny_th1, canny_th2, canny_aperture_size,
+                                                  do_merge)
+
+        lines2 = fld.detect(np.uint8(cv2.cvtColor(normals, cv2.COLOR_BGR2GRAY)))
+
+        # Draw lines on the image
+        img_lines = fld.drawSegments(np.zeros_like(hed), lines1, )[:, :, 2]
+        # _log_image('img_lines.png',fld.drawSegments(img_rs, lines1))
+
+        normal_lines = fld.drawSegments(np.zeros_like(hed), lines2)[:, :, 2]
+        # _log_image('hed_lines.png',fld.drawSegments(img_rs, lines2))
+
+        # We use the hed network as a starting point for watershed
+
+        line_mask = img_lines == 0
+        line_mask[normal_lines > 0] = 0
+
+        conn = ndimage.generate_binary_structure(line_mask.ndim, 2)
+        line_mask = ndimage.grey_erosion(line_mask, footprint=conn)
+
+        _log_image('line_mask.png', 255. * (line_mask))
+
+        core_labels[line_mask == 0] = 0
+        core_labels = ip.refine_mask_watershed(None, img_rs, core_labels, None, erode=0, distance=0.1,
+                                              max_value=np.amax(core_labels) + 1)
+        _log_image('core_labels.png', get_segmentation_image(core_labels, img_rs, avg=False))
 
 
-        for d in range(number_planes):
-            mask = np.uint8(plane_depth[d] > 0)
-            local_maxi = peak_local_max(np.abs(plane_masks[d] - .5), min_distance=5, indices=False,
-                                        labels=mask, exclude_border=False)
-            markers = ndimage.label(local_maxi)[0]
+        components, output, stats, centroids = cv2.connectedComponentsWithStats(np.uint8(hed_min), connectivity=4)
 
-            labels_new = watershed(hed, markers=markers, mask=mask)
-            plane_mask = plane_masks[d].copy()
-            plane_mask[edges_hed > 0] = 0
-            plane_masks[d] = get_segmentation_image(np.uint8(labels_new + 1), plane_masks[d], avg=True)
-            _log_image('distance_masks_segmentation' + str(d) + '.png', 255. * plane_masks[d])
+        sizes = stats[:, -1]
+        sizes[0] = 0
+        large = np.nonzero(sizes > 16)[0]
 
-        plane_masks[plane_masks < .05] = 0
+        hed_large_components = np.zeros_like(hed_min)
+        for comp in large:
+            hed_large_components[output == comp] = 1
 
-        plus = np.concatenate(([np.zeros_like(plane_masks[0])], plane_masks))
-        depth_segmentation = np.int32(np.argmax(plus, axis=0))
+        hed_min[hed_large_components > 0] = 0
+        _log_image('hed_min.png', 255. * (hed_min))
 
-        _log_image('depth_segmentation.png', get_segmentation_image(np.uint8(depth_segmentation), img_rs, avg=False))
+        hed_large_components = ndimage.grey_erosion(hed_large_components, footprint=conn)
+
+        _log_image('hed_large_components.png', 255. * (hed_large_components))
+
+        hed_min[hed_large_components > 0] = 1
+
+        distances = cv2.distanceTransform(np.uint8(hed_min), cv2.DIST_L2, 5)
+
+        hed_min_markers = ndimage.label(hed_min)[0]
+
+        # If we need to break the hed so that pieces are naturally compact
+
+        local_maxi = peak_local_max(distances, indices=False,
+                                    labels=hed_min_markers, num_peaks_per_label=20)
+        hed_min_markers = ndimage.label(local_maxi)[0]
+
+        _log_image('hed_min_markers.png', get_segmentation_image(hed_min_markers, img_rs, avg=False))
+
+        labels_hed = watershed(img_sobel, markers=hed_min_markers, mask=line_mask)
+
+        _log_image('watershed_hed.png', get_segmentation_image(labels_hed, img_rs, avg=False))
+
+        line_masks = plane_masks.copy()
+        line_masks[:, line_mask == 0] = -1000
+        not_plane[line_mask == 0] = -1000
+        line_masks[line_masks < .01] = 0
+        floor_mask[floor_mask < wall_mask] = 0
+        floor_mask[floor_mask < .05] = 0
+        g = ip.rag_mean_color(
+            np.dstack((line_masks.transpose(1, 2, 0), not_plane, floor_mask / 255., img_rs / 255.)), labels_hed)
+
+        labels_graph = graph.merge_hierarchical(labels_hed, g, thresh=0.5, rag_copy=False,
+                                                in_place_merge=True,
+                                                merge_func=ip.merge_mean_color,
+                                                weight_func=ip.weight_mean_color)
+
+        print("graph_reduction", np.amax(labels_graph), np.amax(labels_hed))
+
+        labels_graph[line_mask == 0] = 0
+
+        _log_image('watershed_graph.png', get_segmentation_image(labels_graph, img_rs, avg=False))
+
+        labels_hed = labels_graph
+        label_number = len(np.unique(labels_hed))
+        means = np.zeros((label_number, number_planes), dtype=np.float32)
+        plane_masks[:, line_mask == 0] = 0
+        for i in range(number_planes):
+            _log_image('plane_masks' + str(i) + '.png', 255. * plane_masks[i])
+            plane_masks[i][core_labels == i + 1] = 1
+            means[:, i] = ndimage.mean(plane_masks[i], labels=labels_hed, index=np.unique(labels_hed))
+
+        means_plus = np.zeros((label_number, number_planes + 3), dtype=np.float32)
+        means_plus[:, 3:number_planes + 3] = means
+        means_plus[means_plus < .25] = 0
+        floor_mask[floor_mask < .5] = 0
+        means_plus[:1] = np.mean(floor_mask / 255.)
+        arg = np.argmax(means_plus, axis=-1)
+
+        labels_arg = labels_hed.copy() + number_planes + np.amax(arg)
+
+        #
+        # labels_arg = np.zeros_like(labels_hed)
+        for i in range(label_number):
+            if arg[i] > 0:
+                labels_arg[labels_hed == np.unique(labels_hed)[i]] = arg[i]
+
+        _log_image('watershed_arg.png', get_segmentation_image(labels_arg, img_rs, avg=False))
+        labels_arg[line_mask == 0] = 0
+
+        line_mask = img_lines == 0
+        line_mask[normal_lines > 0] = 0
+        labels_arg = watershed(img_sobel, markers=labels_arg, mask=line_mask, compactness=.003)
+        labels_arg[labels_arg < 0] = 0
+
+        for label in np.unique(labels_arg):
+            mask = np.uint8(labels_arg == label)
+            labels_arg[mask > 0] = 0
+            isolated = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
+            ret, isolated = cv2.threshold(isolated, min(10, isolated.max() - 2), 1, 0)
+            labels_arg[np.uint8(isolated) > 0] = np.int32(label)
+
+        labels_arg = cv2.watershed(img_rs, markers=labels_arg)
+        _log_image('watershed_refine.png', get_segmentation_image(labels_arg, np.zeros_like(img_rs), avg=False))
+
+
 
         data["planes"]["masks"] = np.uint8(np.zeros_like(plane_masks))
 
@@ -369,13 +555,12 @@ class PipelineRefinePlaneMasks(PipelineStep):
         for d in range(number_planes):
             final_mask = np.zeros_like(plane_masks[d], dtype=np.uint8)
 
-            contours, hierarchy = cv2.findContours(255*np.uint8(depth_segmentation==d+1), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            contours, hierarchy = cv2.findContours(255*np.uint8(labels_arg==d+1), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             areas = [cv2.contourArea(cnt) for cnt in contours]
 
             max_cnt = np.argmax(areas)
 
             cv2.drawContours(final_mask, [contours[max_cnt]], 0, 255, -1, cv2.LINE_AA)
-            cv2.drawContours(final_mask, [contours[max_cnt]], 0, 255, 2, cv2.LINE_AA)
 
             data["planes"]["masks"][d] = final_mask
 

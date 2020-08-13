@@ -1,6 +1,8 @@
 import numpy as np
 import cv2
 
+from skimage.future.graph import RAG
+
 from skimage import filters
 
 from . import diagnostics as d
@@ -718,6 +720,138 @@ def crop_image(img, margin=30):
     result = img[margin:h-margin, margin:w-margin]
     
     return result
+
+
+def weight_mean_color(graph, src, dst, n):
+    """Callback to handle merging nodes by recomputing mean color.
+
+    The method expects that the mean color of `dst` is already computed.
+
+    Parameters
+    ----------
+    graph : RAG
+        The graph under consideration.
+    src, dst : int
+        The vertices in `graph` to be merged.
+    n : int
+        A neighbor of `src` or `dst` or both.
+
+    Returns
+    -------
+    data : dict
+        A dictionary with the `"weight"` attribute set as the absolute
+        difference of the mean color between node `dst` and `n`.
+    """
+
+    mean_x = graph.nodes[dst]['mean color']
+    mean_y = graph.nodes[n]['mean color']
+    diff = mean_x - mean_y
+    color_x = mean_x[-3:]
+    color_y = mean_y[-3:]
+
+    color_diff = np.linalg.norm(color_x - color_y)
+
+    diff = np.amax(np.abs(diff[:-3]))+ color_diff
+
+    weight = diff
+
+    return {'weight': weight}
+
+def merge_mean_color(graph, src, dst):
+    """Callback called before merging two nodes of a mean color distance graph.
+
+    This method computes the mean color of `dst`.
+
+    Parameters
+    ----------
+    graph : RAG
+        The graph under consideration.
+    src, dst : int
+        The vertices in `graph` to be merged.
+    """
+    graph.nodes[dst]['total color'] += graph.nodes[src]['total color']
+    graph.nodes[dst]['pixel count'] += graph.nodes[src]['pixel count']
+    graph.nodes[dst]['mean color'] = (graph.nodes[dst]['total color'] /
+                                      graph.nodes[dst]['pixel count'])
+
+def rag_mean_color(image, labels, connectivity=1):
+    """Compute the Region Adjacency Graph using mean colors.
+
+    Given an image and its initial segmentation, this method constructs the
+    corresponding Region Adjacency Graph (RAG). Each node in the RAG
+    represents a set of pixels within `image` with the same label in `labels`.
+    The weight between two adjacent regions represents how similar or
+    dissimilar two regions are depending on the `mode` parameter.
+
+    Parameters
+    ----------
+    image : ndarray, shape(M, N, [..., P,] 3)
+        Input image.
+    labels : ndarray, shape(M, N, [..., P])
+        The labelled image. This should have one dimension less than
+        `image`. If `image` has dimensions `(M, N, 3)` `labels` should have
+        dimensions `(M, N)`.
+    connectivity : int, optional
+        Pixels with a squared distance less than `connectivity` from each other
+        are considered adjacent. It can range from 1 to `labels.ndim`. Its
+        behavior is the same as `connectivity` parameter in
+        ``scipy.ndimage.generate_binary_structure``.
+    mode : {'distance', 'similarity'}, optional
+        The strategy to assign edge weights.
+
+            'distance' : The weight between two adjacent regions is the
+            :math:`|c_1 - c_2|`, where :math:`c_1` and :math:`c_2` are the mean
+            colors of the two regions. It represents the Euclidean distance in
+            their average color.
+
+            'similarity' : The weight between two adjacent is
+            :math:`e^{-d^2/sigma}` where :math:`d=|c_1 - c_2|`, where
+            :math:`c_1` and :math:`c_2` are the mean colors of the two regions.
+            It represents how similar two regions are.
+    sigma : float, optional
+        Used for computation when `mode` is "similarity". It governs how
+        close to each other two colors should be, for their corresponding edge
+        weight to be significant. A very large value of `sigma` could make
+        any two colors behave as though they were similar.
+
+    Returns
+    -------
+    out : RAG
+        The region adjacency graph.
+    """
+
+    graph = RAG(labels, connectivity=connectivity)
+    dim = 1
+    if image.ndim > 2:
+        dim = image.shape[2]
+
+    for n in graph:
+        graph.nodes[n].update({'labels': [n],
+                               'pixel count': 0,
+                               'total color': np.zeros(dim,
+                                                       dtype=np.double)})
+    for index in np.ndindex(labels.shape):
+        current = labels[index]
+        graph.nodes[current]['pixel count'] += 1
+        graph.nodes[current]['total color'] += image[index]
+
+    for n in graph:
+        graph.nodes[n]['mean color'] = (graph.nodes[n]['total color'] /
+                                        graph.nodes[n]['pixel count'])
+
+    for x, y, d in graph.edges(data=True):
+        mean_x = graph.nodes[x]['mean color']
+        mean_y = graph.nodes[y]['mean color']
+        color_x = mean_x[-3:]
+        color_y = mean_y[-3:]
+        diff = mean_x - mean_y
+        color_diff = np.linalg.norm(color_x-color_y)
+
+        diff = np.amax(np.abs(diff[:-3]))+color_diff
+
+        d['weight'] = diff
+
+    return graph
 
 def refine_mask_watershed(args, rgb, mask, image_name, distance=0.0, erode=0, max_value=151):
     """Runs the watershed algorithm on rgb and returns markers"""
