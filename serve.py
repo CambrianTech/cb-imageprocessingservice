@@ -55,13 +55,14 @@ def _get_instance_metadata():
 
 @click.command()
 @click.argument("model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("semantic_model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("fov_model_path", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("user_uploads_bucket", type=click.STRING)
 @click.argument("results_bucket", type=click.STRING)
 @click.argument("plane_url", type=click.STRING)
 @click.option("--image-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--results-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
-def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_url, image_local_dir, results_local_dir):
+def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_url, image_local_dir, results_local_dir):
     print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
@@ -79,7 +80,7 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_
         PipelineCalculateFov(fov_model_path),
         PipelineRemotePlaneDetector(plane_url),
         PipelineRunModels(
-            semantic_path=join(model_path, "semantic"),
+            semantic_path=semantic_model_path,
             hed_path=join("hed_model", "HED_pretrained_bsds.npz")
         ),
         PipelineDeterminePrimaryAngles(),

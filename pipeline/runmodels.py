@@ -2,7 +2,7 @@ import numpy as np
 from scipy.special import softmax
 import cv2
 import tensorflow as tf
-from modelutils import feed_image_batched, feed_images_batched, load_model, get_session_config
+from modelutils import get_session_config
 from pipeline.core import PipelineStep
 import os
 from time import time
@@ -10,6 +10,11 @@ from tensorpack import *
 from tensorpack.tfutils import gradproc, optimizer
 from tensorpack.tfutils.sesscreate import NewSessionCreator
 from tensorpack.tfutils.summary import add_moving_summary, add_param_summary
+from gluoncv.model_zoo import get_model
+from gluoncv.data.transforms.presets.segmentation import test_transform
+from gluoncv.data import batchify
+from mxnet import image
+import mxnet as mx
 
 from .combineplanemasks import combine_plane_masks, combine_plane_clusters
 
@@ -194,8 +199,11 @@ class PipelineRunModels(PipelineStep):
 
         _ = tf.Session(config=get_session_config(use_gpu=True))
 
-        self.model_semantic = load_model(
-            semantic_path, session_config=get_session_config(use_gpu=True))
+        self.mx_ctx = mx.gpu(0)
+        self.model_semantic = get_model(
+            "deeplab_resnest269_ade", pretrained=True,
+            root=semantic_path, ctx=self.mx_ctx
+        )
 
         self.model_hed = OfflinePredictor(PredictConfig(
             model=Model(),
@@ -223,29 +231,29 @@ class PipelineRunModels(PipelineStep):
 
         t = time()
 
-        def dict_from_datum(datum):
-            masks = datum["planes"]["masks"]
-            clusters = datum["planes"]["detection"][:, 4]
-            clusters = clusters.astype(np.int32)
+        # Numpy to mx, resize, test-transform, batch
+        semantic_input = [
+            test_transform(
+                image.resize_short(
+                    mx.nd.array(image, dtype=np.uint8),
+                    480
+                ),
+                self.mx_ctx
+            )
+            for image in images
+        ]
 
-            plane_mask = combine_plane_masks(masks)[1]
-            cluster_mask = combine_plane_clusters(masks, clusters)
+        # Run semantic segmentation model
+        # TODO: Batch properly?
+        semantic_results = [
+            self.model_semantic.predict(inp).asnumpy()
+            for inp in semantic_input
+        ]
 
-            return {
-                "image": datum["image"],
-                "plane_alpha_mask": (255 * plane_mask).astype(np.uint8),
-                "plane_cluster_mask_a": (255 * cluster_mask[..., :3]).astype(np.uint8),
-                "plane_cluster_mask_b": (255 * cluster_mask[..., 3:6]).astype(np.uint8),
-                "plane_cluster_mask_c": (255 * cluster_mask[..., 6:9]).astype(np.uint8),
-            }
-
-        semantic_input = list(map(dict_from_datum, data))
-
-        semantic_results = [s["output"] for s in feed_images_batched(
-            self.model_semantic, semantic_input)]
+        # Store logit and softmaxed results
         for datum, result in zip(data, semantic_results):
             datum["semantic"] = result
-            datum["semantic_probs"] = softmax(result/255, axis=-1)
+            datum["semantic_probs"] = softmax(result, axis=-1)
 
         print("Semantic model took %.2f seconds" % (time() - t))
 

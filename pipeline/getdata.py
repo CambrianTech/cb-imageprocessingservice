@@ -3,7 +3,6 @@ import boto3
 import numpy as np
 from pipeline.core import PipelineStep
 import os
-import cv2
 try:
     from imageio import imread
 except:
