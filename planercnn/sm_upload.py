@@ -14,12 +14,14 @@ sourcedir.tar.gz/
 
 
 def main():
+    """
     with tarfile.open("model.tar.gz", mode="w:gz") as archive:
         os.chdir("planercnn")
         archive.add("checkpoint", recursive=True)
         archive.add("anchors", recursive=True)
+    """
 
-    os.chdir("..")
+    #os.chdir("..")
 
     with tarfile.open("sourcedir.tar.gz", mode="w:gz") as archive:
         os.chdir("planercnn")
@@ -29,18 +31,19 @@ def main():
         archive.add("models", recursive=True)
         archive.add("nms", recursive=True)
         archive.add("roialign", recursive=True)
+        archive.add("datasets", recursive=True)
 
     os.chdir("..")
 
-    """
     sagemaker_session = sagemaker.Session()
+    """
     sagemaker_session.upload_data(
-        path="model.tar.gz", key_prefix="planercnn/model"
-    )
-    sagemaker_session.upload_data(
-        path="sourcedir.tar.gz", key_prefix="planercnn/sourcedir"
+        path="model.tar.gz", key_prefix="planercnn"
     )
     """
+    sagemaker_session.upload_data(
+        path="sourcedir.tar.gz", key_prefix="planercnn"
+    )
 
 
 if __name__ == "__main__":

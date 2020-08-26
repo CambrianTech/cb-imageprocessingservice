@@ -1,4 +1,5 @@
 import pickle
+import os
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -13,10 +14,6 @@ from models.model import compose_image_meta
 # TODO: Only import needed stuff
 from utils import *
 from datasets.plane_dataset import *
-
-
-options = parse_args()
-config = InferenceConfig(options)
 
 
 def load_sample(image, camera, options, config):
@@ -43,12 +40,24 @@ def dict_torch_to_numpy(torch_dict):
 
 
 def model_fn(model_dir):
-    print("Loading detector")
-    with torch.no_grad():
-        detector = PlaneRCNNDetector(options, config, modelType="final")
+    print("model_fn", model_dir)
+    options = parse_args()
+    options.anchorFolder = os.path.join(model_dir, "anchors")
+    print("Options:", options)
+    config = InferenceConfig(options)
 
+    print("Loading detector from", model_dir)
+
+    with torch.no_grad():
+        detector = PlaneRCNNDetector(options, config, modelType="final", checkpoint_prefix_dir=model_dir)
+    return detector
 
 def input_fn(request_body, request_content_type):
+    options = parse_args()
+    options.anchorFolder = os.path.join("/opt/ml/model", "anchors")
+    print("Options:", options)
+    config = InferenceConfig(options)
+
     if request_content_type == "application/python-pickle":
         # Load images as numpy array from received file.
         # Dimensions: [B, H, W, C]

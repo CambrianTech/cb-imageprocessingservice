@@ -11,7 +11,6 @@ from torch.utils.data import DataLoader
 import os
 from tqdm import tqdm
 import numpy as np
-import cv2
 import sys
 
 from models.model import *

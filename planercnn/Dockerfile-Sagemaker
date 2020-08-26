@@ -1,0 +1,9 @@
+FROM 520713654638.dkr.ecr.us-east-1.amazonaws.com/sagemaker-pytorch:0.4.0-gpu-py3
+
+# Install dependencies needed for OpenCV and CUDA headers
+RUN apt-get update && apt-get install --no-install-recommends -y \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender-dev \
+        && apt-get clean

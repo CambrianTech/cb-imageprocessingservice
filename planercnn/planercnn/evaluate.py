@@ -32,7 +32,7 @@ from config import InferenceConfig
 
 
 class PlaneRCNNDetector():
-    def __init__(self, options, config, modelType, checkpoint_dir=''):
+    def __init__(self, options, config, modelType, checkpoint_dir='', checkpoint_prefix_dir=""):
         self.options = options
         self.config = config
         self.modelType = modelType
@@ -57,6 +57,9 @@ class PlaneRCNNDetector():
         if options.suffix != '':
             checkpoint_dir += '_' + options.suffix
             pass
+
+        if checkpoint_prefix_dir:
+            checkpoint_dir = os.path.join(checkpoint_prefix_dir, checkpoint_dir)
 
         ## Indicates that the refinement network is trained separately        
         separate = modelType == 'refine'

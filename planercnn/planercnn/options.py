@@ -25,7 +25,7 @@ def parse_args():
                         default=16, type=int)
     parser.add_argument('--dataset', dest='dataset',
                         help='dataset name for training',
-                        default='', type=str)
+                        default='inference', type=str)
     parser.add_argument('--testingDataset', dest='testingDataset',
                         help='dataset name for test/predict',
                         default='', type=str)
@@ -98,7 +98,7 @@ def parse_args():
                         action='store_true')
     parser.add_argument('--suffix', dest='suffix',
                         help='suffix',
-                        default='', type=str)
+                        default='warping_refine', type=str)
     parser.add_argument('--losses', dest='losses',
                         help='losses',
                         default='', type=str)
@@ -182,7 +182,7 @@ def parse_args():
     ## Evaluation options
     parser.add_argument('--methods', dest='methods',
                         help='evaluation methods',
-                        default='b', type=str)
+                        default='f', type=str)
     
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
     return args
