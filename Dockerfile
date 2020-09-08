@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         cuda-curand-${CUDA/./-} \
         cuda-cusolver-${CUDA/./-} \
         cuda-cusparse-${CUDA/./-} \
+	cuda-nvrtc-${CUDA/./-} \
         curl \
         libcudnn7=${CUDNN}+cuda${CUDA} \
         libfreetype6-dev \
