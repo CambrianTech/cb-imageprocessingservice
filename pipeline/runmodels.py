@@ -234,7 +234,7 @@ class PipelineRunModels(PipelineStep):
         # Numpy to mx, resize, test-transform, batch
         semantic_input = [
             test_transform(
-                image.resize_short(
+                mx.img.resize_short(
                     mx.nd.array(image, dtype=np.uint8),
                     480
                 ),
