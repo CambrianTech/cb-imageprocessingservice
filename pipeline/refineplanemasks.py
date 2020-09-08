@@ -10,7 +10,7 @@ from skimage.filters import threshold_multiotsu, frangi
 import os
 import pickle
 
-IM_LOGGING_ENABLED = False
+IM_LOGGING_ENABLED = True
 
 
 def _log_image(name, image):
@@ -280,16 +280,21 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         _log_ply(img_rs, data["planes"]["masks"], plane_XYZ, mult=1,file_path='logging/3D1.ply')
 
-        semantic_mask = np.uint8(255 * data["semantic_probs"])
-        semantic_mask = cv2.resize(semantic_mask, (640, 480))
-        floor_mask = semantic_mask[:, :, 0]
-        wall_mask = semantic_mask[:, :, 1]
-        other_mask = semantic_mask[:, :, 2]
+        semantic_mask = data["semantic_probs"]
+        print("sm", np.amax(semantic_mask))
+        # semantic_mask = cv2.resize(semantic_mask, (640, 480))
+        # floor_mask = semantic_mask[:, :, 0]
+        print(np.amax(semantic_mask))
+        for k in range(len(semantic_mask)):
+            _log_image(str(k)+'_mask.png', 225.*semantic_mask[k])
+        floor_mask = np.uint8(255.*(semantic_mask[3]+semantic_mask[28]))
+        wall_mask = np.uint8(255.*semantic_mask[0])
+        # other_mask = semantic_mask[:, :, 2]
 
-        _log_image('semantic_mask.png', semantic_mask)
+        # _log_image('semantic_mask.png', semantic_mask)
         _log_image('floor_mask.png', floor_mask)
         _log_image('wall_mask.png', wall_mask)
-        _log_image('other_mask.png', other_mask)
+        # _log_image('other_mask.png', other_mask)
 
         floor_indices, horiz_indices, floor_angs = find_floor_indices(floor_mask, plane_masks, plane_normals)
 

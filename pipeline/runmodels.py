@@ -253,7 +253,7 @@ class PipelineRunModels(PipelineStep):
         # Store logit and softmaxed results
         for datum, result in zip(data, semantic_results):
             datum["semantic"] = result
-            datum["semantic_probs"] = softmax(result, axis=-1)
+            datum["semantic_probs"] = softmax(result[0], axis=0)
 
         print("Semantic model took %.2f seconds" % (time() - t))
 

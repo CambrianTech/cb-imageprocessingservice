@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import math
 from cambrian import image_processing as ip, transformations as T, geometry as geo
-
+import pickle
 
 # Z is UP
 rotX = T.rotation_matrix(0.00, [1, 0, 0])
@@ -124,7 +124,10 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
 
     def run(self, data):
         print("running primary angle")
-        mask = np.uint8(255*data["semantic_probs"][:, :, 0])
+        # with open('results/data.pickle', 'wb') as handle:
+        #     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        mask = cv2.resize(np.uint8(255*(data["semantic_probs"][3]+data["semantic_probs"][28])),(512,512))
+
         normals = np.uint8(data["normals"])
 
         kmeans, labels, centers = ip.kmeans_image(normals, 5)

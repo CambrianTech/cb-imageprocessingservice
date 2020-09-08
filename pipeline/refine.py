@@ -8,12 +8,13 @@ from skimage import filters
 from skimage.filters import threshold_multiotsu
 
 
-IM_LOGGING_ENABLED = False
+IM_LOGGING_ENABLED = True
 
 
 def _log_image(name, image):
     if IM_LOGGING_ENABLED:
-        cv2.imwrite(name, image)
+        cv2.imwrite('logging/' + name, image)
+
 
 
 class PipelineRefineResults(PipelineStep):
@@ -37,9 +38,9 @@ class PipelineRefineResults(PipelineStep):
         img = data["image"]
         img = cv2.resize(img, shape)
         img_bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        semantic_mask = data["semantic_probs"]
 
-
-        prob_mask_full = np.uint8(255*data["semantic_probs"][:, :, 0])
+        prob_mask_full = np.uint8(255.*(semantic_mask[3]+semantic_mask[28]))
 
         # Sometimes there are border artifacts masks
         # prob_mask_full[:, 510:512] = prob_mask_full[:, 508:510]
