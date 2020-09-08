@@ -375,12 +375,13 @@ class PipelineRefinePlaneMasks(PipelineStep):
             final_mask = np.zeros_like(plane_masks[d], dtype=np.uint8)
 
             contours, hierarchy = cv2.findContours(255*np.uint8(depth_segmentation==d+1), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            areas = [cv2.contourArea(cnt) for cnt in contours]
+            if len(contours) > 0:
+                areas = [cv2.contourArea(cnt) for cnt in contours]
 
-            max_cnt = np.argmax(areas)
+                max_cnt = np.argmax(areas)
 
-            cv2.drawContours(final_mask, [contours[max_cnt]], 0, 255, -1, cv2.LINE_AA)
-            cv2.drawContours(final_mask, [contours[max_cnt]], 0, 255, 2, cv2.LINE_AA)
+                cv2.drawContours(final_mask, [contours[max_cnt]], 0, 255, -1, cv2.LINE_AA)
+                cv2.drawContours(final_mask, [contours[max_cnt]], 0, 255, 2, cv2.LINE_AA)
 
             data["planes"]["masks"][d] = final_mask
 
