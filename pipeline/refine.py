@@ -8,7 +8,7 @@ from skimage import filters
 from skimage.filters import threshold_multiotsu
 
 
-IM_LOGGING_ENABLED = True
+IM_LOGGING_ENABLED = False
 
 
 def _log_image(name, image):
