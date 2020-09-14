@@ -425,7 +425,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
     @property
     def output_keys(self) -> list:
-        return []
+        return ["planes"]
 
     def run(self, data):
 
@@ -692,10 +692,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         labels_wall[labels_wall < 1] = 0
         # _log_image("labels_wall.png", get_segmentation_image(np.uint8(labels_wall), img_rs, avg=False))
 
-        # number of walls + floor + ceiling
-        final_plane_number = len(np.unique(labels_wall)) + 1
-
-        print("final_plane_number", final_plane_number)
 
         final_masks = []
         final_plane_parameters = []
@@ -731,7 +727,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         for l in np.unique(labels_wall):
             if l == 0: continue
 
-            mask = np.uint8(labels_wall == l)
+            mask = 255*np.uint8(labels_wall == l)
             final_masks.append(mask)
             plane_parameter = np.zeros((10))
             plane_parameter[:9] = data["planes"]["detection"][wall_like_indices[l - 1]][:9]
@@ -739,11 +735,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
             plane_parameter[9] = 2
             final_plane_parameters.append(plane_parameter)
             final_plane_XYZ.append(plane_XYZ[wall_like_indices[l - 1]])
-            _log_image('final' + str(l) + "f.png", 255. * mask)
+            _log_image('final' + str(l) + ".png", 255. * mask)
 
         # add floor
         if len(floor_indices) > 0:
-            final_masks.append(predict == 3)
+            final_masks.append(255*np.uint8(predict == 3))
             plane_parameter = np.zeros((10))
             plane_parameter[:9] = data["planes"]["detection"][floor_indices[0]][:9]
             plane_parameter[6:9] = plane_parameters[floor_indices[0]]
@@ -753,7 +749,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         # add ceiling
         if len(ceiling_indices) > 0:
-            final_masks.append(predict == 5)
+            final_masks.append(255*np.uint8(predict == 5))
             plane_parameter = np.zeros((10))
             plane_parameter[:9] = data["planes"]["detection"][ceiling_indices[0]][:9]
             plane_parameter[6:9] = plane_parameters[ceiling_indices[0]]
@@ -762,11 +758,52 @@ class PipelineRefinePlaneMasks(PipelineStep):
             final_plane_XYZ.append(plane_XYZ[ceiling_indices[0]])
 
         final_plane_parameters = np.float32(final_plane_parameters)
-        final_masks = np.uint8(final_masks)
+
         final_plane_XYZ = np.float32(final_plane_XYZ)
-        # _log_ply(img_rs, final_masks, final_plane_XYZ, mult=1, file_path='3D_refine.ply')
 
+        final_plane_number = len(final_masks)
 
-        data["planes"]["masks"] = np.uint8(final_masks)
+        print("final_plane_number", final_plane_number)
+
+        data["planes"]["masks"] = np.zeros((final_plane_number, shape[1], shape[0]), dtype=np.uint8)
+
+        data["planes"]["detection"] = np.zeros((final_plane_number, 10), dtype=data["planes"]["detection"].dtype)
         data["planes"]["detection"] = final_plane_parameters
+
+        mask_contours = []
+
+        for d in range(final_plane_number):
+            contours, hierarchy = cv2.findContours(final_masks[d], cv2.RETR_TREE,
+                                                   cv2.CHAIN_APPROX_SIMPLE)
+            if len(contours) > 0:
+
+                for i in range(len(contours)):
+                    area = cv2.contourArea(contours[i])
+                    print(area)
+                    if area > 16*16:
+                        if hierarchy[0, i, 3] == -1:  # this is the outer contour which we need to draw
+                            cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, -1)
+
+                            epsilon = cv2.arcLength(contours[i], True) / shape[0]
+                            approx = cv2.approxPolyDP(contours[i], epsilon, closed=True)
+                            mask_contours.append(approx)
+                        else:
+                            cv2.drawContours(data["planes"]["masks"][d], contours, i, 0, -1)
+
+                    final_mask = cv2.GaussianBlur(np.uint8(data["planes"]["masks"][d]), (5, 5), 0)
+
+                    _, data["planes"]["masks"][d] = cv2.threshold(
+                        final_mask, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                rect = cv2.boundingRect(data["planes"]["masks"][d])
+
+                data["planes"]["detection"][d, 0:4] = [
+                    rect[1], rect[0], rect[1] + rect[3], rect[0] + rect[2]
+                ]
+
+            data["planes"]["contours"] = mask_contours
+
+        with open('logging/data.pickle', 'wb') as handle:
+            pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        _log_ply(img_rs, data["planes"]["masks"], final_plane_XYZ, mult=2, file_path='logging/3D_refine.ply')
 

@@ -11,7 +11,7 @@ import zlib
 
 from pipeline.core import PipelineStep
 
-surface_types = ["unknown", "floor", "wall", "ceiling"]
+surface_types = ["unknown", "floor", "wall", "horizontal", "vertical"]
 
 def _upload_image_to_s3(s3_client, image: np.ndarray, bucket: str, key: str):
     if image.dtype == np.float32:
