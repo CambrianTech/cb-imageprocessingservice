@@ -802,8 +802,5 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
             data["planes"]["contours"] = mask_contours
 
-        with open('logging/data.pickle', 'wb') as handle:
-            pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-        _log_ply(img_rs, data["planes"]["masks"], final_plane_XYZ, mult=2, file_path='logging/3D_refine.ply')
+        # _log_ply(img_rs, data["planes"]["masks"], final_plane_XYZ, mult=2, file_path='logging/3D_refine.ply')
 
