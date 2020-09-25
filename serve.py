@@ -139,6 +139,9 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
             if "data_v2_url" in data:
                 response_dict["data_v2_url"] = data["data_v2_url"]
 
+            if "data_v3_url" in data:
+                response_dict["data_v3_url"] = data["data_v3_url"]
+
             return web.json_response(response_dict)
         return handle
 
