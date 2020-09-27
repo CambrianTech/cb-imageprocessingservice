@@ -759,7 +759,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         final_plane_parameters = np.float32(final_plane_parameters)
 
-        final_plane_XYZ = np.float32(final_plane_XYZ)
+        # final_plane_XYZ = np.float32(final_plane_XYZ)
 
         final_plane_number = len(final_masks)
 
@@ -775,18 +775,19 @@ class PipelineRefinePlaneMasks(PipelineStep):
         for d in range(final_plane_number):
             contours, hierarchy = cv2.findContours(final_masks[d], cv2.RETR_TREE,
                                                    cv2.CHAIN_APPROX_SIMPLE)
+            plane_contours = []
             if len(contours) > 0:
 
                 for i in range(len(contours)):
                     area = cv2.contourArea(contours[i])
-                    print(area)
+
                     if area > 16*16:
                         if hierarchy[0, i, 3] == -1:  # this is the outer contour which we need to draw
                             cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, -1)
 
                             epsilon = cv2.arcLength(contours[i], True) / shape[0]
                             approx = cv2.approxPolyDP(contours[i], epsilon, closed=True)
-                            mask_contours.append(approx)
+                            plane_contours.append(approx.tolist())
                         else:
                             cv2.drawContours(data["planes"]["masks"][d], contours, i, 0, -1)
 
@@ -800,7 +801,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     rect[1], rect[0], rect[1] + rect[3], rect[0] + rect[2]
                 ]
 
-            data["planes"]["contours"] = mask_contours
+            mask_contours.append(plane_contours)
+
+        data["planes"]["contours"] = mask_contours
 
         # _log_ply(img_rs, data["planes"]["masks"], final_plane_XYZ, mult=2, file_path='logging/3D_refine.ply')
 

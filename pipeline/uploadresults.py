@@ -152,7 +152,7 @@ def _encode_plane_surface_v3(plane_index, plane_data, contour_data, mask_url):
         "images": {
             "mask": mask_url
         },
-        "contours": contour_data.tolist()
+        "contours": contour_data
     }
 
 
