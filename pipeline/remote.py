@@ -14,15 +14,17 @@ def _camera_fov_res_to_intrinsics(fov: float, res: np.ndarray):
 
     # Assume the fov corresponds to the longest side and use that for focal
     i = 0 if c[0] >= c[1] else 1
+    print("i", i)
     f = c[i] / np.tan(np.radians(fov) / 2)
+    K = np.array([f, f, c[0], c[1], res[0], res[1]], dtype=np.float32)
 
-    return np.array([f, f, c[0], c[1], res[0], res[1]], dtype=np.float32)
+    return K
 
 
 def _remote_plane_detect(address, data):
     input_dicts = [{
         "image": datum["image"],
-        "camera": _camera_fov_res_to_intrinsics(datum["fov"], np.array([datum["image"].shape[0], datum["image"].shape[1]], dtype=np.float32))
+        "camera": _camera_fov_res_to_intrinsics(datum["fov"], np.array([datum["image"].shape[1], datum["image"].shape[0]], dtype=np.float32))
     } for datum in data]
 
     response_bytes = requests.post(
