@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-
+from skimage.morphology import watershed
 from skimage import filters
 
 from . import diagnostics as d
@@ -719,44 +719,75 @@ def crop_image(img, margin=30):
     
     return result
 
-def refine_mask_watershed(args, rgb, mask, image_name, distance=0.0, erode=0, max_value=151):
+def refine_mask_watershed(args, rgb, mask, image_name, distance=0.0, erode=0, max_value=151, gradient=False, background=True):
     """Runs the watershed algorithm on rgb and returns markers"""
-    markers = np.zeros(mask.shape, dtype=np.int32)
-    
-    for i in range(max_value + 1):
-        num_elements = (mask == i).sum()
-        if num_elements > 50:
-            isolated = np.zeros(mask.shape, dtype=np.uint8)
-            isolated[mask==i] = i + 1 #add one for 0 label, all values are one higher
-            
-            if distance == 0.0:
-                erode_amount = erode
-                if erode == 0:
-                    erode_amount = int(min(15.0, np.sqrt(num_elements) / 10.0)) #calculate
+    if gradient:
+        markers = np.zeros(mask.shape, dtype=np.int32)
+        shift = 0
+        if background:
+            shift = 1
 
-                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_amount, erode_amount))
-                isolated = cv2.erode(isolated, kernel)    
-            else:
-                isolated = cv2.distanceTransform(isolated, cv2.DIST_L2, 5)
-                ret, isolated = cv2.threshold(isolated, distance * isolated.max(), i + 1, 0)
+        for i in range(1, max_value + 1):
+            num_elements = (mask == i).sum()
+            if num_elements > 1:
+                isolated = np.zeros(mask.shape, dtype=np.int32)
+                isolated[mask == i] = i + shift # add one for 0 label, all values are one higher
+                if distance == 0.0:
+                    erode_amount = erode
+                    if erode == 0:
+                        erode_amount = int(min(15.0, np.sqrt(num_elements) / 10.0))  # calculate
 
-            markers += np.uint8(isolated)
+                    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_amount, erode_amount))
 
-    # d.save_diagnostics_image(args, markers, image_name, "markers", verbose=True)
+                else:
 
-    if len(rgb.shape) == 2:
-        base = cv2.cvtColor(rgb, cv2.COLOR_GRAY2RGB)
+                    distance_t = cv2.distanceTransform(np.uint8(isolated>0), cv2.DIST_L2, 5)
+
+                    isolated[distance_t < distance * distance_t.max()] = 0
+
+
+                markers += np.int32(isolated)
+
+        markers[mask==0] = 1
+
+        markers = np.int32(watershed(rgb, markers))-shift
+
     else:
-        base = rgb
 
-    markers = np.uint8(cv2.watershed(base, markers)) - 1
+        markers = np.zeros(mask.shape, dtype=np.int32)
 
-    #replace border walls
-    markers[markers > max_value] = 0
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
-    markers = cv2.dilate(markers, kernel)
+        for i in range(max_value + 1):
+            num_elements = (mask == i).sum()
+            if num_elements > 50:
+                isolated = np.zeros(mask.shape, dtype=np.uint8)
+                isolated[mask == i] = i + 1  # add one for 0 label, all values are one higher
 
-    # d.save_diagnostics_image(args, markers, image_name, "result", verbose=True)
+                if distance == 0.0:
+                    erode_amount = erode
+                    if erode == 0:
+                        erode_amount = int(min(15.0, np.sqrt(num_elements) / 10.0))  # calculate
+
+                    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_amount, erode_amount))
+                    isolated = cv2.erode(isolated, kernel)
+                else:
+                    isolated = cv2.distanceTransform(isolated, cv2.DIST_L2, 5)
+                    ret, isolated = cv2.threshold(isolated, distance * isolated.max(), i + 1, 0)
+
+                markers += np.uint8(isolated)
+
+        # d.save_diagnostics_image(args, markers, image_name, "markers", verbose=True)
+
+        if len(rgb.shape) == 2:
+            base = cv2.cvtColor(rgb, cv2.COLOR_GRAY2RGB)
+        else:
+            base = rgb
+
+        markers = np.uint8(cv2.watershed(base, markers)) - 1
+
+        # replace border walls
+        markers[markers > max_value] = 0
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
+        markers = cv2.dilate(markers, kernel)
 
     return markers
 
