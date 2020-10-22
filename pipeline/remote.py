@@ -14,7 +14,6 @@ def _camera_fov_res_to_intrinsics(fov: float, res: np.ndarray):
 
     # Assume the fov corresponds to the longest side and use that for focal
     i = 0 if c[0] >= c[1] else 1
-    print("i", i)
     f = c[i] / np.tan(np.radians(fov) / 2)
     K = np.array([f, f, c[0], c[1], res[0], res[1]], dtype=np.float32)
 
