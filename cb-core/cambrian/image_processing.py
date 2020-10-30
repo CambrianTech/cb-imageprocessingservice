@@ -719,39 +719,38 @@ def crop_image(img, margin=30):
     
     return result
 
-def refine_mask_watershed(args, rgb, mask, image_name, distance=0.0, erode=0, max_value=151, gradient=False, background=True):
+def refine_mask_watershed(args, rgb, mask, image_name, distance=0.0, erode=0, max_value=151, gradient=False, background=True, watershed_mask=None):
     """Runs the watershed algorithm on rgb and returns markers"""
     if gradient:
         markers = np.zeros(mask.shape, dtype=np.int32)
-        shift = 0
-        if background:
-            shift = 1
 
-        for i in range(1, max_value + 1):
+        for i in range(max_value + 1):
             num_elements = (mask == i).sum()
-            if num_elements > 1:
-                isolated = np.zeros(mask.shape, dtype=np.int32)
-                isolated[mask == i] = i + shift # add one for 0 label, all values are one higher
+            if num_elements > 50:
+                isolated = np.zeros(mask.shape, dtype=np.uint8)
+                isolated[mask == i] = i + 1  # add one for 0 label, all values are one higher
+
                 if distance == 0.0:
                     erode_amount = erode
                     if erode == 0:
                         erode_amount = int(min(15.0, np.sqrt(num_elements) / 10.0))  # calculate
 
                     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_amount, erode_amount))
-
+                    isolated = cv2.erode(isolated, kernel)
                 else:
+                    isolated = cv2.distanceTransform(isolated, cv2.DIST_L2, 5)
+                    ret, isolated = cv2.threshold(isolated, distance * isolated.max(), i + 1, 0)
 
-                    distance_t = cv2.distanceTransform(np.uint8(isolated>0), cv2.DIST_L2, 5)
+                markers += np.uint8(isolated)
 
-                    isolated[distance_t < distance * distance_t.max()] = 0
+        # d.save_diagnostics_image(args, markers, image_name, "markers", verbose=True)
 
-
-                markers += np.int32(isolated)
-
-        markers[mask==0] = 1
-
-        markers = np.int32(watershed(rgb, markers))-shift
-
+        from skimage.morphology import watershed, disk
+        print(len(rgb.shape))
+        if len(rgb.shape) < 3:
+            print("watershed used on bw")
+            base = cv2.cvtColor(rgb, cv2.COLOR_GRAY2RGB)
+            markers = np.int32(watershed(rgb, markers, mask=watershed_mask))
     else:
 
         markers = np.zeros(mask.shape, dtype=np.int32)
@@ -790,6 +789,7 @@ def refine_mask_watershed(args, rgb, mask, image_name, distance=0.0, erode=0, ma
         markers = cv2.dilate(markers, kernel)
 
     return markers
+
 
 def kmeans_image(rgb, k=8):
     """Runs k-means on rgb and returns a result image, labels and the centers"""

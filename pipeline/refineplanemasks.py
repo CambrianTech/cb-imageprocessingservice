@@ -5,18 +5,18 @@ from scipy import ndimage
 from scipy import stats
 from skimage.morphology import watershed
 from time import time
-
+from skimage.morphology import skeletonize
 from cambrian import image_processing as ip
 from skimage.future import graph as gr
 
 import os
 import pickle
 
-IM_LOGGING_ENABLED = True
+IM_LOGGING_ENABLED = False
 
-furniture_labels = [15,23,30,64,97]
-wall_like = [0,8,14,18,22,24,42]
-wall_int = [3, 8, 22,100]
+furniture_labels = [15, 23, 30, 64, 97]
+wall_like = [0, 8, 14, 18, 22, 24, 42]
+wall_int = [3, 8, 22, 100]
 
 def _log_image(name, image):
     if IM_LOGGING_ENABLED:
@@ -45,7 +45,6 @@ def _log_ply(image, masks, plane_XYZ, file_path='logging/3D.ply', write_occlusio
 
         plane_depths = plane_XYZ[:, :, :, 1] * masks + 10 * (1 - masks)
         segmentation = np.argmin(plane_depths, axis=0)
-        _log_image("logging/ply_segmention.png",cv2.normalize(segmentation, None, 0, 255, cv2.NORM_MINMAX))
 
         for mask_index, (mask, XYZ) in enumerate(zip(masks, plane_XYZ)):
             indices = np.nonzero(np.logical_and(segmentation == mask_index, masks[mask_index] > 0))
@@ -201,10 +200,11 @@ def get_planes_class(plane_masks, class_labels):
     for i in range(len(plane_masks)):
         sums = ndimage.sum(plane_masks[i], labels=class_labels, index=indices)
         sorted = np.argsort(sums)[::-1]
-        big = np.nonzero(sums[sorted]>np.max(sums)/2.)[0]
+        big = np.nonzero(sums[sorted] > np.max(sums) / 2.)[0]
         plane_classes.append([indices[sorted[big]]])
 
     return plane_classes
+
 
 def find_floor_indices(floor_mask, plane_masks, plane_normals):
     floor_mask = cv2.resize(floor_mask, (plane_masks[0].shape[1], plane_masks[0].shape[0]))
@@ -212,7 +212,8 @@ def find_floor_indices(floor_mask, plane_masks, plane_normals):
     floor_intersections = []
     dots = []
     for d in range(len(plane_masks)):
-        floor_intersections.append(cv2.countNonZero(np.uint8(plane_masks[d][floor_mask > np.amax(floor_mask)/2.] > np.amax(plane_masks[d])/2.)))
+        floor_intersections.append(cv2.countNonZero(
+            np.uint8(plane_masks[d][floor_mask > np.amax(floor_mask) / 2.] > np.amax(plane_masks[d]) / 2.)))
 
     scores = np.int32(floor_intersections)
     floor_indices = np.nonzero(scores > np.mean(scores))[0]
@@ -221,9 +222,9 @@ def find_floor_indices(floor_mask, plane_masks, plane_normals):
     for d in range(len(plane_masks)):
         dots.append(np.dot(plane_normals[floor_indices[0]], plane_normals[d]))
 
-    angs = np.arccos(np.clip(dots,-1.0,1.0))*180/np.pi
+    angs = np.arccos(np.clip(dots, -1.0, 1.0)) * 180 / np.pi
 
-    horiz_indices = np.nonzero(np.abs(angs)<15)[0]
+    horiz_indices = np.nonzero(np.abs(angs) < 15)[0]
     return floor_indices, horiz_indices, angs
 
 
@@ -233,7 +234,7 @@ def find_wall_indices(wall_mask, plane_masks, floor_normal, plane_normals):
     wall_intersections = []
     dots = []
     for d in range(len(plane_masks)):
-        wall_intersections.append(cv2.countNonZero(np.uint8(plane_masks[d][wall_mask > np.amax(wall_mask)/2.]> np.amax(plane_masks[d])/2.)))
+        wall_intersections.append(cv2.countNonZero(np.uint8(plane_masks[d][wall_mask > 1. / 3.] > .5)))
         dots.append(np.dot(floor_normal, plane_normals[d]))
 
     angs = np.arccos(np.clip(dots, -1.0, 1.0)) * 180 / np.pi
@@ -245,14 +246,14 @@ def find_wall_indices(wall_mask, plane_masks, floor_normal, plane_normals):
     return wall_indices, vert_indices, angs
 
 
-def proj(points,plane):
+def proj(points, plane):
     plane_offset = np.linalg.norm(plane)
-    plane_normal = plane/plane_offset
+    plane_normal = plane / plane_offset
     s = np.dot(points, plane_normal) - plane_offset
     return s
 
 
-def compute_edgelets(lines, class_labels = None):
+def compute_edgelets(lines, class_labels=None):
     """Create edgelets as in the paper.
     Parameters
     ----------
@@ -276,9 +277,8 @@ def compute_edgelets(lines, class_labels = None):
     classes = []
 
     for l in lines:
-
         l = l[0]
-        p0, p1 = np.array([l[0],l[1]]), np.array([l[2],l[3]])
+        p0, p1 = np.array([l[0], l[1]]), np.array([l[2], l[3]])
         c = (p0 + p1) / 2
 
         classes.append(class_labels[int(c[1]), int(c[0])])
@@ -294,10 +294,9 @@ def compute_edgelets(lines, class_labels = None):
     classes = np.array(classes)
 
     directions = np.array(directions) / \
-        np.linalg.norm(directions, axis=1)[:, np.newaxis]
+                 np.linalg.norm(directions, axis=1)[:, np.newaxis]
 
     return (locations, directions, strengths, classes)
-
 
 
 def edgelet_lines(edgelets):
@@ -319,8 +318,8 @@ def edgelet_lines(edgelets):
     lines = np.concatenate((normals, p[:, np.newaxis]), axis=1)
     return lines
 
-import math
-def compute_votes(edgelets, model, threshold_inlier=5, weight_mask=None):
+
+def compute_votes(edgelets, model, threshold_inlier=5):
     """Compute votes for each of the edgelet against a given vanishing point.
     Votes for edgelets which lie inside threshold are same as their strengths,
     otherwise zero.
@@ -347,16 +346,18 @@ def compute_votes(edgelets, model, threshold_inlier=5, weight_mask=None):
 
     dot_prod = np.sum(est_directions * directions, axis=1)
     abs_prod = np.linalg.norm(directions, axis=1) * \
-        np.linalg.norm(est_directions, axis=1)
+               np.linalg.norm(est_directions, axis=1)
     abs_prod[abs_prod == 0] = 1e-5
 
     cosine_theta = np.abs(dot_prod / abs_prod)
+
     theta_thresh = np.cos(threshold_inlier * np.pi / 180)
 
     return (cosine_theta > theta_thresh) * strengths
 
 
-def ransac_vanishing_point(edgelets, num_ransac_iter=2000, threshold_inlier=5, weight_mask=None, max_time =1.0, find_vert=True):
+def ransac_vanishing_point(edgelets, num_ransac_iter=2000, threshold_inlier=5, max_time=1.0, find_vert=True,
+                           seeds=None):
     """Estimate vanishing point using Ransac.
     Parameters
     ----------
@@ -385,14 +386,18 @@ def ransac_vanishing_point(edgelets, num_ransac_iter=2000, threshold_inlier=5, w
     first_index_space = arg_sort[:num_pts // 5]
     second_index_space = arg_sort[:num_pts // 2]
 
-    best_model = None
-    best_votes = np.zeros(num_pts)
+    best_model = []
+    best_votes = 0
     t = time()
+
     for ransac_iter in range(num_ransac_iter):
         if time() - t > max_time:
             return best_model
 
         ind1 = np.random.choice(first_index_space)
+
+        # if classes[ind1]!=0 and classes[ind1]!=3: continue
+
         ind2 = np.random.choice(second_index_space)
 
         l1 = lines[ind1]
@@ -400,29 +405,36 @@ def ransac_vanishing_point(edgelets, num_ransac_iter=2000, threshold_inlier=5, w
 
         current_model = np.cross(l1, l2)
 
-
-        if np.sum(current_model**2) < 1 or current_model[2] == 0:
+        if np.sum(current_model ** 2) < 1 or current_model[2] == 0:
             # reject degenerate candidates
             continue
 
+
         if find_vert:
-            if current_model[1]/current_model[2]<1000: continue
+            if current_model[1] / current_model[2] < 1000: continue
 
-            dt1 = abs(np.dot(directions[ind1], [0,1]))
-            dt2 = abs(np.dot(directions[ind2], [0,1]))
+            dt1 = abs(np.dot(directions[ind1], [0, 1]))
+            dt2 = abs(np.dot(directions[ind2], [0, 1]))
 
-            if dt1 <.95 or dt2<.95:
+            if dt1 < .95 or dt2 < .95:
                 continue
 
         current_votes = compute_votes(
-            edgelets, current_model, threshold_inlier, weight_mask)
+            edgelets, current_model, threshold_inlier).sum()
 
-        if current_votes.sum() > best_votes.sum():
+        if np.any(seeds != None):
+            cm = current_model[:2] / current_model[2]
+            dot = 1 - abs(np.dot(cm / np.linalg.norm(cm), seeds[:2] / np.linalg.norm(seeds[:2])))
 
-            best_model = current_model
-            best_votes = current_votes
+            # print(dot)
+            current_votes = current_votes * dot > .9
+        # print(current_votes, best_votes)
+        if np.any(current_votes > best_votes):
             # print("Current best model has {} votes at iteration {},{}".format(
-            #     current_votes.sum(), ransac_iter, np.round(time()-t,2)))
+            #     best_votes, ransac_iter, np.round(time() - t, 2)))
+
+            best_model = current_model / current_model[2]
+            best_votes = current_votes
 
     return best_model
 
@@ -430,8 +442,8 @@ def ransac_vanishing_point(edgelets, num_ransac_iter=2000, threshold_inlier=5, w
 def calcTransformation(points_1, points_2):
     # center_1 = points_1.mean(0) =(0,0,0)
     # center_2 = points_2.mean(0)=(0,0,0)
-    center_1 = (0,0,0)
-    center_2 = (0,0,0)
+    center_1 = (0, 0, 0)
+    center_2 = (0, 0, 0)
     H = np.matmul((points_1 - center_1).transpose(), (points_2 - center_2))
     U, S, V = np.linalg.svd(H)
 
@@ -443,32 +455,19 @@ def calcTransformation(points_1, points_2):
     return R, t
 
 
-def weight_mean_angle(graph, src, dst, n):
+def weight_mean_color(graph, src, dst, n):
 
     mean_x = graph.nodes[dst]['mean color']
     mean_y = graph.nodes[n]['mean color']
+    u = max(np.linalg.norm(mean_x), 0.00001)
+    v = max(np.linalg.norm(mean_y), 0.00001)
+    weight = 1.0-np.abs(np.dot(mean_x/u, mean_y/v))
 
-    d1 = max(np.linalg.norm(mean_x), .0000001)
-    d2 = max(np.linalg.norm(mean_y), .0000001)
-    # print(a, b)
-    weight = 1.0-np.abs(np.dot(mean_x/d1,mean_y/d2))
-
-    return {'weight': weight}
-
-def _weight_mean_color(graph, src, dst, n):
-
-    mean_x = graph.nodes[dst]['mean color']
-    mean_y = graph.nodes[n]['mean color']
-
-    weight = np.amax(np.abs(mean_x-mean_y))
-    # print(weight)
     return {'weight': weight}
 
 def merge_mean_color(graph, src, dst):
     """Callback called before merging two nodes of a mean color distance graph.
-
     This method computes the mean color of `dst`.
-
     Parameters
     ----------
     graph : RAG
@@ -482,8 +481,8 @@ def merge_mean_color(graph, src, dst):
                                       graph.nodes[dst]['pixel count'])
 
 
-def rag_mean_color(graph, image, labels, mode='normal'):
-
+def rag_mean_color(image, labels, connectivity=1, mode='normal'):
+    graph = gr.RAG(labels, connectivity=connectivity)
     dim = 1
     if image.ndim > 2:
         dim = image.shape[2]
@@ -493,6 +492,7 @@ def rag_mean_color(graph, image, labels, mode='normal'):
                                'pixel count': 0,
                                'total color': np.zeros(dim,
                                                        dtype=np.double)})
+
     for index in np.ndindex(labels.shape):
         current = labels[index]
         graph.nodes[current]['pixel count'] += 1
@@ -508,18 +508,60 @@ def rag_mean_color(graph, image, labels, mode='normal'):
         mean_y = graph.nodes[y]['mean color']
 
         if mode=='normal':
-
-            a = mean_x/max(np.linalg.norm(mean_x),.0000001)
-            b = mean_y/max(np.linalg.norm(mean_y),.0000001)
-
-            d['weight'] = 1.0-np.abs(np.dot(a,b))
-            # print(d['weight'])
+            u = max(np.linalg.norm(mean_x), 0.00001)
+            v = max(np.linalg.norm(mean_y), 0.00001)
+            d['weight'] = 1.0-np.abs(np.dot(mean_x/u,mean_y/v))
 
         else:
             d['weight'] = np.amax(np.abs(mean_x - mean_y))
 
-
     return graph
+
+
+def combined_normals(normals, plane_normals, plane_masks, basis_indices):
+    plane_normals_nn = np.zeros_like(plane_normals)
+    number_planes = len(plane_normals)
+    print("combined_normals2")
+    for i in range(number_planes):
+        plane_normals_nn[i] = stats.mode(normals[plane_masks[i] > np.amax(plane_masks[i]) / 2.], axis=0)[0]
+        plane_normals_nn[i] /= np.linalg.norm(plane_normals_nn[i])
+
+    R, _ = calcTransformation(plane_normals_nn[basis_indices], plane_normals[basis_indices])
+
+    nr = normals.reshape((-1, 3))
+    normals = np.matmul(R, nr.transpose()).transpose().reshape(normals.shape)
+
+    _log_image("normals.png", 127.5 * (1. + normals))
+    lengths = np.maximum(np.sqrt(np.sum(normals * normals, -1)), 1e-6)
+    normals /= np.dstack((lengths, lengths, lengths))
+    # plane_normals_nn = np.matmul(R,plane_normals_nn.transpose()).transpose()
+
+    for i in range(number_planes):
+        m = plane_masks[i].copy()
+        # m[m>.5] = 1
+        mult = np.dstack((m,m,m))
+        normals = (1.0 - mult) * normals + mult * plane_normals[i]
+        # normals[plane_masks[i]>np.amax(plane_masks[i]/4.)] = plane_normals[i]
+
+    lengths = np.maximum(np.sqrt(np.sum(normals * normals, -1)), 1e-6)
+    normals /= np.dstack((lengths, lengths, lengths))
+    return normals
+
+
+def refine_surface(mask, image, big_thresh=.03, small_thresh=.97, watershed_dist=.05, watershed_mask=None):
+    small = ip.refine_mask_watershed(None, image, np.uint8(mask > small_thresh), None, distance=watershed_dist, gradient=True,
+                                   watershed_mask=watershed_mask)
+
+    big = ip.refine_mask_watershed(None, image, np.uint8(mask > big_thresh), None, distance=watershed_dist, gradient=True,
+                                     watershed_mask=watershed_mask)
+
+    markers = np.dstack((np.ones_like(big), small, big))
+    markers = np.argmax(markers, -1)
+
+    markers[markers == 1] = (ndimage.label(markers == 1)[0])[markers == 1] + np.amax(markers)
+    markers[markers == 2] = (ndimage.label(markers == 2)[0])[markers == 2] + np.amax(markers)
+
+    return markers
 
 
 class PipelineRefinePlaneMasks(PipelineStep):
@@ -533,6 +575,10 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
     def run(self, data):
 
+        if IM_LOGGING_ENABLED:
+            with open('logging/data.pickle', 'wb') as handle:
+                pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
         img = data["image"]
 
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -541,8 +587,10 @@ class PipelineRefinePlaneMasks(PipelineStep):
         h, w = output[0].shape
 
         shape = (w, h)
-        img_rs = cv2.resize(img, shape)
 
+        h, w = output[0].shape
+
+        img_rs = cv2.resize(img, shape)
         _log_image('img.png', img_rs)
 
         hed = data["hed"]
@@ -550,73 +598,13 @@ class PipelineRefinePlaneMasks(PipelineStep):
         _log_image('hed.png', hed_rs)
 
         planes_data = data["planes"]
-
-        rug = output[28]
-        output[3] += rug
-        output[28] = 0
-        wall_mask = output[0]
-
-        _log_image("wall_mask.png", 255. * wall_mask)
-
-        floor_mask = output[3]
-        _log_image("floor_mask.png", 255. * floor_mask)
-
-        output_p = np.zeros((151, output.shape[1], output.shape[2]))
-
-        output_p[1:152] = output
-        output_p[0] = np.zeros_like(hed_rs / 255.)
-
-        predict = np.int32(np.argmax(output_p, 0))-1
-
-        _log_segmentation_image("semantic_seg_initial.png", predict, img_rs, avg=False)
-
-        # Fill in wall holes
-        wall_mask = np.uint8(predict == 0)
-        # wall_mask[output[0]<.8] = 0
-        contours, hierarchy = cv2.findContours(wall_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        wall_mask = np.zeros_like(wall_mask)
-        if len(contours) > 0:
-            for i in range(len(contours)):
-                area = cv2.contourArea(contours[i])
-                if area > 64:
-                    cv2.drawContours(wall_mask, contours, i, 1, -1)
-                    if hierarchy[0, i, 3] != -1:
-                        int_mask = np.zeros_like(wall_mask)
-
-                        cv2.drawContours(int_mask, contours, i, 1, -1)
-                        ade_class = int(np.median(predict[int_mask > 0]))
-
-                        if ade_class not in wall_like:
-                            predict[int_mask > 0] = 0
-                            wall_mask[int_mask > 0] = 0
-
-        _log_image("wall_mask.png", 255. * wall_mask)
-
-        length_threshold = 16
-        canny_aperture_size = 7
-
-        fld = cv2.ximgproc.createFastLineDetector(_length_threshold=length_threshold,
-                                                  _canny_aperture_size=canny_aperture_size)
-        lines = fld.detect(cv2.cvtColor(img_rs, cv2.COLOR_BGR2GRAY))
-
-        l_image = np.zeros_like(wall_mask)
-
-        for line in lines:
-            for x1, y1, x2, y2 in line:
-                cv2.line(l_image, (x1, y1), (x2, y2), 255, thickness=1)
-        _log_image("l_image.png", l_image)
-
-        plane_masks = planes_data["masks"]
-        number_planes = len(plane_masks)
-
-        plane_XYZ = planes_data["plane_XYZ"][:, :, 80:-80, :].transpose(0, 2, 3, 1)
-        # _log_ply(img_rs, plane_masks, plane_XYZ, mult=1, file_path='logging/3D.ply')
-
         plane_parameters = np.array(data["planes"]["detection"][:, 6:9], dtype=np.float32)
         plane_offsets = np.linalg.norm(plane_parameters, axis=-1, keepdims=True)
         plane_normals = plane_parameters / np.maximum(plane_offsets, 1e-4)
         plane_clusters = np.array(data["planes"]["detection"][:, 4], dtype=np.int32)
         roi = np.array(data["planes"]["detection"][:, 0:4], dtype=np.int32)
+        plane_masks = planes_data["masks"]
+        number_planes = len(plane_masks)
 
         for i in range(number_planes):
             box = roi[i].copy()
@@ -626,85 +614,188 @@ class PipelineRefinePlaneMasks(PipelineStep):
             box[3] = np.clip(box[3], 0, 639)
             roi[i] = box
 
-        normals = (cv2.resize(data["normals"],  (plane_masks[0].shape[1],plane_masks[0].shape[0])) - 127.5) / 127.5
+        plane_XYZ = planes_data["plane_XYZ"][:, :, 80:-80, :].transpose(0, 2, 3, 1)
+        plane_XYZ_rs = np.zeros((number_planes, shape[1], shape[0], 3))
 
-        _log_image("normals.png", data["normals"])
+        plane_masks_rs = np.zeros((number_planes, shape[1], shape[0]))
 
-        plane_normals_nn = np.zeros_like(plane_normals)
+        for k in range(number_planes):
+            plane_masks_rs[k] = cv2.resize(plane_masks[k], shape)
+            plane_XYZ_rs[k] = cv2.resize(plane_XYZ[k], shape)
 
-        for i in range(number_planes):
-            plane_normals_nn[i] = stats.mode(normals[plane_masks[i] > np.amax(plane_masks[i]) / 2.], axis=0)[0]
-            plane_normals_nn[i] /= np.linalg.norm(plane_normals_nn[i])
+        plane_masks = plane_masks_rs
+        plane_XYZ = plane_XYZ_rs
 
-        R, _ = calcTransformation(plane_normals_nn, plane_normals)
+        normals = cv2.resize(data["normals"], shape)
+        _log_image("normals.png", normals)
+        normals = (normals - 127.5) / 127.5
 
-        nr = normals.reshape((-1, 3))
-        normals = np.matmul(R, nr.transpose()).transpose().reshape(normals.shape)
-        _log_image("normals.png", 127.5 * (1. + normals))
-        lengths = np.maximum(np.sqrt(np.sum(normals * normals, -1)), 1e-6)
-        normals /= np.dstack((lengths, lengths, lengths))
+        depth = planes_data["depth_np"][0, 80:-80, :]
+        _log_image("depth.png", 255. * depth / np.amax(depth))
 
-        for i in range(number_planes):
-            mult = np.dstack((plane_masks[i], plane_masks[i], plane_masks[i]))
-            normals = (1.0 - mult) * normals + mult * plane_normals[i]
 
-        lengths = np.maximum(np.sqrt(np.sum(normals * normals, -1)), 1e-6)
-        normals /= np.dstack((lengths, lengths, lengths))
+        # _log_ply(img_rs, np.float32(plane_masks), plane_XYZ, mult=3, file_path=logging_dir + '3D1.ply')
 
-        _log_image("normals_combined.png", 127.5 * (1. + normals))
+        # merge rugs into floor for time being
+        rug = output[28]
+        output[3] += rug
+        output[28] = 0
 
-        floor_indices, horiz_indices, floor_angs = find_floor_indices(floor_mask, plane_masks, plane_normals)
+        wall_mask = output[0].copy()
+        _log_image("wall_mask.png", 255. * (wall_mask))
 
-        # print("floor indices are: ", floor_indices, horiz_indices)
+        floor_mask = output[3].copy()
+        _log_image("floor_mask.png", 255. * floor_mask)
 
-        floor_index = floor_indices[0]
+        floor_wall_int = np.sqrt(cv2.GaussianBlur(output[0], (9, 9), 0) * cv2.GaussianBlur(output[3], (9, 9), 0))
+        _log_image("floor_mask_int.png", 255. * floor_wall_int / np.amax(floor_wall_int))
+
+        segmentation_initial = np.int32(
+            np.argmax(np.dstack((.5 * np.ones_like(floor_mask), floor_mask, wall_mask)), -1)) + 1
+        _log_segmentation_image("segmentation_initial.png", segmentation_initial, img_rs)
+
+        length_threshold = 16
+        canny_aperture_size = 7
+
+        fld = cv2.ximgproc.createFastLineDetector(_length_threshold=length_threshold,
+                                                  _canny_aperture_size=canny_aperture_size)
+        l_image = np.zeros_like(wall_mask)
+        lines = fld.detect(cv2.cvtColor(img_rs, cv2.COLOR_BGR2GRAY))
+        l = 1
+        for line in lines:
+            for x1, y1, x2, y2 in line:
+                cv2.line(l_image, (x1, y1), (x2, y2), l, thickness=2)
+                l += 1
+        _log_image("l_image.png", l_image)
+
+        edgelets = compute_edgelets(lines, segmentation_initial)
+
+        locations, directions, strengths, classes = edgelets
+
+        print("classes", classes)
+
+        vp0 = ransac_vanishing_point(edgelets, 3000, threshold_inlier=5, max_time=.5, find_vert=True)
+
+        vl_image = np.zeros_like(wall_mask)
+        vanishing_pts = [vp0]
+        # import matplotlib.pyplot as plt
+
+        for k in range(len(vanishing_pts)):
+            print(k, vanishing_pts[k])
+            if np.any(vanishing_pts[k] != None):
+                vp0 = vanishing_pts[k]
+
+                # plt.imshow(cv2.cvtColor(img_rs, cv2.COLOR_BGR2RGB))
+                vertical_line_inliers = compute_votes(edgelets, vp0, 5) > 0
+                edgelets_new = (
+                    locations[vertical_line_inliers], directions[vertical_line_inliers],
+                    strengths[vertical_line_inliers])
+                locations_new, directions_new, strengths_new = edgelets_new
+                classes_new = classes[vertical_line_inliers]
+
+                # color = np.random.randint([0, 0, 10], [254, 10, 235]) / 255.
+                for i in range(locations_new.shape[0]):
+                    # s = (vp0[:2]-locations[i])*directions[i]
+                    xax = [locations_new[i, 0] - directions_new[i, 0] * strengths_new[i] / 2.,
+                           locations_new[i, 0] + directions_new[i, 0] * strengths_new[i] / 2.]
+                    yax = [locations_new[i, 1] - directions_new[i, 1] * strengths_new[i] / 2.,
+                           locations_new[i, 1] + directions_new[i, 1] * strengths_new[i] / 2.]
+                    cv2.line(vl_image, (int(xax[0]), int(yax[0])), (int(xax[1]), int(yax[1])), color=1, thickness=2)
+                    if classes_new[i] != 0:
+                        xax = [locations_new[i, 0], vp0[0]]
+                        yax = [locations_new[i, 1], vp0[1]]
+                        # plt.plot(xax, yax, color=color, linewidth=1)
+
+                # plt.ylim(img_rs.shape[0], 0)
+                # plt.xlim(-20, img_rs.shape[1])
+                # plt.savefig(logging_dir + "vp_near_" + str(int(k)) + ".png", dpi=100)
+                # plt.close()
+
+        _log_image("vl_image.png", 255 * vl_image)
+
+        wall_markers = refine_surface(wall_mask, hed_rs)
+        wall_mask = get_segmentation_image(wall_markers + 1, output[0], avg=True)
+        wall_mask = np.uint8(wall_mask > .5)
+
+        _log_image("wall_mask_refined.png", 255 * wall_mask)
+
+        floor_markers = refine_surface(floor_mask, hed_rs)
+
+        # save legs
+        floor_minus_vl = output[3].copy()
+        floor_minus_vl[vl_image > 0] = 0
+        floor_mask = get_segmentation_image(floor_markers + 1, floor_minus_vl, avg=True)
+        floor_mask = np.uint8(floor_mask > .5)
+
+        _log_image("floor_mask_refined.png", 255 * floor_mask)
+
+        seg = np.uint8(floor_mask > 0)
+        seg[wall_mask > 0] = 2
+
+        _log_segmentation_image("segmentation_initial.png", seg, img_rs, avg=False)
+
+        output_p = np.zeros((151, output.shape[1], output.shape[2]))
+
+        output_p[1:152] = output
+
+        predict = np.int32(np.argmax(output_p, 0)) - 1
+
+        _log_segmentation_image("ade_seg.png", predict + 1, img_rs, avg=False)
+        # stop
+        floor_indices, horiz_indices, floor_angs = find_floor_indices(output[3], plane_masks, plane_normals)
+
+        print("floor indices are: ", floor_indices, horiz_indices)
+
+        floor_index = -1
+
+        if len(floor_indices) > 0:
+            floor_index = floor_indices[0]
 
         floor_normal = plane_normals[floor_index]
-        wall_indices, vert_indices, vert_angs = find_wall_indices(wall_mask, plane_masks, plane_normals[floor_index],
-                                                                    plane_normals)
-        # print("wall indices are: ", wall_indices, vert_indices, vert_angs)
+        print("floor_normal", floor_normal)
+        wall_indices, vert_indices, vert_angs = find_wall_indices(output[0], plane_masks, plane_normals[floor_index],
+                                                                  plane_normals)
+        print("wall indices are: ", wall_indices, vert_indices, vert_angs)
+
+        basis_indices = np.int32(np.concatenate([floor_indices, vert_indices]))
+
+        normals_c = combined_normals(normals, plane_normals, plane_masks, basis_indices)
+
+        _log_image("normals_c_org.png", 127.5 * (normals_c + 1))
 
         for i in range(number_planes):
             if i in vert_indices:
                 mass = np.sum(plane_masks[i])
+
                 if mass > 0:
                     plane_normals[i] = np.cross(floor_normal, np.cross(floor_normal, plane_normals[i]))
 
                     plane_parameters[i] = plane_normals[i] * np.sum(
                         plane_masks[i] * np.dot(plane_XYZ[i], plane_normals[i])) / mass
 
-        plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=640, height=480, max_depth=10)
+        #need to fix resizing issue
 
-        for i in np.unique(plane_clusters):
+        # plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=w, height=h, max_depth=10)
+        #
+        # for i in np.unique(plane_clusters):
+        #
+        #     cluster = np.nonzero(plane_clusters == i)[0]
+        #
+        #     for j in cluster:
+        #         if j not in vert_indices: continue
+        #
+        #         for k in cluster:
+        #             if k <= j: continue
+        #             rect = roi[j]
+        #             plane_rect = [plane_XYZ[j, rect[0], rect[1]], plane_XYZ[j, rect[0], rect[3]],
+        #                           plane_XYZ[j, rect[2], rect[3]], plane_XYZ[j, rect[2], rect[1]]]
+        #             p = np.abs(proj(plane_rect, plane_parameters[k]))
+        #
+        #             if len(p) > 0 and (np.mean(p) < .3):
+        #                 plane_parameters[k] = plane_parameters[j]
 
-            cluster = np.nonzero(plane_clusters == i)[0]
 
-            for j in cluster:
-                if j not in vert_indices: continue
-
-                for k in cluster:
-                    if k <= j: continue
-                    rect = roi[j]
-                    plane_rect = [plane_XYZ[j, rect[0], rect[1]], plane_XYZ[j, rect[0], rect[3]],
-                                  plane_XYZ[j, rect[2], rect[3]], plane_XYZ[j, rect[2], rect[1]]]
-                    p = np.abs(proj(plane_rect, plane_parameters[k]))
-
-                    if len(p) > 0 and (np.mean(p) < .3):
-                        plane_parameters[k] = plane_parameters[j]
-
-        plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=640, height=480, max_depth=10)
-
-        plane_masks_rs = np.zeros((number_planes, shape[1], shape[0]))
-
-        for k in range(number_planes):
-            plane_masks_rs[k] = cv2.resize(plane_masks[k], shape)
-
-        plane_masks = plane_masks_rs
-        normals = cv2.resize(normals, shape)
-
-        edgelets = compute_edgelets(lines, predict)
-
-        vp0 = ransac_vanishing_point(edgelets, 3000, threshold_inlier=5, max_time=0.5)
+        vp0 = vanishing_pts[0]
         vp0 = vp0 / vp0[2]
 
         vertical_line_inliers = compute_votes(edgelets, vp0, 5) > 0
@@ -724,8 +815,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
         directions = directions[s]
         strengths = strengths[s]
 
-        img_fan = np.int32(np.zeros_like(plane_masks[0]))
-
+        labels_fan = np.int32(np.zeros_like(plane_masks[0]))
+        vertical_edges = np.uint8(np.zeros_like(plane_masks[0]))
         for i in range(-1, len(locations)):
             if i == -1:
                 pt1 = np.int32([0, 2 * shape[1]] - vp0[:2])
@@ -736,30 +827,31 @@ class PipelineRefinePlaneMasks(PipelineStep):
             else:
                 pt1 = np.int32(2 * locations[i] - vp0[:2])
                 pt2 = np.int32(2 * locations[i + 1] - vp0[:2])
-
             triangle = np.array([[[vp0[0], vp0[1]], pt1, pt2]], np.int32)
-            cv2.fillPoly(img_fan, pts=triangle, color=i + 2)
+            cv2.fillPoly(labels_fan, pts=triangle, color=i + 2)
+            cv2.polylines(vertical_edges, pts=triangle, isClosed=True, color=1)
 
-        _log_segmentation_image("fan.png", img_fan, img_rs, avg=False)
-
-        floor_mask = output[3]
-        floor_mask[predict != 3] = 0
-        _log_image("floor_mask.png", 255. * floor_mask)
+        labels_fan[wall_mask < .05] = 0
+        _log_image("fan.png", get_segmentation_image(labels_fan, img_rs, avg=False))
+        _log_image("vertical_edges.png", 255. * vertical_edges)
 
         plane_classes = get_planes_class(plane_masks, predict)
 
-        # plane_masks[plane_masks < .03] = 0
-        wall_like_planes = [hed_rs / 255.]
-        wall_like_depths = [10. * np.ones_like(plane_masks[0])]
+        full_plane = plane_masks.copy()
+        full_plane[full_plane<.03] =0
+
+        plane_masks[plane_masks < .5] = 0
+        wall_like_planes = [np.zeros_like(hed_rs / 255.)]
+
         wall_like_indices = []
-        wall_planes = [np.zeros_like(plane_masks[0])]
+        wall_planes = [np.zeros_like(hed_rs / 255.)]
         wall_indices = []
         floor_indices = []
         ceiling_indices = []
 
         for k in range(number_planes):
             ade = np.int32(plane_classes[k])
-            name = "wall_plane" + str(k)
+            name = "plane_" + str(k)
 
             for a in ade[0]:
                 # name += data_ade[a][5]
@@ -774,8 +866,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
                         wall_like_planes.append(plane_masks[k])
                         wall_like_indices.append(k)
                         s = np.uint8(plane_masks[k] > 0)
-                        wall_like_depths.append(cv2.resize(plane_XYZ[k, :, :, 1], shape) * s + (1 - s) * 10)
-                        _log_image(name + ".png", 255. * plane_masks[k])
                     continue
 
                 if a == 3:
@@ -786,88 +876,115 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     ceiling_indices.append(k)
                     continue
 
-            # _log_image(name + ".png", 255. * plane_masks[k])
+            _log_image(name + ".png", 255. * plane_masks[k])
 
         wall_like_planes = np.float32(wall_like_planes)
+        wall_planes = np.float32(wall_planes)
+        wall_planes_seg = np.argmax(wall_like_planes, 0)
 
-        wall_mask_edges = np.uint8(img_fan > 0)
-        wall_mask_edges[wall_mask == 0] = 0
-        wall_mask_edges[l_image > 0] = 0
+        for i in np.unique(wall_planes_seg):
+            mask = skeletonize(wall_planes_seg == i)
+            wall_planes_seg[np.logical_and(mask == 0, wall_planes_seg == i)] = 0
 
-        _log_image("wall_mask_edges.png", 255. * wall_mask_edges)
+        _log_segmentation_image("wall_planes_seg.png", wall_planes_seg, img_rs)
 
-        distances = cv2.distanceTransform(np.uint8(wall_mask_edges > 0), cv2.DIST_L2, 5)
-        labels_wall = img_fan
-        labels_wall[wall_mask_edges == 0] = 0
+        normals_c[wall_mask == 0] = (0, 0, 0)
+        # normals_c = get_segmentation_image(np.int32(labels_fan), np.float32(normals_c), avg=True)
+        _log_segmentation_image("normals_c.png", labels_fan, 127.5 * (normals_c + 1), avg=True)
 
-        _log_segmentation_image("labels_wall_pre0.png", labels_wall, img_rs)
+        g = rag_mean_color(np.float32(normals_c), np.int32(labels_fan), mode='normal')
 
-        g = gr.RAG(labels_wall, connectivity=1)
+        # labels_wall_1 = gr.cut_threshold(labels_fan, g, .2)
+        labels_wall_1 = gr.merge_hierarchical(labels_fan, g, thresh=.2, rag_copy=False,
+                                              in_place_merge=True,
+                                              merge_func=merge_mean_color,
+                                              weight_func=weight_mean_color)
 
+        labels_wall_1 += np.amax(wall_planes_seg)
+        labels_wall_1[wall_mask == 0] = 0
+        _log_segmentation_image("labels_wall_graph.png", labels_wall_1, img_rs, avg=False)
 
+        for i in np.unique(labels_wall_1):
+            if i == 0: continue
+            mask = i == labels_wall_1
+            m = stats.mode(wall_planes_seg[np.logical_and(wall_planes_seg > 0, mask)])
+            print(i, m[0], m[1])
+            if len(m[0]) > 0:
+                labels_wall_1[mask] = m[0]
 
-        normals[wall_mask_edges == 0] = (0, 0, 0)
+        _log_segmentation_image("labels_wall_merge.png", labels_wall_1, img_rs, avg=False)
 
-        g = rag_mean_color(g, normals, labels_wall, mode='normal')
-        labels_wall = gr.merge_hierarchical(labels_wall, g, thresh=.1, rag_copy=False,
-                                            in_place_merge=True,
-                                            merge_func=merge_mean_color,
-                                            weight_func=weight_mean_angle)
-        labels_wall += 1
-
-        labels_wall[wall_mask_edges == 0] = 0
-
-        labels_wall = np.int32(watershed(hed_rs, markers=labels_wall, mask=wall_mask > 0))
-        labels_wall[wall_mask == 0] = 0
-        _log_segmentation_image("labels_wall_merge.png", labels_wall, img_rs, avg=False)
-
-        label_indices = np.unique(labels_wall)
-
+        label_indices = np.unique(labels_wall_1)
+        # wall_like_indices = wall_indices
         wall_planes_number = len(wall_like_indices)
 
         means = np.zeros((len(label_indices), wall_planes_number + 1), dtype=np.float32)
 
         for i in range(1, wall_planes_number + 1):
-            means[:, i] = ndimage.mean(wall_like_planes[i], labels=labels_wall, index=label_indices)
+            means[:, i] = ndimage.mean(full_plane[wall_like_indices[i - 1]], labels=labels_wall_1, index=label_indices)
 
-        means[means < .03] = 0
+        # means[means < .01] = 0
         arg = np.argmax(means, axis=-1)
 
-        labels_arg = np.zeros_like(np.int32(labels_wall.copy()))
-        # labels_arg[labels_arg>0] +=number_planes
+        labels_arg = np.zeros_like(np.int32(labels_wall_1.copy()))
+
+        labels_arg[labels_arg > 0] += number_planes
+
         for i in range(1, len(label_indices)):
             if arg[i] > 0:
-                labels_arg[labels_wall == label_indices[i]] = arg[i]
+                labels_arg[labels_wall_1 == label_indices[i]] = arg[i]
 
-        labels_wall = labels_arg
+        _log_image('labels_arg.png', get_segmentation_image(np.int32(labels_arg), img_rs, avg=False))
 
-        _log_image('labels_arg.png', get_segmentation_image(np.int32(labels_wall), img_rs, avg=False))
+        labels_wall_1[labels_wall_1 > 0] += np.amax(wall_planes_seg)
+        labels_wall_2 = labels_wall_1.copy()
+
+        for i in np.unique(labels_wall_1):
+            if i == 0: continue
+
+            label_mask = labels_wall_1 == i
+
+            intersection = np.sum(label_mask[wall_planes_seg > 0])
+
+            if intersection > 1:
+                w = watershed(hed_rs, wall_planes_seg, mask=label_mask)
+
+                labels_wall_2[label_mask] = w[label_mask] + np.amax(labels_wall_2)
+
+        _log_segmentation_image("final_labels_wall_merge.png", labels_wall_2, img_rs, avg=False)
 
         final_masks = []
         final_plane_parameters = []
         final_plane_XYZ = []
 
-        for l in np.unique(labels_wall):
+        for l in np.unique(labels_wall_2):
             if l == 0: continue
 
-            mask = 255 * np.uint8(labels_wall == l)
-            final_masks.append(mask)
-            plane_parameter = np.zeros((10))
-            plane_parameter[:9] = data["planes"]["detection"][wall_like_indices[l - 1]][:9]
-            plane_parameter[6:9] = plane_parameters[wall_like_indices[l - 1]]
-            plane_parameter[9] = 2
-            final_plane_parameters.append(plane_parameter)
-            final_plane_XYZ.append(plane_XYZ[wall_like_indices[l - 1]])
+            mask = np.uint8(labels_wall_2 == l)
 
+            if np.sum(mask) > 16 * 12:
+                final_masks.append(255 * mask)
+
+                l = int(np.median(labels_arg[mask > 0]))
+
+                plane_parameter = np.zeros((10))
+                plane_parameter[:9] = data["planes"]["detection"][wall_indices[l - 1]][:9]
+                plane_parameter[6:9] = plane_parameters[wall_indices[l - 1]]
+                plane_parameter[9] = 2
+
+                final_plane_parameters.append(plane_parameter)
+
+        print("len", len(floor_indices))
         # add floor
         if len(floor_indices) > 0:
-            final_masks.append(255 * np.uint8(predict == 3))
+            final_masks.append(255 * floor_mask)
+
             plane_parameter = np.zeros((10))
             plane_parameter[:9] = data["planes"]["detection"][floor_indices[0]][:9]
             plane_parameter[6:9] = plane_parameters[floor_indices[0]]
             plane_parameter[9] = 1
+
             final_plane_parameters.append(plane_parameter)
-            final_plane_XYZ.append(plane_XYZ[floor_indices[0]])
 
         # add ceiling
         if len(ceiling_indices) > 0:
@@ -877,24 +994,12 @@ class PipelineRefinePlaneMasks(PipelineStep):
             plane_parameter[6:9] = plane_parameters[ceiling_indices[0]]
             plane_parameter[9] = 3
             final_plane_parameters.append(plane_parameter)
-            final_plane_XYZ.append(plane_XYZ[ceiling_indices[0]])
 
         final_plane_parameters = np.float32(final_plane_parameters)
 
-        final_plane_XYZ = np.float32(final_plane_XYZ)
-
         final_plane_number = len(final_masks)
 
-        _log_ply(img_rs, final_masks, np.float32(final_plane_XYZ), mult=2, file_path='logging/3D_refine.ply')
-        # resizing watershed isn't working
-
-        final_labels = np.zeros((shape[1], shape[0]), np.int32)
-
-        for d in range(final_plane_number):
-            final_labels[final_masks[d] > 0] = d + 1
-
-
-        _log_segmentation_image("final_labels.png", final_labels, img, avg=False)
+        print("final_plane_number", final_plane_number)
 
         data["planes"]["masks"] = np.zeros((final_plane_number, shape[1], shape[0]), dtype=np.uint8)
 
@@ -904,28 +1009,29 @@ class PipelineRefinePlaneMasks(PipelineStep):
         mask_contours = []
 
         for d in range(final_plane_number):
-            contours, hierarchy = cv2.findContours(np.uint8(final_labels == d+1), cv2.RETR_TREE,
+
+            contours, hierarchy = cv2.findContours(final_masks[d], cv2.RETR_TREE,
                                                    cv2.CHAIN_APPROX_SIMPLE)
+
+            data["planes"]["masks"][d] = np.zeros_like(final_masks[d])
+
             plane_contours = []
+
             if len(contours) > 0:
 
                 for i in range(len(contours)):
                     area = cv2.contourArea(contours[i])
 
-                    if area > 32*32:
+                    if area > 16 * 16:
                         if hierarchy[0, i, 3] == -1:  # this is the outer contour which we need to draw
-                            cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, -1, cv2.LINE_AA)
+                            cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, -1, lineType=cv2.LINE_AA)
 
                             # epsilon = cv2.arcLength(contours[i], True) / shape[0]
                             # approx = cv2.approxPolyDP(contours[i], epsilon, closed=True)
+
                             plane_contours.append(contours[i].tolist())
                         else:
-                            cv2.drawContours(data["planes"]["masks"][d], contours, i, 0, -1, cv2.LINE_AA)
-
-                    data["planes"]["masks"][d] = cv2.GaussianBlur(np.uint8(data["planes"]["masks"][d]), (9, 9), 0)
-
-                    _, data["planes"]["masks"][d] = cv2.threshold(data["planes"]["masks"][d], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                    _log_image('final_' + str(d) + ".png", data["planes"]["masks"][d])
+                            cv2.drawContours(data["planes"]["masks"][d], contours, i, 0, -1)
 
                 rect = cv2.boundingRect(data["planes"]["masks"][d])
 
@@ -935,7 +1041,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
             mask_contours.append(plane_contours)
 
-        data["planes"]["contours"] = mask_contours
+            data["planes"]["contours"] = mask_contours
 
 
 
