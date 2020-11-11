@@ -745,10 +745,9 @@ def refine_mask_watershed(args, rgb, mask, image_name, distance=0.0, erode=0, ma
 
         # d.save_diagnostics_image(args, markers, image_name, "markers", verbose=True)
 
-        from skimage.morphology import watershed, disk
-        print(len(rgb.shape))
+
         if len(rgb.shape) < 3:
-            print("watershed used on bw")
+
             base = cv2.cvtColor(rgb, cv2.COLOR_GRAY2RGB)
             markers = np.int32(watershed(rgb, markers, mask=watershed_mask))
     else:

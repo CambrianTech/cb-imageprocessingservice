@@ -87,15 +87,16 @@ COPY . .
 
 RUN chmod 755 ./start.sh
 
+# MXNet and GluonCV prereleases
+RUN pip3 install --pre --upgrade gluoncv
+RUN pip3 install --upgrade mxnet-cu100mkl -f https://dist.mxnet.io/python/all
+
+
 # libglib needed for OpenCV
 RUN apt-get update && apt-get install --no-install-recommends -y libglib2.0-0 && apt-get clean
 
 RUN pip3 install -r requirements.txt --no-cache-dir
 RUN pip3 install ./cb-core/ --no-cache-dir
-
-# MXNet and GluonCV prereleases
-RUN pip3 install --pre --upgrade gluoncv
-RUN pip3 install --upgrade mxnet-cu100mkl -f https://dist.mxnet.io/python/all
 
 EXPOSE 8080
 
