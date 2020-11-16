@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-from skimage.morphology import watershed
+from skimage.segmentation import watershed
 from skimage import filters
 
 from . import diagnostics as d
@@ -719,13 +719,16 @@ def crop_image(img, margin=30):
     
     return result
 
-def refine_mask_watershed(args, rgb, mask, image_name, distance=0.0, erode=0, max_value=151, gradient=False, background=True, watershed_mask=None):
+
+def refine_mask_watershed(args, rgb, mask, image_name, distance=0.0, erode=0, max_value=151, gradient=False,
+                          background=True, watershed_mask=None):
     """Runs the watershed algorithm on rgb and returns markers"""
     if gradient:
         markers = np.zeros(mask.shape, dtype=np.int32)
 
         for i in range(max_value + 1):
             num_elements = (mask == i).sum()
+
             if num_elements > 50:
                 isolated = np.zeros(mask.shape, dtype=np.uint8)
                 isolated[mask == i] = i + 1  # add one for 0 label, all values are one higher
@@ -745,9 +748,8 @@ def refine_mask_watershed(args, rgb, mask, image_name, distance=0.0, erode=0, ma
 
         # d.save_diagnostics_image(args, markers, image_name, "markers", verbose=True)
 
-
         if len(rgb.shape) < 3:
-
+            # print("watershed used on bw")
             base = cv2.cvtColor(rgb, cv2.COLOR_GRAY2RGB)
             markers = np.int32(watershed(rgb, markers, mask=watershed_mask))
     else:
