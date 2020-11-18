@@ -595,6 +595,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         normals_c = np.cross(floor_normal, normals_c)
         _log_image("normals_c_org.png", 127.5 * (normals_c + 1))
 
+
         for i in range(number_planes):
             if i in vert_indices:
                 mass = np.sum(plane_masks[i])
@@ -605,6 +606,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     plane_parameters[i] = plane_normals[i] * np.sum(
                         plane_masks[i] * np.dot(plane_XYZ[i], plane_normals[i])) / mass
 
+        # plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=640, height=480, max_depth=10)
         # merge rugs into floor for time being
         rug = output[28]
         output[3] += rug
@@ -703,6 +705,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         vertical_edges = np.uint8(np.zeros_like(plane_masks[0]))
 
         k = 1
+        ang_threshold = .83
 
         for i in range(-1, len(locations)):
             if i == -1:
@@ -720,9 +723,10 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
             wall_arc = np.logical_and(sure_walls, arc_mask > 0)
             a = np.sum(wall_arc)
+
             pre_normal = np.zeros_like(floor_normal)
             if a > 1:
-                if i == -1:
+                if i == -1 or i==len(locations):
                     pre_normal = np.mean(normals_c[wall_arc], 0)
                     pre_normal /= max(np.linalg.norm(pre_normal), .00001)
                     labels_fan[arc_mask > 0] = k
@@ -735,11 +739,10 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
                 ang = abs(np.dot(cur_normal, pre_normal))
 
-                if ang > .83:
+                if ang > ang_threshold:
                     labels_fan[arc_mask > 0] = k
                     normals_wall_like[np.logical_and(sure_walls, labels_fan == k)] = pre_normal
                 else:
-
                     k += 1
                     labels_fan[arc_mask > 0] = k
 
@@ -843,9 +846,10 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         labels_arg = np.zeros_like(np.int32(labels_wall_1))
 
-        for i in range(1, len(label_indices)):
+        for i in range(1,len(label_indices)):
             if arg[i] > 0:
-                labels_arg[labels_wall_1 == label_indices[i]] = wall_like_indices[arg[i] - 1]
+                labels_arg[labels_wall_1 == label_indices[i]] = wall_like_indices[arg[i] - 1]+1
+
             # else:
             #     print("if no good match just take the closest by angle")
             #     normal = np.mean(normals_c[labels_wall_1 == label_indices[i]],0)
@@ -857,7 +861,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         _log_image('labels_arg.png', get_segmentation_image(np.int32(labels_arg), img_rs, avg=False))
 
-        # needs to be cleaned ups
+        # needs to be cleaned up
         labels_wall_1 = labels_arg.copy()
         labels_wall_1[labels_wall_1 > 0] += np.amax(wall_planes_seg)
         labels_wall_2 = labels_wall_1.copy()
@@ -876,6 +880,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         _log_segmentation_image("final_labels_wall_merge.png", labels_wall_2, img_rs, avg=False)
 
+        # plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=shape[0], height=shape[1], max_depth=10)
+
         final_masks = []
 
         final_plane_parameters = []
@@ -892,7 +898,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                 wall_areas.append((area))
                 final_masks.append(255 * mask)
 
-                l = int(np.median(labels_arg[mask > 0]))
+                l = int(np.median(labels_arg[mask > 0]))-1
 
                 plane_parameter = np.zeros(10)
                 plane_parameter[:9] = data["planes"]["detection"][l][:9]
@@ -903,7 +909,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                 final_plane_XYZ.append(plane_XYZ[l])
 
         # sort wall planes, largest to smallest/ugly due to sheer laziness
-        area_sort = np.argsort(wall_areas)
+        area_sort = np.argsort(wall_areas)[::-1]
         final_masks = np.array(final_masks)[area_sort].tolist()
         final_plane_parameters = np.array(final_plane_parameters)[area_sort].tolist()
         final_plane_XYZ = np.array(final_plane_XYZ)[area_sort].tolist()
