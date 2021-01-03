@@ -187,7 +187,8 @@ def find_surfaces(img, surfaces, output_path):
     
     if vp_found:
         locations, directions, strengths, classes = vpf.edgelets
-        edgelets = (locations[vpf.inlier_indices], directions[vpf.inlier_indices], strengths[vpf.inlier_indices])
+        inliers = vpf.votes > 0
+        edgelets = (locations[inliers], directions[inliers], strengths[inliers])
         locations, directions, strengths = edgelets
         vp_directions = locations - vpf.model[:2]
 
