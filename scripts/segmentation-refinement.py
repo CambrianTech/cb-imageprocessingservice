@@ -11,6 +11,8 @@ import time
 import io
 from Line import Line
 from frei_chen import frei_chen
+from VanishingPointFinder import VanishingPointFinder
+
 import random
 
 SAVE_DEBUG_IMAGES = True 
@@ -167,8 +169,7 @@ def compute_votes(edgelets, model, threshold_inlier=math.radians(5)):
 
     return (cosine_theta > theta_thresh) * strengths
 
-def ransac_vanishing_point(edgelets, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_time=1.0, find_vert=True,
-                           seeds=None):
+def ransac_vanishing_point(edgelets, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_time=1.0, find_vert=True, seeds=None):
     """Estimate vanishing point using Ransac.
     Parameters
     ----------
@@ -230,8 +231,7 @@ def ransac_vanishing_point(edgelets, num_ransac_iter=2000, threshold_inlier=math
             if dt1 < .95 or dt2 < .95:
                 continue
 
-        current_votes = compute_votes(
-            edgelets, current_model, threshold_inlier).sum()
+        current_votes = compute_votes(edgelets, current_model, threshold_inlier).sum()
 
         if np.any(seeds != None):
             cm = current_model[:2] / current_model[2]
@@ -360,20 +360,15 @@ def find_surfaces(img, surfaces, output_path):
 
     if lines_d is not None: Line.draw_all(line_data, lines_d)
 
-
     #vanishing points:
-    edgelets = Line.compute_edgelets(line_data)
-
-    vp_thresh = math.radians(3)
-
-    vp0 = ransac_vanishing_point(edgelets, 3000, threshold_inlier=vp_thresh, max_time=.5, find_vert=True)
+    vpf = VanishingPointFinder(line_data)
+    vp_found = vpf.compute()
     
-    if len(vp0) > 0:
-        vertical_line_inliers = compute_votes(edgelets, vp0, threshold_inlier=vp_thresh) > 0
-        locations, directions, strengths, classes = edgelets
-        edgelets = (locations[vertical_line_inliers], directions[vertical_line_inliers], strengths[vertical_line_inliers])
+    if vp_found:
+        locations, directions, strengths, classes = vpf.edgelets
+        edgelets = (locations[vpf.inlier_indices], directions[vpf.inlier_indices], strengths[vpf.inlier_indices])
         locations, directions, strengths = edgelets
-        vp_directions = locations - vp0[:2]
+        vp_directions = locations - vpf.model[:2]
 
         angles = np.arctan2(vp_directions[:, 1], vp_directions[:, 0])
 
