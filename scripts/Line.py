@@ -61,8 +61,13 @@ class Line:
     def find_line_pair(self):
         points = []
         for line in self.source_lines:
-            points.append((int(line.point_a[0]), int(line.point_a[1])))
-            points.append((int(line.point_b[0]), int(line.point_b[1])))
+            ratio = min(self.length / line.length, line.length / self.length)
+            if ratio > 0.6:
+                points.append((int(line.point_a[0]), int(line.point_a[1])))
+                points.append((int(line.point_b[0]), int(line.point_b[1])))
+
+        if len(points) < 4:
+            return None, None
 
         rect = cv2.minAreaRect(np.array(points))
         size = rect[1]
