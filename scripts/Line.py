@@ -58,11 +58,11 @@ class Line:
             self.samples = LineFunctions.get_line_samples(self.point_a, self.point_b, self.image, int(self.length / self.color_step) + 1)
         return self.samples
 
-    def find_line_pair(self):
+    def find_line_pair(self, min_length=0.3, angle_diff=math.radians(5)):
         points = []
         for line in self.source_lines:
             ratio = min(self.length / line.length, line.length / self.length)
-            if ratio > 0.5:
+            if ratio >= min_length:
                 points.append((int(line.point_a[0]), int(line.point_a[1])))
                 points.append((int(line.point_b[0]), int(line.point_b[1])))
 
@@ -70,7 +70,6 @@ class Line:
             return None
 
         hull = cv2.convexHull(np.array(points))
-        #hull = cv2.approxPolyDP(hull, 2.0, False)
 
         if len(hull) < 4:
             return None
@@ -81,14 +80,12 @@ class Line:
         for i in range(len(hull)):
             point_a = hull[i]
             point_b = hull[(i+1) % len(hull)]
-            dist = distance.euclidean(point_a, point_b)
-            ratio = min(self.length / dist, dist / self.length)
-            if ratio > 0.3:
-                lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1]))
-            
-        #print("size", self.length, line_a.length, line_b.length)
+            new_line = Line(point_a[0], point_a[1], point_b[0], point_b[1])
 
-        return lines
+            if LineFunctions.line_angle_difference(self.angle, new_line.angle) < angle_diff:
+                lines.append(new_line)
+            
+        return lines if len(lines) > 1 else None
 
     def get_color_mean(self):
         if self.color_mean is None:
