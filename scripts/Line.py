@@ -10,7 +10,7 @@ from LineFunctions import LineFunctions
 
 class Line:
 
-    def __init__(self, x0, y0, x1, y1, contour_group=-1, contour_index=-1):
+    def __init__(self, x0, y0, x1, y1, contour_group=-1, contour_index=-1, source_lines=None):
         self.point_a = (x0, y0)
         self.point_b = (x1, y1)
 
@@ -24,6 +24,7 @@ class Line:
         self.color_mean = None
         self.color_std = None
         self.color = None
+        self.source_lines = source_lines
 
         self.recalculate()
 
@@ -57,6 +58,31 @@ class Line:
             self.samples = LineFunctions.get_line_samples(self.point_a, self.point_b, self.image, int(self.length / self.color_step) + 1)
         return self.samples
 
+    def find_line_pair(self):
+        points = []
+        for line in self.source_lines:
+            if line.length > 0.3 * self.length:
+                points.append((int(line.point_a[0]), int(line.point_a[1])))
+                points.append((int(line.point_b[0]), int(line.point_b[1])))
+
+        if len(points) < 4:
+            return None, None
+
+        rect = cv2.minAreaRect(np.array(points))
+        size = rect[1]
+        line_points = cv2.boxPoints(rect)
+
+        if size[0] > size[1]:
+            line_a = Line(line_points[1][0], line_points[1][1], line_points[2][0], line_points[2][1])
+            line_b = Line(line_points[3][0], line_points[3][1], line_points[0][0], line_points[0][1])
+        else:
+            line_a = Line(line_points[0][0], line_points[0][1], line_points[1][0], line_points[1][1])
+            line_b = Line(line_points[2][0], line_points[2][1], line_points[3][0], line_points[3][1])
+            
+        #print("size", self.length, line_a.length, line_b.length)
+
+        return line_a, line_b
+
     def get_color_mean(self):
         if self.color_mean is None:
             self.color_mean = np.mean(self.get_samples(), axis=0)
@@ -75,7 +101,7 @@ class Line:
         return (self.midpoint, (max(self.length * length_multiplier, self.length + length_offset), width), np.degrees(self.angle))
 
     @classmethod
-    def merge(cls, line_data, search_width, search_length, angle_threshold, max_color_std=None, min_confidence=0, length_offset=0, color=None):
+    def merge(cls, line_data, search_width, search_length, angle_threshold, max_color_std=None, min_confidence=0, length_offset=0, create_pairs=False):
 
         initial_count = len(line_data)
         print("Merging %d lines" % (initial_count))
@@ -130,16 +156,19 @@ class Line:
                             
 
             if len(parallel_lines) > 0:
+                parallel_lines.append(line_a)
+                source_lines = parallel_lines
                 new_line = Line(data[0][0], data[0][1], data[1][0], data[1][1])
-                line_a.dead = True
+
                 for line in parallel_lines:
+                    if line.source_lines is not None:
+                        source_lines.extend(line.source_lines)
                     line.dead = True
 
-                if color is not None:
-                    new_line.color = color
+                if create_pairs:
+                    new_line.source_lines = source_lines
 
                 line_data.append(new_line)
-                    
 
             #end while
 
@@ -148,8 +177,18 @@ class Line:
         if min_confidence > 0:
             line_data = list(filter(lambda x: x.get_confidence() >= min_confidence, line_data))
 
+        #now get hull of parallel
+        parallel_lines = list(filter(lambda x: x.source_lines is not None, line_data))
+        for line in parallel_lines:
+            line_a, line_b = line.find_line_pair()
+            if line_a is not None:
+                line.dead = True
+                line_data.append(line_a)
+                line_data.append(line_b)
+
         print("Reduced lines by %d" % (initial_count - len(line_data)))
 
+        line_data = list(filter(lambda x: not x.dead, line_data))
 
         return line_data
 

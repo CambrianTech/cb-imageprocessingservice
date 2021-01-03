@@ -166,18 +166,18 @@ def find_surfaces(img, surfaces, output_path):
     
     if lines_a is not None: Line.draw_all(line_data, lines_a)
     
-    line_data = Line.merge(line_data, diagonal / 150.0, search_length=1.0, angle_threshold=math.radians(3.0), max_color_std=5.0, color=(255,150,50))
+    line_data = Line.merge(line_data, diagonal / 350.0, search_length=1.05, angle_threshold=math.radians(4.0), max_color_std=5.0)
 
     if lines_b is not None: Line.draw_all(line_data, lines_b)
 
-    line_data = Line.merge(line_data, diagonal / 120.0, search_length=1.05, angle_threshold=math.radians(2.0), color=(255,0,0))
+    line_data = Line.merge(line_data, diagonal / 80.0, search_length=1.0, angle_threshold=math.radians(5.0), create_pairs=True)
 
     if lines_c is not None: Line.draw_all(line_data, lines_c)
 
     line_data, intersections = Line.find_corners(line_data, search_length=1.5, angle_threshold=math.radians(10.0), parallel_threshold=math.radians(4), \
             max_color_std=3.0, confidence_diff=0.4)
 
-    line_data = Line.merge(line_data, diagonal / 200.0, search_length=1.07, angle_threshold=math.radians(5.0), color=(255,0,0))
+    #line_data = Line.merge(line_data, diagonal / 200.0, search_length=1.07, angle_threshold=math.radians(5.0))
 
     if lines_d is not None: Line.draw_all(line_data, lines_d)
 
@@ -186,32 +186,10 @@ def find_surfaces(img, surfaces, output_path):
     vp_found = vpf.compute()
     
     if vp_found:
-        locations, directions, strengths, classes = vpf.edgelets
-        inliers = vpf.votes > 0
-        edgelets = (locations[inliers], directions[inliers], strengths[inliers])
-        locations, directions, strengths = edgelets
-        vp_directions = locations - vpf.model[:2]
+        for line in vpf.inliers:
+            line.draw(lines_d, color=(255,0,255), thickness=3)
 
-        angles = np.arctan2(vp_directions[:, 1], vp_directions[:, 0])
-
-        s = np.argsort(angles)
-        angles = angles[s]
-        locations = locations[s]
-        directions = directions[s]
-        strengths = strengths[s]
-
-        for i in range(-1, len(locations)):
-
-            xax = [locations[i, 0] - directions[i, 0] * strengths[i] / 2.,
-                   locations[i, 0] + directions[i, 0] * strengths[i] / 2.]
-            yax = [locations[i, 1] - directions[i, 1] * strengths[i] / 2.,
-                   locations[i, 1] + directions[i, 1] * strengths[i] / 2.]
-
-            cv2.line(lines_d, (int(xax[0]), int(yax[0])), (int(xax[1]), int(yax[1])), color=(255,0,255), thickness=3)
-
-    #cv2.imwrite(os.path.join(output_path, "vertical_edges.png"), 255. * vertical_edges)
     if lines_d is not None:
-
         for intersection in intersections: cv2.circle(lines_c, (int(intersection[0]), int(intersection[1])), max(int(diagonal/100), 3), (255,0,0), 2)
         
         cont_img = np.vstack((np.hstack((lines_a, lines_b)), np.hstack((lines_c, lines_d))))
