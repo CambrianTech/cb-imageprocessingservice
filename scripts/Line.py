@@ -62,38 +62,33 @@ class Line:
         points = []
         for line in self.source_lines:
             ratio = min(self.length / line.length, line.length / self.length)
-            if ratio > 0.6:
+            if ratio > 0.5:
                 points.append((int(line.point_a[0]), int(line.point_a[1])))
                 points.append((int(line.point_b[0]), int(line.point_b[1])))
 
         if len(points) < 4:
-            return None, None
+            return None
 
         hull = cv2.convexHull(np.array(points))
-        hull = cv2.approxPolyDP(hull, 2.0, False)
+        #hull = cv2.approxPolyDP(hull, 2.0, False)
 
-        if len(hull) != 4:
-            return None, None
+        if len(hull) < 4:
+            return None
 
         hull = hull.reshape(len(hull), 2)
 
-        size = distance.euclidean(hull[0], hull[1]), distance.euclidean(hull[1], hull[2])
-
-        width = min(size[0], size[1])
-
-        if width < self.diagonal/300:
-            return None, None
-
-        if size[0] < size[1]:
-            line_a = Line(hull[1][0], hull[1][1], hull[2][0], hull[2][1])
-            line_b = Line(hull[3][0], hull[3][1], hull[0][0], hull[0][1])
-        else:
-            line_a = Line(hull[0][0], hull[0][1], hull[1][0], hull[1][1])
-            line_b = Line(hull[2][0], hull[2][1], hull[3][0], hull[3][1])
+        lines = []
+        for i in range(len(hull)):
+            point_a = hull[i]
+            point_b = hull[(i+1) % len(hull)]
+            dist = distance.euclidean(point_a, point_b)
+            ratio = min(self.length / dist, dist / self.length)
+            if ratio > 0.3:
+                lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1]))
             
         #print("size", self.length, line_a.length, line_b.length)
 
-        return line_a, line_b
+        return lines
 
     def get_color_mean(self):
         if self.color_mean is None:
@@ -193,11 +188,10 @@ class Line:
         if create_pairs:
             parallel_lines = list(filter(lambda x: x.source_lines is not None, line_data))
             for line in parallel_lines:
-                line_a, line_b = line.find_line_pair()
-                if line_a is not None:
+                pair = line.find_line_pair()
+                if pair is not None:
                     line.dead = True
-                    line_data.append(line_a)
-                    line_data.append(line_b)
+                    line_data.extend(pair)
 
         print("Reduced lines by %d" % (initial_count - len(line_data)))
 
