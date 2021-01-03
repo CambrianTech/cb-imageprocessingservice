@@ -166,7 +166,7 @@ def find_surfaces(img, surfaces, output_path):
     
     if lines_a is not None: Line.draw_all(line_data, lines_a)
     
-    line_data = Line.merge(line_data, diagonal / 350.0, search_length=1.05, angle_threshold=math.radians(4.0), max_color_std=5.0)
+    line_data = Line.merge(line_data, diagonal / 300.0, search_length=1.05, angle_threshold=math.radians(4.0), max_color_std=7.0)
 
     if lines_b is not None: Line.draw_all(line_data, lines_b)
 

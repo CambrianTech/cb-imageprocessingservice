@@ -61,15 +61,16 @@ class Line:
     def find_line_pair(self):
         points = []
         for line in self.source_lines:
-            if line.length > 0.3 * self.length:
-                points.append((int(line.point_a[0]), int(line.point_a[1])))
-                points.append((int(line.point_b[0]), int(line.point_b[1])))
-
-        if len(points) < 4:
-            return None, None
+            points.append((int(line.point_a[0]), int(line.point_a[1])))
+            points.append((int(line.point_b[0]), int(line.point_b[1])))
 
         rect = cv2.minAreaRect(np.array(points))
         size = rect[1]
+        width = min(size[0], size[1])
+
+        if width < self.diagonal/300:
+            return None, None
+
         line_points = cv2.boxPoints(rect)
 
         if size[0] > size[1]:
@@ -178,13 +179,14 @@ class Line:
             line_data = list(filter(lambda x: x.get_confidence() >= min_confidence, line_data))
 
         #now get hull of parallel
-        parallel_lines = list(filter(lambda x: x.source_lines is not None, line_data))
-        for line in parallel_lines:
-            line_a, line_b = line.find_line_pair()
-            if line_a is not None:
-                line.dead = True
-                line_data.append(line_a)
-                line_data.append(line_b)
+        if create_pairs:
+            parallel_lines = list(filter(lambda x: x.source_lines is not None, line_data))
+            for line in parallel_lines:
+                line_a, line_b = line.find_line_pair()
+                if line_a is not None:
+                    line.dead = True
+                    line_data.append(line_a)
+                    line_data.append(line_b)
 
         print("Reduced lines by %d" % (initial_count - len(line_data)))
 
