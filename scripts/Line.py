@@ -404,4 +404,29 @@ class Line:
         for line in line_data:
             line.draw(image, color, thickness)
         return image
+
+    @classmethod
+    def compute_edgelets(cls, line_data, class_labels=None):
+        locations = []
+        directions = []
+        strengths = []
+        classes = []
+
+        for line in line_data:
+            p0, p1 = np.array([line.point_a[0], line.point_a[1]]), np.array([line.point_b[0], line.point_b[1]])
+            if class_labels is not None:
+                classes.append(class_labels[int(line.midpoint[1]), int(line.midpoint[0])])
+
+            locations.append(line.midpoint)
+            directions.append(p1 - p0)
+            strengths.append(line.length)
+
+        locations = np.array(locations)
+        directions = np.array(directions)
+        strengths = np.array(strengths)
+        classes = np.array(classes)
+
+        directions = np.array(directions) / np.linalg.norm(directions, axis=1)[:, np.newaxis]
+
+        return (locations, directions, strengths, classes)
     
