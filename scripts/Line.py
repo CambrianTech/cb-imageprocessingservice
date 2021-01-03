@@ -69,21 +69,27 @@ class Line:
         if len(points) < 4:
             return None, None
 
-        rect = cv2.minAreaRect(np.array(points))
-        size = rect[1]
+        hull = cv2.convexHull(np.array(points))
+        hull = cv2.approxPolyDP(hull, 2.0, False)
+
+        if len(hull) != 4:
+            return None, None
+
+        hull = hull.reshape(len(hull), 2)
+
+        size = distance.euclidean(hull[0], hull[1]), distance.euclidean(hull[1], hull[2])
+
         width = min(size[0], size[1])
 
         if width < self.diagonal/300:
             return None, None
 
-        line_points = cv2.boxPoints(rect)
-
-        if size[0] > size[1]:
-            line_a = Line(line_points[1][0], line_points[1][1], line_points[2][0], line_points[2][1])
-            line_b = Line(line_points[3][0], line_points[3][1], line_points[0][0], line_points[0][1])
+        if size[0] < size[1]:
+            line_a = Line(hull[1][0], hull[1][1], hull[2][0], hull[2][1])
+            line_b = Line(hull[3][0], hull[3][1], hull[0][0], hull[0][1])
         else:
-            line_a = Line(line_points[0][0], line_points[0][1], line_points[1][0], line_points[1][1])
-            line_b = Line(line_points[2][0], line_points[2][1], line_points[3][0], line_points[3][1])
+            line_a = Line(hull[0][0], hull[0][1], hull[1][0], hull[1][1])
+            line_b = Line(hull[2][0], hull[2][1], hull[3][0], hull[3][1])
             
         #print("size", self.length, line_a.length, line_b.length)
 
