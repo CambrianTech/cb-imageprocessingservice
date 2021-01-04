@@ -164,8 +164,5 @@ class VanishingPointFinder:
                 self.model = current_model / current_model[2]
                 self.votes = votes
 
-        if best_votes > 0:
-            self.inliers = np.array(self.line_data)[self.votes > 0]
-            
         return best_votes > 0
         

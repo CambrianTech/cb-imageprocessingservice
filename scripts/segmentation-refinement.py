@@ -186,7 +186,8 @@ def find_surfaces(img, surfaces, output_path):
     vp_found = vpf.compute()
     
     if vp_found:
-        for line in vpf.inliers:
+        inliers = np.array(line_data)[vpf.votes > 0]
+        for line in inliers:
             line.draw(lines_d, color=(255,0,255), thickness=3)
 
     if lines_d is not None:
