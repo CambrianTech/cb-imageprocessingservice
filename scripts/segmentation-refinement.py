@@ -9,7 +9,10 @@ import click
 import time
 
 import io
-from cambrian import Line, frei_chen, VanishingPointFinder
+from cambrian.frei_chen import frei_chen
+from cambrian.Line import Line
+from cambrian.VanishingPointFinder import VanishingPointFinder
+
 import random
 
 SAVE_DEBUG_IMAGES = True 

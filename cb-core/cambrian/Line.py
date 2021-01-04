@@ -6,7 +6,7 @@ import random
 from scipy.spatial import distance
 
 import pyximport; pyximport.install(language_level=3)
-from cambrian import LineFunctions
+from cambrian.LineFunctions import LineFunctions
 
 class Line:
 
