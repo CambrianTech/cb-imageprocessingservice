@@ -1,0 +1,83 @@
+{
+    "formatVersion": 2,
+    "name": "Room vKjxS42itL",
+    "id": "room-vKjxS42itL",
+    "floorRotation": 0.9815041911849609,
+    "images": {
+        "lighting": "https://s3.amazonaws.com/cb-backend-data/vKjxS42itL/lighting.png",
+        "superpixels": "https://s3.amazonaws.com/cb-backend-data/vKjxS42itL/superpixels.png",
+        "semantic": "https://s3.amazonaws.com/cb-backend-data/vKjxS42itL/mask.png",
+        "planes_alpha_mask": "https://s3.amazonaws.com/cb-backend-data/vKjxS42itL/planes_alpha_mask.png"
+    },
+    "compressed": {
+        "planes_index_mask": "https://s3.amazonaws.com/cb-backend-data/vKjxS42itL/planes_index_mask.zz"
+    },
+    "camera": {
+        "fov": 60.0,
+        "position": [
+            0,
+            0,
+            0
+        ],
+        "rotation": [
+            0,
+            0,
+            0
+        ]
+    },
+    "geometry": {
+        "surfaces": [
+            {
+                "id": "plane-0",
+                "type": "wall",
+                "name": "Plane 0",
+                "normal": [
+                    0.11063329130411148,
+                    0.3911902606487274,
+                    -0.9136358499526978
+                ],
+                "offset": 0.7430014610290527,
+                "rawParams": [
+                    0.08220069855451584,
+                    0.2906549274921417,
+                    -0.6788327693939209
+                ],
+                "imageExtents": {
+                    "minY": 0.0,
+                    "minX": 296.0,
+                    "maxY": 124.0,
+                    "maxX": 480.0
+                },
+                "images": {
+                    "mask": "https://s3.amazonaws.com/cb-backend-data/vKjxS42itL/plane_masks/mask_0.png"
+                }
+            },
+            {
+                "id": "plane-1",
+                "type": "floor",
+                "name": "Plane 1",
+                "normal": [
+                    0.03764175623655319,
+                    0.43241044878959656,
+                    -0.9008908271789551
+                ],
+                "offset": 1.47589910030365,
+                "rawParams": [
+                    0.05555543303489685,
+                    0.63819420337677,
+                    -1.3296239376068115
+                ],
+                "imageExtents": {
+                    "minY": 193.0,
+                    "minX": 0.0,
+                    "maxY": 640.0,
+                    "maxX": 480.0
+                },
+                "images": {
+                    "mask": "https://s3.amazonaws.com/cb-backend-data/vKjxS42itL/plane_masks/mask_1.png"
+                }
+            }
+        ]
+    },
+    "assets": []
+}
