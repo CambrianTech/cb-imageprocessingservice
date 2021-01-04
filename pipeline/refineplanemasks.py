@@ -4,8 +4,10 @@ import numpy as np
 from scipy import ndimage
 from time import time
 from skimage.morphology import skeletonize
-from cambrian import image_processing as ip
-from cambrian import frei_chen, Line
+
+from cambrian.frei_chen import frei_chen
+from cambrian.Line import Line
+from cambrian.VanishingPointFinder import VanishingPointFinder
 
 import os
 import pickle
@@ -693,27 +695,15 @@ def find_lines(img, gradient, normals, mask, output_path, contour_masks = []):
 
     line_data = [line_data[i] for i in np.argsort(confs)]
 
-    line_data = Line.merge(line_data, diagonal / 120.0, search_length=1.03, angle_threshold=math.radians(3.0))
-    # for line in lines:
-    #     new_line = Line(line[0][0], line[0][1], line[0][2], line[0][3])
-    #     # if mask[mp[1],mp[0]]>0: continue
-    #     conf = new_line.get_confidence()
-    #     if conf > 0.8:
-    #         line_data.append(new_line)
-    # line_data = Line.merge(line_data, diagonal / 120.0, search_length=1.01, angle_threshold=math.radians(3.0))
+    line_data = Line.merge(line_data, diagonal / 300.0, search_length=1.1, angle_threshold=math.radians(5.0), max_color_std=7.0)
 
-    # line_data = Line.merge(line_data, diagonal /90.0, search_length=1.03, angle_threshold=math.radians(2.0))
+    #preserves line pairs:
+    line_data = Line.merge(line_data, diagonal / 80.0, search_length=1.0, angle_threshold=math.radians(5.0), create_pairs=True)
 
-    #
-    # line_data = Line.merge(line_data, diagonal / 90.0, search_length=1.0, angle_threshold=math.radians(3.0),
-    #                        color=(255, 0, 0))
-    # # # #
-    line_data, intersections = Line.find_corners(line_data, search_length=1.5, angle_threshold=math.radians(5.0),
-                                                 parallel_threshold=math.radians(5), confidence_diff=0.4)
-    # # #
-    # line_data = Line.merge(line_data, diagonal / 200.0, search_length=1.07, angle_threshold=math.radians(5.0),
-    #                        color=(255, 0, 0))
-    # print("find lines time", time() - line_time)
+    line_data, intersections = Line.find_corners(line_data, search_length=1.5, angle_threshold=math.radians(10.0), parallel_threshold=math.radians(4), \
+            max_color_std=3.0, confidence_diff=0.4)
+
+    line_data = Line.merge(line_data, diagonal / 300.0, search_length=1.07, angle_threshold=math.radians(5.0))
 
     return line_data, lines
 
