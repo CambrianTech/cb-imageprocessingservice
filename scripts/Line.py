@@ -58,7 +58,7 @@ class Line:
             self.samples = LineFunctions.get_line_samples(self.point_a, self.point_b, self.image, int(self.length / self.color_step) + 1)
         return self.samples
 
-    def find_line_pair(self, min_length=0.3, angle_diff=math.radians(5)):
+    def find_line_pair(self, min_width, min_length=0.3, angle_diff=math.radians(5)):
         points = []
         for line in self.source_lines:
             ratio = min(self.length / line.length, line.length / self.length)
@@ -77,7 +77,7 @@ class Line:
         area = cv2.contourArea(hull)
         width = area / self.length
 
-        if width < self.diagonal/250:
+        if width < min_width:
             return None
 
 
@@ -112,10 +112,14 @@ class Line:
         return (self.midpoint, (max(self.length * length_multiplier, self.length + length_offset), width), np.degrees(self.angle))
 
     @classmethod
-    def merge(cls, line_data, search_width, search_length, angle_threshold, max_color_std=None, min_confidence=0, length_offset=0, create_pairs=False):
+    def merge(cls, line_data, search_width, search_length, angle_threshold, \
+        max_color_std=None, min_confidence=0, length_offset=0, create_pairs=False, min_pair_width=None):
 
         initial_count = len(line_data)
         print("Merging %d lines" % (initial_count))
+
+        if min_pair_width is None:
+            min_pair_width = cls.diagonal/250
 
         i = 0
         while i < len(line_data):
@@ -192,7 +196,7 @@ class Line:
         if create_pairs:
             parallel_lines = list(filter(lambda x: x.source_lines is not None, line_data))
             for line in parallel_lines:
-                pair = line.find_line_pair()
+                pair = line.find_line_pair(min_pair_width)
                 if pair is not None:
                     line.dead = True
                     line_data.extend(pair)
