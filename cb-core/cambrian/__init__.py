@@ -1,1 +1,1 @@
-from . import diagnostics, geometry, image_processing, transformations, utils, nn
+from . import diagnostics, geometry, image_processing, transformations, utils, nn, frei_chen, Line
