@@ -1,4 +1,5 @@
 from setuptools import setup
+from Cython.Build import cythonize
 
 setup(name='cambrian',
       version='0.3',
@@ -15,5 +16,6 @@ setup(name='cambrian',
                   "cb-runsavedmodel=cambrian.cmd.runsavedmodel:main",
                   "cb-quantizecoreml=cambrian.cmd.quantizecoreml:main",
             ],
-      }
+      },
+      ext_modules = cythonize("cambrian/LineFunctions.pyx")
 )
