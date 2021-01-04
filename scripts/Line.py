@@ -74,6 +74,13 @@ class Line:
         if len(hull) < 4:
             return None
 
+        area = cv2.contourArea(hull)
+        width = area / self.length
+
+        if width < self.diagonal/250:
+            return None
+
+
         hull = hull.reshape(len(hull), 2)
 
         lines = []

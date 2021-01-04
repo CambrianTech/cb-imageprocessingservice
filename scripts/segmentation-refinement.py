@@ -166,7 +166,7 @@ def find_surfaces(img, surfaces, output_path):
     
     if lines_a is not None: Line.draw_all(line_data, lines_a)
     
-    line_data = Line.merge(line_data, diagonal / 300.0, search_length=1.1, angle_threshold=math.radians(4.0), max_color_std=7.0)
+    line_data = Line.merge(line_data, diagonal / 300.0, search_length=1.1, angle_threshold=math.radians(5.0), max_color_std=7.0)
 
     if lines_b is not None: Line.draw_all(line_data, lines_b)
 
@@ -177,7 +177,7 @@ def find_surfaces(img, surfaces, output_path):
     line_data, intersections = Line.find_corners(line_data, search_length=1.5, angle_threshold=math.radians(10.0), parallel_threshold=math.radians(4), \
             max_color_std=3.0, confidence_diff=0.4)
 
-    line_data = Line.merge(line_data, diagonal / 400.0, search_length=1.07, angle_threshold=math.radians(5.0))
+    line_data = Line.merge(line_data, diagonal / 300.0, search_length=1.07, angle_threshold=math.radians(5.0))
 
     if lines_d is not None: Line.draw_all(line_data, lines_d)
 
