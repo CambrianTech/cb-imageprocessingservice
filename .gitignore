@@ -123,3 +123,4 @@ gluon_models/
 
 # Plane-RCNN
 /planercnn/planercnn/example_images
+*.c

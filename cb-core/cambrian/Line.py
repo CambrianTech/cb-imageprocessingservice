@@ -6,11 +6,11 @@ import random
 from scipy.spatial import distance
 
 import pyximport; pyximport.install(language_level=3)
-from LineFunctions import LineFunctions
+from cambrian.LineFunctions import LineFunctions
 
 class Line:
 
-    def __init__(self, x0, y0, x1, y1, contour_group=-1, contour_index=-1):
+    def __init__(self, x0, y0, x1, y1, contour_group=-1, contour_index=-1, source_lines=None):
         self.point_a = (x0, y0)
         self.point_b = (x1, y1)
 
@@ -24,6 +24,7 @@ class Line:
         self.color_mean = None
         self.color_std = None
         self.color = None
+        self.source_lines = source_lines
 
         self.recalculate()
 
@@ -57,6 +58,42 @@ class Line:
             self.samples = LineFunctions.get_line_samples(self.point_a, self.point_b, self.image, int(self.length / self.color_step) + 1)
         return self.samples
 
+    def find_line_pair(self, min_width, min_length=0.3, angle_diff=math.radians(5)):
+        points = []
+        for line in self.source_lines:
+            ratio = min(self.length / line.length, line.length / self.length)
+            if ratio >= min_length:
+                points.append((int(line.point_a[0]), int(line.point_a[1])))
+                points.append((int(line.point_b[0]), int(line.point_b[1])))
+
+        if len(points) < 4:
+            return None
+
+        hull = cv2.convexHull(np.array(points))
+
+        if len(hull) < 4:
+            return None
+
+        area = cv2.contourArea(hull)
+        width = area / self.length
+
+        if width < min_width:
+            return None
+
+
+        hull = hull.reshape(len(hull), 2)
+
+        lines = []
+        for i in range(len(hull)):
+            point_a = hull[i]
+            point_b = hull[(i+1) % len(hull)]
+            new_line = Line(point_a[0], point_a[1], point_b[0], point_b[1])
+
+            if LineFunctions.line_angle_difference(self.angle, new_line.angle) < angle_diff:
+                lines.append(new_line)
+            
+        return lines if len(lines) > 1 else None
+
     def get_color_mean(self):
         if self.color_mean is None:
             self.color_mean = np.mean(self.get_samples(), axis=0)
@@ -75,11 +112,14 @@ class Line:
         return (self.midpoint, (max(self.length * length_multiplier, self.length + length_offset), width), np.degrees(self.angle))
 
     @classmethod
-    def merge(cls, line_data, search_width, search_length, angle_threshold, max_color_std=None, min_confidence=0,
-              length_offset=0, color=None):
+    def merge(cls, line_data, search_width, search_length, angle_threshold, \
+        max_color_std=None, min_confidence=0, length_offset=0, create_pairs=False, min_pair_width=None):
 
         initial_count = len(line_data)
         print("Merging %d lines" % (initial_count))
+
+        if min_pair_width is None:
+            min_pair_width = cls.diagonal/250
 
         i = 0
         while i < len(line_data):
@@ -126,238 +166,46 @@ class Line:
                                 dx = math.cos(line_b.angle) * radius
                                 dy = math.sin(line_b.angle) * radius
                                 data = ((midpoint[0] + dx, midpoint[1] + dy), (midpoint[0] - dx, midpoint[1] - dy))
-                                # data = (line_b.point_a, line_b.point_b)
+                                #data = (line_b.point_a, line_b.point_b)
+                                
+                            
 
             if len(parallel_lines) > 0:
+                parallel_lines.append(line_a)
+                source_lines = parallel_lines
                 new_line = Line(data[0][0], data[0][1], data[1][0], data[1][1])
-                line_a.dead = True
+
                 for line in parallel_lines:
+                    if line.source_lines is not None:
+                        source_lines.extend(line.source_lines)
                     line.dead = True
 
-                if color is not None:
-                    new_line.color = color
+                if create_pairs:
+                    new_line.source_lines = source_lines
 
                 line_data.append(new_line)
 
-            # end while
+            #end while
 
-        # clean up dead lines
+        #clean up dead lines
         line_data = list(filter(lambda x: not x.dead, line_data))
         if min_confidence > 0:
             line_data = list(filter(lambda x: x.get_confidence() >= min_confidence, line_data))
 
+        #now get hull of parallel
+        if create_pairs:
+            parallel_lines = list(filter(lambda x: x.source_lines is not None, line_data))
+            for line in parallel_lines:
+                pair = line.find_line_pair(min_pair_width)
+                if pair is not None:
+                    line.dead = True
+                    line_data.extend(pair)
+
         print("Reduced lines by %d" % (initial_count - len(line_data)))
 
+        line_data = list(filter(lambda x: not x.dead, line_data))
+
         return line_data
-
-                # if angle_diff <= .001:
-                #     max_length = line_b.length
-                #     max_confidence = line_a.get_confidence()
-                #     data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
-                #
-                #     parallel_lines.append(line_b)
-                    # l2 = line_b.length**2
-                    # p1 = np.float32(line_b.point_a)
-                    # p2 = np.float32(line_b.point_b)
-                    # p3 = np.float32(line_a.point_a)
-                    # p4 = np.float32(line_a.point_b)
-                    # if l2 == 0:
-                    #     print('p1 and p2 are the same points')
-                    #     continue
-                    #
-                    # t1 = np.sum((p3 - p1) * (p2 - p1)) / l2
-                    # t2 = np.sum((p4 - p1) * (p2 - p1)) / l2
-                    #
-                    # # if abs(t1) >2.0 or abs(t2) > 2.0:
-                    # #     continue
-                    #
-                    # pr1 = p1 + t1 * (p2 - p1)
-                    # pr2 = p1 + t2 * (p2 - p1)
-                    # d = distance.euclidean(pr1,p1)/2.+distance.euclidean(pr2,p2/2.)
-                    #
-                    # if d>100: continue
-                    # print("distance", d)
-                    # pts = np.float32([p1, pr1, p2, pr2])
-                    #
-                    # pta = pts[np.argmin(pts[:, 0])]
-                    # ptb = pts[np.argmax(pts[:, 0])]
-
-                    # data = ((pta[0],pta[1]),(ptb[0],ptb[1]))
-
-
-                    # print(data)
-
-
-                    # rect_b = line_b.bounding_box(2, length_multiplier=search_length, length_offset=length_offset)
-                    # result, intersections = cv2.rotatedRectangleIntersection(rect_a, rect_b)
-                    #
-                    # if not intersections is None:
-                    #     std = line_a.get_color_std() + 0.1
-                    #
-                    #     if max_color_std is not None:
-                    #         diff = np.abs(line_a.get_color_mean() - line_b.get_color_mean())
-                    #         max_diff = np.mean(diff / std)
-                    #
-                    #     if max_color_std is None or max_diff <= max_color_std:
-                    #         parallel_lines.append(line_b)
-                    #         data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
-                    #
-                    #         if line_b.length > 0.8 * max_length and line_b.get_confidence() > max_confidence:
-                    #             max_length = line_b.length
-                    #             max_confidence = line_b.get_confidence()
-                    #             radius = distance.euclidean(data[0], data[1]) / 2
-                    #             midpoint = ((data[0][0] + data[1][0]) / 2, (data[0][1] + data[1][1]) / 2)
-                    #             dx = math.cos(line_b.angle) * radius
-                    #             dy = math.sin(line_b.angle) * radius
-                    #             data = ((midpoint[0] + dx, midpoint[1] + dy), (midpoint[0] - dx, midpoint[1] - dy))
-                    #             # data = (line_b.point_a, line_b.point_b)
-
-            #
-            #
-            # if len(parallel_lines) > 0:
-            #     new_line = Line(data[0][0], data[0][1], data[1][0], data[1][1])
-            #     line_a.dead = True
-            #     for line in parallel_lines:
-            #         line.dead = True
-            #
-            #     if color is not None:
-            #         new_line.color = color
-            #     line_data.append(new_line)
-
-
-            #end while
-        #
-        # #clean up dead lines
-        # line_data = list(filter(lambda x: not x.dead, line_data))
-        #
-        # if min_confidence > 0:
-        #     line_data = list(filter(lambda x: x.get_confidence() >= min_confidence, line_data))
-        #
-        # print("Reduced lines by %d" % (initial_count - len(line_data)))
-        #
-        #
-        # return line_data
-        # initial_count = len(line_data)
-        # print("Merging %d lines" % (initial_count))
-        # min_confidence=.5
-        # i = 0
-        # while i < len(line_data):
-        #     line_a = line_data[i]
-        #     i += 1
-        #
-        #     if line_a.dead or (min_confidence > 0 and line_a.get_confidence() < min_confidence): continue
-        #
-        #     rect_a = line_a.bounding_box(search_width, length_multiplier=search_length, length_offset=length_offset)
-        #     data = (line_a.point_a, line_a.point_b)
-        #
-        #     parallel_lines = []
-        #     max_length = line_a.length
-        #     max_confidence = line_a.get_confidence()
-        #     print(line_a.get_confidence())
-        #     # continue
-        #     for j in range(i+1, len(line_data)):
-        #         continue
-        #         line_b = line_data[len(line_data)-j]
-        #
-        #         if line_b.dead or (min_confidence > 0 and line_b.get_confidence() < min_confidence): continue
-        #
-        #         angle_diff = LineFunctions.line_angle_difference(line_a.angle, line_b.angle)
-        #
-        #         if angle_diff <= angle_threshold:
-        #             rect_b = line_b.bounding_box(2, length_multiplier=search_length, length_offset=length_offset)
-        #             result, intersections = cv2.rotatedRectangleIntersection(rect_a, rect_b)
-        #
-        #             if not intersections is None:
-        #                 std = line_a.get_color_std() + 0.1
-        #
-        #                 if max_color_std is not None:
-        #                     diff = np.abs(line_a.get_color_mean() - line_b.get_color_mean())
-        #                     max_diff = np.mean(diff / std)
-        #
-        #                 if max_color_std is None or max_diff <= max_color_std:
-        #
-        #                     # data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
-        #                     # new_conf = Line(n_data[0][0], n_data[0][1], n_data[1][0], n_data[1][1]).get_confidence()
-        #                     # # if new_conf>max(max_confidence,line_b.get_confidence()):
-        #                     # data=n_data
-        #                     # max_confidence=new_conf
-        #                     # if line_b.get_confidence()<.9:
-        #                         # parallel_lines.append(line_b)
-        #                     # print("c", new_conf, line_b.get_confidence())
-        #
-        #                     if line_b.get_confidence() > line_a.get_confidence():
-        #
-        #                         # max_length = line_b.length
-        #                         max_confidence = line_b.get_confidence()
-        #
-        #                         l2 =line_b.length
-        #                         p1 = np.float32(line_b.point_a)
-        #                         p2 = np.float32(line_b.point_b)
-        #                         p3 = np.float32(line_a.point_a)
-        #                         p4 = np.float32(line_a.point_b)
-        #                         if l2 == 0:
-        #                             print('p1 and p2 are the same points')
-        #
-        #                             t1 = np.sum((p3 - p1) * (p2 - p1)) / l2
-        #                             t2 = np.sum((p4 - p1) * (p2 - p1)) / l2
-        #                             if abs(t1)<5 and abs(t2)<5:
-        #
-        #                                 pr1 = p1 + t1 * (p2 - p1)
-        #                                 pr2 = p1 + t2 * (p2 - p1)
-        #
-        #                                 pts = np.float32([p1,pr1,p2,pr2])
-        #
-        #                                 # data = (pts[np.argmin(pts[:,0])], pts[np.argmax(pts[:,0])])
-        #                         # print("d",np.round(distance.euclidean(data[0],data[1])-l2))
-        #                         #                            if line_b.get_confidence() > max_confidence:
-        #                     # else:
-        #                     #
-        #                     #     l2 =line_a.length
-        #                     #     p3 = np.float32(line_b.point_a)
-        #                     #     p4 = np.float32(line_b.point_b)
-        #                     #     p1 = np.float32(line_a.point_a)
-        #                     #     p2 = np.float32(line_a.point_b)
-        #                     #     if l2 == 0:
-        #                     #         print('p1 and p2 are the same points')
-        #                     #
-        #                     #     t1 = np.sum((p3 - p1) * (p2 - p1)) / l2
-        #                     #     t2 = np.sum((p4 - p1) * (p2 - p1)) / l2
-        #                     #     if abs(t1)>100 or abs(t2)>100:
-        #                     #         # print("t1", t1, t2)
-        #                     #         continue
-        #                     #     pr1 = p1 + t1 * (p2 - p1)
-        #                     #     pr2 = p1 + t2 * (p2 - p1)
-        #
-        #                         # pts = np.float32([p1,pr1,p2,pr2])
-        #                         # print(np.int32(pts))
-        #                         # print("p", np.int32([p1, p2]), np.int32([p3, p4]),np.int32([pr1, pr2]))
-        #
-        #                         # line_a = (pts[np.argmin(pts[:,0])], pts[np.argmax(pts[:,0])])
-        #
-        #
-        #     if len(parallel_lines) > 0:
-        #         new_line = Line(data[0][0], data[0][1], data[1][0], data[1][1])
-        #         # line_a.dead = True
-        #         for line in parallel_lines:
-        #             line.dead = True
-        #
-        #         if color is not None:
-        #             new_line.color = color
-        #
-        #         line_data.append(new_line)
-        #
-        #
-        #     #end while
-        #
-        # #clean up dead lines
-        # line_data = list(filter(lambda x: not x.dead, line_data))
-        # if min_confidence > 0:
-        #     line_data = list(filter(lambda x: x.get_confidence() >= min_confidence, line_data))
-        #
-        # print("Reduced lines by %d" % (initial_count - len(line_data)))
-        #
-        #
-        # return line_data
 
     @classmethod
     def shift_lines(cls, line_data, distance):
@@ -582,19 +430,19 @@ class Line:
 
     def confidence_color(self):
         if self.confidence is None:
-            return (255,255,255) if self.color is None else self.color
+            return (255,0,200) if self.color is None else self.color
         elif self.confidence > 0.80:
-            return (0,255,255)
+            return (0,255,0)
         elif self.confidence > 0.5:
-            return (0,127,255)
+            return (0,220,150)
         elif self.confidence > 0.3:
-            return (255,0,255)
+            return (0,255,255)
         elif self.confidence > 0.1:
-            return (255,0,0)
+            return (0,100,255)
         else:
-                return (0,0,255)
+            return (0,0,255)
 
-    def draw(self, image, color=None, thickness=None, lineType=cv2.LINE_8, scale_x=1.0, scale_y=1.0):
+    def draw(self, image, color=None, thickness=None):
         if color is None:
             color = self.confidence_color()
         if thickness is None:
@@ -603,14 +451,36 @@ class Line:
         # if self.source_lines is not None:
         #     color = (255,100,0)
 
-        pt1 = (int(self.point_a[0]*scale_x), int(self.point_a[1]*scale_y))
-        pt2 = (int(self.point_b[0]*scale_x), int(self.point_b[1]*scale_y))
-
-        cv2.line(image,pt1, pt2, color, thickness, lineType=lineType)
+        cv2.line(image, (int(self.point_a[0]), int(self.point_a[1])), (int(self.point_b[0]), int(self.point_b[1])), color, thickness)
 
     @classmethod
-    def draw_all(cls, line_data, image, color=None, thickness=None, lineType=cv2.LINE_8, sx=1.0, sy=1.0):
+    def draw_all(cls, line_data, image, color=None, thickness=None):
         for line in line_data:
-            line.draw(image, color, thickness, lineType=lineType, scale_x=sx, scale_y=sy)
+            line.draw(image, color, thickness)
         return image
+
+    @classmethod
+    def compute_edgelets(cls, line_data, class_labels=None):
+        locations = []
+        directions = []
+        strengths = []
+        classes = []
+
+        for line in line_data:
+            p0, p1 = np.array([line.point_a[0], line.point_a[1]]), np.array([line.point_b[0], line.point_b[1]])
+            if class_labels is not None:
+                classes.append(class_labels[int(line.midpoint[1]), int(line.midpoint[0])])
+
+            locations.append(line.midpoint)
+            directions.append(p1 - p0)
+            strengths.append(line.length)
+
+        locations = np.array(locations)
+        directions = np.array(directions)
+        strengths = np.array(strengths)
+        classes = np.array(classes)
+
+        directions = np.array(directions) / np.linalg.norm(directions, axis=1)[:, np.newaxis]
+
+        return (locations, directions, strengths, classes)
     

@@ -1,1 +1,1 @@
-from . import diagnostics, geometry, image_processing, transformations, utils, nn, frei_chen, Line
+from . import diagnostics, geometry, image_processing, transformations, utils, nn, frei_chen, Line, VanishingPointFinder, LineFunctions
