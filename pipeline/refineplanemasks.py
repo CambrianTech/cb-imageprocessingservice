@@ -8,7 +8,7 @@ from skimage.morphology import skeletonize
 from cambrian.frei_chen import frei_chen
 from cambrian.Line import Line
 from cambrian.VanishingPointFinder import VanishingPointFinder
-
+import cambrian.image_processing as ip
 import os
 import pickle
 import math
@@ -23,7 +23,7 @@ logging_dir ='logging/'
 #         os.remove(file)
 
 
-IM_LOGGING_ENABLED = True
+IM_LOGGING_ENABLED = False
 
 furniture_labels = [15, 23, 30, 64, 97]
 wall_like = [0, 8, 14, 18, 22, 24, 42, 58,63, 130]
@@ -489,7 +489,7 @@ def combined_normals(normals, plane_normals, plane_masks, basis_indices, cluster
     number_planes = len(plane_normals)
     cluster_indices = cluster_prob > .5
     cluster_indices = cluster_prob > .5
-    print("good clusters", cluster_indices)
+    # print("good clusters", cluster_indices)
     basis_indices = basis_indices[cluster_indices[basis_indices]]
 
     for i in range(number_planes):
@@ -554,7 +554,6 @@ def calcTransformation(points_1, points_2):
 
 def resize_array(array, shape):
     length = len(array)
-    print(array.shape)
 
     dim=1
     array_rs = np.zeros((length, shape[1], shape[0]))
@@ -580,11 +579,10 @@ def rough_dilate_erode(is_dilate, mask, size=5, iterations=1, scale=0.5, maintai
 
 
 def find_lines(img, gradient, normals, mask, output_path, contour_masks = []):
-    line_time = time()
 
     height, width = img.shape[:2]
     diagonal = np.hypot(width, height)
-    print("image w,h", width, height)
+    # print("image w,h", width, height)
 
     bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gabor_scale = 1500.0 / diagonal
@@ -684,7 +682,6 @@ def find_lines(img, gradient, normals, mask, output_path, contour_masks = []):
             # pt1 = np.int32(new_line.point_a)
             # pt2 = np.int32(new_line.point_b)
             cm = new_line.get_color_mean()
-            print("color_mean", cm)
             if cm[3]<15: continue
 
             # if mask[mp[1],mp[0]]>0: continue
@@ -716,20 +713,24 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
     @property
     def output_keys(self) -> list:
-        return ["planes"]
+        return ["planes", "mask", "lighting"]
 
     def run(self, data):
 
-        if IM_LOGGING_ENABLED:
-            with open('logging/data.pickle', 'wb') as handle:
-                pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        # if IM_LOGGING_ENABLED:
+        #     with open('logging/data.pickle', 'wb') as handle:
+        #         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+        logging_index =0
         img = data["image"]
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        if img.shape[1]>1024:
+           img = cv2.resize(img, (1024, int(img.shape[0] / img.shape[1] * 1024)))
 
         logging_index = _log_image("image.png", img, logging_index=logging_index)
 
         output = np.float32(data["semantic_probs"])
-        org_time = time()
 
         hed = data["hed"]
 
@@ -898,7 +899,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         logging_index = _log_segmentation_image("plane_cluster_seg.png", plane_cluster_seg, img_rs,
                                                 logging_index=logging_index)
 
-        st = time()
         other_markers = refine_surface(other_mask, l_image_rgb, big_thresh=.05, small_thresh=.95, watershed_dist=.05,
                                        gradient=False)
         wall_markers = np.int32(
@@ -915,8 +915,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
                            watershed_mask=merged_lines == 0))
 
         # markers = join_segmentations(wall_like_markers,wall_markers)
-
-        print("segmentation refined", time() - st)
 
         ceiling_prob = get_segmentation_image(ceiling_markers + 1, ceiling_mask, avg=True)
         wall_like_prob = get_segmentation_image(wall_like_markers + 1, wall_like_mask, avg=True)
@@ -1302,8 +1300,31 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         final_labels = np.int32(final_labels_rs)
 
+        lighting_rgb = np.uint8(data["lighting"])
+
+        lighting = lighting_rgb[:, :, 1]
+
+        lighting = cv2.resize(lighting, (final_labels.shape[1], final_labels.shape[0]))
+
+        lighting_mask = 255 * np.uint8(final_labels>0)
+
+        # Remove hard edges from lighting
+        smooth_lighting = ip.remove_grooves(lighting, lighting_mask)
+
+        blurred_mask = cv2.GaussianBlur(smooth_lighting, (31, 31), 15)
+
+        blurred_lighting = cv2.GaussianBlur(smooth_lighting, (21, 21), 11)
+        #
+        lighting = ip.alpha_blend(
+            smooth_lighting, blurred_lighting, blurred_mask)
+
+        data["lighting"] = lighting
+
+        logging_index = _log_image('lighting.png', lighting, logging_index=logging_index)
+
         final_labels = cv2.watershed(new_img, final_labels)
         final_labels[final_labels < 0] = 0
+
         logging_index = _log_segmentation_image("final_labels.png", np.int32(final_labels), img,
                                                 logging_index=logging_index)
 
@@ -1330,8 +1351,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     if area > 16 * 16:
                         if hierarchy[0, i, 3] == -1:  # this is the outer contour which we need to draw
                             cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, -1)
-
-                            # cv2.drawContours(img_rs, [contours[i]], -1,(0,0,255), 1, lineType=cv2.LINE_AA)
+                            cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1,255, 1)
+                            # cv2.drawContours(img, [contours[i]], -1,(0,0,255), 1, lineType=cv2.LINE_AA)
                             # epsilon = .25*cv2.arcLength(contours[i], True) / max(shape[0],shape[1])
                             # contours[i] = cv2.approxPolyDP(contours[i], epsilon, closed=True)
                             plane_contours.append(contours[i].tolist())
@@ -1348,6 +1369,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
             data["planes"]["contours"] = mask_contours
 
-        print("time", time() - org_time)
-        _log_ply(img_rs, np.uint8(data["planes"]["masks"]), np.float32(final_plane_XYZ), mult=2,
-                 file_path=logging_dir + '3D_refine.ply')
+        # _log_ply(img_rs, np.uint8(data["planes"]["masks"]), np.float32(final_plane_XYZ), mult=2,
+        #          file_path=logging_dir + '3D_refine.ply')
+
+
+        # logging_index = _log_image('img_contours.png', img, logging_index=logging_index)
+
+        # get rid of this later
+        data["mask"] = data["planes"]["masks"][0]

@@ -782,35 +782,40 @@ def refine_mask_watershed(args, rgb, mask, image_name, distance=0.0, erode=0, ma
         else:
             base = rgb
 
-        markers = np.uint8(cv2.watershed(base, markers)) - 1
+        markers = cv2.watershed(base, markers)
+        markers[markers<0] = 0
 
-        # replace border walls
-        markers[markers > max_value] = 0
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
-        markers = cv2.dilate(markers, kernel)
+        # # replace border walls
+        # markers[markers > max_value] = 0
+        # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
+        # markers = cv2.dilate(markers, kernel)
 
     return markers
+
 
 
 def kmeans_image(rgb, k=8):
     """Runs k-means on rgb and returns a result image, labels and the centers"""
     img = rgb.copy()
-
-    z = img.reshape((-1, 3))
+    dim = 1
+    if img.ndim > 2:
+        dim = img.shape[2]
+    z = img.reshape((-1, dim))
 
     # convert to np.float32
     z = np.float32(z)
 
     # define criteria, number of clusters(K) and apply kmeans()
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-    compactness, labels, centers = cv2.kmeans(z, k, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+    compactness, labels, centers = cv2.kmeans(z, k, None, criteria, 10, cv2.KMEANS_PP_CENTERS)
 
     # Now convert back into uint8, and make original image
     centers = np.uint8(centers)
     res = centers[labels.flatten()]
     res = res.reshape((img.shape))
-    
+
     return res, labels, centers
+
 
 
 def isolate_color(rgbImg, rgb_color):

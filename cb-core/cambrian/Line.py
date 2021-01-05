@@ -116,7 +116,7 @@ class Line:
         max_color_std=None, min_confidence=0, length_offset=0, create_pairs=False, min_pair_width=None):
 
         initial_count = len(line_data)
-        print("Merging %d lines" % (initial_count))
+        # print("Merging %d lines" % (initial_count))
 
         if min_pair_width is None:
             min_pair_width = cls.diagonal/250
@@ -201,7 +201,7 @@ class Line:
                     line.dead = True
                     line_data.extend(pair)
 
-        print("Reduced lines by %d" % (initial_count - len(line_data)))
+        # print("Reduced lines by %d" % (initial_count - len(line_data)))
 
         line_data = list(filter(lambda x: not x.dead, line_data))
 
@@ -442,7 +442,7 @@ class Line:
         else:
             return (0,0,255)
 
-    def draw(self, image, color=None, thickness=None):
+    def draw(self, image, color=None, thickness=None, lineType=cv2.LINE_8, scale_x=1.0, scale_y=1.0):
         if color is None:
             color = self.confidence_color()
         if thickness is None:
@@ -451,12 +451,15 @@ class Line:
         # if self.source_lines is not None:
         #     color = (255,100,0)
 
-        cv2.line(image, (int(self.point_a[0]), int(self.point_a[1])), (int(self.point_b[0]), int(self.point_b[1])), color, thickness)
+        pt1 = (int(self.point_a[0] * scale_x), int(self.point_a[1] * scale_y))
+        pt2 = (int(self.point_b[0] * scale_x), int(self.point_b[1] * scale_y))
+
+        cv2.line(image, pt1, pt2, color, thickness, lineType=lineType)
 
     @classmethod
-    def draw_all(cls, line_data, image, color=None, thickness=None):
+    def draw_all(cls, line_data, image, color=None, thickness=None, lineType=cv2.LINE_8, sx=1.0, sy=1.0):
         for line in line_data:
-            line.draw(image, color, thickness)
+            line.draw(image, color, thickness, lineType=lineType, scale_x=sx, scale_y=sy)
         return image
 
     @classmethod
