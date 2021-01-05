@@ -610,49 +610,13 @@ def find_lines(img, gradient, normals, mask, output_path, contour_masks = []):
 
     line_data = []
 
-    lines_c = img.copy()
-
-
-    def is_image_edge(point_a, point_b, shape, dist=10):
-        max_0 = shape[0] - 1
-        max_1 = shape[1] - 1
-        return (abs(point_a[0]) <= dist and abs(point_b[0]) <= dist) \
-               or (abs(point_a[0] - max_0) <= dist and abs(point_b[0] - max_0) <= dist) \
-               or (abs(point_a[1]) <= dist and abs(point_b[1]) <= dist) \
-               or (abs(point_a[1] - max_1) <= dist and abs(point_b[1] - max_1) <= dist)
-
-    def add_contour_lines(contours, min_confidence):
-        epsilon = diagonal / 200.0
-        min_length = diagonal / 40.0
-        contour_group = 0
-        for contour in contours:
-
-            poly = cv2.approxPolyDP(contour, epsilon, False)
-            contour_index = 0
-            arcLen = cv2.arcLength(poly, False)
-
-            for i in range(0, len(poly) - 1):
-                point_a = poly[i][0]
-                point_b = poly[i + 1][0]
-
-                # remove contours on image edge and break them up into seperate contours (contour_group)
-                if is_image_edge(point_a, point_b, (width, height), epsilon + 1.0):
-                    contour_index = 0
-                    contour_group += 1
-                elif arcLen > min_length:
-                    new_line = Line(point_a[0], point_a[1], point_b[0], point_b[1], contour_group, contour_index)
-                    line_data.append(new_line)
-                    contour_index += 1
-
-        contour_group += 1
-
     contours_src = cv2.adaptiveThreshold(contours_src, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,
                                          int(diagonal / 50) * 2 + 1, -30)
     contours_dilated = rough_dilate_erode(True, contours_src, 3, scale=400 / diagonal, interpolation=cv2.INTER_AREA)
     if gradient is None:
-        Line.prepare(img, contours_dilated, lines_c)
+        Line.prepare(img, contours_dilated)
     else:
-        Line.prepare(np.dstack((img, gradient)), contours_dilated, lines_c)
+        Line.prepare(np.dstack((img, gradient)), contours_dilated)
 
     # find all liens in the edge image
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)

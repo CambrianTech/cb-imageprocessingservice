@@ -69,7 +69,7 @@ def overlay_mask(img, mask, hue=None, saturation=255, darkest_value=80):
 
     return out
 
-def find_surfaces(img, surfaces, output_path):
+def find_lines(img, output_path):
 
     height, width = img.shape[:2]
     diagonal = np.hypot(width, height)
@@ -108,10 +108,9 @@ def find_surfaces(img, surfaces, output_path):
     else:
         lines_a = lines_b = lines_c = lines_d = None
 
-    filtered_contours = []
     contours_src = cv2.adaptiveThreshold(contours_src, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, int(diagonal / 50) * 2 + 1, -30)
     contours_dilated = rough_dilate_erode(True, contours_src, 3, scale=400/diagonal, interpolation=cv2.INTER_AREA)
-    Line.prepare(img, contours_dilated, lines_c)
+    Line.prepare(img, contours_dilated)
 
     #find all lines in the edge image
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 30.0), 1.41, 200, 240, 3, False)
@@ -162,60 +161,6 @@ def find_surfaces(img, surfaces, output_path):
         
         cont_img = np.vstack((np.hstack((lines_a, lines_b)), np.hstack((lines_c, lines_d))))
         cv2.imwrite(os.path.join(output_path, "cont.jpg"), cont_img)
-
-    return #line finding finished
-
-    #refine mask:
-    def get_dilation_amount(surface, amount, min_value=3, max_value=21):
-        return max(min(int(amount / 2 + amount * surface["distance_factor"]), max_value), min_value)
-
-    markers = np.zeros((height, width), dtype=np.int32)
-
-    if SAVE_DEBUG_IMAGES:
-        debug_before = img.copy()
-        debug_analysis = img.copy()
-
-    hues = random.sample(range(0, 350, 10), 1 + len(surfaces))
-    scale = 500.0 / diagonal
-
-    outliers_mask = np.ones(bw.shape, dtype=np.uint8) * 255
-
-    for index in range(len(surfaces)):
-        surface = surfaces[index]
-        surface['hue'] = hues[index]
-        surface['label'] = WatershedLabel.OUTLIER_LABEL + index + 1
-        surface['mask'] = cv2.resize(surface['mask'], (width, height))
-
-        #if surface['type'] in major_surface_types:
-        if SAVE_DEBUG_IMAGES:
-            debug_before = overlay_mask(debug_before, surface['mask'], surface['hue'])
-            debug_analysis = overlay_mask(debug_analysis, surface['mask'], surface['hue'])
-
-        surface["distance_factor"] = 1 / surface["rawParams"][1]
-        pixelCount = cv2.countNonZero(surface['mask'])
-        area = math.sqrt(pixelCount)
-        max_erode = max(int(area/40), 2)
-
-        surface['mask_expanded'] = rough_dilate_erode(True, surface['mask'], max_erode, scale=scale)
-        markers[surface['mask'] > 0] = surface['label']
-        outliers_mask[surface['mask_expanded'] > 0] = 0
-
-    watershed_source = cv2.addWeighted(img, 0.7,  cv2.cvtColor(edges, cv2.COLOR_GRAY2RGB), 0.333, 0)
-    markers[outliers_mask>0] = WatershedLabel.OUTLIER_LABEL
-    markers = Line.draw_all(line_data, markers, color=WatershedLabel.UNKNOWN_LABEL, thickness=int(diagonal/40))
-    watershed_source = Line.draw_all(line_data, watershed_source, color=(0,255,0), thickness=2)
-    
-    if SAVE_DEBUG_IMAGES:
-        debug_markers = translate_markers(watershed_source, markers, len(surfaces), hues)
-
-    result = cv2.watershed(watershed_source, markers)
-
-    if SAVE_DEBUG_IMAGES:
-        debug_analysis = Line.draw_all(line_data, debug_analysis)
-        debug_before = np.hstack((debug_before, debug_analysis))
-        debug_final = translate_markers(img.copy(), result, len(surfaces), hues)
-        debug_final = np.hstack((debug_markers, debug_final))
-        cv2.imwrite(os.path.join(output_path, "debug.jpg"), np.vstack((debug_before, debug_final)))
         
 
 def get_file_paths(input_dir, pattern):
@@ -291,7 +236,7 @@ def parse_data(input_dir, output_dir):
             print("Invalid surface")
             continue
 
-        find_surfaces(img, surfaces, output_path)
+        find_lines(img, output_path)
 
         index += 1
     return index
