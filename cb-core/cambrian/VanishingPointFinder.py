@@ -1,18 +1,14 @@
 import math
 import numpy as np
 import time
+from sklearn.cluster import SpectralClustering
 
 class VanishingPoint:
     def __init__(self, vpf, model, votes):
         self.vpf = vpf
-        self.model = model
+        self.point = (model / model[2])[:2]
         self.votes = votes
-        
         self._score = sum(self.votes)
-        if np.any(self.vpf.seeds != None):
-            cm = self.model[:2] / self.model[2]
-            dot = 1 - abs(np.dot(cm / np.linalg.norm(cm), self.vpf.seeds[:2] / np.linalg.norm(self.vpf.seeds[:2])))
-            self._score = self._score * dot > .9
 
     def __eq__(self, other):
         return self.score() == other.score()
@@ -110,7 +106,7 @@ class VanishingPointFinder:
         lines = np.concatenate((normals, p[:, np.newaxis]), axis=1)
         return lines
 
-    def compute(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_time=1.0, find_vert=True):
+    def compute(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), k=3, max_time=1.0, find_vert=True):
         """Estimate vanishing point using Ransac.
         Parameters
         ----------
@@ -172,13 +168,24 @@ class VanishingPointFinder:
                 if dt1 < .95 or dt2 < .95:
                     continue
 
-            current_model = current_model / current_model[2]
-
             vp = VanishingPoint(self, current_model, self.compute_votes(current_model, threshold_inlier))
             
             vanishing_points.append(vp)
 
         vanishing_points.sort(key=lambda x:x.score, reverse=True)
+
+        X = []
+        for vp in vanishing_points:
+            X.append(vp.point)
+
+        X = np.array(X)
+        labels = SpectralClustering(n_clusters=k, assign_labels="kmeans", affinity='nearest_neighbors', random_state=0).fit_predict(X)
+        labels = labels.tolist()
+
+        best_points = []
+        for i in range(k):
+            index = labels.index(i)
+            best_points.append(vanishing_points[index])
 
         return vanishing_points
         

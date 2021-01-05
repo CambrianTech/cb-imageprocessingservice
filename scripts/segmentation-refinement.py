@@ -148,14 +148,17 @@ def find_lines(img, output_path):
     if lines_d is not None: Line.draw_all(line_data, lines_d)
 
     #vanishing points:
+    num_vps = 3
     vpf = VanishingPointFinder(line_data)
-    vanishing_points = vpf.compute()
+    vanishing_points = vpf.compute(k=num_vps)
     
     if len(vanishing_points) > 0:
-        vp = vanishing_points[0]
-        inliers = np.array(line_data)[vp.votes > 0]
-        for line in inliers:
-            line.draw(lines_d, color=(255,0,255), thickness=3)
+        for vp in vanishing_points:
+            color = np.random.randint(0, 255, size=(3, ))
+            color = ( int (color [ 0 ]), int (color [ 1 ]), int (color [ 2 ]))
+            inliers = np.array(line_data)[vp.votes > 0]
+            for line in inliers:
+                line.draw(lines_d, color=color, thickness=3)
 
     if lines_d is not None:
         for intersection in intersections: cv2.circle(lines_c, (int(intersection[0]), int(intersection[1])), max(int(diagonal/100), 3), (255,0,0), 2)
