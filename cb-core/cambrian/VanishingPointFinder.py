@@ -7,17 +7,21 @@ class VanishingPoint:
         self.vpf = vpf
         self.model = model
         self.votes = votes
-        self._score = None
+        
+        self._score = sum(self.votes)
+        if np.any(self.vpf.seeds != None):
+            cm = self.model[:2] / self.model[2]
+            dot = 1 - abs(np.dot(cm / np.linalg.norm(cm), self.vpf.seeds[:2] / np.linalg.norm(self.vpf.seeds[:2])))
+            self._score = self._score * dot > .9
 
+    def __eq__(self, other):
+        return self.score() == other.score()
+
+    def __lt__(self, other):
+        return self.score() < other.score()
+
+    @property
     def score(self):
-        if self._score is None:
-            self._score = sum(self.votes)
-
-            if np.any(self.vpf.seeds != None):
-                cm = self.model[:2] / self.model[2]
-                dot = 1 - abs(np.dot(cm / np.linalg.norm(cm), self.vpf.seeds[:2] / np.linalg.norm(self.vpf.seeds[:2])))
-                self._score = self._score * dot > .9
-
         return self._score
         
 
@@ -174,7 +178,7 @@ class VanishingPointFinder:
             
             vanishing_points.append(vp)
 
-        vanishing_points.sort(key=lambda x:x.score(), reverse=True)
+        vanishing_points.sort(key=lambda x:x.score, reverse=True)
 
         return vanishing_points
         
