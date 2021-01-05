@@ -8,18 +8,17 @@ class VanishingPoint:
         self.vpf = vpf
         self.point = (model / model[2])[:2]
         self.votes = votes
-        self._score = sum(self.votes)
-
-    def __eq__(self, other):
-        return self.score() == other.score()
-
-    def __lt__(self, other):
-        return self.score() < other.score()
+        self._score = None
 
     @property
     def score(self):
+        if self._score is None:
+            self._score = sum(self.votes)
         return self._score
-        
+
+    def clear_indexes(self, indexes):
+        self.votes[indexes] = 0
+        self._score = None
 
 class VanishingPointFinder:
     def __init__(self, line_data, seeds=None):
@@ -106,7 +105,7 @@ class VanishingPointFinder:
         lines = np.concatenate((normals, p[:, np.newaxis]), axis=1)
         return lines
 
-    def compute(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), k=3, max_time=1.0, find_vert=True):
+    def compute(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_points=10, max_time=1.0):
         """Estimate vanishing point using Ransac.
         Parameters
         ----------
@@ -115,7 +114,7 @@ class VanishingPointFinder:
         num_ransac_iter: int
             Number of iterations to run ransac.
         threshold_inlier: float
-            threshold to be used for computing inliers in degrees.
+            threshold to be used for computing inliers in radians.
         Returns
         -------
         best_model: ndarry of shape (3,)
@@ -158,34 +157,40 @@ class VanishingPointFinder:
                 # reject degenerate candidates
                 continue
 
-
-            if find_vert:
-                if current_model[1] / current_model[2] < 1000: continue
-
-                dt1 = abs(np.dot(directions[ind1], [0, 1]))
-                dt2 = abs(np.dot(directions[ind2], [0, 1]))
-
-                if dt1 < .95 or dt2 < .95:
-                    continue
-
             vp = VanishingPoint(self, current_model, self.compute_votes(current_model, threshold_inlier))
             
             vanishing_points.append(vp)
 
-        vanishing_points.sort(key=lambda x:x.score, reverse=True)
+        filtered = []
+        while len(vanishing_points) > 0 and len(filtered) < max_points:
+            vanishing_points.sort(key=lambda x:x.score, reverse=True)
+            vp = vanishing_points.pop(0)
+            if vp.score == 0:
+                break
+            filtered.append(vp)
+            to_remove = np.where(vp.votes > 0)
+            for vp in vanishing_points:
+                vp.clear_indexes(to_remove)
 
-        X = []
-        for vp in vanishing_points:
-            X.append(vp.point)
+        return filtered
 
-        X = np.array(X)
-        labels = SpectralClustering(n_clusters=k, assign_labels="kmeans", affinity='nearest_neighbors', random_state=0).fit_predict(X)
-        labels = labels.tolist()
+        # if k + 2 < len(filtered):
+        #     X = []
+        #     for vp in filtered:
+        #         print(vp.score)
+        #         X.append(vp.point)
 
-        best_points = []
-        for i in range(k):
-            index = labels.index(i)
-            best_points.append(vanishing_points[index])
+        #     print(len(filtered), k)
+        #     X = np.array(X)
+        #     labels = SpectralClustering(n_clusters=k, assign_labels="kmeans", affinity='nearest_neighbors', random_state=0).fit_predict(X)
+        #     labels = labels.tolist()
 
-        return vanishing_points
+        #     best_points = []
+        #     for i in range(k):
+        #         index = labels.index(i)
+        #         best_points.append(filtered[index])
+
+        #     return best_points
+        # else:
+        #     return filtered
         

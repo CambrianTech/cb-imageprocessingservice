@@ -145,12 +145,11 @@ def find_lines(img, output_path):
 
     line_data = Line.merge(line_data, diagonal / 300.0, search_length=1.07, angle_threshold=math.radians(5.0))
 
-    if lines_d is not None: Line.draw_all(line_data, lines_d)
+    #if lines_d is not None: Line.draw_all(line_data, lines_d)
 
     #vanishing points:
-    num_vps = 3
     vpf = VanishingPointFinder(line_data)
-    vanishing_points = vpf.compute(k=num_vps)
+    vanishing_points = vpf.compute()
     
     if len(vanishing_points) > 0:
         for vp in vanishing_points:
