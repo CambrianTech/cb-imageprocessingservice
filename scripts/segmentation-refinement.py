@@ -149,10 +149,11 @@ def find_lines(img, output_path):
 
     #vanishing points:
     vpf = VanishingPointFinder(line_data)
-    vp_found = vpf.compute()
+    vanishing_points = vpf.compute()
     
-    if vp_found:
-        inliers = np.array(line_data)[vpf.votes > 0]
+    if len(vanishing_points) > 0:
+        vp = vanishing_points[0]
+        inliers = np.array(line_data)[vp.votes > 0]
         for line in inliers:
             line.draw(lines_d, color=(255,0,255), thickness=3)
 
