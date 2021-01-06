@@ -23,9 +23,12 @@ from cambrian.VanishingPointFinder import VanishingPointFinder
 
 import random
 
-ADE_MODEL = 'deeplab_resnest269_ade'
+#SEG_RES = None
 #ADE_MODEL = 'deeplab_resnet101_ade'
+
+ADE_MODEL = 'deeplab_resnest269_ade'
 SEG_RES = 480
+
 SAVE_DEBUG_IMAGES = True 
 
 def segment_image(ctx, model, img):
@@ -206,7 +209,7 @@ def parse_data(input_dir, output_dir):
             end = time.process_time()
             print("segmentation took %.2f seconds" % (end-start))
             cv2.imwrite(seg_path, segmented)
-            
+
             if SAVE_DEBUG_IMAGES:
                 vis_segmented = np.array(get_color_pallete(segmented, 'ade20k').convert('RGB'))
                 vis_segmented = cv2.resize(vis_segmented, (img.shape[1], img.shape[0]))
