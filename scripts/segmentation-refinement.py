@@ -8,6 +8,12 @@ from pathlib import Path
 import click
 import time
 
+import mxnet as mx
+from mxnet.gluon.data.vision import transforms
+import gluoncv
+
+import cambrian.image_processing as ip
+
 import io
 from cambrian.frei_chen import frei_chen
 from cambrian.Line import Line
@@ -16,58 +22,6 @@ from cambrian.VanishingPointFinder import VanishingPointFinder
 import random
 
 SAVE_DEBUG_IMAGES = True 
-
-class WatershedLabel:
-    BOUNDARY_LABEL = 255
-    UNKNOWN_LABEL = 0
-    OUTLIER_LABEL = 1
-
-def translate_markers(debug_markers, markers, num_labels, hues):
-
-    mask = np.zeros(markers.shape, dtype=np.uint8)
-    mask[markers == WatershedLabel.OUTLIER_LABEL] = 255
-    debug_markers = overlay_mask(debug_markers, mask, 0, saturation=0)
-
-    for index in range(num_labels):
-        label = WatershedLabel.OUTLIER_LABEL + 1 + index
-        mask = np.zeros(markers.shape, dtype=np.uint8)
-        mask[markers == label] = 255
-        debug_markers = overlay_mask(debug_markers, mask, hues[index])
-
-    debug_markers[markers == WatershedLabel.BOUNDARY_LABEL] = (0,0,255)
-
-    return debug_markers
-
-def rough_dilate_erode(is_dilate, mask, size=5, iterations=1, scale=0.5, maintain_size=True, interpolation=cv2.INTER_NEAREST):
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(size,size))
-    shape = mask.shape
-    mask = cv2.resize(mask, (int(shape[1] * scale), int(shape[0] * scale)), interpolation)
-    mask = cv2.dilate(mask, kernel, iterations=iterations) if is_dilate else cv2.erode(mask, kernel, iterations=iterations)
-    if maintain_size:
-        mask = cv2.resize(mask, (shape[1], shape[0]), interpolation)
-    return mask
-
-def convertColor(hsv, conversion):
-    return tuple(int(i) for i in cv2.cvtColor(np.uint8([[hsv]]), conversion).flatten())
-
-def overlay_mask(img, mask, hue=None, saturation=255, darkest_value=80):
-    
-    overlay = cv2.resize(mask, (img.shape[1], img.shape[0]))
-    img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) #range 0-180
-
-    grey = img_hsv[:, :, 2].copy()
-    grey[grey<darkest_value] = darkest_value
-
-    if hue is None:
-        hue = random.randint(0,360)
-
-    img_hsv[:, :, 0][overlay>0] = int(hue) / 2.0
-    img_hsv[:, :, 1][overlay>0] = saturation
-    img_hsv[:, :, 2][overlay>0] = grey[overlay>0] 
-
-    out = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR)
-
-    return out
 
 def find_lines(img, output_path):
 
@@ -109,7 +63,7 @@ def find_lines(img, output_path):
         lines_a = lines_b = lines_c = lines_d = None
 
     contours_src = cv2.adaptiveThreshold(contours_src, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, int(diagonal / 50) * 2 + 1, -30)
-    contours_dilated = rough_dilate_erode(True, contours_src, 3, scale=400/diagonal, interpolation=cv2.INTER_AREA)
+    contours_dilated = ip.rough_dilate_erode(True, contours_src, 3, scale=400/diagonal, interpolation=cv2.INTER_AREA)
     Line.prepare(img, contours_dilated)
 
     #find all lines in the edge image
