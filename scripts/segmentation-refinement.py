@@ -11,6 +11,8 @@ import time
 import mxnet as mx
 from mxnet.gluon.data.vision import transforms
 import gluoncv
+from gluoncv.utils.viz import get_color_pallete
+import matplotlib.image as mpimg
 
 import cambrian.image_processing as ip
 
@@ -21,7 +23,23 @@ from cambrian.VanishingPointFinder import VanishingPointFinder
 
 import random
 
+ADE_MODEL = 'deeplab_resnest269_ade'
+#ADE_MODEL = 'deeplab_resnet101_ade'
+SEG_RES = 480
 SAVE_DEBUG_IMAGES = True 
+
+def segment_image(ctx, model, img):
+    from gluoncv.data.transforms.presets.segmentation import test_transform
+    
+    #img = test_transform(img, ctx)
+    if SEG_RES is None:
+        img = test_transform(img, ctx)
+    else:
+        img = test_transform(mx.img.resize_short(img, SEG_RES),ctx)
+    output = model.predict(img)
+    predict = mx.nd.squeeze(mx.nd.argmax(output, 1)).asnumpy()
+
+    return predict
 
 def find_lines(img, output_path):
 
@@ -135,6 +153,9 @@ def parse_data(input_dir, output_dir):
     files = get_file_paths(input_dir, "**/data_v2.json")
     index = 0
 
+    ctx = mx.cpu(0) if mx.context.num_gpus() == 0 else mx.gpu(0)
+    model = gluoncv.model_zoo.get_model(ADE_MODEL, pretrained=True)
+
     for path in files:
         data_path = str(path)
         dir_path = os.path.dirname(data_path)
@@ -176,6 +197,21 @@ def parse_data(input_dir, output_dir):
 
         #run segmentation:
         seg_path = os.path.join(output_path, "mask.png")
+
+        segmented = cv2.imread(seg_path)
+        if segmented is None:
+            print("Segmenting %s" % image_path)
+            start = time.process_time()
+            segmented = segment_image(ctx, model, mx.image.imread(image_path))
+            end = time.process_time()
+            print("segmentation took %.2f seconds" % (end-start))
+            cv2.imwrite(seg_path, segmented)
+            
+            if SAVE_DEBUG_IMAGES:
+                vis_segmented = np.array(get_color_pallete(segmented, 'ade20k').convert('RGB'))
+                vis_segmented = cv2.resize(vis_segmented, (img.shape[1], img.shape[0]))
+                vis_segmented = cv2.addWeighted(img,0.5,vis_segmented,0.5,0)
+                cv2.imwrite(os.path.join(output_path, "segmented.png"), vis_segmented)
 
         #process each surface:
         for surface in surfaces:
