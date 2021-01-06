@@ -21,6 +21,8 @@ from cambrian.frei_chen import frei_chen
 from cambrian.Line import Line
 from cambrian.VanishingPointFinder import VanishingPointFinder
 
+from modelutils import feed_image_batched, feed_images_batched, load_model
+
 import random
 
 #SEG_RES = None
@@ -151,7 +153,7 @@ def get_file_paths(input_dir, pattern):
             files.extend(Path(input_dir).glob('**/*' + ext))
     return files
 
-def parse_data(input_dir, output_dir):
+def parse_data(input_dir, output_dir, model_normals):
 
     files = get_file_paths(input_dir, "**/data_v2.json")
     index = 0
@@ -216,6 +218,10 @@ def parse_data(input_dir, output_dir):
                 vis_segmented = cv2.addWeighted(img,0.5,vis_segmented,0.5,0)
                 cv2.imwrite(os.path.join(output_path, "segmented.png"), vis_segmented)
 
+        normals = feed_image_batched(model_normals, [cv2.resize(img, (512, 512))])
+        if SAVE_DEBUG_IMAGES:
+            cv2.imwrite(os.path.join(output_path, "normals.png"), normals[0])
+
         #process each surface:
         for surface in surfaces:
             mask_url = surface['images']['mask']
@@ -250,7 +256,10 @@ def main(input_dir, output_dir):
 
     start = time.time()
 
-    num_files = parse_data(input_dir, output_dir)
+    normals_path = "models/normals"
+    model_normals = load_model(normals_path)
+
+    num_files = parse_data(input_dir, output_dir, model_normals)
     
     elapsed = (time.time() - start)
     print("Processing %d images took %.2f seconds (%.2fs per image)" % (num_files, elapsed, elapsed/num_files))
