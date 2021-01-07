@@ -70,7 +70,6 @@ def find_lines(img, output_path, segmented, normals):
     
     edges = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -20)
     edges = cv2.bilateralFilter(edges, 5, 5, 5)
-    edges = cv2.resize(edges, (width, height), interpolation = cv2.INTER_CUBIC)
 
     clean_edges = frei_chen(bw)
 
@@ -89,13 +88,19 @@ def find_lines(img, output_path, segmented, normals):
 
     line_data = []
 
-    def _add_lines(fld, image, min_confidence):
+    def _add_lines(fld, image, min_confidence=None):
         lines = fld.detect(image)
         if lines is None: return
 
+        sy = height / image.shape[0]
+        sx = width / image.shape[1]
+
+        if sx != 1.0 or sy != 1.0:
+            lines = lines * [[sx, sy, sx, sy]]
+
         for line in lines: 
             new_line = Line(line[0][0], line[0][1], line[0][2], line[0][3])
-            if new_line.get_confidence() > min_confidence: 
+            if min_confidence is None or new_line.get_confidence() > min_confidence: 
                 line_data.append(new_line)
 
     #find all lines in the edge image
@@ -108,11 +113,10 @@ def find_lines(img, output_path, segmented, normals):
     _add_lines(fld, bw - (clean_edges * 5.0).astype("uint8"), 0.15)
     _add_lines(fld, segmented, 0.15)
 
-    fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 50.0), 1.41, 200, 220, aperture, False)
-    #normals_lines = cv2.resize(cv2.cvtColor(normals, cv2.COLOR_BGR2GRAY), (width, height), interpolation = cv2.INTER_CUBIC)
-    normals_lines = cv2.addWeighted(img, 0.5, cv2.resize(normals, (width, height)), 0.5, 0)
-    cv2.imwrite(os.path.join(output_path, "normals_lines.jpg"), normals_lines)
-    #_add_lines(fld, normals_lines, 0.15)
+    if SAVE_DEBUG_IMAGES:
+        normals_lines = cv2.addWeighted(img, 0.5, cv2.resize(normals, (width, height)), 0.5, 0)
+        lines_a = normals_lines
+        cv2.imwrite(os.path.join(output_path, "normals_lines.jpg"), normals_lines)
     
     if lines_a is not None: Line.draw_all(line_data, lines_a)
     
