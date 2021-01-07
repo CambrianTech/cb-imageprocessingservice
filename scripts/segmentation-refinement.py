@@ -46,7 +46,11 @@ def segment_image(ctx, model, img):
 
     return predict
 
-def find_lines(img, output_path, segmented, normals):
+def find_lines(images, output_path):
+
+    img = images["image"]
+    normals = images["normals"]
+    segmented = images["segmented"]
 
     height, width = img.shape[:2]
     diagonal = np.hypot(width, height)
@@ -71,20 +75,11 @@ def find_lines(img, output_path, segmented, normals):
     edges = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -20)
     edges = cv2.bilateralFilter(edges, 5, 5, 5)
 
-    clean_edges = frei_chen(bw)
-
-    if SAVE_DEBUG_IMAGES:
-        lines_a = img.copy()
-        lines_b = img.copy()
-        lines_c = img.copy()
-        lines_d = img.copy()
-        intersections = []
-    else:
-        lines_a = lines_b = lines_c = lines_d = None
+    images["clean_edges"] = frei_chen(bw)
 
     contours_src = cv2.adaptiveThreshold(contours_src, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, int(diagonal / 50) * 2 + 1, -30)
-    contours_dilated = ip.rough_dilate_erode(True, contours_src, 3, scale=400/diagonal, interpolation=cv2.INTER_AREA)
-    Line.prepare(img, contours_dilated)
+    images["edges"] = ip.rough_dilate_erode(True, contours_src, 3, scale=400/diagonal, interpolation=cv2.INTER_AREA)
+    Line.prepare(images)
 
     line_data = []
 
@@ -110,13 +105,22 @@ def find_lines(img, output_path, segmented, normals):
     aperture = 5 if diagonal > 1200 else 3
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 50.0), 1.41, 200, 220, aperture, False)
 
-    _add_lines(fld, bw - (clean_edges * 5.0).astype("uint8"), 0.15)
+    _add_lines(fld, bw - (images["clean_edges"] * 5.0).astype("uint8"), 0.15)
     _add_lines(fld, segmented, 0.15)
 
+    # fld = cv2.ximgproc.createFastLineDetector(64, _canny_aperture_size=7, _do_merge=False)
+    # _add_lines(fld, cv2.cvtColor(normals, cv2.COLOR_BGR2GRAY))
+
     if SAVE_DEBUG_IMAGES:
-        normals_lines = cv2.addWeighted(img, 0.5, cv2.resize(normals, (width, height)), 0.5, 0)
-        lines_a = normals_lines
-        cv2.imwrite(os.path.join(output_path, "normals_lines.jpg"), normals_lines)
+        lines_a = cv2.addWeighted(img, 0.5, cv2.resize(normals, (width, height)), 0.5, 0)
+        lines_b = cv2.addWeighted(img, 0.5, cv2.resize(images["segmented_color"], (width, height)), 0.5, 0)
+        cv2.imwrite(os.path.join(output_path, "seg_initial.jpg"), lines_b)
+        
+        lines_c = img.copy()
+        lines_d = img.copy()
+        intersections = []
+    else:
+        lines_a = lines_b = lines_c = lines_d = None
     
     if lines_a is not None: Line.draw_all(line_data, lines_a)
     
@@ -213,28 +217,26 @@ def parse_data(input_dir, output_dir, model_normals):
 
         #run segmentation:
         seg_path = os.path.join(output_path, "mask.png")
-
-        segmented = cv2.imread(seg_path, cv2.IMREAD_GRAYSCALE)
-        if segmented is None:
-            print("Segmenting %s" % image_path)
-            start = time.process_time()
-            segmented = segment_image(ctx, model, mx.image.imread(image_path)).astype("uint8")
-            end = time.process_time()
-            print("segmentation took %.2f seconds" % (end-start))
-            cv2.imwrite(seg_path, segmented)
-
-            if SAVE_DEBUG_IMAGES:
-                vis_segmented = np.array(get_color_pallete(segmented, 'ade20k').convert('RGB'))
-                vis_segmented = cv2.resize(vis_segmented, (img.shape[1], img.shape[0]))
-                vis_segmented = cv2.addWeighted(img,0.5,vis_segmented,0.5,0)
-                cv2.imwrite(os.path.join(output_path, "segmented.png"), vis_segmented)
-
         normals_path = os.path.join(output_path, "normals.png")
 
-        normals = cv2.imread(normals_path)
-        if normals is None:
-            normals = feed_image_batched(model_normals, [cv2.resize(img, (512, 512))])[0].astype("uint8")
-            cv2.imwrite(os.path.join(output_path, "normals.png"), normals)
+        images = {}
+        images["image"] = img
+        images['segmented'] = cv2.imread(seg_path, cv2.IMREAD_GRAYSCALE)
+        images['normals'] = cv2.imread(normals_path)
+
+        if images['segmented'] is None:
+            print("Segmenting %s" % image_path)
+            start = time.process_time()
+            images['segmented'] = segment_image(ctx, model, mx.image.imread(image_path)).astype("uint8")
+            end = time.process_time()
+            print("segmentation took %.2f seconds" % (end-start))
+            cv2.imwrite(seg_path, images['segmented'])
+
+        images['segmented_color'] = np.array(get_color_pallete(images['segmented'], 'ade20k').convert('RGB'))
+
+        if images['normals'] is None:
+            images['normals'] = feed_image_batched(model_normals, [cv2.resize(img, (512, 512))])[0].astype("uint8")
+            cv2.imwrite(normals_path, images['normals'])
 
         #process each surface:
         for surface in surfaces:
@@ -252,7 +254,7 @@ def parse_data(input_dir, output_dir, model_normals):
             print("Invalid surface")
             continue
 
-        find_lines(img, output_path, segmented, normals)
+        find_lines(images, output_path)
 
         index += 1
     return index

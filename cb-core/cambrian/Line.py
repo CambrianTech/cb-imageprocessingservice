@@ -35,27 +35,25 @@ class Line:
         self.angle = LineFunctions.line_angle(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
 
     #class variables:
-    image = None
-    edges = None
+    images = None
     debug = None
     confidence_step = 8
     color_step = 7
 
     @classmethod
-    def prepare(cls, image, edges, debug=None):
-        cls.image = image
-        cls.edges = edges
+    def prepare(cls, images, debug=None):
+        cls.images = images
         cls.debug = debug
-        cls.diagonal = math.hypot(cls.image.shape[0], cls.image.shape[1])
+        cls.diagonal = math.hypot(cls.images["image"].shape[0], cls.images["image"].shape[1])
 
     def get_confidence(self):
         if self.confidence is None:
-            self.confidence = LineFunctions.line_contour_confidence(self.point_a, self.point_b, self.edges, int(self.length / self.confidence_step) + 1)
+            self.confidence = LineFunctions.line_contour_confidence(self.point_a, self.point_b, self.images["edges"], int(self.length / self.confidence_step) + 1)
         return self.confidence
 
     def get_samples(self):
         if self.samples is None:
-            self.samples = LineFunctions.get_line_samples(self.point_a, self.point_b, self.image, int(self.length / self.color_step) + 1)
+            self.samples = LineFunctions.get_line_samples(self.point_a, self.point_b, self.images["image"], int(self.length / self.color_step) + 1)
         return self.samples
 
     def find_line_pair(self, min_width, min_length=0.3, angle_diff=math.radians(5)):
@@ -106,7 +104,7 @@ class Line:
 
     @classmethod
     def _out_of_range(cls, point):
-        return point[0] < 0 or point[1] < 0 or point[0] >= cls.image.shape[1] or point[1] >= cls.image.shape[0]
+        return point[0] < 0 or point[1] < 0 or point[0] >= cls.images["image"].shape[1] or point[1] >= cls.images["image"].shape[0]
 
     def bounding_box(self, width=10, length_multiplier=1.0, length_offset=0.0):
         return (self.midpoint, (max(self.length * length_multiplier, self.length + length_offset), width), np.degrees(self.angle))
@@ -230,8 +228,8 @@ class Line:
                 down_point_b = (line.point_b[0] - dx, line.point_b[1] - dy)
 
                 num_samples = 1 + int(line.length/5)
-                up_conf = LineFunctions.line_contour_confidence(up_point_a, up_point_b, cls.crisp_edges, num_samples)
-                down_conf = LineFunctions.line_contour_confidence(down_point_a, down_point_b, cls.crisp_edges, num_samples)
+                up_conf = LineFunctions.line_contour_confidence(up_point_a, up_point_b, cls.images["clean_edges"], num_samples)
+                down_conf = LineFunctions.line_contour_confidence(down_point_a, down_point_b, cls.images["clean_edges"], num_samples)
 
                 if up_conf > best_score or down_conf > best_score:
                     hits += 1
@@ -292,8 +290,8 @@ class Line:
             above, below = LineFunctions.get_parallel_lines(line.point_a, line.point_b, line.length, ab_distance) 
             #cv2.line(cls.debug, (int(above[0][0]), int(above[0][1])), (int(above[1][0]), int(above[1][1])), (255,0,255), 1)
 
-            above_color = np.mean(LineFunctions.get_line_samples(above[0], above[1], cls.image, num_line_samples), axis=0)
-            below_color = np.mean(LineFunctions.get_line_samples(below[0], below[1], cls.image, num_line_samples), axis=0)
+            above_color = np.mean(LineFunctions.get_line_samples(above[0], above[1], cls.images["image"], num_line_samples), axis=0)
+            below_color = np.mean(LineFunctions.get_line_samples(below[0], below[1], cls.images["image"], num_line_samples), axis=0)
             ab_diff = above_color - below_color
 
             def is_match(point, corner, is_point_a):
@@ -303,7 +301,7 @@ class Line:
                 num_color_samples = int(min(num_line_samples, length+1))
 
                 if num_color_samples > 3:
-                    extension_samples = LineFunctions.get_line_samples(point, corner, cls.image, num_color_samples)
+                    extension_samples = LineFunctions.get_line_samples(point, corner, cls.images["image"], num_color_samples)
                     extension_color = np.mean(extension_samples, axis=0)
                     diff = np.abs(extension_color - line_mean)
                     mean_diff = np.mean(diff / (line_std + 0.1))
@@ -320,8 +318,8 @@ class Line:
                     above_e, below_e = LineFunctions.get_parallel_lines(corner, point, length, ab_distance) if is_point_a else LineFunctions.get_parallel_lines(point, corner, length, ab_distance)
                     #cv2.line(cls.debug, (int(above_e[0][0]), int(above_e[0][1])), (int(above_e[1][0]), int(above_e[1][1])), (0,0,0), 1)
 
-                    above_color_e = np.mean(LineFunctions.get_line_samples(above_e[0], above_e[1], cls.image, num_line_samples), axis=0)
-                    below_color_e = np.mean(LineFunctions.get_line_samples(below_e[0], below_e[1], cls.image, num_line_samples), axis=0)
+                    above_color_e = np.mean(LineFunctions.get_line_samples(above_e[0], above_e[1], cls.images["image"], num_line_samples), axis=0)
+                    below_color_e = np.mean(LineFunctions.get_line_samples(below_e[0], below_e[1], cls.images["image"], num_line_samples), axis=0)
                     ab_diff_e = above_color_e - below_color_e
 
                     above_diff = np.max(np.abs(above_color_e - above_color))
@@ -336,7 +334,7 @@ class Line:
                 num_conf_samples = int(min(num_line_conf_samples, length+1))
 
                 if num_conf_samples > 3:
-                    extension_confidence = LineFunctions.line_contour_confidence(point, corner, cls.edges, num_conf_samples)
+                    extension_confidence = LineFunctions.line_contour_confidence(point, corner, cls.images["edges"], num_conf_samples)
                     if abs(extension_confidence - line_confidence) > confidence_diff: return False
 
                 return True #additional similarity check
