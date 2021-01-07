@@ -48,15 +48,11 @@ def segment_image(ctx, model, img):
 
 def find_lines(images, output_path):
 
-    img = images["image"]
-    normals = images["normals"]
-    segmented = images["segmented"]
-
-    height, width = img.shape[:2]
+    height, width = images["image"].shape[:2]
     diagonal = np.hypot(width, height)
     print("image w,h", width, height)
 
-    bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    bw = cv2.cvtColor(images["image"], cv2.COLOR_BGR2GRAY)
     gabor_scale = 1500.0 / diagonal
     bw_res = cv2.resize(bw, (int(width * gabor_scale), int(height * gabor_scale)), cv2.INTER_CUBIC) if gabor_scale < 1.0 else bw
 
@@ -106,18 +102,18 @@ def find_lines(images, output_path):
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 50.0), 1.41, 200, 220, aperture, False)
 
     _add_lines(fld, bw - (images["clean_edges"] * 5.0).astype("uint8"), 0.15)
-    _add_lines(fld, segmented, 0.15)
+    _add_lines(fld, images["segmented"], 0.15)
 
     # fld = cv2.ximgproc.createFastLineDetector(64, _canny_aperture_size=7, _do_merge=False)
-    # _add_lines(fld, cv2.cvtColor(normals, cv2.COLOR_BGR2GRAY))
+    # _add_lines(fld, cv2.cvtColor(images["normals"], cv2.COLOR_BGR2GRAY))
 
     if SAVE_DEBUG_IMAGES:
-        lines_a = cv2.addWeighted(img, 0.5, cv2.resize(normals, (width, height)), 0.5, 0)
-        lines_b = cv2.addWeighted(img, 0.5, cv2.resize(images["segmented_color"], (width, height)), 0.5, 0)
+        lines_a = cv2.addWeighted(images["image"], 0.5, cv2.resize(images["normals"], (width, height)), 0.5, 0)
+        lines_b = cv2.addWeighted(images["image"], 0.5, cv2.resize(images["segmented_color"], (width, height)), 0.5, 0)
         cv2.imwrite(os.path.join(output_path, "seg_initial.jpg"), lines_b)
         
-        lines_c = img.copy()
-        lines_d = img.copy()
+        lines_c = images["image"].copy()
+        lines_d = images["image"].copy()
         intersections = []
     else:
         lines_a = lines_b = lines_c = lines_d = None
