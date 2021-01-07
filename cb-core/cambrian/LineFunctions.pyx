@@ -113,8 +113,7 @@ class LineFunctions:
 
     @staticmethod
     def get_line_samples(point_a, point_b, image, num_points):
-        points = filter(lambda p: _is_within_image(p[0], p[1], image.shape[1], image.shape[0]), np.linspace(point_b, point_a, num_points, dtype=int))
-        return list(map(lambda p: image[p[1], p[0]], points))
+        return list(map(lambda p: image[p[1], p[0]], filter(lambda p: _is_within_image(p[0], p[1], image.shape[1], image.shape[0]), np.linspace(point_b, point_a, num_points, dtype=int))))
 
     @staticmethod
     def line_contour_confidence(point_a, point_b, image, num_points):
