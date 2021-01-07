@@ -46,7 +46,7 @@ def segment_image(ctx, model, img):
 
     return predict
 
-def find_lines(img, output_path):
+def find_lines(img, output_path, segmented, normals):
 
     height, width = img.shape[:2]
     diagonal = np.hypot(width, height)
@@ -56,14 +56,14 @@ def find_lines(img, output_path):
     gabor_scale = 1500.0 / diagonal
     bw_res = cv2.resize(bw, (int(width * gabor_scale), int(height * gabor_scale)), cv2.INTER_CUBIC) if gabor_scale < 1.0 else bw
 
-    def gabor(theta, lambd, gamma = 0.0, psi = 0.0):
+    def _gabor(theta, lambd, gamma = 0.0, psi = 0.0):
         ksize = lambd
         sigma = ksize * lambd
         result = cv2.filter2D(bw_res, cv2.CV_8UC1, cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_32F))
         return result
 
-    v_gabor = gabor(0, 7)
-    h_gabor = gabor(np.pi/2.0, 9)
+    v_gabor = _gabor(0, 7)
+    h_gabor = _gabor(np.pi/2.0, 9)
 
     contours_src = cv2.addWeighted(v_gabor, 1.0, h_gabor, 1.0, 0)
     contours_src = cv2.resize(contours_src, (width, height), interpolation = cv2.INTER_CUBIC)
@@ -73,8 +73,6 @@ def find_lines(img, output_path):
     edges = cv2.resize(edges, (width, height), interpolation = cv2.INTER_CUBIC)
 
     clean_edges = frei_chen(bw)
-
-    line_data = []
 
     if SAVE_DEBUG_IMAGES:
         lines_a = img.copy()
@@ -89,23 +87,32 @@ def find_lines(img, output_path):
     contours_dilated = ip.rough_dilate_erode(True, contours_src, 3, scale=400/diagonal, interpolation=cv2.INTER_AREA)
     Line.prepare(img, contours_dilated)
 
-    #find all lines in the edge image
-    fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 30.0), 1.41, 200, 240, 3, False)
-    lines = fld.detect(edges)
-    
-    if lines is not None:
+    line_data = []
+
+    def _add_lines(fld, image, min_confidence):
+        lines = fld.detect(image)
+        if lines is None: return
+
         for line in lines: 
             new_line = Line(line[0][0], line[0][1], line[0][2], line[0][3])
-            if new_line.get_confidence() > 0.2: line_data.append(new_line)
+            if new_line.get_confidence() > min_confidence: 
+                line_data.append(new_line)
+
+    #find all lines in the edge image
+    fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 30.0), 1.41, 200, 240, 3, False)
+    _add_lines(fld, edges, 0.2)
 
     aperture = 5 if diagonal > 1200 else 3
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 50.0), 1.41, 200, 220, aperture, False)
-    lines = fld.detect(bw - (clean_edges * 5.0).astype("uint8"))    
-    
-    if lines is not None:
-        for line in lines: 
-            new_line = Line(line[0][0], line[0][1], line[0][2], line[0][3])
-            if new_line.get_confidence() > 0.15: line_data.append(new_line)
+
+    _add_lines(fld, bw - (clean_edges * 5.0).astype("uint8"), 0.15)
+    _add_lines(fld, segmented, 0.15)
+
+    fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 50.0), 1.41, 200, 220, aperture, False)
+    #normals_lines = cv2.resize(cv2.cvtColor(normals, cv2.COLOR_BGR2GRAY), (width, height), interpolation = cv2.INTER_CUBIC)
+    normals_lines = cv2.addWeighted(img, 0.5, cv2.resize(normals, (width, height)), 0.5, 0)
+    cv2.imwrite(os.path.join(output_path, "normals_lines.jpg"), normals_lines)
+    #_add_lines(fld, normals_lines, 0.15)
     
     if lines_a is not None: Line.draw_all(line_data, lines_a)
     
@@ -203,11 +210,11 @@ def parse_data(input_dir, output_dir, model_normals):
         #run segmentation:
         seg_path = os.path.join(output_path, "mask.png")
 
-        segmented = cv2.imread(seg_path)
+        segmented = cv2.imread(seg_path, cv2.IMREAD_GRAYSCALE)
         if segmented is None:
             print("Segmenting %s" % image_path)
             start = time.process_time()
-            segmented = segment_image(ctx, model, mx.image.imread(image_path))
+            segmented = segment_image(ctx, model, mx.image.imread(image_path)).astype("uint8")
             end = time.process_time()
             print("segmentation took %.2f seconds" % (end-start))
             cv2.imwrite(seg_path, segmented)
@@ -218,9 +225,12 @@ def parse_data(input_dir, output_dir, model_normals):
                 vis_segmented = cv2.addWeighted(img,0.5,vis_segmented,0.5,0)
                 cv2.imwrite(os.path.join(output_path, "segmented.png"), vis_segmented)
 
-        normals = feed_image_batched(model_normals, [cv2.resize(img, (512, 512))])
-        if SAVE_DEBUG_IMAGES:
-            cv2.imwrite(os.path.join(output_path, "normals.png"), normals[0])
+        normals_path = os.path.join(output_path, "normals.png")
+
+        normals = cv2.imread(normals_path)
+        if normals is None:
+            normals = feed_image_batched(model_normals, [cv2.resize(img, (512, 512))])[0].astype("uint8")
+            cv2.imwrite(os.path.join(output_path, "normals.png"), normals)
 
         #process each surface:
         for surface in surfaces:
@@ -238,7 +248,7 @@ def parse_data(input_dir, output_dir, model_normals):
             print("Invalid surface")
             continue
 
-        find_lines(img, output_path)
+        find_lines(img, output_path, segmented, normals)
 
         index += 1
     return index
