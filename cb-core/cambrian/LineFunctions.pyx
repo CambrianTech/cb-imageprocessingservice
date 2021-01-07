@@ -95,8 +95,8 @@ cdef tuple _merge_lines(double ax, double ay, double bx, double by, double cx, d
 
     return (delta1x, delta1y), (delta2x, delta2y)
 
-cdef _out_of_range(x, y, width, height):
-    return x < 0 or y < 0 or x >= width or y >= height
+cdef _is_within_image(x, y, width, height):
+    return not (x < 0 or y < 0 or x >= width or y >= height)
 
 class LineFunctions:
 
@@ -113,11 +113,8 @@ class LineFunctions:
 
     @staticmethod
     def get_line_samples(point_a, point_b, image, num_points):
-        samples = list()
-        for point in np.linspace(point_b, point_a, num_points):
-            if not _out_of_range(point[0], point[1], image.shape[1], image.shape[0]): 
-                samples.append(image[int(point[1]), int(point[0])])
-        return samples
+        points = filter(lambda p: _is_within_image(p[0], p[1], image.shape[1], image.shape[0]), np.linspace(point_b, point_a, num_points, dtype=int))
+        return list(map(lambda p: image[p[1], p[0]], points))
 
     @staticmethod
     def line_contour_confidence(point_a, point_b, image, num_points):
