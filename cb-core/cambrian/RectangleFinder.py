@@ -39,6 +39,11 @@ class RectangleFinder:
             list of RectangularSurface objects, sorted by score.
         """
 
+        num_pts = len(self.vanishing_points)
+
+        first_index_space = self.vanishing_points[:num_pts // 5]
+        second_index_space = self.vanishing_points[:num_pts // 2]
+
         rectangles = []
 
         t = time.time()
@@ -46,6 +51,11 @@ class RectangleFinder:
         for ransac_iter in range(num_ransac_iter):
             if time.time() - t > max_time:
                 break
+
+            vp1 = np.random.choice(first_index_space)
+            vp2 = np.random.choice(second_index_space)
+
+            #print(vp1, vp2)
 
         return rectangles
 

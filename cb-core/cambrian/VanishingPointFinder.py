@@ -8,6 +8,7 @@ class VanishingPoint:
         self.vpf = vpf
         self.point = (model / model[2])[:2]
         self.votes = votes
+        self._inliers = None
         self._score = None
 
     @property
@@ -16,15 +17,24 @@ class VanishingPoint:
             self._score = sum(self.votes)
         return self._score
 
+    @property
+    def inliers(self):
+        if self._inliers is None:
+            self._inliers = np.array(self.vpf.line_data)[self.votes > 0]
+        return self._inliers
+    
+    @property
+    def angle(self):
+        return 0
+
     def clear_indexes(self, indexes):
         self.votes[indexes] = 0
         self._score = None
 
 class VanishingPointFinder:
-    def __init__(self, line_data, seeds=None):
+    def __init__(self, line_data):
         self.line_data = line_data
         self.edgelets = self.compute_edgelets()
-        self.seeds = seeds
 
     def compute_votes(self, model, threshold_inlier):
         """Compute votes for each of the edgelet against a given vanishing point.

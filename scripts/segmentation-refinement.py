@@ -219,9 +219,7 @@ def find_surfaces(images, line_data, output_path):
         for vp in vanishing_points:
             color = np.random.randint(0, 255, size=(3, ))
             color = ( int (color [ 0 ]), int (color [ 1 ]), int (color [ 2 ]))
-            inliers = np.array(line_data)[vp.votes > 0]
-            
-            for line in inliers: line.draw(vp_image, color=color, thickness=5)
+            for line in vp.inliers: line.draw(vp_image, color=color, thickness=5)
 
     rf = RectangleFinder(images, vanishing_points)
     rectangles = rf.compute()
