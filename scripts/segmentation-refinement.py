@@ -46,6 +46,26 @@ def segment_image(ctx, model, img):
 
     return predict
 
+def colorize_labels(image):
+    return np.array(get_color_pallete(image, 'ade20k').convert('RGB'))
+
+def run_watershed(img, mask, distance, num_labels=152, adjusted_labels=None):
+    markers = np.zeros(img.shape[:2], dtype=np.int32)
+    
+    for i in range(0, num_labels):
+        num_elements = (mask == i).sum()
+        if num_elements > 50:
+            isolated = np.zeros(mask.shape, dtype=np.uint8)
+            isolated[mask == i] = 255 
+            isolated = cv2.distanceTransform(isolated, cv2.DIST_L2, 5)
+            _, isolated = cv2.threshold(isolated, distance * isolated.max(), i + 1, 0)
+            markers[isolated > 0] = i + 1
+
+    markers = cv2.watershed(img, markers)
+    markers = markers - 1
+    #markers[markers<0] = 0
+    return markers.astype(np.uint8)
+
 def find_lines(images, output_path):
 
     height, width = images["image"].shape[:2]
@@ -71,12 +91,24 @@ def find_lines(images, output_path):
     edges = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -20)
     edges = cv2.bilateralFilter(edges, 5, 5, 5)
 
-    images["clean_edges"] = frei_chen(bw)
+    images["clean_edges"] = (frei_chen(bw) * 5.0).astype("uint8")
 
     contours_src = cv2.adaptiveThreshold(contours_src, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, int(diagonal / 50) * 2 + 1, -30)
     images["edges"] = ip.rough_dilate_erode(True, contours_src, 3, scale=400/diagonal, interpolation=cv2.INTER_AREA)
-    Line.prepare(images)
+    
+    mask = cv2.resize(images["segmented"], (width, height), interpolation = cv2.INTER_NEAREST)
+    img_enhanced = cv2.addWeighted(images["image"], 1.0, cv2.cvtColor(images["clean_edges"], cv2.COLOR_GRAY2BGR), 30.0, 0)
+    mask = run_watershed(img_enhanced, mask, distance=0.05)
 
+    if SAVE_DEBUG_IMAGES:
+        cv2.imwrite(os.path.join(output_path, "original.jpg"), images["image"])
+        cv2.imwrite(os.path.join(output_path, "enhanced.jpg"), img_enhanced)
+        
+        debug = cv2.addWeighted(images["image"], 0.5, colorize_labels(mask), 0.5, 0)
+        cv2.imwrite(os.path.join(output_path, "seg_adjusted.jpg"), debug)
+
+    #find lines
+    Line.prepare(images)
     line_data = []
 
     def _add_lines(fld, image, min_confidence=None):
@@ -95,14 +127,16 @@ def find_lines(images, output_path):
                 line_data.append(new_line)
 
     #find all lines in the edge image
-    fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 30.0), 1.41, 200, 240, 3, False)
-    _add_lines(fld, edges, 0.2)
+    #fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 30.0), 1.41, 200, 240, 3, False)
+    #_add_lines(fld, edges, 0.2)
 
-    aperture = 5 if diagonal > 1200 else 3
-    fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 50.0), 1.41, 200, 220, aperture, False)
+    #aperture = 5 if diagonal > 1200 else 3
+    #fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 50.0), 1.41, 200, 220, aperture, False)
+    #_add_lines(fld, bw - (images["clean_edges"] * 5.0).astype("uint8"), 0.15)
 
-    _add_lines(fld, bw - (images["clean_edges"] * 5.0).astype("uint8"), 0.15)
-    _add_lines(fld, images["segmented"], 0.15)
+    seg_diagonal = np.hypot(images["segmented"].shape[0], images["segmented"].shape[1])
+    fld = cv2.ximgproc.createFastLineDetector(int(seg_diagonal / 30.0), 1.41, 200, 220, 3, False)
+    _add_lines(fld, images["segmented"])
 
     # fld = cv2.ximgproc.createFastLineDetector(64, _canny_aperture_size=7, _do_merge=False)
     # _add_lines(fld, cv2.cvtColor(images["normals"], cv2.COLOR_BGR2GRAY))
@@ -110,8 +144,6 @@ def find_lines(images, output_path):
     if SAVE_DEBUG_IMAGES:
         lines_a = cv2.addWeighted(images["image"], 0.5, cv2.resize(images["normals"], (width, height)), 0.5, 0)
         lines_b = cv2.addWeighted(images["image"], 0.5, cv2.resize(images["segmented_color"], (width, height)), 0.5, 0)
-        cv2.imwrite(os.path.join(output_path, "seg_initial.jpg"), lines_b)
-        
         lines_c = images["image"].copy()
         lines_d = images["image"].copy()
         intersections = []
@@ -228,7 +260,10 @@ def parse_data(input_dir, output_dir, model_normals):
             print("segmentation took %.2f seconds" % (end-start))
             cv2.imwrite(seg_path, images['segmented'])
 
-        images['segmented_color'] = np.array(get_color_pallete(images['segmented'], 'ade20k').convert('RGB'))
+        images['segmented_color'] = colorize_labels(images['segmented'])
+        if SAVE_DEBUG_IMAGES:
+            debug = cv2.addWeighted(images["image"], 0.5, cv2.resize(images["segmented_color"], (img.shape[1], img.shape[0])), 0.5, 0)
+            cv2.imwrite(os.path.join(output_path, "seg_initial.jpg"), debug)
 
         if images['normals'] is None:
             images['normals'] = feed_image_batched(model_normals, [cv2.resize(img, (512, 512))])[0].astype("uint8")

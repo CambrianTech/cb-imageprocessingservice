@@ -68,6 +68,8 @@ class VanishingPointFinder:
         strengths = []
         classes = []
 
+        if len(self.line_data) < 5: return None
+
         for line in self.line_data:
             p0, p1 = np.array([line.point_a[0], line.point_a[1]]), np.array([line.point_b[0], line.point_b[1]])
             if class_labels is not None:
@@ -125,6 +127,8 @@ class VanishingPointFinder:
         "Auto-rectification of user photos." 2014 IEEE International Conference on
         Image Processing (ICIP). IEEE, 2014.
         """
+        if self.edgelets is None: return []
+
         locations, directions, strengths = self.edgelets[:3]
         lines = self.edgelet_lines(self.edgelets)
 
