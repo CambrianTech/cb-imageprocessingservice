@@ -10,12 +10,9 @@ from cambrian.LineFunctions import LineFunctions
 
 class Line:
 
-    def __init__(self, x0, y0, x1, y1, contour_group=-1, contour_index=-1, source_lines=None):
+    def __init__(self, x0, y0, x1, y1, source_lines=None):
         self.point_a = (x0, y0)
         self.point_b = (x1, y1)
-
-        self.contour_group = contour_group
-        self.contour_index = contour_index
 
         self.dead = False
 

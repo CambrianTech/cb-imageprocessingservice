@@ -20,6 +20,7 @@ import io
 from cambrian.frei_chen import frei_chen
 from cambrian.Line import Line
 from cambrian.VanishingPointFinder import VanishingPointFinder
+from cambrian.RectangleFinder import RectangleFinder
 
 from modelutils import feed_image_batched, feed_images_batched, load_model
 
@@ -52,6 +53,7 @@ def colorize_labels(image):
 def run_watershed(img, mask, distance, num_labels=152, adjusted_labels=None):
     markers = np.zeros(img.shape[:2], dtype=np.int32)
     
+    labels = []
     for i in range(0, num_labels):
         num_elements = (mask == i).sum()
         if num_elements > 50:
@@ -60,11 +62,20 @@ def run_watershed(img, mask, distance, num_labels=152, adjusted_labels=None):
             isolated = cv2.distanceTransform(isolated, cv2.DIST_L2, 5)
             _, isolated = cv2.threshold(isolated, distance * isolated.max(), i + 1, 0)
             markers[isolated > 0] = i + 1
+            labels.append(i)
 
     markers = cv2.watershed(img, markers)
     markers = markers - 1
     #markers[markers<0] = 0
-    return markers.astype(np.uint8)
+    return markers.astype(np.uint8), labels
+
+def is_image_edge(point_a, point_b, shape, dist=10):
+    max_0 = shape[0] - 1
+    max_1 = shape[1] - 1
+    return (abs(point_a[0]) <= dist and abs(point_b[0]) <= dist) \
+        or (abs(point_a[0] - max_0) <= dist and abs(point_b[0] - max_0) <= dist) \
+        or (abs(point_a[1]) <= dist and abs(point_b[1]) <= dist) \
+        or (abs(point_a[1] - max_1) <= dist and abs(point_b[1] - max_1) <= dist)
 
 def find_lines(images, output_path):
 
@@ -87,6 +98,22 @@ def find_lines(images, output_path):
 
     contours_src = cv2.addWeighted(v_gabor, 1.0, h_gabor, 1.0, 0)
     contours_src = cv2.resize(contours_src, (width, height), interpolation = cv2.INTER_CUBIC)
+
+    def add_contour_lines(contours, min_confidence=None):
+        epsilon = diagonal / 200.0
+        min_length = diagonal / 30.0
+        contour_group = 0
+        for contour in contours:
+            poly = cv2.approxPolyDP(contour, epsilon, False)
+
+            for i in range(0, len(poly)-1):
+                point_a = poly[i][0]
+                point_b = poly[i+1][0]
+
+                if not is_image_edge(point_a, point_b, (width, height), epsilon+1.0):
+                    new_line = Line(point_a[0], point_a[1], point_b[0], point_b[1])
+                    if new_line.length >= min_length:
+                        line_data.append(new_line)
     
     edges = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -20)
     edges = cv2.bilateralFilter(edges, 5, 5, 5)
@@ -97,19 +124,26 @@ def find_lines(images, output_path):
     images["edges"] = ip.rough_dilate_erode(True, contours_src, 3, scale=400/diagonal, interpolation=cv2.INTER_AREA)
     
     mask = cv2.resize(images["segmented"], (width, height), interpolation = cv2.INTER_NEAREST)
-    img_enhanced = cv2.addWeighted(images["image"], 1.0, cv2.cvtColor(images["clean_edges"], cv2.COLOR_GRAY2BGR), 30.0, 0)
-    mask = run_watershed(img_enhanced, mask, distance=0.05)
+
+    # img_enhanced = cv2.addWeighted(images["image"], 1.0, cv2.cvtColor(images["clean_edges"], cv2.COLOR_GRAY2BGR), 30.0, 0)
+    # mask, labels = run_watershed(img_enhanced, mask, distance=0.04)       
 
     if SAVE_DEBUG_IMAGES:
         cv2.imwrite(os.path.join(output_path, "original.jpg"), images["image"])
-        cv2.imwrite(os.path.join(output_path, "enhanced.jpg"), img_enhanced)
+        #cv2.imwrite(os.path.join(output_path, "enhanced.jpg"), img_enhanced)
         
-        debug = cv2.addWeighted(images["image"], 0.5, colorize_labels(mask), 0.5, 0)
-        cv2.imwrite(os.path.join(output_path, "seg_adjusted.jpg"), debug)
+        #debug = cv2.addWeighted(images["image"], 0.5, colorize_labels(mask), 0.5, 0)
+        #cv2.imwrite(os.path.join(output_path, "seg_adjusted.jpg"), debug)
 
     #find lines
     Line.prepare(images)
     line_data = []
+
+    # for label in labels:
+    #     isolated = np.zeros(mask.shape, dtype=np.uint8)
+    #     isolated[mask == label] = 255
+    #     contours, _ = cv2.findContours(isolated, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+    #     add_contour_lines(contours)
 
     def _add_lines(fld, image, min_confidence=None):
         lines = fld.detect(image)
@@ -127,23 +161,19 @@ def find_lines(images, output_path):
                 line_data.append(new_line)
 
     #find all lines in the edge image
-    #fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 30.0), 1.41, 200, 240, 3, False)
-    #_add_lines(fld, edges, 0.2)
+    fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 30.0), 1.41, 200, 240, 3, False)
+    _add_lines(fld, edges, 0.2)
 
-    #aperture = 5 if diagonal > 1200 else 3
-    #fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 50.0), 1.41, 200, 220, aperture, False)
-    #_add_lines(fld, bw - (images["clean_edges"] * 5.0).astype("uint8"), 0.15)
-
-    seg_diagonal = np.hypot(images["segmented"].shape[0], images["segmented"].shape[1])
-    fld = cv2.ximgproc.createFastLineDetector(int(seg_diagonal / 30.0), 1.41, 200, 220, 3, False)
-    _add_lines(fld, images["segmented"])
+    aperture = 5 if diagonal > 1200 else 3
+    fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 50.0), 1.41, 200, 220, aperture, False)
+    _add_lines(fld, bw - (images["clean_edges"] * 5.0).astype("uint8"), 0.15)
 
     # fld = cv2.ximgproc.createFastLineDetector(64, _canny_aperture_size=7, _do_merge=False)
     # _add_lines(fld, cv2.cvtColor(images["normals"], cv2.COLOR_BGR2GRAY))
 
     if SAVE_DEBUG_IMAGES:
         lines_a = cv2.addWeighted(images["image"], 0.5, cv2.resize(images["normals"], (width, height)), 0.5, 0)
-        lines_b = cv2.addWeighted(images["image"], 0.5, cv2.resize(images["segmented_color"], (width, height)), 0.5, 0)
+        lines_b = cv2.addWeighted(images["image"], 0.5, colorize_labels(mask), 0.5, 0)
         lines_c = images["image"].copy()
         lines_d = images["image"].copy()
         intersections = []
@@ -156,7 +186,7 @@ def find_lines(images, output_path):
 
     if lines_b is not None: Line.draw_all(line_data, lines_b)
 
-    line_data = Line.merge(line_data, diagonal / 80.0, search_length=1.0, angle_threshold=math.radians(5.0), create_pairs=True)
+    line_data = Line.merge(line_data, diagonal / 80.0, search_length=1.0, angle_threshold=math.radians(3.0), create_pairs=True)
 
     if lines_c is not None: Line.draw_all(line_data, lines_c)
 
@@ -165,26 +195,38 @@ def find_lines(images, output_path):
 
     line_data = Line.merge(line_data, diagonal / 300.0, search_length=1.07, angle_threshold=math.radians(5.0))
 
-    #if lines_d is not None: Line.draw_all(line_data, lines_d)
-
-    #vanishing points:
-    vpf = VanishingPointFinder(line_data)
-    vanishing_points = vpf.compute()
-    
-    if len(vanishing_points) > 0:
-        for vp in vanishing_points:
-            color = np.random.randint(0, 255, size=(3, ))
-            color = ( int (color [ 0 ]), int (color [ 1 ]), int (color [ 2 ]))
-            inliers = np.array(line_data)[vp.votes > 0]
-            for line in inliers:
-                line.draw(lines_d, color=color, thickness=3)
+    if lines_d is not None: Line.draw_all(line_data, lines_d)
 
     if lines_d is not None:
         for intersection in intersections: cv2.circle(lines_c, (int(intersection[0]), int(intersection[1])), max(int(diagonal/100), 3), (255,0,0), 2)
         
         cont_img = np.vstack((np.hstack((lines_a, lines_b)), np.hstack((lines_c, lines_d))))
         cv2.imwrite(os.path.join(output_path, "cont.jpg"), cont_img)
-        
+
+    return line_data
+
+def find_surfaces(images, line_data, output_path):
+
+    if SAVE_DEBUG_IMAGES:
+        vp_image = images["image"].copy()
+        surfaces_image = images["image"].copy()
+
+    #vanishing points:
+    vpf = VanishingPointFinder(line_data)
+    vanishing_points = vpf.compute()
+    
+    if SAVE_DEBUG_IMAGES and len(vanishing_points) > 0:
+        for vp in vanishing_points:
+            color = np.random.randint(0, 255, size=(3, ))
+            color = ( int (color [ 0 ]), int (color [ 1 ]), int (color [ 2 ]))
+            inliers = np.array(line_data)[vp.votes > 0]
+            
+            for line in inliers: line.draw(vp_image, color=color, thickness=5)
+
+    rf = RectangleFinder(images, vanishing_points)
+    rectangles = rf.compute()
+
+    cv2.imwrite(os.path.join(output_path, "surfaces.jpg"), np.hstack((vp_image, surfaces_image)))
 
 def get_file_paths(input_dir, pattern):
     files = []
@@ -285,7 +327,10 @@ def parse_data(input_dir, output_dir, model_normals):
             print("Invalid surface")
             continue
 
-        find_lines(images, output_path)
+        line_data = find_lines(images, output_path)
+
+        if len(line_data) > 4:
+            surfaces = find_surfaces(images, line_data, output_path)
 
         index += 1
     return index

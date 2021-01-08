@@ -111,16 +111,16 @@ class VanishingPointFinder:
         """Estimate vanishing point using Ransac.
         Parameters
         ----------
-        edgelets: tuple of ndarrays
-            (locations, directions, strengths) as computed by `compute_edgelets`.
         num_ransac_iter: int
             Number of iterations to run ransac.
         threshold_inlier: float
             threshold to be used for computing inliers in radians.
+        max_points: int
+            max number of vanishing points to return
         Returns
         -------
-        best_model: ndarry of shape (3,)
-            Best model for vanishing point estimated.
+        vanishing_points: list
+            list of VanishingPoint objects, sorted by score.
         Reference
         ---------
         Chaudhury, Krishnendu, Stephen DiVerdi, and Sergey Ioffe.
@@ -137,14 +137,12 @@ class VanishingPointFinder:
         arg_sort = np.argsort(-strengths)
         first_index_space = arg_sort[:num_pts // 5]
         second_index_space = arg_sort[:num_pts // 2]
-
-        best_model = None
         vanishing_points = []
         t = time.time()
 
         for ransac_iter in range(num_ransac_iter):
             if time.time() - t > max_time:
-                return best_model
+                break
 
             ind1 = np.random.choice(first_index_space)
 
