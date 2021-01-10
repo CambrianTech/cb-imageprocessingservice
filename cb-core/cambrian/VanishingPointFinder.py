@@ -20,7 +20,8 @@ class VanishingPoint:
     @property
     def inliers(self):
         if self._inliers is None:
-            self._inliers = np.array(self.vpf.line_data)[self.votes > 0]
+            self._inliers = list(np.array(self.vpf.line_data)[self.votes > 0])
+            self._inliers.sort(key=lambda x: x.angle)
         return self._inliers
     
     @property

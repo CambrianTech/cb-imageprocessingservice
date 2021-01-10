@@ -4,6 +4,7 @@ import cv2
 import sys
 import random
 from scipy.spatial import distance
+from scipy.stats import mode
 
 import pyximport; pyximport.install(language_level=3)
 from cambrian.LineFunctions import LineFunctions
@@ -22,6 +23,8 @@ class Line:
         self.color_std = None
         self.color = None
         self.source_lines = source_lines
+        self.labels = None
+        self._label = None
 
         self.recalculate()
 
@@ -36,10 +39,12 @@ class Line:
     debug = None
     confidence_step = 8
     color_step = 7
+    seg_step = 7
+    image_keys=["image", "edges", "segmentation"] #expects same size
 
     @classmethod
     def prepare(cls, images, debug=None):
-        cls.images = images
+        cls.images = images #must be same
         cls.debug = debug
         cls.diagonal = math.hypot(cls.images["image"].shape[0], cls.images["image"].shape[1])
 
@@ -52,6 +57,17 @@ class Line:
         if self.samples is None:
             self.samples = LineFunctions.get_line_samples(self.point_a, self.point_b, self.images["image"], int(self.length / self.color_step) + 1)
         return self.samples
+
+    def get_labels(self):
+        if self.labels is None:
+            self.labels = LineFunctions.get_line_samples(self.point_a, self.point_b, self.images["segmented"], int(self.length / self.seg_step) + 1)
+        return self.labels
+
+    @property
+    def label(self):
+        if self._label is None:
+            self._label = mode(self.get_labels())
+        return self._label
 
     def find_line_pair(self, min_width, min_length=0.3, angle_diff=math.radians(5)):
         points = []

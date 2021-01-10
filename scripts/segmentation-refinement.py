@@ -118,8 +118,7 @@ def find_lines(images, output_path):
 
     contours_src = cv2.adaptiveThreshold(contours_src, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, int(diagonal / 50) * 2 + 1, -30)
     images["edges"] = ip.rough_dilate_erode(True, contours_src, 3, scale=400/diagonal, interpolation=cv2.INTER_AREA)
-    
-    mask = cv2.resize(images["segmented"], (width, height), interpolation = cv2.INTER_NEAREST)
+    images["segmented"] = cv2.resize(images["segmented"], (width, height), interpolation = cv2.INTER_NEAREST)
 
     # img_enhanced = cv2.addWeighted(images["image"], 1.0, cv2.cvtColor(images["clean_edges"], cv2.COLOR_GRAY2BGR), 30.0, 0)
     # mask, labels = run_watershed(img_enhanced, mask, distance=0.04)       
@@ -169,7 +168,7 @@ def find_lines(images, output_path):
 
     if SAVE_DEBUG_IMAGES:
         lines_a = cv2.addWeighted(images["image"], 0.5, cv2.resize(images["normals"], (width, height)), 0.5, 0)
-        lines_b = cv2.addWeighted(images["image"], 0.5, colorize_labels(mask), 0.5, 0)
+        lines_b = cv2.addWeighted(images["image"], 0.5, colorize_labels(images["segmented"]), 0.5, 0)
         lines_c = images["image"].copy()
         lines_d = images["image"].copy()
         intersections = []
@@ -217,7 +216,7 @@ def find_surfaces(images, line_data, output_path):
         for vp in vanishing_points:
             color = np.random.randint(0, 255, size=(3, ))
             color = ( int (color [ 0 ]), int (color [ 1 ]), int (color [ 2 ]))
-            for line in vp.inliers: line.draw(vp_image, color=color, thickness=5)
+            for line in vp.inliers: line.draw(vp_image, color=color, thickness=3)
 
     rf = RectangleFinder(images, vanishing_points)
     rectangles = rf.compute()
