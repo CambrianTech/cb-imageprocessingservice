@@ -5,4 +5,4 @@ from .Line import Line
 from .RectangleFinder import RectangleFinder
 from .VanishingPointFinder import VanishingPointFinder
 from .LineFunctions import LineFunctions
-from .SegmentationLabel import SegmentationLabel
+from .SegmentationLabel import SegmentationLabel, SegmentationCollection

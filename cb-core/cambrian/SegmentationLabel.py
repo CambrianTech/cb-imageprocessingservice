@@ -96,7 +96,7 @@ class SegmentationLabel(Enum):
     DIRTTRACK=92
     CLOTHING=93
     POLE=94
-    GROUND=95
+    LAND=95
     BANNISTER=96
     ESCALATOR=97
     OTTOMAN=98
@@ -142,7 +142,7 @@ class SegmentationLabel(Enum):
     TRAY=138
     TRASH=139
     FAN=140
-    FAN=141
+    PIER=141
     CRT=142
     PLATE=143
     MONITOR=144
@@ -152,3 +152,7 @@ class SegmentationLabel(Enum):
     GLASS=148
     CLOCK=149
     FLAG=150
+
+class SegmentationCollection:
+    WALL=[SegmentationLabel.WALL, SegmentationLabel.COLUMN, SegmentationLabel.WINDOW, SegmentationLabel.DOOR, SegmentationLabel.SCREENDOOR, SegmentationLabel.CURTAIN]
+    GROUND=[SegmentationLabel.FLOOR, SegmentationLabel.GROUND, SegmentationLabel.ROAD, SegmentationLabel.PAVEMENT, SegmentationLabel.GRASS, SegmentationLabel.LAND, SegmentationLabel.STAGE]
