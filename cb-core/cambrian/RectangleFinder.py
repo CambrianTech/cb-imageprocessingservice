@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import time
+from .SegmentationLabel import SegmentationLabel
 
 class RectangularSurface:
     def __init__(self, rf, model, votes):

@@ -17,11 +17,7 @@ import matplotlib.image as mpimg
 import cambrian.image_processing as ip
 
 import io
-from cambrian.frei_chen import frei_chen
-from cambrian.Line import Line
-from cambrian.VanishingPointFinder import VanishingPointFinder
-from cambrian.RectangleFinder import RectangleFinder
-
+from cambrian import frei_chen, VanishingPointFinder, Line, RectangleFinder
 from modelutils import feed_image_batched, feed_images_batched, load_model
 
 import random
@@ -214,6 +210,8 @@ def find_surfaces(images, line_data, output_path):
     #vanishing points:
     vpf = VanishingPointFinder(line_data)
     vanishing_points = vpf.compute()
+
+
     
     if SAVE_DEBUG_IMAGES and len(vanishing_points) > 0:
         for vp in vanishing_points:
