@@ -2,6 +2,7 @@ from enum import Enum
 
 #https://github.com/CSAILVision/sceneparsing/blob/master/objectInfo150.csv
 class SegmentationLabel(Enum):
+    UNKNOWN=0
     WALL=1
     BUILDING=2
     SKY=3

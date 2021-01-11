@@ -4,10 +4,10 @@ import cv2
 import sys
 import random
 from scipy.spatial import distance
-from scipy.stats import mode
 
 import pyximport; pyximport.install(language_level=3)
 from cambrian.LineFunctions import LineFunctions
+from cambrian.SegmentationLabel import SegmentationLabel
 
 class Line:
 
@@ -39,7 +39,6 @@ class Line:
     debug = None
     confidence_step = 8
     color_step = 7
-    seg_step = 7
     image_keys=["image", "edges", "segmentation"] #expects same size
 
     @classmethod
@@ -60,13 +59,13 @@ class Line:
 
     def get_labels(self):
         if self.labels is None:
-            self.labels = LineFunctions.get_line_samples(self.point_a, self.point_b, self.images["segmented"], int(self.length / self.seg_step) + 1)
+            self.labels = 1 + np.array(LineFunctions.get_line_samples(self.point_a, self.point_b, self.images["segmented"], 5)).astype(int)
         return self.labels
 
     @property
     def label(self):
         if self._label is None:
-            self._label = mode(self.get_labels())
+            self._label = SegmentationLabel(int(np.median(self.get_labels())))
         return self._label
 
     def find_line_pair(self, min_width, min_length=0.3, angle_diff=math.radians(5)):

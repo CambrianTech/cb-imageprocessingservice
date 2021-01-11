@@ -8,6 +8,8 @@ from pathlib import Path
 import click
 import time
 
+from scipy.special import softmax
+
 import mxnet as mx
 from mxnet.gluon.data.vision import transforms
 import gluoncv
@@ -17,9 +19,9 @@ import matplotlib.image as mpimg
 import cambrian.image_processing as ip
 
 import io
-from cambrian import frei_chen, VanishingPointFinder, Line, RectangleFinder
+from cambrian import frei_chen, VanishingPointFinder, Line, RectangleFinder, SegmentationLabel, SegmentationCollection
 from modelutils import feed_image_batched, feed_images_batched, load_model
-
+from gluoncv.data.transforms.presets.segmentation import test_transform
 import random
 
 #SEG_RES = None
@@ -30,18 +32,29 @@ SEG_RES = 480
 
 SAVE_DEBUG_IMAGES = True 
 
-def segment_image(ctx, model, img):
-    from gluoncv.data.transforms.presets.segmentation import test_transform
-    
-    #img = test_transform(img, ctx)
-    if SEG_RES is None:
-        img = test_transform(img, ctx)
-    else:
-        img = test_transform(mx.img.resize_short(img, SEG_RES),ctx)
-    output = model.predict(img)
-    predict = mx.nd.squeeze(mx.nd.argmax(output, 1)).asnumpy()
+def segment_images(ctx, model, images, datum):
+    # Numpy to mx, resize, test-transform, batch
+    semantic_input = [
+        test_transform(
+            mx.img.resize_short(
+                mx.nd.array(image, dtype=np.uint8),
+                SEG_RES
+            ),
+            ctx
+        )
+        for image in images
+    ]
 
-    return predict
+    # Run semantic segmentation model
+    # TODO: Batch properly?
+    semantic_results = [
+        model.predict(inp).asnumpy()
+        for inp in semantic_input
+    ]
+
+    for result in semantic_results:
+        datum["semantic"] = result
+        datum["semantic_probs"] = softmax(result[0], axis=0)
 
 def colorize_labels(image):
     return np.array(get_color_pallete(image, 'ade20k').convert('RGB'))
@@ -209,14 +222,15 @@ def find_surfaces(images, line_data, output_path):
     #vanishing points:
     vpf = VanishingPointFinder(line_data)
     vanishing_points = vpf.compute()
-
-
     
     if SAVE_DEBUG_IMAGES and len(vanishing_points) > 0:
         for vp in vanishing_points:
             color = np.random.randint(0, 255, size=(3, ))
             color = ( int (color [ 0 ]), int (color [ 1 ]), int (color [ 2 ]))
-            for line in vp.inliers: line.draw(vp_image, color=color, thickness=3)
+            on = False
+            for line in vp.inliers: 
+                on = line.label in SegmentationCollection.WALL
+                if on: line.draw(vp_image, color=color, thickness=3)
 
     rf = RectangleFinder(images, vanishing_points)
     rectangles = rf.compute()
@@ -284,27 +298,32 @@ def parse_data(input_dir, output_dir, model_normals):
         seg_path = os.path.join(output_path, "mask.png")
         normals_path = os.path.join(output_path, "normals.png")
 
-        images = {}
-        images["image"] = img
-        images['segmented'] = cv2.imread(seg_path, cv2.IMREAD_GRAYSCALE)
-        images['normals'] = cv2.imread(normals_path)
+        datum = {}
+        datum["image"] = img
+        datum['segmented'] = cv2.imread(seg_path, cv2.IMREAD_GRAYSCALE)
+        datum['normals'] = cv2.imread(normals_path)
 
-        if images['segmented'] is None:
+        if datum['segmented'] is None:
             print("Segmenting %s" % image_path)
             start = time.process_time()
-            images['segmented'] = segment_image(ctx, model, mx.image.imread(image_path)).astype("uint8")
+            segment_images(ctx, model, [img], datum)
             end = time.process_time()
             print("segmentation took %.2f seconds" % (end-start))
-            cv2.imwrite(seg_path, images['segmented'])
+            datum['segmented'] = np.argmax(datum['semantic_probs'], axis=0)
+            cv2.imwrite(seg_path, datum['segmented'])
 
-        images['segmented_color'] = colorize_labels(images['segmented'])
+        datum['labels'] = [SegmentationLabel(x+1) for x in list(np.unique(datum['segmented']))]
+
+        print(datum['labels'])
+
+        datum['segmented_color'] = colorize_labels(datum['segmented'])
         if SAVE_DEBUG_IMAGES:
-            debug = cv2.addWeighted(images["image"], 0.5, cv2.resize(images["segmented_color"], (img.shape[1], img.shape[0])), 0.5, 0)
+            debug = cv2.addWeighted(datum["image"], 0.5, cv2.resize(datum["segmented_color"], (img.shape[1], img.shape[0])), 0.5, 0)
             cv2.imwrite(os.path.join(output_path, "seg_initial.jpg"), debug)
 
-        if images['normals'] is None:
-            images['normals'] = feed_image_batched(model_normals, [cv2.resize(img, (512, 512))])[0].astype("uint8")
-            cv2.imwrite(normals_path, images['normals'])
+        if datum['normals'] is None:
+            datum['normals'] = feed_image_batched(model_normals, [cv2.resize(img, (512, 512))])[0].astype("uint8")
+            cv2.imwrite(normals_path, datum['normals'])
 
         #process each surface:
         for surface in surfaces:
@@ -322,10 +341,10 @@ def parse_data(input_dir, output_dir, model_normals):
             print("Invalid surface")
             continue
 
-        line_data = find_lines(images, output_path)
+        line_data = find_lines(datum, output_path)
 
         if len(line_data) > 4:
-            surfaces = find_surfaces(images, line_data, output_path)
+            surfaces = find_surfaces(datum, line_data, output_path)
 
         index += 1
     return index
