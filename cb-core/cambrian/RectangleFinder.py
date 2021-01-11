@@ -24,7 +24,7 @@ class RectangleFinder:
         self.images = images
         self.vanishing_points = vanishing_points
 
-    def compute(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_time=1.0):
+    def compute(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_time=1.0, debug=None):
         """Estimate rectangular surfaces using Ransac.
         Parameters
         ----------
@@ -42,8 +42,10 @@ class RectangleFinder:
 
         num_pts = len(self.vanishing_points)
 
-        first_index_space = self.vanishing_points[:num_pts // 5]
-        second_index_space = self.vanishing_points[:num_pts // 2]
+        if num_pts < 2: return []
+
+        first_index_space = self.vanishing_points[:num_pts // 2]
+        second_index_space = self.vanishing_points[:num_pts]
 
         rectangles = []
 

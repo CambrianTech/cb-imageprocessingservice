@@ -218,6 +218,8 @@ def find_surfaces(images, line_data, output_path):
     if SAVE_DEBUG_IMAGES:
         vp_image = images["image"].copy()
         surfaces_image = images["image"].copy()
+    else:
+        surfaces_image = vp_image = None
 
     #vanishing points:
     vpf = VanishingPointFinder(line_data)
@@ -227,13 +229,11 @@ def find_surfaces(images, line_data, output_path):
         for vp in vanishing_points:
             color = np.random.randint(0, 255, size=(3, ))
             color = ( int (color [ 0 ]), int (color [ 1 ]), int (color [ 2 ]))
-            on = False
             for line in vp.inliers: 
-                on = line.label in SegmentationCollection.WALL
-                if on: line.draw(vp_image, color=color, thickness=3)
+                line.draw(vp_image, color=color, thickness=3)
 
     rf = RectangleFinder(images, vanishing_points)
-    rectangles = rf.compute()
+    rectangles = rf.compute(debug=surfaces_image)
 
     cv2.imwrite(os.path.join(output_path, "surfaces.jpg"), np.hstack((vp_image, surfaces_image)))
 
