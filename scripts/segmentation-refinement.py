@@ -312,7 +312,7 @@ def parse_data(input_dir, output_dir, model_normals):
             datum['segmented'] = np.argmax(datum['semantic_probs'], axis=0)
             cv2.imwrite(seg_path, datum['segmented'])
 
-        datum['labels'] = [SegmentationLabel(x+1) for x in list(np.unique(datum['segmented']))]
+        datum['labels'] = [SegmentationLabel(x) for x in list(np.unique(datum['segmented']))]
 
         print(datum['labels'])
 
