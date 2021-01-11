@@ -1,10 +1,12 @@
 import math
 import numpy as np
 import time
-from .SegmentationLabel import SegmentationLabel
+import cv2
+from cambrian.SegmentationLabel import SegmentationLabel
+import cambrian.image_processing as ip
 
 class RectangularSurface:
-    def __init__(self, rf, model, votes):
+    def __init__(self, rf, model, votes, debug=None):
         self.vpf = vpf
         self.votes = votes
         self._score = None
@@ -20,11 +22,44 @@ class RectangularSurface:
         self._score = None
 
 class RectangleFinder:
-    def __init__(self, images, vanishing_points):
-        self.images = images
+    def __init__(self, datum, vanishing_points, debug=None):
+        self.datum = datum
         self.vanishing_points = vanishing_points
+        self.debug = debug
+        self.diagonal = math.hypot(self.datum['segmented'].shape[0], self.datum['segmented'].shape[1])
+        self.find_contours()
 
-    def compute(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_time=1.0, debug=None):
+    def find_contours(self, distance=0.9):
+
+        shape = self.datum['segmented'].shape
+        scale = 400 / self.diagonal
+        ds_mask = cv2.resize(self.datum['segmented'], (int(shape[1] * scale), int(shape[0] * scale)), cv2.INTER_NEAREST)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(13,13))
+
+        def get_label_contours(label):
+            isolated = np.zeros(ds_mask.shape, dtype=np.uint8)
+            isolated[ds_mask == label] = 255
+            isolated = cv2.dilate(isolated, kernel)
+            isolated = cv2.resize(isolated, (shape[1], shape[0]))
+            isolated[isolated<127] = 0
+            contours, _ = cv2.findContours(isolated, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+
+            if self.debug is not None:
+                self.debug = ip.overlay_mask(self.debug, isolated, hue=label*20)
+                for cnt in contours:
+                    cv2.drawContours(self.debug, [cnt], 0, (0,255,0), 3)
+            
+            return contours
+
+        self.wall_contours = get_label_contours(SegmentationLabel.WALL)
+               
+
+            #isolated = cv2.dilate(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5)))
+            
+                
+                
+
+    def compute(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_time=1.0):
         """Estimate rectangular surfaces using Ransac.
         Parameters
         ----------

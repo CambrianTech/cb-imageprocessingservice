@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import IntEnum
 
 #https://github.com/CSAILVision/sceneparsing/blob/master/objectInfo150.csv
-class SegmentationLabel(Enum):
+class SegmentationLabel(IntEnum):
     WALL=0
     BUILDING=1
     SKY=2

@@ -232,8 +232,9 @@ def find_surfaces(images, line_data, output_path):
             for line in vp.inliers: 
                 line.draw(vp_image, color=color, thickness=3)
 
-    rf = RectangleFinder(images, vanishing_points)
-    rectangles = rf.compute(debug=surfaces_image)
+    rf = RectangleFinder(images, vanishing_points, debug=surfaces_image)
+    rectangles = rf.compute()
+    surfaces_image = rf.debug
 
     cv2.imwrite(os.path.join(output_path, "surfaces.jpg"), np.hstack((vp_image, surfaces_image)))
 
@@ -299,7 +300,7 @@ def parse_data(input_dir, output_dir, model_normals):
         normals_path = os.path.join(output_path, "normals.png")
 
         datum = {}
-        datum["image"] = img
+        datum['image'] = img
         datum['segmented'] = cv2.imread(seg_path, cv2.IMREAD_GRAYSCALE)
         datum['normals'] = cv2.imread(normals_path)
 
