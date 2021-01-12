@@ -223,7 +223,7 @@ def find_surfaces(images, line_data, output_path):
 
     #vanishing points:
     vpf = VanishingPointFinder(line_data)
-    vanishing_points = vpf.compute()
+    vanishing_points = vpf.compute(threshold_inlier=math.radians(3))
     
     if SAVE_DEBUG_IMAGES and len(vanishing_points) > 0:
         for vp in vanishing_points:

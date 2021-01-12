@@ -146,8 +146,8 @@ class VanishingPointFinder:
         num_pts = strengths.size
 
         arg_sort = np.argsort(-strengths)
-        first_index_space = arg_sort[:num_pts // 5]
-        second_index_space = arg_sort[:num_pts // 2]
+        first_index_space = arg_sort[:num_pts // 2]
+        second_index_space = arg_sort[num_pts // 3:]
         vanishing_points = []
         t = time.time()
 
