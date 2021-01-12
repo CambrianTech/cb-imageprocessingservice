@@ -25,8 +25,7 @@ class Line:
         self.source_lines = source_lines
         self.labels = None
         self._label = None
-
-        self.probabilities = {}
+        self.probabilities = None
 
         self.recalculate()
 
@@ -46,7 +45,9 @@ class Line:
     def prepare(cls, images, debug=None):
         cls.images = images #must be same
         cls.debug = debug
-        cls.diagonal = math.hypot(cls.images["image"].shape[0], cls.images["image"].shape[1])
+        cls.width = images["image"].shape[1]
+        cls.height = images["image"].shape[0]
+        cls.diagonal = math.hypot(cls.width, cls.height)
 
     def get_confidence(self):
         if self.confidence is None:
@@ -63,10 +64,23 @@ class Line:
             self.labels = np.array(LineFunctions.get_line_samples(self.point_a, self.point_b, self.images["segmented"], int(self.length / self.color_step) + 1)).astype(int)
         return self.labels
 
-    # def get_probability(self, label):
-    #     if label not in self.probabilities:
-    #         self.probabilities[label] = np.array(LineFunctions.get_line_samples(self.point_a, self.point_b, self.images["segmented"], int(self.length / self.color_step) + 1)).astype(int)
-    #     return self.probabilities
+    def translated_points(self, width, height):
+        sy = height / self.height
+        sx = width / self.width
+
+        return (self.point_a[0] * sx, self.point_a[1] * sy), (self.point_b[0] * sx, self.point_b[1] * sy)
+
+    def get_probability(self, label):
+        if self.probabilities is None:
+            width = self.images["semantic_probs"].shape[2]
+            height = self.images["semantic_probs"].shape[1]
+            point_a, point_b = self.translated_points(width, height)
+            num_points = int(self.length / self.color_step) + 1
+            points = LineFunctions.get_line_points(point_a, point_b, width, height, num_points)
+            data = np.array(list(map(lambda p: self.images["semantic_probs"][:,p[1], p[0]], points)))
+            self.probabilities = np.mean(data, axis=0) / np.amax(data, axis=0)
+            
+        return self.probabilities[label]
 
     @property
     def label(self):

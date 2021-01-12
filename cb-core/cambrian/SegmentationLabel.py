@@ -159,11 +159,19 @@ class SegmentationSet:
     FLOOR=[SegmentationLabel.FLOOR, SegmentationLabel.GROUND, SegmentationLabel.ROAD, SegmentationLabel.PAVEMENT, SegmentationLabel.GRASS, SegmentationLabel.LAND, SegmentationLabel.STAGE]
     CEILING=[SegmentationLabel.CEILING]
     DOOR=[SegmentationLabel.DOOR, SegmentationLabel.SCREENDOOR, SegmentationLabel.CURTAIN]
-    TABLETOP=[SegmentationLabel.TABLE, SegmentationLabel.COFFEETABLE, SegmentationLabel.STEP]
+    TABLE=[SegmentationLabel.TABLE, SegmentationLabel.COFFEETABLE, SegmentationLabel.STEP]
 
     @classmethod
-    def key(cls, _set):
+    def label(cls, _set):
+        return _set[0]
+
+    @classmethod
+    def name(cls, _set):
         return _set[0].name
+
+    @classmethod
+    def value(cls, _set):
+        return _set[0].value
 
     @classmethod
     def color(cls, _set):

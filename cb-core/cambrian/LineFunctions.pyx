@@ -109,11 +109,16 @@ class LineFunctions:
         result = _get_intersection(line_a_point_a, line_a_point_b, line_b_point_a, line_b_point_b)
         if result[0] == -1:
             return None
-        return result    
+        return result  
+
+    @staticmethod
+    def get_line_points(point_a, point_b, width, height, num_points):
+        return filter(lambda p: _is_within_image(p[0], p[1], width, height), np.linspace(point_b, point_a, num_points, dtype=int))
 
     @staticmethod
     def get_line_samples(point_a, point_b, image, num_points):
-        return list(map(lambda p: image[p[1], p[0]], filter(lambda p: _is_within_image(p[0], p[1], image.shape[1], image.shape[0]), np.linspace(point_b, point_a, num_points, dtype=int))))
+        points = LineFunctions.get_line_points(point_a, point_b, image.shape[1], image.shape[0], num_points)
+        return list(map(lambda p: image[p[1], p[0]], points))
 
     @staticmethod
     def line_contour_confidence(point_a, point_b, image, num_points):

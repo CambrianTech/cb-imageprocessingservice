@@ -321,7 +321,7 @@ def parse_data(input_dir, output_dir, model_normals):
 
         datum['labels'] = [SegmentationLabel(x) for x in list(np.unique(datum['segmented']))]
 
-        print(datum['semantic_probs'].shape, datum['segmented'].shape)
+        #print(datum['semantic_probs'].shape, datum['segmented'].shape)
         print(datum['labels'])
 
         datum['segmented_color'] = colorize_labels(datum['segmented'])

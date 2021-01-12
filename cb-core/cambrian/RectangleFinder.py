@@ -3,6 +3,7 @@ import numpy as np
 import time
 import cv2
 from cambrian.SegmentationLabel import SegmentationLabel, SegmentationSet
+from cambrian.LineFunctions import LineFunctions
 import cambrian.image_processing as ip
 
 class RectangularSurface:
@@ -27,6 +28,10 @@ class LabelData:
         self.mask = None
         self.line_sets = None
 
+    @property
+    def label(self):
+        return SegmentationSet.label(self.label_set)
+
 class RectangleFinder:
     def __init__(self, datum, vanishing_points, label_sets=[SegmentationSet.FLOOR, SegmentationSet.CEILING, SegmentationSet.WALL], debug=None):
         self.datum = datum
@@ -43,47 +48,57 @@ class RectangleFinder:
         scale = 200 / self.diagonal
         ds_mask = cv2.resize(self.datum['segmented'], (int(shape[1] * scale), int(shape[0] * scale)), cv2.INTER_NEAREST)
 
-        def get_label_mask(label_set):
+        def get_label_mask(label_data):
             isolated = np.zeros(ds_mask.shape, dtype=np.uint8)
             for label in label_set:
                 isolated[ds_mask == label] = 255
             isolated = cv2.erode(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5)))
             isolated = cv2.dilate(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(9,9)))
-            isolated = cv2.resize(isolated, (shape[1], shape[0]))
             isolated[isolated<127] = 0
-            
-            return isolated
-
-        def get_line_sets(label_set):
-            line_sets = []
+            label_data.mask = isolated
+            return label_data
+        
+        #tues april 13 2:30
+        def get_line_sets(label_data):
+            label_data.line_sets = []
 
             for vp in self.vanishing_points:
-                line_set = []
+                matches = []
+                for line in vp.inliers:
+                    if line.label in label_data.label_set: matches.append(line)
+                    else:
+                        point_a, point_b = line.translated_points(label_data.mask.shape[1], label_data.mask.shape[0])
+                        samples = LineFunctions.get_line_samples(point_a, point_b, label_data.mask, 5)
 
-                matches = list(filter(lambda x: x.label in label_set, vp.inliers))
+                        #check within expanded mask and decent probability of label type (could check all in set)
+                        if len(samples) > 0 and max(samples) > 0 and line.get_probability(label_set[0]) > 0.1: 
+                            matches.append(line)
 
                 if len(matches):
-                    line_sets.append(matches)
-
-            return line_sets
+                    label_data.line_sets.append(matches)
+            return label_data
 
         self.data = {}
 
         for label_set in self.label_sets:
-            key = SegmentationSet.key(label_set)
-            self.data[key] = LabelData(label_set)
-            self.data[key].mask = get_label_mask(label_set)
-            self.data[key].line_sets = get_line_sets(label_set)
+            value = LabelData(label_set)
+            get_label_mask(value)
+            get_line_sets(value)
+            self.data[value.label] = value
 
         if self.debug is not None:
             for key in self.data:
                 datum = self.data[key]
                 color = SegmentationSet.color(datum.label_set)
                 hue = ip.convert_color(color, cv2.COLOR_BGR2HSV_FULL)[0]
-                self.debug = ip.overlay_mask(self.debug, datum.mask, hue=hue)
+                mask = cv2.resize(datum.mask, (shape[1], shape[0]))
+                self.debug = ip.overlay_mask(self.debug, mask, hue=hue)
 
             for key in self.data:
                 datum = self.data[key]
+
+                if key != SegmentationLabel.WALL: continue
+
                 color = SegmentationSet.color(datum.label_set)
                 for lines in datum.line_sets:
                     for line in lines:
