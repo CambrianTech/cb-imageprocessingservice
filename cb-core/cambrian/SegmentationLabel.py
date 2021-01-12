@@ -1,4 +1,5 @@
 from enum import IntEnum
+import cambrian.image_processing as ip
 
 #https://github.com/CSAILVision/sceneparsing/blob/master/objectInfo150.csv
 class SegmentationLabel(IntEnum):
@@ -163,5 +164,9 @@ class SegmentationSet:
     @classmethod
     def key(cls, _set):
         return _set[0].name
+
+    @classmethod
+    def color(cls, _set):
+        return ip.get_label_color(_set[0])
 
 

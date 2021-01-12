@@ -56,12 +56,31 @@ class RectangleFinder:
             
             return isolated
 
+        def get_line_sets(label_set):
+            line_sets = []
+
+            color = SegmentationSet.color(label_set)
+            for vp in self.vanishing_points:
+                line_set = []
+
+                matches = list(filter(lambda x: x.label in label_set, vp.inliers))
+
+                if len(matches):
+                    if self.debug is not None:
+                        for line in matches:
+                            line.draw(self.debug, color=color, thickness=3)
+
+                    line_sets.append(matches)
+
+            return line_sets
+
         self.data = {}
 
         for label_set in self.label_sets:
             key = SegmentationSet.key(label_set)
             self.data[key] = LabelData(label_set)
             self.data[key].mask = get_label_mask(label_set)
+            self.data[key].line_sets = get_line_sets(label_set)
 
         #exit()
         # self.line_sets = []
@@ -74,15 +93,7 @@ class RectangleFinder:
 
             #isolated = cv2.dilate(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5)))
             
-    def get_line_sets(self, vanishing_point):
-        lines = []
-
-        for line in vanishing_point.inliers: 
-            if self.debug is not None:
-                color = ip.get_label_color(line.label)
-                line.draw(self.debug, color=color, thickness=3)
-
-        return lines
+    
                 
 
     def compute(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_time=1.0):
