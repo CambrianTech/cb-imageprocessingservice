@@ -25,9 +25,10 @@ class LabelData:
     def __init__(self, label_set):
         self.label_set = label_set
         self.mask = None
+        self.line_sets = None
 
 class RectangleFinder:
-    def __init__(self, datum, vanishing_points, label_sets=[SegmentationSet.WALL, SegmentationSet.FLOOR, SegmentationSet.CEILING], debug=None):
+    def __init__(self, datum, vanishing_points, label_sets=[SegmentationSet.FLOOR, SegmentationSet.CEILING, SegmentationSet.WALL], debug=None):
         self.datum = datum
         self.vanishing_points = vanishing_points
         self.debug = debug
@@ -46,30 +47,22 @@ class RectangleFinder:
             isolated = np.zeros(ds_mask.shape, dtype=np.uint8)
             for label in label_set:
                 isolated[ds_mask == label] = 255
-            isolated = cv2.erode(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3)))
-            isolated = cv2.dilate(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(13,13)))
+            isolated = cv2.erode(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5)))
+            isolated = cv2.dilate(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(9,9)))
             isolated = cv2.resize(isolated, (shape[1], shape[0]))
             isolated[isolated<127] = 0
-
-            if self.debug is not None:
-                self.debug = ip.overlay_mask(self.debug, isolated, hue=label_set[0]*13)
             
             return isolated
 
         def get_line_sets(label_set):
             line_sets = []
 
-            color = SegmentationSet.color(label_set)
             for vp in self.vanishing_points:
                 line_set = []
 
                 matches = list(filter(lambda x: x.label in label_set, vp.inliers))
 
                 if len(matches):
-                    if self.debug is not None:
-                        for line in matches:
-                            line.draw(self.debug, color=color, thickness=3)
-
                     line_sets.append(matches)
 
             return line_sets
@@ -82,16 +75,19 @@ class RectangleFinder:
             self.data[key].mask = get_label_mask(label_set)
             self.data[key].line_sets = get_line_sets(label_set)
 
-        #exit()
-        # self.line_sets = []
-        # for vp in self.vanishing_points:
-        #     self.line_sets.extend(self.get_line_sets(vp))
+        if self.debug is not None:
+            for key in self.data:
+                datum = self.data[key]
+                color = SegmentationSet.color(datum.label_set)
+                hue = ip.convert_color(color, cv2.COLOR_BGR2HSV_FULL)[0]
+                self.debug = ip.overlay_mask(self.debug, datum.mask, hue=hue)
 
-        # self.wall_mask = get_label_mask(SegmentationLabel.WALL)
-        # self.floor_mask = get_label_mask(SegmentationLabel.FLOOR)
-        # self.ceiling_mask = get_label_mask(SegmentationLabel.CEILING)       
-
-            #isolated = cv2.dilate(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5)))
+            for key in self.data:
+                datum = self.data[key]
+                color = SegmentationSet.color(datum.label_set)
+                for lines in datum.line_sets:
+                    for line in lines:
+                        line.draw(self.debug, color=color, thickness=3)
             
     
                 

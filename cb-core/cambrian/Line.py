@@ -59,7 +59,7 @@ class Line:
 
     def get_labels(self):
         if self.labels is None:
-            self.labels = np.array(LineFunctions.get_line_samples(self.point_a, self.point_b, self.images["segmented"], 5)).astype(int)
+            self.labels = np.array(LineFunctions.get_line_samples(self.point_a, self.point_b, self.images["segmented"], int(self.length / self.color_step) + 1)).astype(int)
         return self.labels
 
     @property
