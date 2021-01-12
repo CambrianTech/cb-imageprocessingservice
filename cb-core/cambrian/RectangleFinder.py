@@ -2,7 +2,7 @@ import math
 import numpy as np
 import time
 import cv2
-from cambrian.SegmentationLabel import SegmentationLabel
+from cambrian.SegmentationLabel import SegmentationLabel, SegmentationSet
 import cambrian.image_processing as ip
 
 class RectangularSurface:
@@ -21,42 +21,68 @@ class RectangularSurface:
         self.votes[indexes] = 0
         self._score = None
 
+class LabelData:
+    def __init__(self, label_set):
+        self.label_set = label_set
+        self.mask = None
+
 class RectangleFinder:
-    def __init__(self, datum, vanishing_points, debug=None):
+    def __init__(self, datum, vanishing_points, label_sets=[SegmentationSet.WALL, SegmentationSet.FLOOR, SegmentationSet.CEILING], debug=None):
         self.datum = datum
         self.vanishing_points = vanishing_points
         self.debug = debug
         self.diagonal = math.hypot(self.datum['segmented'].shape[0], self.datum['segmented'].shape[1])
-        self.find_contours()
+        self.label_sets = label_sets
+        self.initialize_data()
 
-    def find_contours(self, distance=0.9):
+
+    def initialize_data(self, distance=0.9):
 
         shape = self.datum['segmented'].shape
-        scale = 400 / self.diagonal
+        scale = 200 / self.diagonal
         ds_mask = cv2.resize(self.datum['segmented'], (int(shape[1] * scale), int(shape[0] * scale)), cv2.INTER_NEAREST)
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(13,13))
 
-        def get_label_contours(label):
+        def get_label_mask(label_set):
             isolated = np.zeros(ds_mask.shape, dtype=np.uint8)
-            isolated[ds_mask == label] = 255
-            isolated = cv2.dilate(isolated, kernel)
+            for label in label_set:
+                isolated[ds_mask == label] = 255
+            isolated = cv2.erode(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3)))
+            isolated = cv2.dilate(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(13,13)))
             isolated = cv2.resize(isolated, (shape[1], shape[0]))
             isolated[isolated<127] = 0
-            contours, _ = cv2.findContours(isolated, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
             if self.debug is not None:
-                self.debug = ip.overlay_mask(self.debug, isolated, hue=label*20)
-                for cnt in contours:
-                    cv2.drawContours(self.debug, [cnt], 0, (0,255,0), 3)
+                self.debug = ip.overlay_mask(self.debug, isolated, hue=label_set[0]*13)
             
-            return contours
+            return isolated
 
-        self.wall_contours = get_label_contours(SegmentationLabel.WALL)
-               
+        self.data = {}
+
+        for label_set in self.label_sets:
+            key = SegmentationSet.key(label_set)
+            self.data[key] = LabelData(label_set)
+            self.data[key].mask = get_label_mask(label_set)
+
+        #exit()
+        # self.line_sets = []
+        # for vp in self.vanishing_points:
+        #     self.line_sets.extend(self.get_line_sets(vp))
+
+        # self.wall_mask = get_label_mask(SegmentationLabel.WALL)
+        # self.floor_mask = get_label_mask(SegmentationLabel.FLOOR)
+        # self.ceiling_mask = get_label_mask(SegmentationLabel.CEILING)       
 
             #isolated = cv2.dilate(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5)))
             
-                
+    def get_line_sets(self, vanishing_point):
+        lines = []
+
+        for line in vanishing_point.inliers: 
+            if self.debug is not None:
+                color = ip.get_label_color(line.label)
+                line.draw(self.debug, color=color, thickness=3)
+
+        return lines
                 
 
     def compute(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_time=1.0):
@@ -81,6 +107,8 @@ class RectangleFinder:
 
         first_index_space = self.vanishing_points[:num_pts // 2]
         second_index_space = self.vanishing_points[:num_pts]
+
+
 
         rectangles = []
 

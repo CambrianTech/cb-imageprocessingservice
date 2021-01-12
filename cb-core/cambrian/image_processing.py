@@ -5,6 +5,10 @@ from skimage import filters
 
 from . import diagnostics as d
 
+from gluoncv.utils.viz.segmentation import adepallete
+
+_adepallete = np.array(adepallete).reshape(len(adepallete)//3, 3)
+
 def overlay_mask(img, mask, hue=None, saturation=255, darkest_value=80):
     
     overlay = cv2.resize(mask, (img.shape[1], img.shape[0]))
@@ -35,6 +39,10 @@ def rough_dilate_erode(is_dilate, mask, size=5, iterations=1, scale=0.5, maintai
 
 def convert_color(color, conversion):
     return tuple(int(i) for i in cv2.cvtColor(np.uint8([[color]]), conversion).flatten())
+
+def get_label_color(label, palette=_adepallete):
+    color = palette[label]
+    return int(color[0]), int(color[1]), int(color[2])
 
 def soft_light(img_in, img_layer, opacity):
     """

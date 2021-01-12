@@ -19,7 +19,7 @@ import matplotlib.image as mpimg
 import cambrian.image_processing as ip
 
 import io
-from cambrian import frei_chen, VanishingPointFinder, Line, RectangleFinder, SegmentationLabel, SegmentationCollection
+from cambrian import frei_chen, VanishingPointFinder, Line, RectangleFinder, SegmentationLabel, SegmentationSet
 from modelutils import feed_image_batched, feed_images_batched, load_model
 from gluoncv.data.transforms.presets.segmentation import test_transform
 import random

@@ -153,6 +153,15 @@ class SegmentationLabel(IntEnum):
     CLOCK=148
     FLAG=149
 
-class SegmentationCollection:
-    WALL=[SegmentationLabel.WALL, SegmentationLabel.COLUMN, SegmentationLabel.WINDOW, SegmentationLabel.DOOR, SegmentationLabel.SCREENDOOR, SegmentationLabel.CURTAIN]
-    GROUND=[SegmentationLabel.FLOOR, SegmentationLabel.GROUND, SegmentationLabel.ROAD, SegmentationLabel.PAVEMENT, SegmentationLabel.GRASS, SegmentationLabel.LAND, SegmentationLabel.STAGE]
+class SegmentationSet:
+    WALL=[SegmentationLabel.WALL, SegmentationLabel.COLUMN]
+    FLOOR=[SegmentationLabel.FLOOR, SegmentationLabel.GROUND, SegmentationLabel.ROAD, SegmentationLabel.PAVEMENT, SegmentationLabel.GRASS, SegmentationLabel.LAND, SegmentationLabel.STAGE]
+    CEILING=[SegmentationLabel.CEILING]
+    DOOR=[SegmentationLabel.DOOR, SegmentationLabel.SCREENDOOR, SegmentationLabel.CURTAIN]
+    TABLETOP=[SegmentationLabel.TABLE, SegmentationLabel.COFFEETABLE, SegmentationLabel.STEP]
+
+    @classmethod
+    def key(cls, _set):
+        return _set[0].name
+
+
