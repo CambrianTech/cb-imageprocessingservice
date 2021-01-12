@@ -23,7 +23,7 @@ from cambrian import frei_chen, VanishingPointFinder, Line, RectangleFinder, Seg
 from modelutils import feed_image_batched, feed_images_batched, load_model
 from gluoncv.data.transforms.presets.segmentation import test_transform
 import random
-
+import pickle
 #SEG_RES = None
 #ADE_MODEL = 'deeplab_resnet101_ade'
 
@@ -297,6 +297,7 @@ def parse_data(input_dir, output_dir, model_normals):
 
         #run segmentation:
         seg_path = os.path.join(output_path, "mask.png")
+        seg_probs_path = os.path.join(output_path, "semantic.pickle")
         normals_path = os.path.join(output_path, "normals.png")
 
         datum = {}
@@ -304,17 +305,23 @@ def parse_data(input_dir, output_dir, model_normals):
         datum['segmented'] = cv2.imread(seg_path, cv2.IMREAD_GRAYSCALE)
         datum['normals'] = cv2.imread(normals_path)
 
-        if datum['segmented'] is None:
+        if datum['segmented'] is None or not os.path.exists(seg_probs_path):
             print("Segmenting %s" % image_path)
             start = time.process_time()
             segment_images(ctx, model, [img], datum)
             end = time.process_time()
             print("segmentation took %.2f seconds" % (end-start))
-            datum['segmented'] = np.argmax(datum['semantic_probs'], axis=0)
+            datum['segmented'] = np.argmax(datum['semantic_probs'], axis=0).astype("uint8")
             cv2.imwrite(seg_path, datum['segmented'])
+            with open(seg_probs_path, 'wb') as handle:
+                pickle.dump(datum['semantic_probs'], handle)
+        else:
+            with open(seg_probs_path, 'rb') as handle:
+                datum['semantic_probs'] = pickle.load(handle)
 
         datum['labels'] = [SegmentationLabel(x) for x in list(np.unique(datum['segmented']))]
 
+        print(datum['semantic_probs'].shape, datum['segmented'].shape)
         print(datum['labels'])
 
         datum['segmented_color'] = colorize_labels(datum['segmented'])

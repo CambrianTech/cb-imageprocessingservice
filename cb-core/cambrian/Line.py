@@ -26,6 +26,8 @@ class Line:
         self.labels = None
         self._label = None
 
+        self.probabilities = {}
+
         self.recalculate()
 
     def recalculate(self):
@@ -39,7 +41,6 @@ class Line:
     debug = None
     confidence_step = 8
     color_step = 7
-    image_keys=["image", "edges", "segmentation"] #expects same size
 
     @classmethod
     def prepare(cls, images, debug=None):
@@ -61,6 +62,11 @@ class Line:
         if self.labels is None:
             self.labels = np.array(LineFunctions.get_line_samples(self.point_a, self.point_b, self.images["segmented"], int(self.length / self.color_step) + 1)).astype(int)
         return self.labels
+
+    # def get_probability(self, label):
+    #     if label not in self.probabilities:
+    #         self.probabilities[label] = np.array(LineFunctions.get_line_samples(self.point_a, self.point_b, self.images["segmented"], int(self.length / self.color_step) + 1)).astype(int)
+    #     return self.probabilities
 
     @property
     def label(self):
