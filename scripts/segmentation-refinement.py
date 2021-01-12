@@ -194,7 +194,7 @@ def find_lines(images, output_path):
 
     if lines_b is not None: Line.draw_all(line_data, lines_b)
 
-    line_data = Line.merge(line_data, diagonal / 80.0, search_length=1.0, angle_threshold=math.radians(3.0), create_pairs=True)
+    line_data = Line.merge(line_data, diagonal / 120.0, search_length=1.0, angle_threshold=math.radians(3.0), create_pairs=True)
 
     if lines_c is not None: Line.draw_all(line_data, lines_c)
 
