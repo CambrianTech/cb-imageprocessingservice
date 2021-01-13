@@ -215,15 +215,16 @@ def find_lines(images, output_path):
 
 def find_surfaces(datum, line_data, output_path):
 
-    if SAVE_DEBUG_IMAGES:
-        vp_image = datum["image"].copy()
-        surfaces_image = datum["image"].copy()
-    else:
-        surfaces_image = vp_image = None
-
     image, labels, centers = ip.kmeans_image(datum['normals'])
     num_surfaces = centers.shape[0]
     datum['kmeans_normals'] = image
+
+    if SAVE_DEBUG_IMAGES:
+        vp_image = datum["image"].copy()
+        normals_resized = cv2.resize(datum['kmeans_normals'], (datum["image"].shape[1], datum["image"].shape[0]))
+        surfaces_image = cv2.addWeighted(datum["image"], 0.5, normals_resized, 0.5, 0)
+    else:
+        surfaces_image = vp_image = None
 
     cv2.imwrite(os.path.join(output_path, "normals_kmeans.png"), datum['kmeans_normals'])
   
@@ -239,7 +240,8 @@ def find_surfaces(datum, line_data, output_path):
 
     rf = SurfaceFinder(datum, vanishing_points, debug=surfaces_image)
     surfaces = rf.compute()
-    surfaces_image = rf.debug
+    if rf.debug is not None:
+        surfaces_image = rf.debug
 
     cv2.imwrite(os.path.join(output_path, "surfaces.jpg"), np.hstack((vp_image, surfaces_image)))
 

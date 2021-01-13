@@ -108,7 +108,7 @@ class SurfaceFinder:
                 color = SegmentationSet.color(datum.label_set)
                 hue = ip.convert_color(color, cv2.COLOR_BGR2HSV_FULL)[0]
                 mask = cv2.resize(datum.mask, (shape[1], shape[0]))
-                self.debug = ip.overlay_mask(self.debug, mask, hue=hue)
+                #self.debug = ip.overlay_mask(self.debug, mask, hue=hue)
 
             for key in self.data:
                 datum = self.data[key]
