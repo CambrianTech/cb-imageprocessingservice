@@ -19,7 +19,7 @@ import matplotlib.image as mpimg
 import cambrian.image_processing as ip
 
 import io
-from cambrian import frei_chen, VanishingPointFinder, Line, RectangleFinder, SegmentationLabel, SegmentationSet
+from cambrian import frei_chen, VanishingPointFinder, Line, SurfaceFinder, SegmentationLabel, SegmentationSet
 from modelutils import feed_image_batched, feed_images_batched, load_model
 from gluoncv.data.transforms.presets.segmentation import test_transform
 import random
@@ -231,8 +231,8 @@ def find_surfaces(images, line_data, output_path):
             for line in vp.inliers: 
                 line.draw(vp_image, color=color, thickness=3)
 
-    rf = RectangleFinder(images, vanishing_points, debug=surfaces_image)
-    rectangles = rf.compute()
+    rf = SurfaceFinder(images, vanishing_points, debug=surfaces_image)
+    surfaces = rf.compute()
     surfaces_image = rf.debug
 
     cv2.imwrite(os.path.join(output_path, "surfaces.jpg"), np.hstack((vp_image, surfaces_image)))

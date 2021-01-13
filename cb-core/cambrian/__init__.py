@@ -2,7 +2,7 @@ from . import diagnostics, geometry, image_processing, transformations, utils, n
 
 from .frei_chen import frei_chen
 from .Line import Line
-from .RectangleFinder import RectangleFinder
+from .SurfaceFinder import SurfaceFinder
 from .VanishingPointFinder import VanishingPointFinder
 from .LineFunctions import LineFunctions
 from .SegmentationLabel import SegmentationLabel, SegmentationSet

@@ -5,8 +5,9 @@ import cv2
 from cambrian.SegmentationLabel import SegmentationLabel, SegmentationSet
 from cambrian.LineFunctions import LineFunctions
 import cambrian.image_processing as ip
+from cambrian.Line import Line
 
-class RectangularSurface:
+class Surface:
     def __init__(self, rf, model, votes, debug=None):
         self.vpf = vpf
         self.votes = votes
@@ -32,7 +33,7 @@ class LabelData:
     def label(self):
         return SegmentationSet.label(self.label_set)
 
-class RectangleFinder:
+class SurfaceFinder:
     def __init__(self, datum, vanishing_points, label_sets=[SegmentationSet.FLOOR, SegmentationSet.CEILING, SegmentationSet.WALL], debug=None):
         self.datum = datum
         self.vanishing_points = vanishing_points
@@ -56,23 +57,37 @@ class RectangleFinder:
             isolated = cv2.dilate(isolated, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(9,9)))
             isolated[isolated<127] = 0
             label_data.mask = isolated
+
+            # label_data.contours, _ = cv2.findContours(label_data.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            # label_data.hulls = []
+            # for cnt in label_data.contours:
+            #     label_data.hulls.append(cv2.convexHull(cnt, returnPoints = True))
+
             return label_data
         
         #tues april 13 2:30
         def get_line_sets(label_data):
+
             label_data.line_sets = []
 
             for vp in self.vanishing_points:
                 matches = []
+
                 for line in vp.inliers:
-                    if line.label in label_data.label_set: matches.append(line)
+                    is_match = False
+                    if line.label in label_data.label_set: 
+                        is_match = True
                     else:
                         point_a, point_b = line.translated_points(label_data.mask.shape[1], label_data.mask.shape[0])
-                        samples = LineFunctions.get_line_samples(point_a, point_b, label_data.mask, 5)
+                        mask_samples = LineFunctions.get_line_samples(point_a, point_b, label_data.mask, 5)
 
                         #check within expanded mask and decent probability of label type (could check all in set)
-                        if len(samples) > 0 and max(samples) > 0 and line.get_probability(label_set[0]) > 0.1: 
-                            matches.append(line)
+                        if len(mask_samples) > 0 and max(mask_samples) > 0 and line.get_probability(label_set[0]) > 0.1: 
+                            is_match = True
+
+                    if is_match:                        
+                        matches.append(line)
+
 
                 if len(matches):
                     label_data.line_sets.append(matches)
@@ -99,8 +114,8 @@ class RectangleFinder:
 
                 if key != SegmentationLabel.WALL: continue
 
-                color = SegmentationSet.color(datum.label_set)
                 for lines in datum.line_sets:
+                    color = ip.get_random_color()
                     for line in lines:
                         line.draw(self.debug, color=color, thickness=3)
             
@@ -119,7 +134,7 @@ class RectangleFinder:
             max number of vanishing points to return
         Returns
         -------
-        rectangles: list
+        surfaces: list
             list of RectangularSurface objects, sorted by score.
         """
 
@@ -130,9 +145,7 @@ class RectangleFinder:
         first_index_space = self.vanishing_points[:num_pts // 2]
         second_index_space = self.vanishing_points[:num_pts]
 
-
-
-        rectangles = []
+        surfaces = []
 
         t = time.time()
         
@@ -145,5 +158,5 @@ class RectangleFinder:
 
             #print(vp1, vp2)
 
-        return rectangles
+        return surfaces
 

@@ -64,11 +64,15 @@ class Line:
             self.labels = np.array(LineFunctions.get_line_samples(self.point_a, self.point_b, self.images["segmented"], int(self.length / self.color_step) + 1)).astype(int)
         return self.labels
 
-    def translated_points(self, width, height):
-        sy = height / self.height
-        sx = width / self.width
+    @classmethod
+    def translate_points(cls, width, height, point_a, point_b):
+        sy = height / cls.height
+        sx = width / cls.width
 
-        return (self.point_a[0] * sx, self.point_a[1] * sy), (self.point_b[0] * sx, self.point_b[1] * sy)
+        return (point_a[0] * sx, point_a[1] * sy), (point_b[0] * sx, point_b[1] * sy)
+
+    def translated_points(self, width, height):
+        return self.translate_points(width, height, point_a=self.point_a, point_b=self.point_b)
 
     def get_probability(self, label):
         if self.probabilities is None:
