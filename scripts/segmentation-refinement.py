@@ -227,8 +227,7 @@ def find_surfaces(images, line_data, output_path):
     
     if SAVE_DEBUG_IMAGES and len(vanishing_points) > 0:
         for vp in vanishing_points:
-            color = np.random.randint(0, 255, size=(3, ))
-            color = ( int (color [ 0 ]), int (color [ 1 ]), int (color [ 2 ]))
+            color = ip.get_random_color()
             for line in vp.inliers: 
                 line.draw(vp_image, color=color, thickness=3)
 

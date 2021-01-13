@@ -44,6 +44,10 @@ def get_label_color(label, palette=_adepallete):
     color = palette[label]
     return int(color[0]), int(color[1]), int(color[2])
 
+def get_random_color():
+    color = np.random.randint(0, 255, size=(3, ))
+    return ( int (color [ 0 ]), int (color [ 1 ]), int (color [ 2 ]))
+
 def soft_light(img_in, img_layer, opacity):
     """
     Apply soft light blending mode of a layer on an image.
