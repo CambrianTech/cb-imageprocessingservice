@@ -6,6 +6,7 @@ from cambrian.SegmentationLabel import SegmentationLabel, SegmentationSet
 from cambrian.LineFunctions import LineFunctions
 import cambrian.image_processing as ip
 from cambrian.Line import Line
+import os
 
 class Surface:
     def __init__(self, rf, model, votes, debug=None):

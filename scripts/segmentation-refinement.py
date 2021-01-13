@@ -213,14 +213,20 @@ def find_lines(images, output_path):
 
     return line_data
 
-def find_surfaces(images, line_data, output_path):
+def find_surfaces(datum, line_data, output_path):
 
     if SAVE_DEBUG_IMAGES:
-        vp_image = images["image"].copy()
-        surfaces_image = images["image"].copy()
+        vp_image = datum["image"].copy()
+        surfaces_image = datum["image"].copy()
     else:
         surfaces_image = vp_image = None
 
+    image, labels, centers = ip.kmeans_image(datum['normals'])
+    num_surfaces = centers.shape[0]
+    datum['kmeans_normals'] = image
+
+    cv2.imwrite(os.path.join(output_path, "normals_kmeans.png"), datum['kmeans_normals'])
+  
     #vanishing points:
     vpf = VanishingPointFinder(line_data)
     vanishing_points = vpf.compute(threshold_inlier=math.radians(3))
@@ -231,7 +237,7 @@ def find_surfaces(images, line_data, output_path):
             for line in vp.inliers: 
                 line.draw(vp_image, color=color, thickness=3)
 
-    rf = SurfaceFinder(images, vanishing_points, debug=surfaces_image)
+    rf = SurfaceFinder(datum, vanishing_points, debug=surfaces_image)
     surfaces = rf.compute()
     surfaces_image = rf.debug
 
@@ -300,6 +306,7 @@ def parse_data(input_dir, output_dir, model_normals):
         normals_path = os.path.join(output_path, "normals.png")
 
         datum = {}
+        datum['output_path'] = output_path
         datum['image'] = img
         datum['segmented'] = cv2.imread(seg_path, cv2.IMREAD_GRAYSCALE)
         datum['normals'] = cv2.imread(normals_path)

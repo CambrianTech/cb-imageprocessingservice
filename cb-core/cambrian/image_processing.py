@@ -837,7 +837,7 @@ def refine_mask_watershed(args, rgb, mask, image_name, distance=0.0, erode=0, ma
 
 
 
-def kmeans_image(rgb, k=8):
+def kmeans_image(rgb, k=None, max_k=11, cutoff=1.01):
     """Runs k-means on rgb and returns a result image, labels and the centers"""
     img = rgb.copy()
     dim = 1
@@ -850,14 +850,28 @@ def kmeans_image(rgb, k=8):
 
     # define criteria, number of clusters(K) and apply kmeans()
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-    compactness, labels, centers = cv2.kmeans(z, k, None, criteria, 10, cv2.KMEANS_PP_CENTERS)
 
+    if k is None:
+        last_deviation = 0
+        for test_k in range(3, max_k):
+            
+            compactness, labels, centers = cv2.kmeans(z, test_k, None, criteria, 5, cv2.KMEANS_PP_CENTERS)
+            values = centers[labels.flatten()]
+            deviation = np.mean(np.std(values, axis=0))
+            
+            if deviation < last_deviation * 1.01:
+                break
+
+            k = test_k
+            last_deviation = deviation
+
+    compactness, labels, centers = cv2.kmeans(z, k, None, criteria, 9, cv2.KMEANS_PP_CENTERS)
+    values = centers[labels.flatten()]
+    
     # Now convert back into uint8, and make original image
-    centers = np.uint8(centers)
-    res = centers[labels.flatten()]
-    res = res.reshape((img.shape))
+    image = values.reshape((img.shape)).astype("uint8")
 
-    return res, labels, centers
+    return image, labels, centers
 
 
 
