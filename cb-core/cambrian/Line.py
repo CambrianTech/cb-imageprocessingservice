@@ -423,7 +423,7 @@ class Line:
             #end while
 
         #clean up dead lines
-        print("Found %d corners" % len(corners))
+        # print("Found %d corners" % len(corners))
         line_data = list(filter(lambda x: not x.dead, line_data))
 
         return line_data, corners
