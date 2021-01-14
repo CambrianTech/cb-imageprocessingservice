@@ -2,10 +2,34 @@ import math
 import numpy as np
 import time
 
+class VanishingPoint:
+    def __init__(self, vpf, model, votes):
+        self.vpf = vpf
+        self.model = model
+        self.votes = votes
+        
+        self._score = sum(self.votes)
+        if np.any(self.vpf.seeds != None):
+            cm = self.model[:2] / self.model[2]
+            dot = 1 - abs(np.dot(cm / np.linalg.norm(cm), self.vpf.seeds[:2] / np.linalg.norm(self.vpf.seeds[:2])))
+            self._score = self._score * dot > .9
+
+    def __eq__(self, other):
+        return self.score() == other.score()
+
+    def __lt__(self, other):
+        return self.score() < other.score()
+
+    @property
+    def score(self):
+        return self._score
+        
+
 class VanishingPointFinder:
-    def __init__(self, line_data):
+    def __init__(self, line_data, seeds=None):
         self.line_data = line_data
         self.edgelets = self.compute_edgelets()
+        self.seeds = seeds
 
     def compute_votes(self, model, threshold_inlier):
         """Compute votes for each of the edgelet against a given vanishing point.
@@ -86,7 +110,7 @@ class VanishingPointFinder:
         lines = np.concatenate((normals, p[:, np.newaxis]), axis=1)
         return lines
 
-    def compute(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_time=1.0, find_vert=True, seeds=None):
+    def compute(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_time=1.0, find_vert=True):
         """Estimate vanishing point using Ransac.
         Parameters
         ----------
@@ -115,7 +139,8 @@ class VanishingPointFinder:
         first_index_space = arg_sort[:num_pts // 5]
         second_index_space = arg_sort[:num_pts // 2]
 
-        best_votes = 0
+        best_model = None
+        vanishing_points = []
         t = time.time()
 
         for ransac_iter in range(num_ransac_iter):
@@ -147,22 +172,13 @@ class VanishingPointFinder:
                 if dt1 < .95 or dt2 < .95:
                     continue
 
-            votes = self.compute_votes(current_model, threshold_inlier)
-            current_votes = votes.sum()
+            current_model = current_model / current_model[2]
 
-            if np.any(seeds != None):
-                cm = current_model[:2] / current_model[2]
-                dot = 1 - abs(np.dot(cm / np.linalg.norm(cm), seeds[:2] / np.linalg.norm(seeds[:2])))
+            vp = VanishingPoint(self, current_model, self.compute_votes(current_model, threshold_inlier))
+            
+            vanishing_points.append(vp)
 
-                current_votes = current_votes * dot > .9
+        vanishing_points.sort(key=lambda x:x.score, reverse=True)
 
-            if np.any(current_votes > best_votes):
-                # print("Current best model has {} votes at iteration {},{}".format(
-                #     best_votes, ransac_iter, np.round(time() - t, 2)))
-
-                best_votes = current_votes
-                self.model = current_model / current_model[2]
-                self.votes = votes
-
-        return best_votes > 0
+        return vanishing_points
         

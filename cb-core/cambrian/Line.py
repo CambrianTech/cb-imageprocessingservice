@@ -42,7 +42,7 @@ class Line:
     color_step = 7
 
     @classmethod
-    def prepare(cls, image, edges, debug):
+    def prepare(cls, image, edges, debug=None):
         cls.image = image
         cls.edges = edges
         cls.debug = debug
