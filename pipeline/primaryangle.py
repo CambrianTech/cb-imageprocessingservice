@@ -145,7 +145,7 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
             normal = get_normal_from_rgb(color)
             normal_len = max(0.00001, np.linalg.norm(normal))
             normal /= normal_len
-            print(normal)
+
             color_mask = ip.isolate_color(reduced_normals, color)
             isolated_surfaces.append((color, normal, color_mask))
 
@@ -181,8 +181,7 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
 
         floor_normal_len = max(0.00001, np.linalg.norm(floor_normal))
         floor_normal /= floor_normal_len
-        print("floor normal")
-        print(floor_normal)
+
         cam_pitch = 0.0
         cam_roll = 0.0
 
@@ -197,7 +196,7 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
 
         data["camera_rotation"] = [0.0, 0.0, 0.0]
 
-        print("camera rotation:", data["camera_rotation"])
+        # print("camera rotation:", data["camera_rotation"])
 
         data["camera_elevation"] = 0.0
 
@@ -221,4 +220,4 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
 
         data["floor_rotation"] = floor_rotation
 
-        print("floor rotation:", data["floor_rotation"])
+        # print("floor rotation:", data["floor_rotation"])
