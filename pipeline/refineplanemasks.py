@@ -1232,7 +1232,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
                         basis_forward[0] - basis_ahead[0]) * basis_forward
 
                     floor_rotation = -geometry.angle_between(basis_ahead, basis_forward)
-                    plane_rotations[i] = floor_rotation
+                    if ~np.isnan(floor_rotation):
+                        plane_rotations[i] = floor_rotation
 
 
                 plane = plane_XYZ[i]
@@ -1338,8 +1339,10 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     basis_ahead = geometry.unit_vector(np.float32([0, plane_normals[i][2], -plane_normals[i][1]]))
                     basis_forward = np.sign(basis_forward[2] - basis_ahead[2]) * np.sign(
                         basis_forward[0] - basis_ahead[0]) * basis_forward
+                    rot = -geometry.angle_between(basis_ahead, basis_forward)
 
-                    plane_rotations[i] = -geometry.angle_between(basis_ahead, basis_forward)
+                    if ~np.isnan(floor_rotation):
+                        plane_rotations[i] = rot
 
                 if abs(dot1) < 0.1 and len(basis) > 1:
                     coor = np.argmax(np.abs(basis_forward))
@@ -1357,7 +1360,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     basis_forward = np.sign(basis_forward[1] - basis_ahead[1]) * np.sign(
                         basis_forward[0] - basis_ahead[0]) * basis_forward
 
-                    plane_rotations[i] = -geometry.angle_between(basis_ahead, basis_forward)
+                    rot = -geometry.angle_between(basis_ahead, basis_forward)
+
+                    if ~np.isnan(floor_rotation):
+                        plane_rotations[i] = rot
+
 
 
                 plane = plane_XYZ[i]
@@ -1796,6 +1803,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         # get rid of this later
         data["mask"] = data["planes"]["masks"][0]
 
-        data["floor_rotation"] = floor_rotation
+        if abs(floor_rotation)>0:
+            data["floor_rotation"] = floor_rotation
 
         # print("floor rotation check", data["floor_rotation"])
