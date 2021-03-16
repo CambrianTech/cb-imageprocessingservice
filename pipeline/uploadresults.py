@@ -130,6 +130,7 @@ def _encode_plane_surface_v3(plane_index, plane_data, contour_data, mask_url):
     plane_parameters = np.array(plane_data[6:9], dtype=np.float32)
     plane_offset = np.maximum(1e-4, np.linalg.norm(plane_parameters))
     plane_normal = plane_parameters / plane_offset
+    plane_rotation = plane_data[10]
 
     plane_image_extents = {
         "minY": plane_data[0],
@@ -147,6 +148,7 @@ def _encode_plane_surface_v3(plane_index, plane_data, contour_data, mask_url):
         "name": "Plane %d" % plane_index,
         "normal": plane_normal.tolist(),
         "offset": plane_offset,
+        "rotation": plane_rotation,
         "rawParams": plane_parameters.tolist(),
         "imageExtents": plane_image_extents,
         "images": {

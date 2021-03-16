@@ -21,7 +21,6 @@ from scipy.stats import mode
 
 from skimage.morphology import remove_small_objects, remove_small_holes
 
-
 IM_LOGGING_ENABLED = False
 IM_LOGGING3D_ENABLED = False
 
@@ -807,9 +806,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
     def run(self, data):
 
-        # if IM_LOGGING_ENABLED:
-        #     with open('logging/data.pickle', 'wb') as handle:
-        #         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        if IM_LOGGING_ENABLED:
+            with open('logging/data.pickle', 'wb') as handle:
+                pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         logging_index =0
         logging_dir = 'logging/'
@@ -831,12 +830,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
         h, w = output[0].shape
 
         shape = (w, h)
-        h, w = output[0].shape
 
-        shape = (w, h)
-
-        camera = camera_fov_res_to_intrinsics(60, np.array(shape))
-        # print("camera", camera)
+        camera = camera_fov_res_to_intrinsics(data["fov"], np.array(shape))
 
         hed_rs = cv2.resize(hed, shape)
 
@@ -1103,14 +1098,18 @@ class PipelineRefinePlaneMasks(PipelineStep):
         vp0[:2] *= [sx, sy]
         locations[:, 0] *= sx
         locations[:, 1] *= sy
-        camera = camera_fov_res_to_intrinsics(60, np.array(shape))
-        # print("camera", camera)
+
         plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=w, height=h, max_depth=10, camera=camera)
         basis_up = geometry.unit_vector(uv_to_xyz([vp0[0], vp0[1]], 1, width=w, height=h, camera=camera))
         basis_up = -np.sign(basis_up[2]) * basis_up
 
+        if floor_index > -1 and abs(1. - np.dot(basis_up, floor_normal)) > .05:
+            basis_up = floor_normal
+
         primary_d = [basis_up]
+
         vp1 = vanishingpts[1]
+
         if vanishingpts[1] is not None:
             vp1 = vp1 / vp1[2]
             vp1[:2] *= [sx, sy]
@@ -1190,13 +1189,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
                                                 logging_index=logging_index)
 
         ind = 0
-
+        img_dir = img_rs.copy()
         for i in range(number_planes):
             if i == floor_index:
-                color = np.int32(np.random.randint([127, 127, 127], [254, 254, 235]))
-                # color[ind % 3] = 0
-                ind += 1
-                mask = np.zeros_like(img_rs)
 
                 contours, hierarchy = cv2.findContours(np.uint8(sure_floor), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 hull_mask = np.uint8(sure_floor)
@@ -1208,8 +1203,16 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
                 plane_normals[i] = basis[0]
 
-                basis_forward = geometry.unit_vector(
-                    np.cross(plane_normals[i], np.cross(basis_up, plane_normals[wall_indices[0]])))
+                basis_forward = [0, 1, 0]
+
+                if len(vert_indices)>0:
+                    basis_forward = geometry.unit_vector(
+                        np.cross(plane_normals[i], np.cross(basis_up, plane_normals[vert_indices[0]])))
+
+                if len(wall_indices)>0:
+                    basis_forward = geometry.unit_vector(
+                        np.cross(plane_normals[i], np.cross(basis_up, plane_normals[wall_indices[0]])))
+
                 basis_right = geometry.unit_vector(np.cross(basis_forward, basis_up))
 
                 if len(basis) > 1:
@@ -1248,10 +1251,14 @@ class PipelineRefinePlaneMasks(PipelineStep):
                 # basis_right = geometry.unit_vector(np.cross(basis_forward,plane_normals[i]))
                 # basis_right = np.dot(M, basis_right)
                 # basis_forward = np.dot(M, basis_forward)
-                #
+
                 # uv_center = np.int32(xyz_to_uv(plane_center, width=w, height=h, camera=camera))
                 # pre_pos = np.int32(xyz_to_uv(plane_center, width=w, height=h, camera=camera))
-                #
+                # #
+                # color = np.int32(np.random.randint([127, 127, 127], [254, 254, 235]))
+                # # color[ind % 3] = 0
+                # ind += 1
+                # mask = np.zeros_like(img_rs)
                 # a = 50
                 # scale = 5.
                 # color = (int(color[0]), int(color[1]), int(color[2]))
@@ -1271,26 +1278,26 @@ class PipelineRefinePlaneMasks(PipelineStep):
                 #             cv2.line(mask, (pre_pos[0], pre_pos[1]), (uv_pos2[0], uv_pos2[1]), color = (0,255,255),
                 #                      thickness=2)
                 #         pre_pos = uv_pos
-                # img_rs[np.logical_and(mask[:,:,2]>0,sure_floor>0)] = mask[np.logical_and(mask[:,:,2]>0,sure_floor>0)]
+                # img_dir[np.logical_and(mask[:,:,2]>0,sure_floor>0)] = mask[np.logical_and(mask[:,:,2]>0,sure_floor>0)]
                 # # img_rs[np.logical_and(mask[:,:,2]>0,hull_mask>0)] = mask[np.logical_and(mask[:,:,2]>0,hull_mask>0)]
                 # # plane_center = np.float32([0,.01,0])
                 #
                 # uv_center = np.int32(xyz_to_uv(plane_center, width=w, height=h, camera=camera))
                 #
-                # cv2.polylines(img_rs, pts=np.array([[[vp0[0], vp0[1]], [uv_center[0], uv_center[1]]]], np.int32), isClosed=False, color=(0,0,255), thickness=3,lineType=cv2.LINE_AA)
+                # cv2.polylines(img_dir, pts=np.array([[[vp0[0], vp0[1]], [uv_center[0], uv_center[1]]]], np.int32), isClosed=False, color=(0,0,255), thickness=3,lineType=cv2.LINE_AA)
                 # if len(basis)>1:
                 #     a = np.int32(xyz_to_uv(plane_center + 10000*basis_forward, width=w, height=h, camera=camera))
-                #     cv2.polylines(img_rs, pts=np.array([[[a[0], a[1]], [uv_center[0], uv_center[1]]]], np.int32),
+                #     cv2.polylines(img_dir, pts=np.array([[[a[0], a[1]], [uv_center[0], uv_center[1]]]], np.int32),
                 #                   isClosed=False, color=(255, 0, 0), thickness=3, lineType=cv2.LINE_AA)
                 # if len(basis) > 1:
                 #     b = np.int32(xyz_to_uv(plane_center + 10000*basis_right, width=w, height=h, camera=camera))
-                #     cv2.polylines(img_rs, pts=np.array([[[b[0], b[1]], [uv_center[0], uv_center[1]]]], np.int32),
+                #     cv2.polylines(img_dir, pts=np.array([[[b[0], b[1]], [uv_center[0], uv_center[1]]]], np.int32),
                 #               isClosed=False, color=(0, 255, 0), thickness=3)
                 #     b = np.int32(xyz_to_uv(plane_center + 10000*basis_ahead, width=w, height=h, camera=camera))
-                #     cv2.polylines(img_rs, pts=np.array([[[b[0], b[1]], [uv_center[0], uv_center[1]]]], np.int32),
+                #     cv2.polylines(img_dir, pts=np.array([[[b[0], b[1]], [uv_center[0], uv_center[1]]]], np.int32),
                 #               isClosed=False, color=(255, 255, 255), thickness=1)
                 #     b = np.int32(xyz_to_uv(plane_center + 10000*basis[1], width=w, height=h, camera=camera))
-                #     cv2.polylines(img_rs, pts=np.array([[[b[0], b[1]], [uv_center[0], uv_center[1]]]], np.int32),
+                #     cv2.polylines(img_dir, pts=np.array([[[b[0], b[1]], [uv_center[0], uv_center[1]]]], np.int32),
                 #               isClosed=False, color=0, thickness=1)
 
             if i in vert_indices or i in wall_indices:
@@ -1333,13 +1340,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
                         basis_forward[0] - basis_ahead[0]) * basis_forward
 
                     plane_rotations[i] = -geometry.angle_between(basis_ahead, basis_forward)
-                    #
-                    # M = geometry.rotation_matrix(plane_normals[i], plane_rotations[i])
-                    #
-                    # basis_forward = geometry.unit_vector(np.float32([0, plane_normals[i][2], -plane_normals[i][1]]))
-                    # basis_up = geometry.unit_vector(np.cross(basis_forward, plane_normals[i]))
-                    # basis_up = np.dot(M, basis_up)
-                    # basis_forward = np.dot(M, basis_forward)
 
                 if abs(dot1) < 0.1 and len(basis) > 1:
                     coor = np.argmax(np.abs(basis_forward))
@@ -1358,13 +1358,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                         basis_forward[0] - basis_ahead[0]) * basis_forward
 
                     plane_rotations[i] = -geometry.angle_between(basis_ahead, basis_forward)
-                    #
-                    # M = geometry.rotation_matrix(plane_normals[i], plane_rotations[i])
-                    #
-                    # basis_forward = geometry.unit_vector(np.float32([0, plane_normals[i][2], -plane_normals[i][1]]))
-                    # basis_up = geometry.unit_vector(np.cross(basis_forward, plane_normals[i]))
-                    # basis_up = np.dot(M, basis_up)
-                    # basis_forward = np.dot(M, basis_forward)
+
 
                 plane = plane_XYZ[i]
                 plane_center = np.mean(plane[hull_mask > 0], axis=0)
@@ -1377,8 +1371,12 @@ class PipelineRefinePlaneMasks(PipelineStep):
                 plane_parameters[i] = plane_normals[i] * offset
                 plane_XYZ[i], _ = calcPlaneXYZ([plane_parameters[i]], width=w, height=h, camera=camera, max_depth=10)
 
+                # M = geometry.rotation_matrix(plane_normals[i], plane_rotations[i])
                 #
-                #
+                # basis_forward = geometry.unit_vector(np.float32([0, plane_normals[i][2], -plane_normals[i][1]]))
+                # basis_up = geometry.unit_vector(np.cross(basis_forward, plane_normals[i]))
+                # basis_up = np.dot(M, basis_up)
+                # basis_forward = np.dot(M, basis_forward)
                 #
                 # color = np.int32(np.random.randint([127, 127, 127], [254, 254, 235]))
                 # color[ind % 3] = 0
@@ -1407,23 +1405,24 @@ class PipelineRefinePlaneMasks(PipelineStep):
                 #         pre_pos = uv_pos
                 # pmean = get_segmentation_image(np.int32(labels_fan),plane_masks[i], avg=True)
                 #
-                # img_rs[np.logical_and(sure_walls>0, np.logical_and(mask[:,:,0]>0, pmean>.05))] = color
+                # img_dir[np.logical_and(sure_walls>0, np.logical_and(mask[:,:,0]>0, pmean>.05))] = color
                 # # img_rs[hull_mask>0] = color
                 #
                 #
-                # cv2.polylines(img_rs, pts=np.array([[[vp0[0], vp0[1]], [uv_center[0], uv_center[1]]]], np.int32), isClosed=False, color=(255,0,255), thickness=3,lineType=cv2.LINE_AA)
+                # cv2.polylines(img_dir, pts=np.array([[[vp0[0], vp0[1]], [uv_center[0], uv_center[1]]]], np.int32), isClosed=False, color=(255,0,255), thickness=3,lineType=cv2.LINE_AA)
                 # if len(basis) > 1:
                 #     a = np.int32(xyz_to_uv(plane_center + 1000*basis[1], width=w, height=h, camera=camera))
-                #     cv2.polylines(img_rs, pts=np.array([[[a[0], a[1]], [uv_center[0], uv_center[1]]]], np.int32),
+                #     cv2.polylines(img_dir, pts=np.array([[[a[0], a[1]], [uv_center[0], uv_center[1]]]], np.int32),
                 #               isClosed=False, color=(255, 0, 0), thickness=1, lineType=cv2.LINE_AA)
                 # if len(basis) > 2:
                 #     b = np.int32(xyz_to_uv(plane_center + 10000*basis[2], width=w, height=h, camera=camera))
-                #     cv2.polylines(img_rs, pts=np.array([[[b[0], b[1]], [uv_center[0], uv_center[1]]]], np.int32),
+                #     cv2.polylines(img_dir, pts=np.array([[[b[0], b[1]], [uv_center[0], uv_center[1]]]], np.int32),
                 #           isClosed=False, color=(0, 255, 0), thickness=1)
                 #
-                # cv2.circle(img_rs, (uv_center[0], uv_center[1]), 5, (0, 0, 0), thickness=-1)
+                # cv2.circle(img_dir, (uv_center[0], uv_center[1]), 5, (0, 0, 0), thickness=-1)
+        # logging_index = _log_image(logging_dir, "img_dir.png", img_dir,
+        #                            logging_index=logging_index)
 
-        # _log_image(logging_dir, "plane_directions.png", img_rs, logging_index=logging_index, logging=True)
         # logging_index = _log_ply(logging_dir, "3D2.ply", img_rs, plane_masks, np.float32(plane_XYZ), mult=1, logging_index = logging_index)
 
         plane_classes = get_planes_class(plane_masks, ade_seg)
@@ -1598,10 +1597,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
                 l = int(np.median(labels_arg[mask > 0])) - 1
 
-                plane_parameter = np.zeros(10)
+                plane_parameter = np.zeros(11)
                 plane_parameter[:9] = data["planes"]["detection"][l][:9]
                 plane_parameter[6:9] = plane_parameters[l]
                 plane_parameter[9] = 2
+                plane_parameter[10] = plane_rotations[l]
 
                 # _log_image(logging_dir, str(l) + "plane_masks.png", 255. * plane_masks[l])
 
@@ -1621,10 +1621,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
             # floor_mask = cv2.dilate(floor_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
             final_masks.append(255 * floor_mask)
 
-            plane_parameter = np.zeros((10))
+            plane_parameter = np.zeros((11))
             plane_parameter[:9] = data["planes"]["detection"][floor_indices[0]][:9]
             plane_parameter[6:9] = plane_parameters[floor_indices[0]]
             plane_parameter[9] = 1
+            plane_parameter[10] = plane_rotations[floor_indices[0]]
 
             final_plane_parameters.append(plane_parameter)
             final_plane_XYZ.append(plane_XYZ[floor_indices[0]])
@@ -1634,10 +1635,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
         if len(ceiling_indices) > 0:
             ceiling_mask = 255 * np.uint8(segmentation_initial == 4)
             final_masks.append(ceiling_mask)
-            plane_parameter = np.zeros((10))
+            plane_parameter = np.zeros((11))
             plane_parameter[:9] = data["planes"]["detection"][ceiling_indices[0]][:9]
             plane_parameter[6:9] = plane_parameters[ceiling_indices[0]]
             plane_parameter[9] = 3
+            plane_parameter[10] = plane_rotations[ceiling_indices[0]]
             final_plane_parameters.append(plane_parameter)
             final_plane_XYZ.append(plane_XYZ[ceiling_indices[0]])
             final_rotations.append(plane_rotations[ceiling_indices[0]])
@@ -1751,7 +1753,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         data["planes"]["masks"] = np.zeros((final_plane_number, img.shape[0], img.shape[1]), dtype=np.uint8)
 
-        data["planes"]["detection"] = np.zeros((final_plane_number, 10), dtype=data["planes"]["detection"].dtype)
+        data["planes"]["detection"] = np.zeros((final_plane_number, 11), dtype=data["planes"]["detection"].dtype)
         data["planes"]["detection"] = final_plane_parameters
         # data["planes"]["rotation"] = final_rotations
 
@@ -1795,4 +1797,5 @@ class PipelineRefinePlaneMasks(PipelineStep):
         data["mask"] = data["planes"]["masks"][0]
 
         data["floor_rotation"] = floor_rotation
+
         # print("floor rotation check", data["floor_rotation"])
