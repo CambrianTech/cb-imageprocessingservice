@@ -1324,6 +1324,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
                 dot1 = abs(np.dot(basis_forward, basis[1]))
 
+                rot = 0.0
+
                 if abs(1 - dot1) < .1 and len(basis) > 1:
                     coor = np.argmax(np.abs(basis_forward))
 
@@ -1341,7 +1343,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                         basis_forward[0] - basis_ahead[0]) * basis_forward
                     rot = -geometry.angle_between(basis_ahead, basis_forward)
 
-                    if ~np.isnan(floor_rotation):
+                    if ~np.isnan(rot):
                         plane_rotations[i] = rot
 
                 if abs(dot1) < 0.1 and len(basis) > 1:
@@ -1362,7 +1364,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
                     rot = -geometry.angle_between(basis_ahead, basis_forward)
 
-                    if ~np.isnan(floor_rotation):
+                    if ~np.isnan(rot):
                         plane_rotations[i] = rot
 
 
