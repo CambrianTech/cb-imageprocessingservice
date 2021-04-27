@@ -4,16 +4,13 @@ import numpy as np
 from scipy import ndimage
 from time import time
 
-from cambrian.frei_chen import frei_chen
-from cambrian.Line import Line
-from cambrian.VanishingPointFinder import VanishingPointFinder
 import cambrian.image_processing as ip
 from cambrian import geometry
 from cambrian.frei_chen import frei_chen
 from cambrian.Line import Line
 from skimage.segmentation import join_segmentations
 from skimage.morphology import skeletonize
-import os
+
 import pickle
 import math
 from skimage.segmentation import watershed
@@ -21,7 +18,7 @@ from scipy.stats import mode
 
 from skimage.morphology import remove_small_objects, remove_small_holes
 
-IM_LOGGING_ENABLED = True
+IM_LOGGING_ENABLED = False
 IM_LOGGING3D_ENABLED = False
 
 furniture_labels = [15, 30, 23, 64, 97, 44, 35,19, 7, 69, 75, 93, 110]
@@ -1572,6 +1569,28 @@ class PipelineRefinePlaneMasks(PipelineStep):
         final_labels += 1
         final_labels = np.uint8(final_labels)
 
+        lighting_rgb = np.uint8(data["lighting"])
+
+        lighting = lighting_rgb[:, :, 1]
+
+        lighting = cv2.resize(lighting, (final_labels.shape[1], final_labels.shape[0]))
+
+        lighting_mask = 255 * np.uint8(final_labels > 0)
+
+        # Remove hard edges from lighting
+        smooth_lighting = ip.remove_grooves(lighting, lighting_mask)
+
+        blurred_mask = cv2.GaussianBlur(smooth_lighting, (31, 31), 15)
+
+        blurred_lighting = cv2.GaussianBlur(smooth_lighting, (21, 21), 11)
+        #
+        lighting = ip.alpha_blend(
+            smooth_lighting, blurred_lighting, blurred_mask)
+
+        data["lighting"] = lighting
+
+        logging_index = _log_image(logging_dir, 'lighting.png', lighting, logging_index=logging_index)
+
         length_threshold = 32
         canny_aperture_size = 7
 
@@ -1594,10 +1613,13 @@ class PipelineRefinePlaneMasks(PipelineStep):
         final_line_data = Line.merge(final_line_data, 3, search_length=1.01, angle_threshold=math.radians(1.0))
 
         mask_res = 2048
-        mask_shape = (int(mask_res * img.shape[1] / img.shape[0]), mask_res)
-        if sx > sy:
-            mask_shape = (mask_res, int(mask_res * img.shape[0] / img.shape[1]))
+        mask_shape = (mask_res, int(mask_res * img.shape[0] / img.shape[1]))
 
+        if img.shape[0]>img.shape[1]:
+            print("switch")
+            mask_shape = (int(mask_res * img.shape[1] / img.shape[0]), mask_res)
+
+        print("mask shape", img.shape, mask_shape)
         final_masks_hr = resize_array(np.uint8(final_masks), mask_shape)
         final_labels_hr = np.int32(np.argmax(final_masks_hr, 0))
 
@@ -1644,28 +1666,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         final_labels = np.int32(final_labels_hr)
 
 
-        lighting_rgb = np.uint8(data["lighting"])
-
-        lighting = lighting_rgb[:, :, 1]
-
-        lighting = cv2.resize(lighting, (final_labels.shape[1], final_labels.shape[0]))
-
-        lighting_mask = 255 * np.uint8(final_labels > 0)
-
-        # Remove hard edges from lighting
-        smooth_lighting = ip.remove_grooves(lighting, lighting_mask)
-
-        blurred_mask = cv2.GaussianBlur(smooth_lighting, (31, 31), 15)
-
-        blurred_lighting = cv2.GaussianBlur(smooth_lighting, (21, 21), 11)
-        #
-        lighting = ip.alpha_blend(
-            smooth_lighting, blurred_lighting, blurred_mask)
-
-        data["lighting"] = lighting
-
-        logging_index = _log_image(logging_dir, 'lighting.png', lighting, logging_index=logging_index)
-
 
 
         data["planes"]["masks"] = np.zeros((final_plane_number, final_labels.shape[0], final_labels.shape[1]), dtype=np.uint8)
@@ -1692,20 +1692,18 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     if area > 4*16 * 16:
                         if hierarchy[0, i, 3] == -1:  # this is the outer contour which we need to draw
                             cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, -1,cv2.LINE_AA)
-                            cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, 6,cv2.LINE_AA)
-                            cv2.drawContours(final_labels, [contours[i]], -1, d + 2, -1, cv2.LINE_AA)
-                            cv2.drawContours(final_labels, [contours[i]], -1, d + 2, 4, cv2.LINE_AA)
-                            # cv2.drawContours(img, [contours[i]], -1,(0,0,255), 1, lineType=cv2.LINE_AA)
-                            # epsilon = .25*cv2.arcLength(contours[i], True) / max(shape[0],shape[1])
-                            # contours[i] = cv2.approxPolyDP(contours[i], epsilon, closed=True)
-                            plane_contours.append(contours[i].tolist())
+                            cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, 4,cv2.LINE_AA)
+                            # cv2.drawContours(final_labels, [contours[i]], -1, d + 2, -1, cv2.LINE_AA)
+                            # cv2.drawContours(final_labels, [contours[i]], -1, d + 2, 4, cv2.LINE_AA)
+                            plane_contours.append(np.array([[[0, 0]]]).tolist())
+
                         else:
                             cv2.drawContours(data["planes"]["masks"][d], contours, i, 0, -1)
 
-                rect = cv2.boundingRect(data["planes"]["masks"][d])
+                # rect = cv2.boundingRect(data["planes"]["masks"][d])
 
                 data["planes"]["detection"][d, 0:4] = [
-                    rect[1], rect[0], rect[1] + rect[3], rect[0] + rect[2]
+                    0, 0, 0, 0
                 ]
 
             mask_contours.append(plane_contours)
@@ -1713,7 +1711,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
             data["planes"]["contours"] = mask_contours
 
         # get rid of this later
-        data["mask"] = data["planes"]["masks"][0]
+        data["mask"] = data["planes"]["masks"][-2]
 
         if abs(floor_rotation)>0:
             data["floor_rotation"] = floor_rotation

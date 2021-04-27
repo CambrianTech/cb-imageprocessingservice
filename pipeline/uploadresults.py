@@ -245,14 +245,14 @@ class PipelineUploadResults(PipelineStep):
         lighting_image = data["lighting"]
         superpixels_image = data["superpixels"]
 
-        json_dict = _make_data_dict(data, _make_url)
-        data_v2_dict = _make_data_v2_dict(data,
-                                          _make_url(key_lighting),
-                                          _make_url(key_superpixels),
-                                          _make_url(key_semantic),
-                                          _make_url(key_planes_index_mask),
-                                          _make_url(key_planes_alpha_mask),
-                                          _make_plane_mask_url)
+        # json_dict = _make_data_dict(data, _make_url)
+        # data_v2_dict = _make_data_v2_dict(data,
+        #                                   _make_url(key_lighting),
+        #                                   _make_url(key_superpixels),
+        #                                   _make_url(key_semantic),
+        #                                   _make_url(key_planes_index_mask),
+        #                                   _make_url(key_planes_alpha_mask),
+        #                                   _make_plane_mask_url)
 
         data_v3_dict = _make_data_v3_dict(data,
                                           _make_url(key_lighting),
@@ -268,10 +268,10 @@ class PipelineUploadResults(PipelineStep):
                                 self.bucket_name, key_semantic)
             _upload_image_to_s3(self.s3_client, lighting_image,
                                 self.bucket_name, key_lighting)
-            _upload_json_to_s3(self.s3_client, json_dict,
-                               self.bucket_name, key_data)
-            _upload_json_to_s3(self.s3_client, data_v2_dict,
-                               self.bucket_name, key_data_v2)
+            # _upload_json_to_s3(self.s3_client, json_dict,
+            #                    self.bucket_name, key_data)
+            # _upload_json_to_s3(self.s3_client, data_v2_dict,
+            #                    self.bucket_name, key_data_v2)
             _upload_json_to_s3(self.s3_client, data_v3_dict,
                                self.bucket_name, key_data_v3)
             _upload_image_to_s3(self.s3_client, superpixels_image,
@@ -298,8 +298,8 @@ class PipelineUploadResults(PipelineStep):
 
             mask_path = _make_local_url(key_semantic)
             lighting_path = _make_local_url(key_lighting)
-            data_path = _make_local_url(key_data)
-            data_v2_path = _make_local_url(key_data_v2)
+            # data_path = _make_local_url(key_data)
+            # data_v2_path = _make_local_url(key_data_v2)
             data_v3_path = _make_local_url(key_data_v3)
             superpixels_path = _make_local_url(key_superpixels)
             planes_index_mask_path = _make_local_url(key_planes_index_mask)
@@ -307,8 +307,8 @@ class PipelineUploadResults(PipelineStep):
 
             os.makedirs(os.path.dirname(mask_path), exist_ok=True)
             os.makedirs(os.path.dirname(lighting_path), exist_ok=True)
-            os.makedirs(os.path.dirname(data_path), exist_ok=True)
-            os.makedirs(os.path.dirname(data_v2_path), exist_ok=True)
+            # os.makedirs(os.path.dirname(data_path), exist_ok=True)
+            # os.makedirs(os.path.dirname(data_v2_path), exist_ok=True)
             os.makedirs(os.path.dirname(data_v3_path), exist_ok=True)
             os.makedirs(os.path.dirname(superpixels_path), exist_ok=True)
 
@@ -321,10 +321,10 @@ class PipelineUploadResults(PipelineStep):
             imsave(mask_path, mask_image)
             imsave(lighting_path, lighting_image)
 
-            with open(data_path, "w", encoding="utf-8") as out_file:
-                json.dump(json_dict, out_file, indent=4)
-            with open(data_v2_path, "w", encoding="utf-8") as out_file:
-                json.dump(data_v2_dict, out_file, indent=4)
+            # with open(data_path, "w", encoding="utf-8") as out_file:
+            #     json.dump(json_dict, out_file, indent=4)
+            # with open(data_v2_path, "w", encoding="utf-8") as out_file:
+            #     json.dump(data_v2_dict, out_file, indent=4)
             with open(data_v3_path, "w", encoding="utf-8") as out_file:
                 json.dump(data_v3_dict, out_file, indent=4)
 
@@ -353,7 +353,7 @@ class PipelineUploadResults(PipelineStep):
 
         data["semantic_url"] = _make_url(key_semantic)
         data["lighting_url"] = _make_url(key_lighting)
-        data["data_url"] = _make_url(key_data)
-        data["data_v2_url"] = _make_url(key_data_v2)
+        # data["data_url"] = _make_url(key_data)
+        # data["data_v2_url"] = _make_url(key_data_v2)
         data["data_v3_url"] = _make_url(key_data_v3)
         data["superpixels_url"] = _make_url(key_superpixels)

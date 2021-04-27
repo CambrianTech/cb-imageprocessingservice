@@ -131,7 +131,7 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
             response_dict = {
                 "lighting_url": data["lighting_url"],
                 "semantic_url": data["semantic_url"],
-                "data_url": data["data_url"],
+                "data_url": data["data_v3_url"],
                 "superpixels_url": data["superpixels_url"],
             }
 
