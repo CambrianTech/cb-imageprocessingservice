@@ -681,7 +681,7 @@ def combined_normals(normals, plane_normals, plane_masks, basis_indices, cluster
 
     lengths = np.maximum(np.sqrt(np.sum(normals * normals, -1)), 1e-6)
     normals /= np.dstack((lengths, lengths, lengths))
-    # plane_normals_nn = np.matmul(R,plane_normals_nn.transpose()).transpose()
+    plane_normals_nn = np.matmul(R,plane_normals_nn.transpose()).transpose()
 
     for i in range(number_planes):
         # if cluster_indices[i]:
@@ -693,7 +693,7 @@ def combined_normals(normals, plane_normals, plane_masks, basis_indices, cluster
 
     lengths = np.maximum(np.sqrt(np.sum(normals * normals, -1)), 1e-6)
     normals /= np.dstack((lengths, lengths, lengths))
-    return normals
+    return normals, plane_normals_nn
 
 
 def refine_surface(mask, image, big_thresh=.03, small_thresh=.97, watershed_dist=.05, watershed_mask=None, gradient=True):
@@ -956,7 +956,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
         ceiling_normal = plane_normals[ceiling_index]
         # print("ceiling normal, floor normal", ceiling_normal, floor_normal, np.dot(ceiling_normal,floor_normal))
 
-        normals_combined = combined_normals(normals, plane_normals, plane_masks, basis_indices, cluster_prob)
+        normals_combined, normals_nn_normals = combined_normals(-normals, plane_normals, plane_masks, basis_indices,
+                                                                cluster_prob)
         normals_c = normals_combined
         floor_ceiling_avg_normal = floor_normal
         #
@@ -1111,7 +1112,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         basis_up = geometry.unit_vector(uv_to_xyz([vp0[0], vp0[1]], 1, width=w, height=h, camera=camera))
         basis_up = -np.sign(basis_up[2]) * basis_up
 
-        if floor_index > -1 and abs(1. - np.dot(basis_up, floor_normal)) > .05:
+        if floor_index > -1 and abs(1. - np.dot(basis_up, floor_normal)) > .05 and abs(1. - np.dot(basis_up, normals_nn_normals[floor_index])) > .05:
             basis_up = floor_normal
 
         primary_d = [basis_up]
@@ -1448,7 +1449,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     print("if no good match just take the closest by angle", all_vertical,
                           plane_parameters[all_vertical[wall_index]], all_vertical[wall_index])
 
-        plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=w, height=h, max_depth=10)
+        plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=w, height=h, camera=camera, max_depth=10)
         logging_index = _log_segmentation_image(logging_dir, 'labels_arg.png', labels_arg, img_lr,
                                                 logging_index=logging_index)
 
