@@ -663,7 +663,8 @@ def calcTransformation(points_1, points_2):
 
 
 def combined_normals(normals, plane_normals, plane_masks, basis_indices, cluster_prob):
-    plane_normals_nn = np.zeros_like(plane_normals)
+
+    plane_normals_nn = plane_normals.copy()
     number_planes = len(plane_normals)
     cluster_indices = cluster_prob > .5
     # print("good clusters", cluster_indices)
@@ -674,19 +675,25 @@ def combined_normals(normals, plane_normals, plane_masks, basis_indices, cluster
             plane_normals_nn[i] = mode(normals[plane_masks[i] > np.amax(plane_masks[i]) / 2.], axis=0)[0]
             plane_normals_nn[i] /= np.linalg.norm(plane_normals_nn[i])
 
+
+    # plane_normals_nn[0] = -plane_normals_nn[0]
+
     R, _ = calcTransformation(plane_normals_nn[basis_indices], plane_normals[basis_indices])
+    # R = np.eye(3)
 
     nr = normals.reshape((-1, 3))
     normals = np.matmul(R, nr.transpose()).transpose().reshape(normals.shape)
 
     lengths = np.maximum(np.sqrt(np.sum(normals * normals, -1)), 1e-6)
     normals /= np.dstack((lengths, lengths, lengths))
-    plane_normals_nn = np.matmul(R,plane_normals_nn.transpose()).transpose()
+
+    plane_normals_nn[basis_indices] = np.matmul(R,plane_normals_nn[basis_indices].transpose()).transpose()
+    print(plane_normals_nn[basis_indices])
 
     for i in range(number_planes):
         # if cluster_indices[i]:
         m = plane_masks[i].copy()
-        # m[m>.25] = 1
+        # m[m>.5] = 1
         mult = np.dstack((m,m,m))
 
         normals = (1.0 - mult) * normals + mult * plane_normals[i]
@@ -694,6 +701,7 @@ def combined_normals(normals, plane_normals, plane_masks, basis_indices, cluster
     lengths = np.maximum(np.sqrt(np.sum(normals * normals, -1)), 1e-6)
     normals /= np.dstack((lengths, lengths, lengths))
     return normals, plane_normals_nn
+
 
 
 def refine_surface(mask, image, big_thresh=.03, small_thresh=.97, watershed_dist=.05, watershed_mask=None, gradient=True):
@@ -959,11 +967,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         normals_combined, normals_nn_normals = combined_normals(-normals, plane_normals, plane_masks, basis_indices,
                                                                 cluster_prob)
         normals_c = normals_combined
-        floor_ceiling_avg_normal = floor_normal
-        #
-        # if len(ceiling_indices) > 0:
-        #     floor_ceiling_avg_normal = -floor_normal / 2. + plane_normals[ceiling_index] / 2.
-        #     normals_c = np.cross(floor_normal/2.-plane_normals[ceiling_index]/2., np.cross(floor_normal/2.-plane_normals[ceiling_index]/2., normals_combined))
 
         lengths = np.maximum(np.sqrt(np.sum(normals_c * normals_c, -1)), 1e-6)
         normals_c /= np.dstack((lengths, lengths, lengths))
@@ -1112,9 +1115,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         basis_up = geometry.unit_vector(uv_to_xyz([vp0[0], vp0[1]], 1, width=w, height=h, camera=camera))
         basis_up = -np.sign(basis_up[2]) * basis_up
 
-        if floor_index > -1 and abs(1. - np.dot(basis_up, floor_normal)) > .05 and abs(1. - np.dot(basis_up, normals_nn_normals[floor_index])) > .05:
-            basis_up = floor_normal
-
         primary_d = [basis_up]
 
         vp1 = vanishingpts[1]
@@ -1196,7 +1196,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
                                    logging_index=logging_index)
         logging_index = _log_segmentation_image(logging_dir, "vl_image.png", vl_image, img_lr,
                                                 logging_index=logging_index)
-
         for i in range(number_planes):
             if i == floor_index:
 
@@ -1208,15 +1207,29 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     hull = cv2.convexHull(flat_contours)
                     cv2.drawContours(hull_mask, [hull], -1, 1, -1)
 
-                plane_normals[i] = basis[0]
+                # check for wrong pitch
+                _, floor_plane_depth = calcPlaneXYZ([basis[0]], width=w, height=h, camera=camera, max_depth=30)
+                floor_plane_depth = floor_plane_depth[0]
+                floor_plane_int = cv2.countNonZero(np.uint8(np.logical_and(floor_plane_depth == 0, hull_mask > 0)))
+
+                bad_vvp = floor_plane_int > 0
+                logging_index = _log_image(logging_dir, "floor_depth.png",
+                                           255. * (np.logical_and(floor_plane_depth == 0, hull_mask > 0)),
+                                           logging_index=logging_index)
+
+                if bad_vvp:
+                    basis[0] = floor_normal
+
+                basis_up = basis[0]
+                plane_normals[i] = basis_up
 
                 basis_forward = [0, 1, 0]
 
-                if len(vert_indices)>0:
+                if len(vert_indices) > 0:
                     basis_forward = geometry.unit_vector(
                         np.cross(plane_normals[i], np.cross(basis_up, plane_normals[vert_indices[0]])))
 
-                if len(wall_indices)>0:
+                if len(wall_indices) > 0:
                     basis_forward = geometry.unit_vector(
                         np.cross(plane_normals[i], np.cross(basis_up, plane_normals[wall_indices[0]])))
 
@@ -1234,6 +1247,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     basis_forward = R[1, :]
                     basis_right = R[0, :]
                     plane_normals[i] = -np.sign(R[2, 2]) * R[2, :]
+
                     basis_ahead = geometry.unit_vector(np.float32([0, plane_normals[i][2], -plane_normals[i][1]]))
                     basis_forward = np.sign(basis_forward[1] - basis_ahead[1]) * np.sign(
                         basis_forward[0] - basis_ahead[0]) * basis_forward
@@ -1241,7 +1255,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     floor_rotation = -geometry.angle_between(basis_ahead, basis_forward)
                     if ~np.isnan(floor_rotation):
                         plane_rotations[i] = floor_rotation
-
 
                 plane = plane_XYZ[i]
                 plane_center = np.mean(plane[hull_mask > 0], axis=0)
