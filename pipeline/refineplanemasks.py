@@ -8,6 +8,7 @@ import cambrian.image_processing as ip
 from cambrian import geometry
 from cambrian.frei_chen import frei_chen
 from cambrian.Line import Line
+from cambrian.transformations import euler_from_matrix
 from skimage.segmentation import join_segmentations
 from skimage.morphology import skeletonize
 
@@ -1236,6 +1237,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                 basis_right = geometry.unit_vector(np.cross(basis_forward, basis_up))
 
                 if len(basis) > 1:
+
                     basis_forward = basis[1]
                     coor = np.argmax(np.abs(basis_forward))
 
@@ -1245,8 +1247,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
                     R = calcTransformation(B, Z)[0]
                     basis_forward = R[1, :]
-                    basis_right = R[0, :]
-                    plane_normals[i] = -np.sign(R[2, 2]) * R[2, :]
+
+                    angle_check = abs(euler_from_matrix(R)[0])
+                    if angle_check < .1:
+                        basis_right = R[0, :]
+                        plane_normals[i] = -np.sign(R[2, 2]) * R[2, :]
 
                     basis_ahead = geometry.unit_vector(np.float32([0, plane_normals[i][2], -plane_normals[i][1]]))
                     basis_forward = np.sign(basis_forward[1] - basis_ahead[1]) * np.sign(
@@ -1286,51 +1291,51 @@ class PipelineRefinePlaneMasks(PipelineStep):
                 basis_up = -np.sign(basis[0][2]) * basis[0]
 
                 basis_forward = geometry.unit_vector(np.cross(plane_normals[i], basis_up))
+                if len(basis) > 1:
+                    dot1 = abs(np.dot(basis_forward, basis[1]))
 
-                dot1 = abs(np.dot(basis_forward, basis[1]))
+                    rot = 0.0
 
-                rot = 0.0
+                    if abs(1 - dot1) < .1 and len(basis) > 1:
+                        coor = np.argmax(np.abs(basis_forward))
 
-                if abs(1 - dot1) < .1 and len(basis) > 1:
-                    coor = np.argmax(np.abs(basis_forward))
+                        Z = np.float32([[0, 0, 0], [0, 0, -1]])
+                        B = np.float32([basis[1], -np.sign(basis[0][2]) * basis[0]])
+                        Z[0][coor] = np.sign(basis_forward[coor])
 
-                    Z = np.float32([[0, 0, 0], [0, 0, -1]])
-                    B = np.float32([basis[1], -np.sign(basis[0][2]) * basis[0]])
-                    Z[0][coor] = np.sign(basis_forward[coor])
+                        R = calcTransformation(B, Z)[0]
 
-                    R = calcTransformation(B, Z)[0]
+                        basis_forward = R[coor, :]
+                        basis_up = R[2, :]
+                        plane_normals[i] = -R[(coor + 1) % 2, :]
+                        basis_ahead = geometry.unit_vector(np.float32([0, plane_normals[i][2], -plane_normals[i][1]]))
+                        basis_forward = np.sign(basis_forward[2] - basis_ahead[2]) * np.sign(
+                            basis_forward[0] - basis_ahead[0]) * basis_forward
+                        rot = -geometry.angle_between(basis_ahead, basis_forward)
 
-                    basis_forward = R[coor, :]
-                    basis_up = R[2, :]
-                    plane_normals[i] = -R[(coor + 1) % 2, :]
-                    basis_ahead = geometry.unit_vector(np.float32([0, plane_normals[i][2], -plane_normals[i][1]]))
-                    basis_forward = np.sign(basis_forward[2] - basis_ahead[2]) * np.sign(
-                        basis_forward[0] - basis_ahead[0]) * basis_forward
-                    rot = -geometry.angle_between(basis_ahead, basis_forward)
+                        if ~np.isnan(rot):
+                            plane_rotations[i] = rot
 
-                    if ~np.isnan(rot):
-                        plane_rotations[i] = rot
+                    if abs(dot1) < 0.1 and len(basis) > 1:
+                        coor = np.argmax(np.abs(basis_forward))
 
-                if abs(dot1) < 0.1 and len(basis) > 1:
-                    coor = np.argmax(np.abs(basis_forward))
+                        Z = np.float32([[0, 0, 0], [0, 0, -1]])
+                        B = np.float32([basis[1], -np.sign(basis[0][2]) * basis[0]])
+                        Z[0][coor] = np.sign(basis_forward[coor])
 
-                    Z = np.float32([[0, 0, 0], [0, 0, -1]])
-                    B = np.float32([basis[1], -np.sign(basis[0][2]) * basis[0]])
-                    Z[0][coor] = np.sign(basis_forward[coor])
+                        R = calcTransformation(B, Z)[0]
 
-                    R = calcTransformation(B, Z)[0]
+                        basis_forward = R[(coor + 1) % 2, :]
+                        basis_up = R[2, :]
+                        plane_normals[i] = -R[coor % 2, :]
+                        basis_ahead = geometry.unit_vector(np.float32([0, plane_normals[i][2], -plane_normals[i][1]]))
+                        basis_forward = np.sign(basis_forward[1] - basis_ahead[1]) * np.sign(
+                            basis_forward[0] - basis_ahead[0]) * basis_forward
 
-                    basis_forward = R[(coor + 1) % 2, :]
-                    basis_up = R[2, :]
-                    plane_normals[i] = -R[coor % 2, :]
-                    basis_ahead = geometry.unit_vector(np.float32([0, plane_normals[i][2], -plane_normals[i][1]]))
-                    basis_forward = np.sign(basis_forward[1] - basis_ahead[1]) * np.sign(
-                        basis_forward[0] - basis_ahead[0]) * basis_forward
+                        rot = -geometry.angle_between(basis_ahead, basis_forward)
 
-                    rot = -geometry.angle_between(basis_ahead, basis_forward)
-
-                    if ~np.isnan(rot):
-                        plane_rotations[i] = rot
+                        if ~np.isnan(rot):
+                            plane_rotations[i] = rot
 
 
 
