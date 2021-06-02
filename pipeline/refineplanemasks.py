@@ -849,6 +849,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
         rug = output[28]
         output[3] += rug
         output[28] = 0
+        output[3] += output[13]
+        output[13] = 0
+        output[3] += output[9]
+        output[9] = 0
+
         wall_mask = output[0].copy()
 
         logging_index = _log_image(logging_dir, "wall_mask.png", 255. * (wall_mask), logging_index=logging_index)
@@ -1590,21 +1595,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         lighting_rgb = np.uint8(data["lighting"])
 
-        lighting = lighting_rgb[:, :, 1]
-
-        lighting = cv2.resize(lighting, (final_labels.shape[1], final_labels.shape[0]))
-
-        lighting_mask = 255 * np.uint8(final_labels > 0)
-
-        # Remove hard edges from lighting
-        smooth_lighting = ip.remove_grooves(lighting, lighting_mask)
-
-        blurred_mask = cv2.GaussianBlur(smooth_lighting, (31, 31), 15)
-
-        blurred_lighting = cv2.GaussianBlur(smooth_lighting, (21, 21), 11)
-        #
-        lighting = ip.alpha_blend(
-            smooth_lighting, blurred_lighting, blurred_mask)
+        sigma_r=1.0
+        sigma_s=30
+        lighting_smooth = cv2.edgePreservingFilter(lighting_rgb, flags=1, sigma_s=sigma_s, sigma_r=sigma_r)
+        logging_index = _log_image(logging_dir, 'lighting_smooth.png', lighting_smooth, logging_index=logging_index)
+        lighting = lighting_smooth[:, :, 1]
 
         data["lighting"] = lighting
 
@@ -1635,10 +1630,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
         mask_shape = (mask_res, int(mask_res * img.shape[0] / img.shape[1]))
 
         if img.shape[0]>img.shape[1]:
-            print("switch")
             mask_shape = (int(mask_res * img.shape[1] / img.shape[0]), mask_res)
 
-        print("mask shape", img.shape, mask_shape)
         final_masks_hr = resize_array(np.uint8(final_masks), mask_shape)
         final_labels_hr = np.int32(np.argmax(final_masks_hr, 0))
 
@@ -1684,9 +1677,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         final_labels_hr[final_labels_hr < 0] = 0
         final_labels = np.int32(final_labels_hr)
 
-
-
-
         data["planes"]["masks"] = np.zeros((final_plane_number, final_labels.shape[0], final_labels.shape[1]), dtype=np.uint8)
 
         data["planes"]["detection"] = np.zeros((final_plane_number, 11), dtype=data["planes"]["detection"].dtype)
@@ -1730,7 +1720,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
             data["planes"]["contours"] = mask_contours
 
         # get rid of this later
-        data["mask"] = data["planes"]["masks"][-2]
+        data["mask"] = np.zeros_like(data["planes"]["masks"][0])
+        if len(data["planes"]["masks"]) > 2:
+            data["mask"] = data["planes"]["masks"][-2]
 
         if abs(floor_rotation)>0:
             data["floor_rotation"] = floor_rotation
