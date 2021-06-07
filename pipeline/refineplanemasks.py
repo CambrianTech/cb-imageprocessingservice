@@ -793,7 +793,7 @@ def camera_fov_res_to_intrinsics(fov: float, res: np.ndarray):
     c = res / 2
 
     # Assume the fov corresponds to the longest side and use that for focal
-    i = 0 if c[0] >= c[1] else 1
+    i = 1 if c[0] >= c[1] else 0
     f = c[i] / np.tan(np.radians(fov) / 2)
     K = np.array([f, f, c[0], c[1], res[0], res[1]], dtype=np.float32)
 
@@ -1258,6 +1258,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                         basis_right = R[0, :]
                         plane_normals[i] = -np.sign(R[2, 2]) * R[2, :]
 
+                    plane_normals[i] = np.cross([1, 0, 0], np.cross(plane_normals[i], [1, 0, 0]))
                     basis_ahead = geometry.unit_vector(np.float32([0, plane_normals[i][2], -plane_normals[i][1]]))
                     basis_forward = np.sign(basis_forward[1] - basis_ahead[1]) * np.sign(
                         basis_forward[0] - basis_ahead[0]) * basis_forward
@@ -1596,7 +1597,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         lighting_rgb = np.uint8(data["lighting"])
 
         sigma_r=1.0
-        sigma_s=30
+        sigma_s=10
         lighting_smooth = cv2.edgePreservingFilter(lighting_rgb, flags=1, sigma_s=sigma_s, sigma_r=sigma_r)
         logging_index = _log_image(logging_dir, 'lighting_smooth.png', lighting_smooth, logging_index=logging_index)
         lighting = lighting_smooth[:, :, 1]
@@ -1701,7 +1702,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     if area > 4*16 * 16:
                         if hierarchy[0, i, 3] == -1:  # this is the outer contour which we need to draw
                             cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, -1,cv2.LINE_AA)
-                            cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, 4,cv2.LINE_AA)
+                            # cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, 4,cv2.LINE_AA)
                             # cv2.drawContours(final_labels, [contours[i]], -1, d + 2, -1, cv2.LINE_AA)
                             # cv2.drawContours(final_labels, [contours[i]], -1, d + 2, 4, cv2.LINE_AA)
                             plane_contours.append(np.array([[[0, 0]]]).tolist())
