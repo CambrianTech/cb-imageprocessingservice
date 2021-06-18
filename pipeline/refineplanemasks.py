@@ -1461,17 +1461,17 @@ class PipelineRefinePlaneMasks(PipelineStep):
                     label_normal = np.mean(normals_wall[label_mask], 0)
 
                     label_normal /= max(np.linalg.norm(label_normal), .00001)
+                    if len(all_vertical) > 0:
+                        wall_index = np.argmax(np.dot(plane_normals[all_vertical], label_normal))
 
-                    wall_index = np.argmax(np.dot(plane_normals[all_vertical], label_normal))
+                        plane_center = np.mean(XYZ[label_mask], axis=0)
+                        offset = np.dot(plane_center, label_normal)
 
-                    plane_center = np.mean(XYZ[label_mask], axis=0)
-                    offset = np.dot(plane_center, label_normal)
+                        plane_parameters[all_vertical[wall_index]] = plane_normals[all_vertical[wall_index]] * offset
 
-                    plane_parameters[all_vertical[wall_index]] = plane_normals[all_vertical[wall_index]] * offset
-
-                    labels_arg[label_mask] = all_vertical[wall_index] + 1
-                    print("if no good match just take the closest by angle", all_vertical,
-                          plane_parameters[all_vertical[wall_index]], all_vertical[wall_index])
+                        labels_arg[label_mask] = all_vertical[wall_index] + 1
+                        print("if no good match just take the closest by angle", all_vertical,
+                              plane_parameters[all_vertical[wall_index]], all_vertical[wall_index])
 
         plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=w, height=h, camera=camera, max_depth=10)
         logging_index = _log_segmentation_image(logging_dir, 'labels_arg.png', labels_arg, img_lr,
