@@ -18,12 +18,14 @@ from skimage.segmentation import watershed
 from scipy.stats import mode
 
 from skimage.morphology import remove_small_objects, remove_small_holes
+from semanticlabels import ADE20K
 
 IM_LOGGING_ENABLED = False
 IM_LOGGING3D_ENABLED = False
 
 furniture_labels = [15, 30, 23, 64, 97, 44, 35,19, 7, 69, 75, 93, 110]
-wall_like = [0, 8, 14, 18, 22, 24, 42, 58,63, 130]
+wall_like = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen]
+
 wall_int = [3, 8, 22, 100]
 f=1.0
 METADATA = np.array([571.87, 571.87, 320, 240, 640, 480, 0, 0, 0, 0])
@@ -1167,29 +1169,30 @@ class PipelineRefinePlaneMasks(PipelineStep):
         sx = w / img.shape[1]
         sy = h / img.shape[0]
 
-        rug = output[28]
-        output[3] += rug
-        output[28] = 0
-        output[3] += output[13]
-        output[13] = 0
-        output[3] += output[9]
-        output[9] = 0
+        #Include other types as part of floor: rug, earth, grass
+        output[ADE20K.floor.index] += output[ADE20K.rug.index]
+        output[ADE20K.rug.index] = 0
 
-        wall_mask = output[0].copy()
+        output[ADE20K.floor.index] += output[ADE20K.earth.index]
+        output[ADE20K.earth.index] = 0
+
+        output[ADE20K.floor.index] += output[ADE20K.grass.index]
+        output[ADE20K.grass.index] = 0
+
+        wall_mask = output[ADE20K.wall.index].copy()
 
         logging_index = _log_image(logging_dir, "wall_mask.png", 255. * (wall_mask), logging_index=logging_index)
 
-        floor_mask = output[3].copy()
+        floor_mask = output[ADE20K.floor.index].copy()
         logging_index = _log_image(logging_dir, "floor_mask.png", 255. * floor_mask, logging_index=logging_index)
 
-        ceiling_mask = output[5].copy()
+        ceiling_mask = output[ADE20K.ceiling.index].copy()
         logging_index = _log_image(logging_dir, "ceiling_mask.png", 255. * ceiling_mask, logging_index=logging_index)
 
         wall_like_mask = np.zeros_like(wall_mask)
 
-        for i in wall_like:
-            if i == 0: continue
-            wall_like_mask += output[i]
+        for label in wall_like:
+            wall_like_mask += output[label.index]
 
         logging_index = _log_image(logging_dir, "wall_like_mask.png", 255. * wall_like_mask,
                                    logging_index=logging_index)
