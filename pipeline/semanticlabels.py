@@ -78,7 +78,7 @@ class ADE20K(SemanticLabel):
 	bridge = 62
 	bookcase = 63
 	blind = 64
-	coffee = 65
+	coffee_table = 65
 	toilet = 66
 	flower = 67
 	book = 68
@@ -89,7 +89,7 @@ class ADE20K(SemanticLabel):
 	palm = 73
 	kitchen = 74
 	computer = 75
-	swivel = 76
+	swivel_chair = 76
 	boat = 77
 	bar = 78
 	arcade = 79

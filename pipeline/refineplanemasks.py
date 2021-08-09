@@ -23,10 +23,9 @@ from semanticlabels import ADE20K
 IM_LOGGING_ENABLED = False
 IM_LOGGING3D_ENABLED = False
 
-furniture_labels = [15, 30, 23, 64, 97, 44, 35,19, 7, 69, 75, 93, 110]
+furniture_labels = [ADE20K.table, ADE20K.armchair, ADE20K.sofa, ADE20K.coffee_table, ADE20K.ottoman, ADE20K.chest, ADE20K.wardrobe, ADE20K.chair, ADE20K.bed, ADE20K.bench, ADE20K.swivel_chair, ADE20K.pole, ADE20K.stool]
 wall_like = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen]
 
-wall_int = [3, 8, 22, 100]
 f=1.0
 METADATA = np.array([571.87, 571.87, 320, 240, 640, 480, 0, 0, 0, 0])
 
