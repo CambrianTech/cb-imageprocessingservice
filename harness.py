@@ -51,7 +51,7 @@ def main(input_dir, output_dir):
     num_files = parse_data(input_dir, output_dir)
     elapsed = (time.time() - start)
 
-    print("Processing %d images took %.2f seconds (%.2fs per image)" % (num_files, elapsed, elapsed/num_files))
+    print("Processing %d data took %.2f seconds (%.2fs each)" % (num_files, elapsed, elapsed/num_files))
 
 if __name__ == "__main__":
     main()
