@@ -125,3 +125,4 @@ gluon_models/
 /planercnn/planercnn/example_images
 *.c
 /scripts/models
+/scripts/refine-input
