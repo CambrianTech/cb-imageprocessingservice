@@ -1,6 +1,4 @@
-import math
 import os
-import json
 import numpy as np
 from pathlib import Path
 import pickle
@@ -38,7 +36,7 @@ def run_harness(data, directory):
 
 
 @click.command()
-@click.argument("input_dir", default='refine-input', type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("input_dir", default='input', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("output_dir", default='output', type=click.Path(exists=False, file_okay=False, dir_okay=True))
 def main(input_dir, output_dir):
 
