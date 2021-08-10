@@ -73,6 +73,13 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
 
     print("Creating pipeline")
 
+    if image_local_dir is not None and not os.path.exists(image_local_dir):
+        os.makedirs(image_local_dir)
+
+    if results_local_dir is not None and not os.path.exists(results_local_dir):
+        os.makedirs(results_local_dir)
+
+
     # Create the steps we want to use in the pipelines
     steps = [
         PipelineGetData(user_uploads_bucket),
@@ -152,7 +159,7 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
 
         image_s3_key = request.match_info.get("id", None)
         if image_s3_key is None:
-            raise web.HTTPBadRequest()
+            raise web.HTTPBadRequest("id parameter not supplied")
 
         output_dir = join(image_local_dir, user_uploads_bucket)
         os.makedirs(output_dir, exist_ok=True)
@@ -173,7 +180,7 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
         image_s3_key = request.match_info.get("id", None)
         bucket = request.match_info.get("bucket", None)
         if image_s3_key is None or bucket is None:
-            raise web.HTTPBadRequest()
+            raise web.HTTPBadRequest("id parameter not supplied")
 
         return web.FileResponse(os.path.join(results_local_dir, bucket, image_s3_key))
 

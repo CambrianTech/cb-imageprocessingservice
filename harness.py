@@ -6,6 +6,17 @@ import pickle
 import click
 import time
 
+from pipeline.core import schedule_and_wait, merge_future_dicts, num_waiting_items
+from pipeline.fov import PipelineCalculateFov
+from pipeline.getdata import PipelineGetData
+from pipeline.primaryangle import PipelineDeterminePrimaryAngles
+from pipeline.runmodels import PipelineRunModels
+from pipeline.superpixels import PipelineSuperpixels
+from pipeline.refineplanemasks import PipelineRefinePlaneMasks
+from pipeline.combineplanemasks import PipelineCombinePlaneMasks
+from pipeline.uploadresults import PipelineUploadResults
+from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
+
 def get_file_paths(input_dir, pattern="*.pickle"):
     files = []
     files.extend(Path(input_dir).glob('**/' + pattern))
@@ -36,7 +47,7 @@ def run_harness(data, directory):
 
 
 @click.command()
-@click.argument("input_dir", default='input', type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("input_dir", default='test_images', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("output_dir", default='output', type=click.Path(exists=False, file_okay=False, dir_okay=True))
 def main(input_dir, output_dir):
 

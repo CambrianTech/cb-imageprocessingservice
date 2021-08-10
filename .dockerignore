@@ -17,10 +17,13 @@ coverage.xml
 *,cover
 *.log
 .git
+.DS_Store
 
 planercnn
-sklearn_models
-tensorflow_models
-gluon_models
-images
-results
+scripts
+
+#images
+#results
+#sklearn_models
+#tensorflow_models
+#gluon_models
