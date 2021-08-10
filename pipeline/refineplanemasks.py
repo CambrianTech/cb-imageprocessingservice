@@ -18,7 +18,7 @@ from skimage.segmentation import watershed
 from scipy.stats import mode
 
 from skimage.morphology import remove_small_objects, remove_small_holes
-from semanticlabels import ADE20K
+from pipeline.semanticlabels import ADE20K
 
 IM_LOGGING_ENABLED = False
 IM_LOGGING3D_ENABLED = False
