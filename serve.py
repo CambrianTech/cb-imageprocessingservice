@@ -70,7 +70,9 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
 
 
     # Create the steps we want to use in the pipelines
-    pipeline = Pipeline(user_uploads_bucket, results_bucket, semantic_model_path, fov_model_path, "http://localhost:%d" % cpu_networks_port)
+    remote_path = "http://localhost:%d" % cpu_networks_port
+    
+    pipeline = Pipeline(user_uploads_bucket, results_bucket, semantic_model_path, fov_model_path, remote_path, plane_url)
 
     pipeline.start()
     

@@ -15,9 +15,21 @@ class Pipeline():
 
         #setup input:
         if plane_url is not None:
-            self.steps = []
-            self.steps.append(PipelineGetData(bucket_name=source))
-            self.steps.append(PipelineRemoteNetworks("http://localhost:%d" % cpu_networks_port))
+             self.steps = [
+                PipelineGetData(source_bucket, source_directory),
+                PipelineRemoteNetworks("http://localhost:%d" % cpu_networks_port),
+                PipelineCalculateFov(fov_model_path),
+                PipelineRemotePlaneDetector(plane_url),
+                PipelineRunModels(
+                    semantic_path=semantic_model_path,
+                    hed_path=join("hed_model", "HED_pretrained_bsds.npz")
+                ),
+                PipelineDeterminePrimaryAngles(),
+                PipelineSuperpixels(),
+                PipelineRefinePlaneMasks(results_bucket),
+                PipelineCombinePlaneMasks(),
+                PipelineUploadResults(results_bucket)
+            ]
         else:
             self.steps = []
             self.steps.append(PipelineGetData(local_directory=source))
