@@ -6,7 +6,7 @@ import pickle
 import click
 import time
 
-from pipeline.pipeline import Pipeline
+from pipeline.buildpipeline import Pipeline
 
 def get_file_paths(input_dir, pattern="*.pickle"):
     files = []

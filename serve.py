@@ -15,7 +15,7 @@ import aiohttp_cors
 import boto3
 import requests
 
-from pipeline.core import Pipeline
+from pipeline.buildpipeline import Pipeline
 
 def _get_instance_metadata():
     metadata = {}
