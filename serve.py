@@ -15,18 +15,7 @@ import aiohttp_cors
 import boto3
 import requests
 
-from pipeline.core import schedule_and_wait, merge_future_dicts, num_waiting_items
-from pipeline.fov import PipelineCalculateFov
-from pipeline.getdata import PipelineGetData
-from pipeline.primaryangle import PipelineDeterminePrimaryAngles
-# from pipeline.refine import PipelineRefineResults
-from pipeline.runmodels import PipelineRunModels
-from pipeline.superpixels import PipelineSuperpixels
-from pipeline.refineplanemasks import PipelineRefinePlaneMasks
-from pipeline.combineplanemasks import PipelineCombinePlaneMasks
-from pipeline.uploadresults import PipelineUploadResults
-from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
-
+from pipeline.core import Pipeline
 
 def _get_instance_metadata():
     metadata = {}
@@ -81,30 +70,15 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
 
 
     # Create the steps we want to use in the pipelines
-    steps = [
-        PipelineGetData(user_uploads_bucket),
-        PipelineRemoteNetworks("http://localhost:%d" % cpu_networks_port),
-        PipelineCalculateFov(fov_model_path),
-        PipelineRemotePlaneDetector(plane_url),
-        PipelineRunModels(
-            semantic_path=semantic_model_path,
-            hed_path=join("hed_model", "HED_pretrained_bsds.npz")
-        ),
-        PipelineDeterminePrimaryAngles(),
-        PipelineSuperpixels(),
-        PipelineRefinePlaneMasks(results_bucket),
-        PipelineCombinePlaneMasks(),
-        PipelineUploadResults(results_bucket)
-    ]
+    pipeline = Pipeline(semantic_model_path, fov_model_path, results_bucket, cpu_networks_port, source_bucket=user_uploads_bucket)
 
-    # Start the processing workers for all steps
-    for step in steps:
-        step.start()
-
+    pipeline.start()
+    
+    
     # Pipeline for finding planes, generating lighting and predicting fov.
     async def planes_pipeline(input_dict: typing.Dict):
         total_start_time = time()
-        for step in steps:
+        for step in pipeline.steps:
             input_dict = await schedule_and_wait(step.schedule, input_dict)
         print("Planes total pipeline time: %.2fs" %
               (time() - total_start_time))
@@ -114,7 +88,7 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
     def get_pipeline_handler(pipeline_fn):
         async def handle(request):
             print("Handle segment:", request, "(items waiting in pipeline: %d)" %
-                  num_waiting_items(steps))
+                  num_waiting_items(pipeline.steps))
 
             # Get image S3 key from GET request
             image_s3_key = request.match_info.get("id", None)
@@ -223,10 +197,10 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
             for _ in range(60):
                 await asyncio.sleep(1)
                 avg_waiting_items = 0.9 * avg_waiting_items + \
-                    0.1 * num_waiting_items(steps)
+                    0.1 * num_waiting_items(pipeline.steps)
 
             print("Waiting items: %.2f (avg: %.2f)" %
-                  (num_waiting_items(steps), avg_waiting_items))
+                  (num_waiting_items(pipeline.steps), avg_waiting_items))
 
             if metadata is not None:
                 await loop.run_in_executor(None, push_metrics, avg_waiting_items)

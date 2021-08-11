@@ -45,29 +45,14 @@ def parse_data(input_dir, output_dir):
 def run_harness(data, directory):
     print("Processing %s" % directory, data.shape)
 
-def get_pipeline(user_uploads_bucket, semantic_model_path, fov_model_path, results_bucket, cpu_networks_port):
-    steps = [
-        PipelineGetData(user_uploads_bucket),
-        PipelineRemoteNetworks("http://localhost:%d" % cpu_networks_port),
-        PipelineCalculateFov(fov_model_path),
-        PipelineRemotePlaneDetector(plane_url),
-        PipelineRunModels(
-            semantic_path=semantic_model_path,
-            hed_path=join("hed_model", "HED_pretrained_bsds.npz")
-        ),
-        PipelineDeterminePrimaryAngles(),
-        PipelineSuperpixels(),
-        PipelineRefinePlaneMasks(results_bucket),
-        PipelineCombinePlaneMasks(),
-        PipelineUploadResults(results_bucket)
-    ]
-    return steps
-
 
 @click.command()
 @click.argument("input_dir", default='test_images', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("output_dir", default='output', type=click.Path(exists=False, file_okay=False, dir_okay=True))
-def main(input_dir, output_dir):
+@click.argument("model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("semantic_model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("fov_model_path", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path):
 
     if not os.path.exists(input_dir):
         raise Exception('The directory does not exist at path {}'.format(input_dir)) 
