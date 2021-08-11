@@ -76,7 +76,6 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
 
     pipeline.start()
 
-
     # Setup http server
     def get_pipeline_handler(pipeline_fn):
         async def handle(request):

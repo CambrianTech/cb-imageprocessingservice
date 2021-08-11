@@ -3,6 +3,7 @@ import os
 import typing
 import time
 
+from pipeline.core import schedule_and_wait
 from pipeline.fov import PipelineCalculateFov
 from pipeline.getdata import PipelineBucketSource, PipelineFileSource
 from pipeline.primaryangle import PipelineDeterminePrimaryAngles
@@ -55,10 +56,10 @@ class Pipeline():
         for step in self.steps:
             step.start()
 
-    def process(self, input_dict: typing.Dict):
-        total_start_time = time()
+    async def process(self, input_dict: typing.Dict):
+        total_start_time = time.time()
         for step in self.steps:
             input_dict = await schedule_and_wait(step.schedule, input_dict)
         print("Planes total pipeline time: %.2fs" %
-              (time() - total_start_time))
+              (time.time() - total_start_time))
         return input_dict

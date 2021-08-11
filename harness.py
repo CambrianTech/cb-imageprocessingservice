@@ -5,6 +5,7 @@ import pickle
 
 import click
 import time
+import asyncio
 
 from pipeline.buildpipeline import Pipeline
 
@@ -18,7 +19,7 @@ def get_file_paths(input_dir, pattern=None):
             files.extend(Path(input_dir).glob('**/*' + ext))
     return files
 
-def parse_data(pipeline, input_dir, output_dir):
+async def process_files(pipeline, input_dir, output_dir):
     files = get_file_paths(input_dir)
 
     print("Importing %d files from \"%s\" into \"%s\"" % (len(files), input_dir, output_dir))
@@ -33,14 +34,9 @@ def parse_data(pipeline, input_dir, output_dir):
 
         await pipeline.process(data)
 
-        
-
     index = 0
 
     return len(files)
-
-def run_harness(data, directory):
-    print("Processing %s" % directory, data.shape)
 
 
 @click.command()
@@ -58,19 +54,12 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path)
         os.makedirs(output_dir)
 
     pipeline = Pipeline(semantic_model_path, fov_model_path)
-
-    start = time.time()
-
-    num_files = parse_data(pipeline, input_dir, output_dir)
-
-    elapsed = (time.time() - start)
-
-    if num_files > 0:
-        print("Processing %d data took %.2f seconds (%.2fs each)" % (num_files, elapsed, elapsed/num_files))
-
     pipeline.start()
 
-    print("Done")
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(process_files(pipeline, input_dir, output_dir))
+    loop.close()
+
 
 if __name__ == "__main__":
     main()
