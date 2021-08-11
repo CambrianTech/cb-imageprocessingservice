@@ -1,3 +1,6 @@
+
+import os
+
 from pipeline.fov import PipelineCalculateFov
 from pipeline.getdata import PipelineGetData
 from pipeline.primaryangle import PipelineDeterminePrimaryAngles
@@ -10,42 +13,39 @@ from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 
 class Pipeline():
 
-    def __init__(self, source, destination, semantic_model_path, fov_model_path, plane_url=None):
+    def __init__(self, source, dest, semantic_model_path, fov_model_path, plane_source_url=None, plane_dest_url=None):
 
 
         #setup input:
-        if plane_url is not None:
+        if plane_source_url is not None:
              self.steps = [
-                PipelineGetData(source_bucket, source_directory),
-                PipelineRemoteNetworks("http://localhost:%d" % cpu_networks_port),
+                PipelineGetData(bucket_name=source),
+                PipelineRemoteNetworks(plane_source_url),
                 PipelineCalculateFov(fov_model_path),
-                PipelineRemotePlaneDetector(plane_url),
+                PipelineRemotePlaneDetector(plane_dest_url),
                 PipelineRunModels(
                     semantic_path=semantic_model_path,
-                    hed_path=join("hed_model", "HED_pretrained_bsds.npz")
+                    hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")
                 ),
                 PipelineDeterminePrimaryAngles(),
                 PipelineSuperpixels(),
-                PipelineRefinePlaneMasks(results_bucket),
+                PipelineRefinePlaneMasks(),
                 PipelineCombinePlaneMasks(),
-                PipelineUploadResults(results_bucket)
+                PipelineUploadResults(bucket_name=dest)
             ]
         else:
-            self.steps = []
-            self.steps.append(PipelineGetData(local_directory=source))
-
-
-        self.steps.extend([
-            PipelineRunModels(
-                semantic_path=semantic_model_path,
-                hed_path=join("hed_model", "HED_pretrained_bsds.npz")
-            ),
-            PipelineDeterminePrimaryAngles(),
-            PipelineSuperpixels(),
-            PipelineRefinePlaneMasks(destination),
-            PipelineCombinePlaneMasks(),
-            PipelineUploadResults(destination)
-        ])
+            self.steps = [
+                PipelineGetData(local_directory=source),
+                PipelineCalculateFov(fov_model_path),
+                PipelineRunModels(
+                    semantic_path=semantic_model_path,
+                    hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")
+                ),
+                PipelineDeterminePrimaryAngles(),
+                PipelineSuperpixels(),
+                PipelineRefinePlaneMasks(),
+                PipelineCombinePlaneMasks()
+            ]
 
 
     def start():
