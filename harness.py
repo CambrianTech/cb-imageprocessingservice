@@ -8,14 +8,18 @@ import time
 
 from pipeline.buildpipeline import Pipeline
 
-def get_file_paths(input_dir, pattern="*.pickle"):
+def get_file_paths(input_dir, pattern=None):
     files = []
-    files.extend(Path(input_dir).glob('**/' + pattern))
-            
+    if pattern:
+        files.extend(Path(input_dir).glob('**/' + pattern))
+    else: 
+        extensions = ('.png', '.jpg', '.jpeg')
+        for ext in extensions:
+            files.extend(Path(input_dir).glob('**/*' + ext))
     return files
 
-def parse_data(input_dir, output_dir):
-    files = get_file_paths(input_dir, "*.pickle")
+def parse_data(pipeline, input_dir, output_dir):
+    files = get_file_paths(input_dir)
 
     print("Importing %d files from \"%s\" into \"%s\"" % (len(files), input_dir, output_dir))
 
@@ -23,11 +27,13 @@ def parse_data(input_dir, output_dir):
         data_path = str(path)
         dir_path = os.path.dirname(data_path)
 
-        print("Parsing", path)
+        data = {"image_path": path}
 
-        with open(path, 'rb') as handle:
-            data_pickle = pickle.load(handle)
-            run_harness(data_pickle, dir_path)
+        print("Processing", path)
+
+        await pipeline.process(data)
+
+        
 
     index = 0
 
@@ -51,15 +57,20 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    pipeline = Pipeline(input_dir, output_dir, semantic_model_path, fov_model_path)
+    pipeline = Pipeline(semantic_model_path, fov_model_path)
 
     start = time.time()
 
-    num_files = parse_data(input_dir, output_dir)
+    num_files = parse_data(pipeline, input_dir, output_dir)
+
     elapsed = (time.time() - start)
 
     if num_files > 0:
         print("Processing %d data took %.2f seconds (%.2fs each)" % (num_files, elapsed, elapsed/num_files))
+
+    pipeline.start()
+
+    print("Done")
 
 if __name__ == "__main__":
     main()

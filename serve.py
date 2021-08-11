@@ -72,19 +72,10 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
     # Create the steps we want to use in the pipelines
     remote_path = "http://localhost:%d" % cpu_networks_port
     
-    pipeline = Pipeline(user_uploads_bucket, results_bucket, semantic_model_path, fov_model_path, remote_path, plane_url)
+    pipeline = Pipeline(semantic_model_path, fov_model_path, bucket_source=user_uploads_bucket, bucket_dest=results_bucket, plane_source=remote_path, plane_dest=plane_url)
 
     pipeline.start()
-    
-    
-    # Pipeline for finding planes, generating lighting and predicting fov.
-    async def planes_pipeline(input_dict: typing.Dict):
-        total_start_time = time()
-        for step in pipeline.steps:
-            input_dict = await schedule_and_wait(step.schedule, input_dict)
-        print("Planes total pipeline time: %.2fs" %
-              (time() - total_start_time))
-        return input_dict
+
 
     # Setup http server
     def get_pipeline_handler(pipeline_fn):
@@ -225,9 +216,9 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
     segment_resource = app.router.add_resource("/segment/{id}")
     planes_resource = app.router.add_resource("/planes/{id}")
     cors.add(segment_resource.add_route(
-        "GET", get_pipeline_handler(planes_pipeline)))
+        "GET", get_pipeline_handler(pipeline.process)))
     cors.add(planes_resource.add_route(
-        "GET", get_pipeline_handler(planes_pipeline)))
+        "GET", get_pipeline_handler(pipeline.process)))
 
     # Add endpoint for directly getting and uploading images if local
     # image input dir was defined

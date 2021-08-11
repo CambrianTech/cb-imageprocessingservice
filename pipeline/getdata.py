@@ -16,11 +16,10 @@ def _get_image_from_s3(s3_client, bucket: str, key: str) -> np.ndarray:
     return imread(data)  # uint8 [0, 255]
 
 
-class PipelineGetData(PipelineStep):
-    def __init__(self, bucket_name=None, local_directory=None):
+class PipelineBucketSource(PipelineStep):
+    def __init__(self, bucket_name=None):
         super().__init__()
         self.bucket_name = bucket_name
-        self.local_directory = local_directory
         self.s3_client = boto3.client("s3")
 
     @property
@@ -42,3 +41,22 @@ class PipelineGetData(PipelineStep):
             data["image"] = imread(local_path)
 
         data["image"] = data["image"][:, :, :3]
+
+class PipelineFileSource(PipelineStep):
+    def __init__(self):
+        super().__init__()
+
+    @property
+    def required_keys(self) -> list:
+        return ["image_path"]
+
+    @property
+    def output_keys(self) -> list:
+        return ["image"]
+
+    def run(self, data):
+        print("Reading", data["image_path"])
+
+        data["image"] = imread(data["image_path"])
+        data["image"] = data["image"][:, :, :3]
+
