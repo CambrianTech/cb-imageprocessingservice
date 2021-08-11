@@ -45,6 +45,24 @@ def parse_data(input_dir, output_dir):
 def run_harness(data, directory):
     print("Processing %s" % directory, data.shape)
 
+def get_pipeline(user_uploads_bucket, semantic_model_path, fov_model_path, results_bucket, cpu_networks_port):
+    steps = [
+        PipelineGetData(user_uploads_bucket),
+        PipelineRemoteNetworks("http://localhost:%d" % cpu_networks_port),
+        PipelineCalculateFov(fov_model_path),
+        PipelineRemotePlaneDetector(plane_url),
+        PipelineRunModels(
+            semantic_path=semantic_model_path,
+            hed_path=join("hed_model", "HED_pretrained_bsds.npz")
+        ),
+        PipelineDeterminePrimaryAngles(),
+        PipelineSuperpixels(),
+        PipelineRefinePlaneMasks(results_bucket),
+        PipelineCombinePlaneMasks(),
+        PipelineUploadResults(results_bucket)
+    ]
+    return steps
+
 
 @click.command()
 @click.argument("input_dir", default='test_images', type=click.Path(exists=True, file_okay=False, dir_okay=True))
@@ -62,7 +80,9 @@ def main(input_dir, output_dir):
     num_files = parse_data(input_dir, output_dir)
     elapsed = (time.time() - start)
 
-    print("Processing %d data took %.2f seconds (%.2fs each)" % (num_files, elapsed, elapsed/num_files))
+    if num_files > 0:
+        print("Processing %d data took %.2f seconds (%.2fs each)" % (num_files, elapsed, elapsed/num_files))
 
 if __name__ == "__main__":
     main()
+

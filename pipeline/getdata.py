@@ -17,9 +17,10 @@ def _get_image_from_s3(s3_client, bucket: str, key: str) -> np.ndarray:
 
 
 class PipelineGetData(PipelineStep):
-    def __init__(self, bucket_name):
+    def __init__(self, bucket_name=None, local_directory=None):
         super().__init__()
         self.bucket_name = bucket_name
+        self.local_directory = local_directory
         self.s3_client = boto3.client("s3")
 
     @property
@@ -32,12 +33,12 @@ class PipelineGetData(PipelineStep):
 
     def run(self, data):
         # Get image from S3 or local folder if local dir is set.
-        if "image_local_dir" not in data:
+        if self.local_directory is None:
             data["image"] = _get_image_from_s3(
                 self.s3_client, self.bucket_name, data["image_s3_key"])
         else:
             local_path = os.path.join(
-                data["image_local_dir"], self.bucket_name, data["image_s3_key"])
+                self.local_directory, data["image_s3_key"])
             data["image"] = imread(local_path)
 
         data["image"] = data["image"][:, :, :3]
