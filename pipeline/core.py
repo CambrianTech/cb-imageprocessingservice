@@ -4,7 +4,6 @@ import asyncio
 import typing
 from multiprocessing import cpu_count
 
-
 class PipelineStep(metaclass=ABCMeta):
     def __init__(self, batch_max_wait_time=1.0, batch_debounce_time=0.2, batch_max_size=4):
         self.batch_max_wait_time = batch_max_wait_time
@@ -118,28 +117,3 @@ def num_waiting_items(steps: typing.List[PipelineStep]) -> int:
     """Counts the number of waiting items in a list of pipeline steps."""
     return sum([step.num_waiting_items for step in steps])
 
-class Pipeline():
-
-    def __init__(self, semantic_model_path, fov_model_path, results_bucket, cpu_networks_port, source_bucket=None, source_directory=None):
-
-        self.steps = [
-            PipelineGetData(source_bucket, source_directory),
-            PipelineRemoteNetworks("http://localhost:%d" % cpu_networks_port),
-            PipelineCalculateFov(fov_model_path),
-            PipelineRemotePlaneDetector(plane_url),
-            PipelineRunModels(
-                semantic_path=semantic_model_path,
-                hed_path=join("hed_model", "HED_pretrained_bsds.npz")
-            ),
-            PipelineDeterminePrimaryAngles(),
-            PipelineSuperpixels(),
-            PipelineRefinePlaneMasks(results_bucket),
-            PipelineCombinePlaneMasks(),
-            PipelineUploadResults(results_bucket)
-        ]
-
-
-    def start():
-        # Start the processing workers for all steps
-        for step in steps:
-            step.start()

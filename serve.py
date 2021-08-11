@@ -70,7 +70,7 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
 
 
     # Create the steps we want to use in the pipelines
-    pipeline = Pipeline(semantic_model_path, fov_model_path, results_bucket, cpu_networks_port, source_bucket=user_uploads_bucket)
+    pipeline = Pipeline(user_uploads_bucket, results_bucket, semantic_model_path, fov_model_path, "http://localhost:%d" % cpu_networks_port)
 
     pipeline.start()
     

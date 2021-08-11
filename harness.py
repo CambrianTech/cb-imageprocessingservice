@@ -6,16 +6,7 @@ import pickle
 import click
 import time
 
-from pipeline.core import schedule_and_wait, merge_future_dicts, num_waiting_items
-from pipeline.fov import PipelineCalculateFov
-from pipeline.getdata import PipelineGetData
-from pipeline.primaryangle import PipelineDeterminePrimaryAngles
-from pipeline.runmodels import PipelineRunModels
-from pipeline.superpixels import PipelineSuperpixels
-from pipeline.refineplanemasks import PipelineRefinePlaneMasks
-from pipeline.combineplanemasks import PipelineCombinePlaneMasks
-from pipeline.uploadresults import PipelineUploadResults
-from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
+from pipeline.pipeline import Pipeline
 
 def get_file_paths(input_dir, pattern="*.pickle"):
     files = []
@@ -49,9 +40,9 @@ def run_harness(data, directory):
 @click.command()
 @click.argument("input_dir", default='test_images', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("output_dir", default='output', type=click.Path(exists=False, file_okay=False, dir_okay=True))
-@click.argument("model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
-@click.argument("semantic_model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
-@click.argument("fov_model_path", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("model_path", default='tensorflow_models', type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("semantic_model_path", default='gluon_models', type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("fov_model_path", default='sklearn_models/fov_classifier_lc128.joblib', type=click.Path(exists=True, file_okay=True, dir_okay=False))
 def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path):
 
     if not os.path.exists(input_dir):
@@ -59,6 +50,8 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path)
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+
+    pipeline = Pipeline(input_dir, output_dir, semantic_model_path, fov_model_path)
 
     start = time.time()
 
