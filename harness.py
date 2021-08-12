@@ -6,6 +6,7 @@ import pickle
 import click
 import time
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from pipeline.buildpipeline import Pipeline
 
@@ -25,12 +26,10 @@ async def process_files(pipeline, input_dir, output_dir):
     print("Importing %d files from \"%s\" into \"%s\"" % (len(files), input_dir, output_dir))
 
     for path in files:
-        data_path = str(path)
-        dir_path = os.path.dirname(data_path)
+        name = Path(path).stem
 
-        data = {"image_path": path}
-
-        print("Processing", path)
+        data = {"image_path": path, "image_s3_key":name}
+        print("Processing", name)
 
         await pipeline.process(data)
 
@@ -45,7 +44,7 @@ async def process_files(pipeline, input_dir, output_dir):
 @click.argument("model_path", default='tensorflow_models', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("semantic_model_path", default='gluon_models', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("fov_model_path", default='sklearn_models/fov_classifier_lc128.joblib', type=click.Path(exists=True, file_okay=True, dir_okay=False))
-@click.argument("planes_url", default='http://planes:8081/', type=click.STRING)
+@click.argument("planes_url", default='http://localhost:8081/', type=click.STRING)
 
 def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url):
 
@@ -55,12 +54,17 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    loop = asyncio.get_event_loop()
+
+    print("Setting default executor")
+    loop.set_default_executor(ThreadPoolExecutor())
+
     pipeline = Pipeline(model_path, semantic_model_path, fov_model_path, planes_url)
     pipeline.start()
 
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(process_files(pipeline, input_dir, output_dir))
-    loop.close()
+
+    # loop.close()
 
 
 if __name__ == "__main__":

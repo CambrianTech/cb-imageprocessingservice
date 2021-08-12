@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from scipy import ndimage
 from time import time
+import os
 
 import cambrian.image_processing as ip
 from cambrian import geometry
@@ -20,7 +21,7 @@ from scipy.stats import mode
 from skimage.morphology import remove_small_objects, remove_small_holes
 from pipeline.semanticlabels import ADE20K
 
-IM_LOGGING_ENABLED = False
+IM_LOGGING_ENABLED = True
 IM_LOGGING3D_ENABLED = False
 
 furniture_labels = [ADE20K.table, ADE20K.armchair, ADE20K.sofa, ADE20K.coffee_table, ADE20K.ottoman, ADE20K.chest, ADE20K.wardrobe, ADE20K.chair, ADE20K.bed, ADE20K.bench, ADE20K.swivel_chair, ADE20K.pole, ADE20K.stool]
@@ -1133,12 +1134,23 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
     def run(self, data):
 
+        logging_dir = 'logging/' + data["image_s3_key"] + "/"
+
+
         if IM_LOGGING_ENABLED:
-            with open('logging/data.pickle', 'wb') as handle:
+            if not os.path.exists('logging'):
+                os.makedirs('logging')
+
+            if not os.path.exists(logging_dir):
+                os.makedirs(logging_dir)
+
+            data_filename = logging_dir + 'data.pickle'
+
+            print("Saving data pickle to " + data_filename)
+            with open(data_filename, 'wb') as handle:
                 pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         logging_index = 0
-        logging_dir = 'logging/'
 
         img = data["image"]
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
