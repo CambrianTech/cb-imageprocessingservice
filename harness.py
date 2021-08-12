@@ -45,7 +45,9 @@ async def process_files(pipeline, input_dir, output_dir):
 @click.argument("model_path", default='tensorflow_models', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("semantic_model_path", default='gluon_models', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("fov_model_path", default='sklearn_models/fov_classifier_lc128.joblib', type=click.Path(exists=True, file_okay=True, dir_okay=False))
-def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path):
+@click.argument("planes_url", default='http://planes:8081/', type=click.STRING)
+
+def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url):
 
     if not os.path.exists(input_dir):
         raise Exception('The directory does not exist at path {}'.format(input_dir)) 
@@ -53,7 +55,7 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    pipeline = Pipeline(semantic_model_path, fov_model_path)
+    pipeline = Pipeline(model_path, semantic_model_path, fov_model_path, planes_url)
     pipeline.start()
 
     loop = asyncio.get_event_loop()

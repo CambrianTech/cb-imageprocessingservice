@@ -1,5 +1,4 @@
 import asyncio
-import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from os.path import join
 import os
@@ -55,11 +54,6 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
     print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
-    print("Starting CPU networks process")
-    cpu_networks_port = 8082
-    subprocess.Popen(["python3", "runcpunetworks.py",
-                      model_path, str(cpu_networks_port)])
-
     print("Creating pipeline")
 
     if image_local_dir is not None and not os.path.exists(image_local_dir):
@@ -67,12 +61,8 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
 
     if results_local_dir is not None and not os.path.exists(results_local_dir):
         os.makedirs(results_local_dir)
-
-
-    # Create the steps we want to use in the pipelines
-    remote_path = "http://localhost:%d" % cpu_networks_port
     
-    pipeline = Pipeline(semantic_model_path, fov_model_path, bucket_source=user_uploads_bucket, bucket_dest=results_bucket, plane_source=remote_path, plane_dest=plane_url)
+    pipeline = Pipeline(model_path, semantic_model_path, fov_model_path, planes_network_url=plane_url, bucket_source=user_uploads_bucket, bucket_dest=results_bucket)
 
     pipeline.start()
 

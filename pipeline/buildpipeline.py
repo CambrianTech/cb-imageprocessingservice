@@ -2,6 +2,7 @@
 import os
 import typing
 import time
+import subprocess
 
 from pipeline.core import schedule_and_wait
 from pipeline.fov import PipelineCalculateFov
@@ -16,16 +17,23 @@ from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 
 class Pipeline():
 
-    def __init__(self, semantic_model_path, fov_model_path, bucket_source=None, bucket_dest=None, plane_source=None, plane_dest=None):
+    def __init__(self, model_path, semantic_model_path, fov_model_path, planes_network_url, bucket_source=None, bucket_dest=None):
 
+
+        print("Starting CPU networks process")
+        cpu_networks_port = 8082
+        subprocess.Popen(["python3", "runcpunetworks.py", model_path, str(cpu_networks_port)])
+
+        # Create the steps we want to use in the pipelines
+        remote_path = "http://localhost:%d" % cpu_networks_port
 
         #setup input:
         if bucket_source is not None:
              self.steps = [
                 PipelineBucketSource(bucket_source),
-                PipelineRemoteNetworks(plane_source),
+                PipelineRemoteNetworks(remote_path),
                 PipelineCalculateFov(fov_model_path),
-                PipelineRemotePlaneDetector(plane_dest),
+                PipelineRemotePlaneDetector(planes_network_url),
                 PipelineRunModels(
                     semantic_path=semantic_model_path,
                     hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")
@@ -39,7 +47,9 @@ class Pipeline():
         else:
             self.steps = [
                 PipelineFileSource(),
+                PipelineRemoteNetworks(remote_path),
                 PipelineCalculateFov(fov_model_path),
+                PipelineRemotePlaneDetector(planes_network_url),
                 PipelineRunModels(
                     semantic_path=semantic_model_path,
                     hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")
