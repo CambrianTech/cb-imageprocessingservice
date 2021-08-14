@@ -1135,20 +1135,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
     def run(self, data):
 
-        logging_dir = 'logging/' + data["image_s3_key"] + "/"
-
-        if IM_LOGGING_ENABLED:
-            if not os.path.exists('logging'):
-                os.makedirs('logging')
-
-            if not os.path.exists(logging_dir):
-                os.makedirs(logging_dir)
-
-            if LOG_DATA:
-                data_filename = logging_dir + 'data.pickle'
-                print("Saving data pickle to " + data_filename)
-                with open(data_filename, 'wb') as handle:
-                    pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        logging_dir = data['logging_dir']
+        IM_LOGGING_ENABLED = data['logging_dir'] is not None
 
         logging_index = 0
 

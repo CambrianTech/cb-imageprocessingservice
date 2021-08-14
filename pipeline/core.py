@@ -117,3 +117,8 @@ def num_waiting_items(steps: typing.List[PipelineStep]) -> int:
     """Counts the number of waiting items in a list of pipeline steps."""
     return sum([step.num_waiting_items for step in steps])
 
+def get_unique_id(data:typing.Dict):
+    return data["image_s3_key"]    
+
+
+

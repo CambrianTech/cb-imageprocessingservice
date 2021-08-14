@@ -20,10 +20,10 @@ def get_file_paths(input_dir, pattern=None):
             files.extend(Path(input_dir).glob('**/*' + ext))
     return files
 
-async def process_files(pipeline, input_dir, output_dir, pattern=None):
+async def process_files(pipeline, input_dir, pattern=None):
     files = get_file_paths(input_dir, pattern)
 
-    print("Importing %d files from \"%s\" into \"%s\"" % (len(files), input_dir, output_dir))
+    print("Importing %d files from \"%s\"" % (len(files), input_dir))
 
     for path in files:
         url = Path(path)
@@ -44,13 +44,11 @@ async def process_files(pipeline, input_dir, output_dir, pattern=None):
 @click.argument("fov_model_path", default='sklearn_models/fov_classifier_lc128.joblib', type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("planes_url", default='http://localhost:8081/', type=click.STRING)
 @click.option('--restore', type=int)
-def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url, restore):
+@click.option('--export', type=int)
+def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url, restore, export):
 
     if not os.path.exists(input_dir):
         raise Exception('The directory does not exist at path {}'.format(input_dir)) 
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
 
     loop = asyncio.get_event_loop()
     loop.set_default_executor(ThreadPoolExecutor())
@@ -59,14 +57,16 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     if restore:
         file_pattern = "*.pickle"
-        pipeline = Pipeline(PipelineMode.Restore, restore_step=PipelineStep(restore), \
+        pipeline = Pipeline(PipelineMode.Restore, restore_step=PipelineStep(restore), logging_dir=output_dir, \
             model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
         pipeline.start()
     else:
-        pipeline = Pipeline(PipelineMode.Process, model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
+        export_step = PipelineStep(export) if export is not None else None
+        pipeline = Pipeline(PipelineMode.Process, export_step=export_step, logging_dir=output_dir, \
+            model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
         pipeline.start()
 
-    loop.run_until_complete(process_files(pipeline, input_dir, output_dir, pattern=file_pattern))
+    loop.run_until_complete(process_files(pipeline, input_dir, pattern=file_pattern))
     
 
 

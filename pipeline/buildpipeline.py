@@ -3,7 +3,7 @@ import os
 import time
 import subprocess
 
-from pipeline.core import schedule_and_wait
+from pipeline.core import schedule_and_wait, get_unique_id
 from pipeline.fov import PipelineCalculateFov
 from pipeline.getdata import PipelineBucketSource, PipelineFileSource
 from pipeline.primaryangle import PipelineDeterminePrimaryAngles
@@ -36,7 +36,12 @@ class PipelineStep(IntEnum):
 
 class Pipeline():
 
-    def __init__(self, mode:PipelineMode, model_path=None, semantic_model_path=None, fov_model_path=None, planes_url=None, bucket_source=None, bucket_dest=None, cpu_networks_port = 8082, restore_step:PipelineStep=None):
+    def __init__(self,  mode:PipelineMode, \
+                        model_path=None, semantic_model_path=None, fov_model_path=None, \
+                        planes_url=None, bucket_source=None, bucket_dest=None, cpu_networks_port = 8082, \
+                        restore_step:PipelineStep=None, export_step:PipelineStep=None, logging_dir=None):
+
+        self.mode = mode
 
         self.model_path = model_path
         self.semantic_model_path = semantic_model_path
@@ -46,9 +51,12 @@ class Pipeline():
         self.bucket_dest = bucket_dest
         self.cpu_networks_port = cpu_networks_port
         self.remote_path = "http://localhost:%d" % cpu_networks_port
+        self.restore_step = restore_step
+        self.export_step = export_step
+        self.logging_dir = logging_dir
 
         # Create the steps we want to use in the pipelines
-        if mode == PipelineMode.Serve:
+        if self.mode == PipelineMode.Serve:
              self.steps = [
                 PipelineBucketSource(self.bucket_source),
                 PipelineRemoteNetworks(self.remote_path),
@@ -62,7 +70,7 @@ class Pipeline():
                 PipelineUploadResults(self.bucket_dest)
             ]
 
-        elif mode == PipelineMode.Process:
+        elif self.mode == PipelineMode.Process:
             self.steps = [
                 PipelineFileSource(),
                 PipelineRemoteNetworks(self.remote_path),
@@ -75,7 +83,7 @@ class Pipeline():
                 PipelineCombinePlaneMasks()
             ]
 
-        elif mode == PipelineMode.Restore:
+        elif self.mode == PipelineMode.Restore:
             print("Restoring from", restore_step.name)
 
             self.steps = [PipelineFileSource()]
@@ -96,22 +104,39 @@ class Pipeline():
                 self.steps.append(PipelineRefinePlaneMasks())
             if restore_step <= PipelineStep.CombinePlaneMasks:
                 self.steps.append(PipelineCombinePlaneMasks())
-            
-
 
     def start(self):
-        print("Starting")
-        
-        #subprocess.Popen(["python3", "runcpunetworks.py", self.model_path, str(self.cpu_networks_port)])
+        print("Starting threads")
+
+        #start RemoteNetworks if needed downstream
+        if self.mode != PipelineMode.Restore or self.restore_step <= PipelineStep.RemoteNetworks:
+            subprocess.Popen(["python3", "runcpunetworks.py", self.model_path, str(self.cpu_networks_port)])
 
         # Start the processing workers for all steps
         for step in self.steps:
             step.start()
 
     async def process(self, data):
+
+        if self.logging_dir is not None and not os.path.exists(self.logging_dir):
+            os.makedirs(self.logging_dir)
+
         total_start_time = time.time()
+        index = 0
         for step in self.steps:
+
+            data["logging_dir"] = None if self.logging_dir is None else "%s/%s" % (self.logging_dir, get_unique_id(data))
+
             data = await schedule_and_wait(step.schedule, data)
+
+            if index == self.export_step and data["logging_dir"] is not None:
+                data_filename = data["logging_dir"] + 'data.pickle'
+                print("Saving data pickle to " + data_filename)
+                with open(data_filename, 'wb') as handle:
+                    pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+            index += 1
+
         print("Planes total pipeline time: %.2fs" %
               (time.time() - total_start_time))
         return data
