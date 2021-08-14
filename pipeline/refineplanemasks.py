@@ -23,6 +23,7 @@ from pipeline.semanticlabels import ADE20K
 
 IM_LOGGING_ENABLED = True
 IM_LOGGING3D_ENABLED = False
+LOG_DATA = False
 
 furniture_labels = [ADE20K.table, ADE20K.armchair, ADE20K.sofa, ADE20K.coffee_table, ADE20K.ottoman, ADE20K.chest, ADE20K.wardrobe, ADE20K.chair, ADE20K.bed, ADE20K.bench, ADE20K.swivel_chair, ADE20K.pole, ADE20K.stool]
 wall_like = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen]
@@ -1136,7 +1137,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         logging_dir = 'logging/' + data["image_s3_key"] + "/"
 
-
         if IM_LOGGING_ENABLED:
             if not os.path.exists('logging'):
                 os.makedirs('logging')
@@ -1144,11 +1144,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
             if not os.path.exists(logging_dir):
                 os.makedirs(logging_dir)
 
-            data_filename = logging_dir + 'data.pickle'
-
-            print("Saving data pickle to " + data_filename)
-            with open(data_filename, 'wb') as handle:
-                pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            if LOG_DATA:
+                data_filename = logging_dir + 'data.pickle'
+                print("Saving data pickle to " + data_filename)
+                with open(data_filename, 'wb') as handle:
+                    pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         logging_index = 0
 

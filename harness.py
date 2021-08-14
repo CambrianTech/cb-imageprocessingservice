@@ -20,17 +20,15 @@ def get_file_paths(input_dir, pattern=None):
             files.extend(Path(input_dir).glob('**/*' + ext))
     return files
 
-async def process_files(pipeline, input_dir, output_dir):
-    files = get_file_paths(input_dir)
+async def process_files(pipeline, input_dir, output_dir, pattern=None):
+    files = get_file_paths(input_dir, pattern)
 
     print("Importing %d files from \"%s\" into \"%s\"" % (len(files), input_dir, output_dir))
 
     for path in files:
-        name = Path(path).stem
-
-        data = {"image_path": path, "image_s3_key":name}
-        print("Processing", name)
-
+        url = Path(path)
+        name = os.path.dirname(path)
+        data = {"path": path, "image_s3_key": name if path.suffix == ".pickle" else url.stem}
         await pipeline.process(data)
 
     index = 0
@@ -46,7 +44,6 @@ async def process_files(pipeline, input_dir, output_dir):
 @click.argument("fov_model_path", default='sklearn_models/fov_classifier_lc128.joblib', type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("planes_url", default='http://localhost:8081/', type=click.STRING)
 @click.option('--restore', type=int)
-
 def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url, restore):
 
     if not os.path.exists(input_dir):
@@ -55,17 +52,21 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    if restore:
-        pipeline = Pipeline(PipelineMode.Restore, restore_step=PipelineStep(restore), model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
-        
-    else:
-        loop = asyncio.get_event_loop()
-        loop.set_default_executor(ThreadPoolExecutor())
+    loop = asyncio.get_event_loop()
+    loop.set_default_executor(ThreadPoolExecutor())
 
+    file_pattern = None
+
+    if restore:
+        file_pattern = "*.pickle"
+        pipeline = Pipeline(PipelineMode.Restore, restore_step=PipelineStep(restore), \
+            model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
+        pipeline.start()
+    else:
         pipeline = Pipeline(PipelineMode.Process, model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
         pipeline.start()
 
-        loop.run_until_complete(process_files(pipeline, input_dir, output_dir))
+    loop.run_until_complete(process_files(pipeline, input_dir, output_dir, pattern=file_pattern))
     
 
 

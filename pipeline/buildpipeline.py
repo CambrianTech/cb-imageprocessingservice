@@ -1,6 +1,5 @@
 
 import os
-import typing
 import time
 import subprocess
 
@@ -37,8 +36,7 @@ class PipelineStep(IntEnum):
 
 class Pipeline():
 
-    def __init__(self, mode:PipelineMode, model_path=None, semantic_model_path=None, fov_model_path=None, 
-        planes_url=None, bucket_source=None, bucket_dest=None, cpu_networks_port = 8082, restore_step:PipelineStep=None):
+    def __init__(self, mode:PipelineMode, model_path=None, semantic_model_path=None, fov_model_path=None, planes_url=None, bucket_source=None, bucket_dest=None, cpu_networks_port = 8082, restore_step:PipelineStep=None):
 
         self.model_path = model_path
         self.semantic_model_path = semantic_model_path
@@ -82,21 +80,21 @@ class Pipeline():
 
             self.steps = [PipelineFileSource()]
 
-            if restore_step >= PipelineStep.RemoteNetworks:
+            if restore_step <= PipelineStep.RemoteNetworks:
                 self.steps.append(PipelineRemoteNetworks(self.remote_path))
-            if restore_step >= PipelineStep.CalculateFov:
+            if restore_step <= PipelineStep.CalculateFov:
                 self.steps.append(PipelineCalculateFov(self.fov_model_path))
-            if restore_step >= PipelineStep.RemotePlaneDetector:
+            if restore_step <= PipelineStep.RemotePlaneDetector:
                 self.steps.append(PipelineRemotePlaneDetector(self.planes_url))
-            if restore_step >= PipelineStep.RunModels:
+            if restore_step <= PipelineStep.RunModels:
                 self.steps.append(PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")))
-            if restore_step >= PipelineStep.DeterminePrimaryAngles:
+            if restore_step <= PipelineStep.DeterminePrimaryAngles:
                 self.steps.append(PipelineDeterminePrimaryAngles())
-            if restore_step >= PipelineStep.Superpixels:
+            if restore_step <= PipelineStep.Superpixels:
                 self.steps.append(PipelineSuperpixels())
-            if restore_step >= PipelineStep.RefinePlaneMasks: 
+            if restore_step <= PipelineStep.RefinePlaneMasks: 
                 self.steps.append(PipelineRefinePlaneMasks())
-            if restore_step >= PipelineStep.CombinePlaneMasks:
+            if restore_step <= PipelineStep.CombinePlaneMasks:
                 self.steps.append(PipelineCombinePlaneMasks())
             
 
@@ -104,16 +102,16 @@ class Pipeline():
     def start(self):
         print("Starting")
         
-        subprocess.Popen(["python3", "runcpunetworks.py", self.model_path, str(self.cpu_networks_port)])
+        #subprocess.Popen(["python3", "runcpunetworks.py", self.model_path, str(self.cpu_networks_port)])
 
         # Start the processing workers for all steps
         for step in self.steps:
             step.start()
 
-    async def process(self, input_dict: typing.Dict):
+    async def process(self, data):
         total_start_time = time.time()
         for step in self.steps:
-            input_dict = await schedule_and_wait(step.schedule, input_dict)
+            data = await schedule_and_wait(step.schedule, data)
         print("Planes total pipeline time: %.2fs" %
               (time.time() - total_start_time))
-        return input_dict
+        return data

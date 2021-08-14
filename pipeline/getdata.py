@@ -8,6 +8,8 @@ try:
 except:
     from scipy.misc import imread
 
+import pickle
+from pathlib import Path
 
 def _get_image_from_s3(s3_client, bucket: str, key: str) -> np.ndarray:
     data = BytesIO()
@@ -48,15 +50,25 @@ class PipelineFileSource(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["image_path"]
+        return ["path"]
 
     @property
     def output_keys(self) -> list:
         return ["image"]
 
     def run(self, data):
-        print("Reading", data["image_path"])
 
-        data["image"] = imread(data["image_path"])
-        data["image"] = data["image"][:, :, :3]
+        path = Path(data["path"])
+
+        if path.suffix == ".pickle":
+            print("Reading data from", path)
+            with open(path, 'rb') as handle:
+                loaded = pickle.load(handle)
+                #todo: maybe there's a deep copy that works instead? 
+                for key in loaded:
+                    data[key] = loaded[key]
+        else:
+            print("Reading image", data["path"])
+            data["image"] = imread(data["path"])
+            data["image"] = data["image"][:, :, :3]
 
