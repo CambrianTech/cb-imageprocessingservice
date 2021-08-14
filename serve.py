@@ -14,7 +14,7 @@ import aiohttp_cors
 import boto3
 import requests
 
-from pipeline.buildpipeline import Pipeline
+from pipeline.buildpipeline import Pipeline, PipelineMode
 
 def _get_instance_metadata():
     metadata = {}
@@ -62,7 +62,13 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
     if results_local_dir is not None and not os.path.exists(results_local_dir):
         os.makedirs(results_local_dir)
     
-    pipeline = Pipeline(model_path, semantic_model_path, fov_model_path, planes_network_url=plane_url, bucket_source=user_uploads_bucket, bucket_dest=results_bucket)
+    pipeline = Pipeline(PipelineMode.Serve, 
+        model_path=model_path, 
+        semantic_model_path=semantic_model_path, 
+        fov_model_path=fov_model_path, 
+        planes_network_url=plane_url, 
+        bucket_source=user_uploads_bucket, 
+        bucket_dest=results_bucket)
 
     pipeline.start()
 

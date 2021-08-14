@@ -8,7 +8,7 @@ import time
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-from pipeline.buildpipeline import Pipeline
+from pipeline.buildpipeline import Pipeline, PipelineMode, PipelineStep
 
 def get_file_paths(input_dir, pattern=None):
     files = []
@@ -45,8 +45,9 @@ async def process_files(pipeline, input_dir, output_dir):
 @click.argument("semantic_model_path", default='gluon_models', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("fov_model_path", default='sklearn_models/fov_classifier_lc128.joblib', type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("planes_url", default='http://localhost:8081/', type=click.STRING)
+@click.option('--restore', type=int)
 
-def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url):
+def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url, restore):
 
     if not os.path.exists(input_dir):
         raise Exception('The directory does not exist at path {}'.format(input_dir)) 
@@ -54,17 +55,18 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    loop = asyncio.get_event_loop()
+    if restore:
+        pipeline = Pipeline(PipelineMode.Restore, restore_step=PipelineStep(restore), model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
+        
+    else:
+        loop = asyncio.get_event_loop()
+        loop.set_default_executor(ThreadPoolExecutor())
 
-    print("Setting default executor")
-    loop.set_default_executor(ThreadPoolExecutor())
+        pipeline = Pipeline(PipelineMode.Process, model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
+        pipeline.start()
 
-    pipeline = Pipeline(model_path, semantic_model_path, fov_model_path, planes_url)
-    pipeline.start()
-
-    loop.run_until_complete(process_files(pipeline, input_dir, output_dir))
-
-    # loop.close()
+        loop.run_until_complete(process_files(pipeline, input_dir, output_dir))
+    
 
 
 if __name__ == "__main__":
