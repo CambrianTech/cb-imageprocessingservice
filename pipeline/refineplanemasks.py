@@ -20,10 +20,7 @@ from scipy.stats import mode
 
 from skimage.morphology import remove_small_objects, remove_small_holes
 from pipeline.semanticlabels import ADE20K
-
-IM_LOGGING_ENABLED = True
-IM_LOGGING3D_ENABLED = False
-LOG_DATA = False
+from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply
 
 furniture_labels = [ADE20K.table, ADE20K.armchair, ADE20K.sofa, ADE20K.coffee_table, ADE20K.ottoman, ADE20K.chest, ADE20K.wardrobe, ADE20K.chair, ADE20K.bed, ADE20K.bench, ADE20K.swivel_chair, ADE20K.pole, ADE20K.stool]
 wall_like = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen]
@@ -33,118 +30,6 @@ METADATA = np.array([571.87, 571.87, 320, 240, 640, 480, 0, 0, 0, 0])
 
 IMAGE_MAX_DIM = 640
 IMAGE_MIN_DIM = 480
-
-
-def _log_image(logging_dir, name, image, logging_index=0, logging=IM_LOGGING_ENABLED):
-    if logging:
-        name = logging_dir + str(logging_index) + " - " + name
-        print("name", name)
-        cv2.imwrite(name, image)
-    return logging_index + 1
-
-def _log_segmentation_image(logging_dir, name, segmentation, image, avg=False, logging_index=0):
-    if IM_LOGGING_ENABLED:
-        name = logging_dir + str(logging_index) + " - " + name
-        seg = get_segmentation_image(segmentation, image, avg)
-        cv2.imwrite(name, seg)
-    return logging_index + 1
-
-def _log_ply(logging_dir, name, image, masks, plane_XYZ, write_occlusion=False, mult=1.0, logging_index = 0):
-    if IM_LOGGING3D_ENABLED:
-        file_path = logging_dir + str(logging_index) + " - " + name
-        image = cv2.resize(image, (int(mult * 160), int(mult * 120)))
-        width = image.shape[1]
-        height = image.shape[0]
-        faces = []
-        points = []
-        planes = np.zeros(shape=(len(masks), height, width, 3))
-        new_masks = np.zeros(shape=(len(masks), height, width))
-        for i in range(len(masks)):
-            new_masks[i] = cv2.resize(masks[i], (width, height))
-            planes[i] = cv2.resize(plane_XYZ[i], (width, height))
-        plane_XYZ = planes
-        masks = new_masks
-
-        plane_depths = plane_XYZ[:, :, :, 1] * masks + 10 * (1 - masks)
-        segmentation = np.argmin(plane_depths, axis=0)
-
-        for mask_index, (mask, XYZ) in enumerate(zip(masks, plane_XYZ)):
-            indices = np.nonzero(np.logical_and(segmentation == mask_index, masks[mask_index] > 0.01))
-            # indices = np.nonzero(masks[mask_index] > .05)
-            for y, x in zip(indices[0], indices[1]):
-                if y == height - 1 or x == width - 1:
-                    continue
-                validNeighborPixels = []
-                for neighborPixel in [(x, y + 1), (x + 1, y), (x + 1, y + 1)]:
-                    # if mask[neighborPixel[1], neighborPixel[0]] > 0.5:
-                    validNeighborPixels.append(neighborPixel)
-                    # pass
-                    continue
-                if len(validNeighborPixels) == 3:
-                    faces.append([len(points) + c for c in range(3)])
-                    points += [(XYZ[pixel[1], pixel[0]], pixel, segmentation[pixel[1], pixel[0]] == mask_index) for
-                               pixel in
-                               [(x, y), (x + 1, y + 1), (x + 1, y)]]
-                    faces.append([len(points) + c for c in range(3)])
-                    points += [(XYZ[pixel[1], pixel[0]], pixel, segmentation[pixel[1], pixel[0]] == mask_index) for
-                               pixel in
-                               [(x, y), (x, y + 1), (x + 1, y + 1)]]
-                elif len(validNeighborPixels) == 2:
-                    faces.append([len(points) + c for c in range(3)])
-                    points += [(XYZ[pixel[1], pixel[0]], pixel, segmentation[pixel[1], pixel[0]] == mask_index) for
-                               pixel in
-                               [(x, y), (validNeighborPixels[0][0], validNeighborPixels[0][1]),
-                                (validNeighborPixels[1][0], validNeighborPixels[1][1])]]
-                    pass
-                continue
-            continue
-
-        imageFilename = "textureless"
-        with open(file_path, 'w') as f:
-            header = """ply
-        format ascii 1.0"""
-            header += imageFilename
-            header += """
-        element vertex """
-            header += str(len(points))
-            header += """
-        property float x
-        property float y
-        property float z
-        property uchar red
-        property uchar green
-        property uchar blue
-        element face """
-            header += str(len(faces))
-            header += """
-        property list uchar int vertex_indices
-        end_header
-        """
-            f.write(header)
-            for point in points:
-                X = point[0][0]
-                Y = point[0][1]
-                Z = point[0][2]
-                if not write_occlusion or point[2]:
-                    color = image[point[1][1], point[1][0]]
-                else:
-                    color = (128, 128, 128)
-                    pass
-                f.write(str(X) + ' ' + str(Z) + ' ' + str(-Y) + ' ' + str(color[2]) + ' ' + str(color[1]) + ' ' + str(
-                    color[0]) + '\n')
-                continue
-
-            for face in faces:
-                valid = True
-                f.write('3 ')
-                for c in face:
-                    f.write(str(c) + ' ')
-                    continue
-                f.write('\n')
-                continue
-            f.close()
-            pass
-    return logging_index + 1
 
 
 def rough_dilate_erode(is_dilate, mask, size=5, iterations=1, scale=0.5, maintain_size=True, interpolation=cv2.INTER_NEAREST):
@@ -351,19 +236,6 @@ def proj(points, plane):
 
 
 #######################################
-
-def get_segmentation_image(labels, image, avg=False, resize=True):
-    if True:
-        img_seg = image
-        if resize:
-            img_seg = cv2.resize(image, (labels.shape[1], labels.shape[0]))
-
-        for label in range(1, np.amax(labels) + 1):
-            color = np.random.randint([0, 0, 10], [254, 254, 235])
-            if avg: color = np.mean(img_seg[labels == label], axis=0)
-            img_seg[labels == label] = color
-        return img_seg
-
 
 def get_planes_class(plane_masks, class_labels):
     plane_classes = []
@@ -1135,25 +1007,20 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
     def run(self, data):
 
-        logging_dir = data['logging_dir']
-        IM_LOGGING_ENABLED = data['logging_dir'] is not None
-
-        logging_index = 0
-
         img = data["image"]
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         if img.shape[1] > 1024:
             img = cv2.resize(img, (1024, int(img.shape[0] / img.shape[1] * 1024)))
 
-        logging_index = _log_image(logging_dir, "image.png", img, logging_index=logging_index)
+        log_image(data, "image", img)
 
         output = np.float32(data["semantic_probs"])
 
         hed = data["hed"]
 
         hed_lr = hed
-        logging_index = _log_image(logging_dir, 'hed.png', hed_lr, logging_index=logging_index)
+        log_image(data, 'hed', hed_lr)
 
         h, w = output[0].shape
 
@@ -1180,25 +1047,24 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         wall_mask = output[ADE20K.wall.index].copy()
 
-        logging_index = _log_image(logging_dir, "wall_mask.png", 255. * (wall_mask), logging_index=logging_index)
+        log_image(data, "wall_mask", 255. * (wall_mask))
 
         floor_mask = output[ADE20K.floor.index].copy()
-        logging_index = _log_image(logging_dir, "floor_mask.png", 255. * floor_mask, logging_index=logging_index)
+        log_image(data, "floor_mask", 255. * floor_mask)
 
         ceiling_mask = output[ADE20K.ceiling.index].copy()
-        logging_index = _log_image(logging_dir, "ceiling_mask.png", 255. * ceiling_mask, logging_index=logging_index)
+        log_image(data, "ceiling_mask", 255. * ceiling_mask)
 
         wall_like_mask = np.zeros_like(wall_mask)
 
         for label in wall_like:
             wall_like_mask += output[label.index]
 
-        logging_index = _log_image(logging_dir, "wall_like_mask.png", 255. * wall_like_mask,
-                                   logging_index=logging_index)
+        log_image(data, "wall_like_mask", 255. * wall_like_mask)
 
         other_mask = 1.0 - floor_mask - wall_mask - wall_like_mask - ceiling_mask
 
-        logging_index = _log_image(logging_dir, "other_mask.png", 255. * other_mask, logging_index=logging_index)
+        log_image(data, "other_mask", 255. * other_mask)
 
         ade_seg_c = np.dstack(
             (.95 * np.ones_like(other_mask), other_mask, floor_mask, wall_mask, ceiling_mask, wall_like_mask))
@@ -1206,8 +1072,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         ade_seg = np.argmax(ade_seg_c, -1)
         ade_skel = skeletonize(other_mask > .5)
 
-        logging_index = _log_segmentation_image(logging_dir, "ade_seg.png", np.int32(ade_seg), img_lr,
-                                                logging_index=logging_index)
+        log_segmentation_image(data, "ade_seg", np.int32(ade_seg), img_lr)
 
         line_data, lines = find_lines(img, cv2.resize(hed, (img.shape[1], img.shape[0])), data["normals"])
 
@@ -1229,10 +1094,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
         Line.draw_all(line_data, merged_lines, color=255, thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
 
         l_image_rgb[merged_lines > 0] = 255
-        logging_index = _log_segmentation_image(logging_dir, "l_image.png", all_lines, img_lr,
-                                                logging_index=logging_index)
+        log_segmentation_image(data, "l_image", all_lines, img_lr)
 
-        logging_index = _log_image(logging_dir, "l_image_rgb.png", l_image_rgb, logging_index=logging_index)
+        log_image(data, "l_image_rgb", l_image_rgb)
 
         planes_data = data["planes"]
         plane_parameters = np.array(data["planes"]["detection"][:, 6:9], dtype=np.float32)
@@ -1256,10 +1120,10 @@ class PipelineRefinePlaneMasks(PipelineStep):
         XYZ = planes_data["XYZ"][:, 80:-80, :].transpose(1, 2, 0)
         # depth = cv2.resize(depth, shape)
         XYZ = cv2.resize(XYZ, shape)
-        logging_index = _log_image(logging_dir, "XYZ.png", 255. * XYZ / np.amax(XYZ), logging_index=logging_index)
+        log_image(data, "XYZ", 255. * XYZ / np.amax(XYZ))
 
         normals = cv2.resize(data["normals"], shape)
-        logging_index = _log_image(logging_dir, "normals.png", normals, logging_index=logging_index)
+        log_image(data, "normals", normals)
 
         normals = (normals - 127.5) / 127.5
 
@@ -1300,8 +1164,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         lengths = np.maximum(np.sqrt(np.sum(normals_c * normals_c, -1)), 1e-6)
         normals_c /= np.dstack((lengths, lengths, lengths))
-        logging_index = _log_image(logging_dir, "normals_c_org.png", 127.5 * (normals_c + 1),
-                                   logging_index=logging_index)
+        log_image(data, "normals_c_org", 127.5 * (normals_c + 1))
 
         cluster_masks = [.03 * np.ones_like(plane_masks[0])]
         cluster_mask_indices = [0]
@@ -1318,12 +1181,10 @@ class PipelineRefinePlaneMasks(PipelineStep):
         plane_cluster_seg_rs = np.int32(
             cv2.resize(np.uint8(plane_cluster_seg), (img.shape[1], img.shape[0]), interpolation=cv2.INTER_NEAREST))
 
-        logging_index = _log_segmentation_image(logging_dir, "plane_cluster_seg.png", plane_cluster_seg, img_lr,
-                                                logging_index=logging_index)
+        log_segmentation_image(data, "plane_cluster_seg", plane_cluster_seg, img_lr)
 
-        logging_index = _log_image(logging_dir, "XYZ.png", 255. * XYZ / np.amax(XYZ), logging_index=logging_index)
-        logging_index = _log_ply(logging_dir, "3D.ply", img_lr, plane_masks, np.float32(plane_XYZ), mult=1,
-                                 logging_index=logging_index)
+        log_image(data, "XYZ", 255. * XYZ / np.amax(XYZ))
+        log_ply(data, "3D", img_lr, plane_masks, np.float32(plane_XYZ), mult=1)
 
         ######################################## Initial refinement work
         w_mask = merged_lines == 0
@@ -1360,12 +1221,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
         other_mask[ade_skel > 0] = 1
         other_prob = get_segmentation_image(other_markers + 1, other_mask, avg=True)
 
-        logging_index = _log_image(logging_dir, "floor_markers.png", 255. * floor_prob, logging_index=logging_index)
-        logging_index = _log_image(logging_dir, "other_markers.png", 255. * other_prob, logging_index=logging_index)
-        logging_index = _log_image(logging_dir, "ceiling_markers.png", 255. * ceiling_prob, logging_index=logging_index)
-        logging_index = _log_image(logging_dir, "wall_like_markers.png", 255. * wall_like_prob,
-                                   logging_index=logging_index)
-        logging_index = _log_image(logging_dir, "wall_markers.png", 255. * wall_prob, logging_index=logging_index)
+        log_image(data, "floor_markers", 255. * floor_prob)
+        log_image(data, "other_markers", 255. * other_prob)
+        log_image(data, "ceiling_markers", 255. * ceiling_prob)
+        log_image(data, "wall_like_markers", 255. * wall_like_prob)
+        log_image(data, "wall_markers", 255. * wall_prob)
 
         segmentation_initial = np.int32(np.argmax(np.dstack(
             (.05 * np.ones_like(other_mask), other_prob, floor_prob, wall_prob, ceiling_prob, wall_like_prob)), -1))
@@ -1395,8 +1255,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         segmentation_initial = cv2.watershed(cv2.cvtColor(np.uint8(distances), cv2.COLOR_GRAY2BGR),
                                              segmentation_initial)
 
-        logging_index = _log_segmentation_image(logging_dir, "segmentation_initial.png", segmentation_initial, img_lr,
-                                                logging_index=logging_index)
+        log_segmentation_image(data, "segmentation_initial", segmentation_initial, img_lr)
 
         #############################################################
 
@@ -1417,8 +1276,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         if floor_index > -1:
             plane_parameters[floor_indices[0]] = floor_normal * floor_offset
 
-        logging_index = _log_image(logging_dir, "img_dir.png", img_dir,
-                                   logging_index=logging_index)
+        log_image(data, "img_dir", img_dir)
 
         vp0 = vps[0] / vps[0][2]
 
@@ -1492,8 +1350,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         labels_fan, fan_normals_reduced, normals_wall = merge_by_angle_sweep(labels_fan, normals_c, fan_normals,
                                                                              wall_mask > .9, angle_threshold=.85)
 
-        logging_index = _log_segmentation_image(logging_dir, "fan1.png", labels_fan, img_lr,
-                                                logging_index=logging_index)
+        log_segmentation_image(data, "fan1", labels_fan, img_lr)
 
         unique_labels = np.unique(labels_fan[labels_fan > 0])
 
@@ -1507,14 +1364,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         vl_image = np.zeros_like(all_lines)
         vl_image[sure_walls == 0] = 0
-        logging_index = _log_segmentation_image(logging_dir, "fan2.png", labels_fan, img_lr,
-                                                logging_index=logging_index)
-        logging_index = _log_image(logging_dir, "normals_wall_org.png", 127.5 * (normals_wall + 1),
-                                   logging_index=logging_index)
-        logging_index = _log_segmentation_image(logging_dir, "vl_image.png", vl_image, img_lr,
-                                                logging_index=logging_index)
+        log_segmentation_image(data, "fan2", labels_fan, img_lr)
+        log_image(data, "normals_wall_org", 127.5 * (normals_wall + 1))
+        log_segmentation_image(data, "vl_image", vl_image, img_lr)
 
-        # logging_index = _log_ply(logging_dir, "3D2.ply", img_lr, plane_masks, np.float32(plane_XYZ), mult=1, logging_index = logging_index)
+        # log_ply(data, "3D2.ply", img_lr, plane_masks, np.float32(plane_XYZ), mult=1)
 
         plane_classes = get_planes_class(plane_masks, ade_seg)
         # print("plane_classes", plane_classes)
@@ -1559,13 +1413,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
             mask = skeletonize(wall_planes_seg == i)
             wall_planes_seg[np.logical_and(mask == 0, wall_planes_seg == i)] = 0
 
-        logging_index = _log_segmentation_image(logging_dir, "wall_planes_seg.png", wall_planes_seg, img_lr,
-                                                logging_index=logging_index)
+        log_segmentation_image(data, "wall_planes_seg", wall_planes_seg, img_lr)
 
         labels_wall_1 = labels_fan
         labels_wall_1[labels_wall_1 > 0] += np.amax(wall_planes_seg) + 1
-        logging_index = _log_segmentation_image(logging_dir, "labels_wall_graph.png", labels_fan, img_lr, avg=False,
-                                                logging_index=logging_index)
+        log_segmentation_image(data, "labels_wall_graph", labels_fan, img_lr, avg=False)
 
         for i in np.unique(labels_wall_1):
             if i == 0: continue
@@ -1576,8 +1428,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
             if len(m[0]) > 1:
                 labels_wall_1[mask] = m[0]
 
-        logging_index = _log_segmentation_image(logging_dir, "labels_wall_merge1.png", labels_wall_1, img_lr, avg=False,
-                                                logging_index=logging_index)
+        log_segmentation_image(data, "labels_wall_merge1", labels_wall_1, img_lr, avg=False)
 
         label_indices = np.unique(labels_wall_1)
 
@@ -1629,8 +1480,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                               plane_parameters[all_vertical[wall_index]], all_vertical[wall_index])
 
         plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=w, height=h, camera=camera, max_depth=10)
-        logging_index = _log_segmentation_image(logging_dir, 'labels_arg.png', labels_arg, img_lr,
-                                                logging_index=logging_index)
+        log_segmentation_image(data, 'labels_arg', labels_arg, img_lr)
 
         # needs to be cleaned up
         # labels_wall_1 = labels_arg.copy()
@@ -1664,8 +1514,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
                 labels_wall_2[l] = w[l]
 
-        logging_index = _log_segmentation_image(logging_dir, "labels_wall_merge2.png", labels_wall_2, img_lr, avg=False,
-                                                logging_index=logging_index)
+        log_segmentation_image(data, "labels_wall_merge2", labels_wall_2, img_lr, avg=False)
 
         final_masks = []
 
@@ -1693,7 +1542,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                 plane_parameter[9] = 2
                 plane_parameter[10] = plane_rotations[l]
 
-                # _log_image(logging_dir, str(l) + "plane_masks.png", 255. * plane_masks[l])
+                # log_image(data, str(l) + "plane_masks", 255. * plane_masks[l])
 
                 final_plane_parameters.append(plane_parameter)
                 final_plane_XYZ.append(plane_XYZ[l])
@@ -1755,11 +1604,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
         sigma_s = 10
 
         lighting_smooth = cv2.edgePreservingFilter(lighting_rgb, flags=1, sigma_s=sigma_s, sigma_r=sigma_r)
-        logging_index = _log_image(logging_dir, 'lighting_smooth.png', lighting_smooth, logging_index=logging_index)
+        log_image(data, 'lighting_smooth', lighting_smooth)
 
         data["lighting"] = lighting_smooth
 
-        logging_index = _log_image(logging_dir, 'lighting.png', lighting_smooth, logging_index=logging_index)
+        log_image(data, 'lighting', lighting_smooth)
 
         length_threshold = 32
         canny_aperture_size = 7
@@ -1826,8 +1675,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
             final_labels_hr[mask > 0] = 0
             final_labels_hr[pruned > 0] = i
 
-        logging_index = _log_segmentation_image(logging_dir, "pre_final_labels.png", final_labels_hr - 1, img,
-                                                logging_index=logging_index)
+        log_segmentation_image(data, "pre_final_labels", final_labels_hr - 1, img)
 
         final_labels_hr = cv2.watershed(cv2.cvtColor(distances, cv2.COLOR_GRAY2BGR), np.int32(final_labels_hr))
         final_labels_hr[final_labels_hr < 0] = 0
@@ -1883,6 +1731,5 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         if abs(floor_rotation) > 0:
             data["floor_rotation"] = floor_rotation
-        logging_index = _log_segmentation_image(logging_dir, "final_labels.png", np.int32(final_labels) - 1, img,
-                                                logging_index=logging_index)
+        log_segmentation_image(data, "final_labels", np.int32(final_labels) - 1, img)
         # print("floor rotation check", data["floor_rotation"])

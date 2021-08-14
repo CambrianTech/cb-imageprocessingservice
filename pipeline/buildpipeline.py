@@ -3,7 +3,8 @@ import os
 import time
 import subprocess
 
-from pipeline.core import schedule_and_wait, get_unique_id
+from pipeline.core import schedule_and_wait
+from pipeline.logging import get_unique_id
 from pipeline.fov import PipelineCalculateFov
 from pipeline.getdata import PipelineBucketSource, PipelineFileSource
 from pipeline.primaryangle import PipelineDeterminePrimaryAngles
@@ -39,7 +40,7 @@ class Pipeline():
     def __init__(self,  mode:PipelineMode, \
                         model_path=None, semantic_model_path=None, fov_model_path=None, \
                         planes_url=None, bucket_source=None, bucket_dest=None, cpu_networks_port = 8082, \
-                        restore_step:PipelineStep=None, export_step:PipelineStep=None, logging_dir=None):
+                        restore_step:PipelineStep=None, export_step:PipelineStep=None, logging_dir=None, logging_step:PipelineStep=None):
 
         self.mode = mode
 
@@ -54,6 +55,7 @@ class Pipeline():
         self.restore_step = restore_step
         self.export_step = export_step
         self.logging_dir = logging_dir
+        self.logging_step = logging_step
 
         # Create the steps we want to use in the pipelines
         if self.mode == PipelineMode.Serve:
@@ -125,7 +127,9 @@ class Pipeline():
         index = 0
         for step in self.steps:
 
+            #consider perhaps passing logging down into steps, trigger off that
             data["logging_dir"] = None if self.logging_dir is None else "%s/%s" % (self.logging_dir, get_unique_id(data))
+            data["logging_step"] = self.logging_step
 
             data = await schedule_and_wait(step.schedule, data)
 
