@@ -20,7 +20,7 @@ from scipy.stats import mode
 
 from skimage.morphology import remove_small_objects, remove_small_holes
 from pipeline.semanticlabels import ADE20K
-from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply
+from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 
 from enum import Enum
 
@@ -1034,25 +1034,18 @@ class PipelineRefinePlaneMasks(PipelineStep):
         isolated = {}
 
         isolated[SemanticKey.Wall] = output[ADE20K.wall.index].copy()
-
-        log_image(data, SemanticKey.Wall, 255. * (isolated[SemanticKey.Wall]))
-
         isolated[SemanticKey.Floor] = output[ADE20K.floor.index].copy()
-        log_image(data, SemanticKey.Floor, 255. * isolated[SemanticKey.Floor])
-
         isolated[SemanticKey.Ceiling] = output[ADE20K.ceiling.index].copy()
-        log_image(data, SemanticKey.Ceiling, 255. * isolated[SemanticKey.Ceiling])
-
         isolated[SemanticKey.WallLike] = np.zeros_like(isolated[SemanticKey.Wall])
 
         for label in wall_like:
             isolated[SemanticKey.WallLike] += output[label.index]
 
-        log_image(data, SemanticKey.WallLike, 255. * isolated[SemanticKey.WallLike])
-
         isolated[SemanticKey.Other] = 1.0 - isolated[SemanticKey.Floor] - isolated[SemanticKey.Wall] - isolated[SemanticKey.WallLike] - isolated[SemanticKey.Ceiling]
 
-        log_image(data, isolated[SemanticKey.Other], 255. * isolated[SemanticKey.Other])
+        if im_logging_enabled(data, LogLevel.Segmentation):
+            for key in isolated.keys():
+                log_image(data, key.value, 255. * isolated[key])
 
         return isolated
 
