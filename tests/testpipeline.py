@@ -16,17 +16,17 @@ class TestPipelineUploadResults(unittest.TestCase):
         semantic_probs = np.zeros((512, 512, 2))
         lighting = np.zeros((512, 512))
 
-        image_s3_key = "TestPipelineUploadResults"
+        unique_id = "TestPipelineUploadResults"
 
         data = {
-            "image_s3_key": "TestPipelineUploadResults",
+            "unique_id": "TestPipelineUploadResults",
             "semantic_probs": semantic_probs,
             "lighting": lighting
         }
 
         step.run(data)
 
-        self.assertIs(data["image_s3_key"], image_s3_key)
+        self.assertIs(data["unique_id"], unique_id)
         self.assertIs(data["semantic_probs"], semantic_probs)
         self.assertIs(data["lighting"], lighting)
 
@@ -38,15 +38,15 @@ class TestPipelineGetData(unittest.TestCase):
     def test_standard(self):
         step = PipelineGetData("cb-user-image-uploads")
 
-        image_s3_key = "iTInnsV7hXrEKdPWJY2vO5y7LJ9uOey8"
+        unique_id = "iTInnsV7hXrEKdPWJY2vO5y7LJ9uOey8"
 
         data = {
-            "image_s3_key": image_s3_key
+            "unique_id": unique_id
         }
 
         step.run(data)
 
-        self.assertIs(data["image_s3_key"], image_s3_key)
+        self.assertIs(data["unique_id"], unique_id)
         self.assertIn("image", data)
 
 
