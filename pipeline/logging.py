@@ -11,14 +11,18 @@ class LogLevel(IntFlag):
 
     All = 0x1 << 15
 
+_logging_index = 0
+
 def get_unique_id(data:dict):
     return data["unique_id"]
 
-def make_log_path(data:dict, name:str, extension=".jpeg"):
+def make_log_path(data:dict, name:str, extension=".jpg"):
+    global _logging_index
     directory = get_logging_dir(data)
     if not os.path.exists(directory):
         os.makedirs(directory)
-    filename = str(name) + str(extension)
+
+    filename = "%d - %s%s" % (_logging_index, name, extension)
     return os.path.join(directory, filename)
 
 def im_logging_enabled(data:dict, level=LogLevel.All):
@@ -38,6 +42,8 @@ def get_logging_step(data:dict):
     return data["logging_step"] if "logging_step" in data else LogLevel.Nothing
 
 def set_logging_step(data:dict, step:int, current_step:int):
+    global _logging_index
+    _logging_index = 0
     data["logging_step"] = step
     data["step"] = current_step
 
@@ -57,11 +63,13 @@ def log_data(data:dict):
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
                 
 
-def log_image(data:dict, name:str, image, extension=".jpeg"):
+def log_image(data:dict, name:str, image, extension=".jpg"):
+    global _logging_index
     if im_logging_enabled(data, LogLevel.Images):
         path = make_log_path(data, name, extension)
         print("Saving image", path)
         cv2.imwrite(path, image)
+        _logging_index += 1
 
 def get_segmentation_image(labels, image, avg=False, resize=True):
     img_seg = image
@@ -74,16 +82,20 @@ def get_segmentation_image(labels, image, avg=False, resize=True):
         img_seg[labels == label] = color
     return img_seg
 
-def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpeg"):
+def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg"):
+    global _logging_index
     if im_logging_enabled(data, LogLevel.Segmentation):
         seg = get_segmentation_image(segmentation, image, avg)
         path = make_log_path(data, name, extension)
         cv2.imwrite(path, seg)
+        _logging_index += 1
 
 def log_ply(data:dict, name, image, masks, plane_XYZ, write_occlusion=False, mult=1.0):
+    global _logging_index
     if im_logging_enabled(data, LogLevel.Models):
         file_path = make_log_path(data, name, ".ply")
         print("Saving model", file_path)
+        _logging_index += 1
 
         image = cv2.resize(image, (int(mult * 160), int(mult * 120)))
         width = image.shape[1]
