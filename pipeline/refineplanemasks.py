@@ -1083,16 +1083,10 @@ class PipelineRefinePlaneMasks(PipelineStep):
         #Include other types as part of floor: rug, earth, grass:
         self._combine_floor_masks(output)
 
+        #break masks into major groups: Floor, Wall, Ceiling, etc
         isolated = self._isolate_masks(data, output)
-
-        ade_seg_c = np.dstack(
-            (.95 * np.ones_like(isolated[SemanticKey.Other]), isolated[SemanticKey.Other], isolated[SemanticKey.Floor], isolated[SemanticKey.Wall], isolated[SemanticKey.Ceiling], isolated[SemanticKey.WallLike]))
-
-        ade_seg = np.argmax(ade_seg_c, -1)
-        ade_skel = skeletonize(isolated[SemanticKey.Other] > .5)
-
-        log_segmentation_image(data, "ade_seg", np.int32(ade_seg), img_lr)
-
+        
+        #get lines
         line_data, lines = find_lines(img, cv2.resize(hed, (img.shape[1], img.shape[0])), data["normals"])
 
         all_lines = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
@@ -1230,6 +1224,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
         wall_like_prob = get_segmentation_image(wall_like_markers + 1, isolated[SemanticKey.WallLike], avg=True)
         wall_like_prob[wall_like_prob < .25] = 0
         wall_prob = get_segmentation_image(wall_markers + 1, isolated[SemanticKey.Wall], avg=True)
+
+        ade_skel = skeletonize(isolated[SemanticKey.Other] > .5)
         isolated[SemanticKey.Floor][ade_skel > 0] = 0
         floor_prob = get_segmentation_image(floor_markers + 1, isolated[SemanticKey.Floor], avg=True)
         floor_prob[floor_prob < .25] = 0
@@ -1387,6 +1383,12 @@ class PipelineRefinePlaneMasks(PipelineStep):
         log_segmentation_image(data, "vl_image", vl_image, img_lr)
 
         # log_ply(data, "3D2.ply", img_lr, plane_masks, np.float32(plane_XYZ), mult=1)
+
+        ade_seg_c = np.dstack(
+            (.95 * np.ones_like(isolated[SemanticKey.Other]), isolated[SemanticKey.Other], isolated[SemanticKey.Floor], isolated[SemanticKey.Wall], isolated[SemanticKey.Ceiling], isolated[SemanticKey.WallLike]))
+
+        ade_seg = np.argmax(ade_seg_c, -1)
+        log_segmentation_image(data, "ade_seg", np.int32(ade_seg), img_lr)
 
         plane_classes = get_planes_class(plane_masks, ade_seg)
         # print("plane_classes", plane_classes)

@@ -28,8 +28,8 @@ async def process_files(pipeline, input_dir, pattern, log_level):
 
     for path in files:
         url = Path(path)
-        name = os.path.dirname(path)
-        data = {"path": path, "unique_id": name if path.suffix == ".pickle" else url.stem}
+        unique_id = url.parents[0].name
+        data = {"path": path, "unique_id": unique_id if path.suffix == ".pickle" else url.stem}
 
         set_log_level(data, log_level)
 

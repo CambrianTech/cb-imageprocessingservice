@@ -111,7 +111,6 @@ venv.bak/
 logging
 /tools/split_dataset
 /tools/dataset
-logging*
 
 .vscode/
 
