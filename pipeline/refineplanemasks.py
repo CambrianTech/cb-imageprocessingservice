@@ -22,6 +22,8 @@ from skimage.morphology import remove_small_objects, remove_small_holes
 from pipeline.semanticlabels import ADE20K
 from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply
 
+from enum import Enum
+
 furniture_labels = [ADE20K.table, ADE20K.armchair, ADE20K.sofa, ADE20K.coffee_table, ADE20K.ottoman, ADE20K.chest, ADE20K.wardrobe, ADE20K.chair, ADE20K.bed, ADE20K.bench, ADE20K.swivel_chair, ADE20K.pole, ADE20K.stool]
 wall_like = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen]
 
@@ -996,6 +998,16 @@ def compute_normal_from_vps(edgelets,img, fov, floor_normal, floor_offset, floor
     return vps, inliers, floor_normal, floor_offset, floor_rotation, fov, img_dir
 
 
+#labels for ade20k, subtract = 1 for output number. 
+
+class SemanticKey(Enum):
+    Wall = "wall"
+    Floor = "floor"
+    Ceiling = "ceiling"
+    WallLike = "wall-like"
+    Other = "other"
+
+
 class PipelineRefinePlaneMasks(PipelineStep):
     @property
     def required_keys(self) -> list:
@@ -1004,6 +1016,46 @@ class PipelineRefinePlaneMasks(PipelineStep):
     @property
     def output_keys(self) -> list:
         return ["planes", "mask", "lighting", "floor_rotation"]
+
+    def _combine_floor_masks(self, output):
+        
+        output[ADE20K.floor.index] += output[ADE20K.rug.index]
+        output[ADE20K.rug.index] = 0
+
+        output[ADE20K.floor.index] += output[ADE20K.earth.index]
+        output[ADE20K.earth.index] = 0
+
+        output[ADE20K.floor.index] += output[ADE20K.grass.index]
+        output[ADE20K.grass.index] = 0
+
+
+    def _isolate_masks(self, data, output):
+
+        isolated = {}
+
+        isolated[SemanticKey.Wall] = output[ADE20K.wall.index].copy()
+
+        log_image(data, SemanticKey.Wall, 255. * (isolated[SemanticKey.Wall]))
+
+        isolated[SemanticKey.Floor] = output[ADE20K.floor.index].copy()
+        log_image(data, SemanticKey.Floor, 255. * isolated[SemanticKey.Floor])
+
+        isolated[SemanticKey.Ceiling] = output[ADE20K.ceiling.index].copy()
+        log_image(data, SemanticKey.Ceiling, 255. * isolated[SemanticKey.Ceiling])
+
+        isolated[SemanticKey.WallLike] = np.zeros_like(isolated[SemanticKey.Wall])
+
+        for label in wall_like:
+            isolated[SemanticKey.WallLike] += output[label.index]
+
+        log_image(data, SemanticKey.WallLike, 255. * isolated[SemanticKey.WallLike])
+
+        isolated[SemanticKey.Other] = 1.0 - isolated[SemanticKey.Floor] - isolated[SemanticKey.Wall] - isolated[SemanticKey.WallLike] - isolated[SemanticKey.Ceiling]
+
+        log_image(data, isolated[SemanticKey.Other], 255. * isolated[SemanticKey.Other])
+
+        return isolated
+
 
     def run(self, data):
 
@@ -1035,42 +1087,16 @@ class PipelineRefinePlaneMasks(PipelineStep):
         sx = w / img.shape[1]
         sy = h / img.shape[0]
 
-        #Include other types as part of floor: rug, earth, grass
-        output[ADE20K.floor.index] += output[ADE20K.rug.index]
-        output[ADE20K.rug.index] = 0
+        #Include other types as part of floor: rug, earth, grass:
+        self._combine_floor_masks(output)
 
-        output[ADE20K.floor.index] += output[ADE20K.earth.index]
-        output[ADE20K.earth.index] = 0
-
-        output[ADE20K.floor.index] += output[ADE20K.grass.index]
-        output[ADE20K.grass.index] = 0
-
-        wall_mask = output[ADE20K.wall.index].copy()
-
-        log_image(data, "wall_mask", 255. * (wall_mask))
-
-        floor_mask = output[ADE20K.floor.index].copy()
-        log_image(data, "floor_mask", 255. * floor_mask)
-
-        ceiling_mask = output[ADE20K.ceiling.index].copy()
-        log_image(data, "ceiling_mask", 255. * ceiling_mask)
-
-        wall_like_mask = np.zeros_like(wall_mask)
-
-        for label in wall_like:
-            wall_like_mask += output[label.index]
-
-        log_image(data, "wall_like_mask", 255. * wall_like_mask)
-
-        other_mask = 1.0 - floor_mask - wall_mask - wall_like_mask - ceiling_mask
-
-        log_image(data, "other_mask", 255. * other_mask)
+        isolated = self._isolate_masks(data, output)
 
         ade_seg_c = np.dstack(
-            (.95 * np.ones_like(other_mask), other_mask, floor_mask, wall_mask, ceiling_mask, wall_like_mask))
+            (.95 * np.ones_like(isolated[SemanticKey.Other]), isolated[SemanticKey.Other], isolated[SemanticKey.Floor], isolated[SemanticKey.Wall], isolated[SemanticKey.Ceiling], isolated[SemanticKey.WallLike]))
 
         ade_seg = np.argmax(ade_seg_c, -1)
-        ade_skel = skeletonize(other_mask > .5)
+        ade_skel = skeletonize(isolated[SemanticKey.Other] > .5)
 
         log_segmentation_image(data, "ade_seg", np.int32(ade_seg), img_lr)
 
@@ -1127,7 +1153,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         normals = (normals - 127.5) / 127.5
 
-        floor_indices, ceiling_indices, horiz_indices, floor_angs = find_floor_indices(floor_mask, ceiling_mask,
+        floor_indices, ceiling_indices, horiz_indices, floor_angs = find_floor_indices(isolated[SemanticKey.Floor], isolated[SemanticKey.Ceiling],
                                                                                        plane_masks, plane_normals)
 
         # print("floor indices are: ", floor_indices, horiz_indices)
@@ -1148,8 +1174,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         if len(ceiling_indices) > 0:
             ceiling_index = ceiling_indices[0]
 
-        wall_indices, vert_indices, vert_angs = find_wall_indices(wall_mask, plane_masks, plane_normals[floor_index],
-                                                                  plane_normals)
+        wall_indices, vert_indices, vert_angs = find_wall_indices(isolated[SemanticKey.Wall], plane_masks, plane_normals[floor_index], plane_normals)
 
         # print("wall indices are: ", wall_indices, vert_indices, vert_angs)
 
@@ -1190,36 +1215,36 @@ class PipelineRefinePlaneMasks(PipelineStep):
         w_mask = merged_lines == 0
 
         other_markers = np.int32(
-            refine_surface(other_mask, img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.03,
+            refine_surface(isolated[SemanticKey.Other], img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.03,
                            gradient=False))
 
         wall_markers = np.int32(
-            refine_surface(wall_mask, hed_lr, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True,
+            refine_surface(isolated[SemanticKey.Wall], hed_lr, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True,
                            watershed_mask=w_mask))
 
         floor_markers = np.int32(
-            refine_surface(floor_mask, img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
+            refine_surface(isolated[SemanticKey.Floor], img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
 
         wall_like_markers = np.int32(
-            refine_surface(wall_like_mask, img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.05,
+            refine_surface(isolated[SemanticKey.WallLike], img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.05,
                            gradient=False))
 
         ceiling_markers = np.int32(
-            refine_surface(ceiling_mask, hed_lr, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True,
+            refine_surface(isolated[SemanticKey.Ceiling], hed_lr, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True,
                            watershed_mask=w_mask))
 
-        ceiling_prob = get_segmentation_image(ceiling_markers + 1, ceiling_mask, avg=True)
-        wall_like_prob = get_segmentation_image(wall_like_markers + 1, wall_like_mask, avg=True)
+        ceiling_prob = get_segmentation_image(ceiling_markers + 1, isolated[SemanticKey.Ceiling], avg=True)
+        wall_like_prob = get_segmentation_image(wall_like_markers + 1, isolated[SemanticKey.WallLike], avg=True)
         wall_like_prob[wall_like_prob < .25] = 0
-        wall_prob = get_segmentation_image(wall_markers + 1, wall_mask, avg=True)
-        floor_mask[ade_skel > 0] = 0
-        floor_prob = get_segmentation_image(floor_markers + 1, floor_mask, avg=True)
+        wall_prob = get_segmentation_image(wall_markers + 1, isolated[SemanticKey.Wall], avg=True)
+        isolated[SemanticKey.Floor][ade_skel > 0] = 0
+        floor_prob = get_segmentation_image(floor_markers + 1, isolated[SemanticKey.Floor], avg=True)
         floor_prob[floor_prob < .25] = 0
         floor_markers[floor_prob < .25] = 100
         other_markers = join_segmentations(floor_markers, other_markers)
 
-        other_mask[ade_skel > 0] = 1
-        other_prob = get_segmentation_image(other_markers + 1, other_mask, avg=True)
+        isolated[SemanticKey.Other][ade_skel > 0] = 1
+        other_prob = get_segmentation_image(other_markers + 1, isolated[SemanticKey.Other], avg=True)
 
         log_image(data, "floor_markers", 255. * floor_prob)
         log_image(data, "other_markers", 255. * other_prob)
@@ -1228,7 +1253,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         log_image(data, "wall_markers", 255. * wall_prob)
 
         segmentation_initial = np.int32(np.argmax(np.dstack(
-            (.05 * np.ones_like(other_mask), other_prob, floor_prob, wall_prob, ceiling_prob, wall_like_prob)), -1))
+            (.05 * np.ones_like(isolated[SemanticKey.Other]), other_prob, floor_prob, wall_prob, ceiling_prob, wall_like_prob)), -1))
 
         segmentation_initial[np.logical_and(segmentation_initial == 3, wall_prob < .5)] = 6
         m = np.logical_and(segmentation_initial == 2, other_prob > .5)
@@ -1269,7 +1294,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                                                                                                          data["fov"],
                                                                                                          floor_normal,
                                                                                                          floor_offset,
-                                                                                                         floor_mask)
+                                                                                                         isolated[SemanticKey.Floor])
 
         data["fov"] = fov
 
@@ -1331,7 +1356,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
             arc_mask = cv2.fillPoly(np.zeros_like(labels_fan), pts=triangle, color=1)
 
             wall_arc = np.logical_and(sure_walls > 0, arc_mask > 0)
-            wedge = np.logical_and(wall_arc, wall_mask > .9)
+            wedge = np.logical_and(wall_arc, isolated[SemanticKey.Wall] > .9)
             a = np.sum(wedge)
 
             if a > 0:
@@ -1348,7 +1373,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         # Merge by normal angle diff
 
         labels_fan, fan_normals_reduced, normals_wall = merge_by_angle_sweep(labels_fan, normals_c, fan_normals,
-                                                                             wall_mask > .9, angle_threshold=.85)
+                                                                             isolated[SemanticKey.Wall] > .9, angle_threshold=.85)
 
         log_segmentation_image(data, "fan1", labels_fan, img_lr)
 
@@ -1359,7 +1384,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         fan_normals_reduced /= np.dstack((lengths, lengths, lengths))[0]
 
         labels_fan, fan_normals_reduced, normals_wall = merge_by_angle_sweep(labels_fan, normals_wall,
-                                                                             fan_normals_reduced, wall_mask > 0,
+                                                                             fan_normals_reduced, isolated[SemanticKey.Wall] > 0,
                                                                              angle_threshold=.8)
 
         vl_image = np.zeros_like(all_lines)
@@ -1556,9 +1581,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         # add floor
         if len(floor_indices) > 0:
-            floor_mask = np.uint8(segmentation_initial == 2)
+            isolated[SemanticKey.Floor] = np.uint8(segmentation_initial == 2)
             # floor_mask = cv2.dilate(floor_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
-            final_masks.append(255 * floor_mask)
+            final_masks.append(255 * isolated[SemanticKey.Floor])
 
             plane_parameter = np.zeros((11))
             plane_parameter[:9] = data["planes"]["detection"][floor_indices[0]][:9]
@@ -1572,8 +1597,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         # add ceiling
         if len(ceiling_indices) > 0:
-            ceiling_mask = 255 * np.uint8(segmentation_initial == 4)
-            final_masks.append(ceiling_mask)
+            isolated[SemanticKey.Ceiling] = 255 * np.uint8(segmentation_initial == 4)
+            final_masks.append(isolated[SemanticKey.Ceiling])
             plane_parameter = np.zeros((11))
             plane_parameter[:9] = data["planes"]["detection"][ceiling_indices[0]][:9]
             plane_parameter[6:9] = plane_parameters[ceiling_indices[0]]
