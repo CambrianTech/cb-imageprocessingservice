@@ -1049,6 +1049,21 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         return isolated
 
+    def _get_lines_image(self, data, img, lines, sx, sy):
+        all_lines = np.int32(np.zeros((img.shape[0], img.shape[1])))
+        l = 1
+
+        for line in lines:
+            for x1, y1, x2, y2 in line:
+                x1 = int(sx * x1)
+                x2 = int(sx * x2)
+                y1 = int(sy * y1)
+                y2 = int(sy * y2)
+                cv2.line(all_lines, (x1, y1), (x2, y2), l, thickness=2, lineType=cv2.LINE_8)
+                l += 1
+
+        return all_lines
+
 
     def run(self, data):
 
@@ -1074,7 +1089,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         camera = camera_fov_res_to_intrinsics(data["fov"], np.array(shape))
 
         hed_lr = cv2.resize(hed, shape)
-
         img_lr = cv2.resize(img, shape)
 
         sx = w / img.shape[1]
@@ -1089,27 +1103,18 @@ class PipelineRefinePlaneMasks(PipelineStep):
         #get lines
         line_data, lines = find_lines(img, cv2.resize(hed, (img.shape[1], img.shape[0])), data["normals"])
 
-        all_lines = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
+        #get labeled lines image
+        all_lines = self._get_lines_image(data, img_lr, lines, sx, sy)
 
-        l_image_rgb = img_lr.copy()
-        l = 1
-
-        for line in lines:
-            for x1, y1, x2, y2 in line:
-                x1 = int(sx * x1)
-                x2 = int(sx * x2)
-                y1 = int(sy * y1)
-                y2 = int(sy * y2)
-                cv2.line(all_lines, (x1, y1), (x2, y2), l, thickness=2, lineType=cv2.LINE_8)
-                l += 1
-
+        #draw lines in BW
         merged_lines = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
         Line.draw_all(line_data, merged_lines, color=255, thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
 
-        l_image_rgb[merged_lines > 0] = 255
-        log_segmentation_image(data, "l_image", all_lines, img_lr)
-
-        log_image(data, "l_image_rgb", l_image_rgb)
+        if im_logging_enabled(data, LogLevel.Segmentation):
+            l_image_rgb = img_lr.copy()
+            l_image_rgb[merged_lines > 0] = 255
+            log_segmentation_image(data, "l_image", all_lines, img_lr)
+            log_image(data, "l_image_rgb", l_image_rgb)
 
         planes_data = data["planes"]
         plane_parameters = np.array(data["planes"]["detection"][:, 6:9], dtype=np.float32)
@@ -1378,9 +1383,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         vl_image = np.zeros_like(all_lines)
         vl_image[sure_walls == 0] = 0
-        log_segmentation_image(data, "fan2", labels_fan, img_lr)
-        log_image(data, "normals_wall_org", 127.5 * (normals_wall + 1))
-        log_segmentation_image(data, "vl_image", vl_image, img_lr)
+
+        if im_logging_enabled(data, LogLevel.Segmentation):
+            log_segmentation_image(data, "fan2", labels_fan, img_lr)
+            log_image(data, "normals_wall_org", 127.5 * (normals_wall + 1))
+            log_segmentation_image(data, "vl_image", vl_image, img_lr)
 
         # log_ply(data, "3D2.ply", img_lr, plane_masks, np.float32(plane_XYZ), mult=1)
 
