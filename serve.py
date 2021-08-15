@@ -66,7 +66,7 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
         model_path=model_path, 
         semantic_model_path=semantic_model_path, 
         fov_model_path=fov_model_path, 
-        planes_network_url=plane_url, 
+        planes_url=plane_url, 
         bucket_source=user_uploads_bucket, 
         bucket_dest=results_bucket)
 
