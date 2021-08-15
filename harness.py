@@ -9,7 +9,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 from pipeline.buildpipeline import Pipeline, PipelineMode, PipelineStepIndex
-from pipeline.logging import set_log_level
+from pipeline.logging import set_log_level, LogLevel
 
 def get_file_paths(input_dir, pattern=None):
     files = []
@@ -49,7 +49,7 @@ async def process_files(pipeline, input_dir, pattern, log_level):
 @click.argument("planes_url", default='http://localhost:8081/', type=click.STRING)
 @click.option('--restore', type=int, help='Pipeline step to restore from. Data pickle files expected inside input_dir')
 @click.option('--export', type=int, help='Pipeline step to export')
-@click.option('--log_level', type=int, default=0xff, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
+@click.option('--log_level', type=int, default=LogLevel.Images|LogLevel.Segmentation, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
 def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url, restore, export, log_level, log_step):
 
