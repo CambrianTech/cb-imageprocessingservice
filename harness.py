@@ -50,7 +50,8 @@ async def process_files(pipeline, input_dir, pattern, log_level):
 @click.option('--restore', type=int, help='Pipeline step to restore from. Data pickle files expected inside input_dir')
 @click.option('--export', type=int, help='Pipeline step to export')
 @click.option('--log_level', type=int, default=0xff, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
-def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url, restore, export, log_level):
+@click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
+def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url, restore, export, log_level, log_step):
 
     if not os.path.exists(input_dir):
         raise Exception('The directory does not exist at path {}'.format(input_dir)) 
@@ -60,7 +61,7 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     file_pattern = "*.pickle" if restore is not None else None
     restore_step = PipelineStepIndex(restore) if restore is not None else None
     export_step = PipelineStepIndex(export) if export is not None else None
-    logging_step = PipelineStepIndex.RefinePlaneMasks
+    logging_step = PipelineStepIndex(log_step) if log_step is not None else None
 
     loop = asyncio.get_event_loop()
     loop.set_default_executor(ThreadPoolExecutor())

@@ -148,6 +148,7 @@ class Pipeline():
             set_logging_dir(data, logging_dir)
 
             current_step = self.step_index(index)
+            
             set_logging_step(data, self.logging_step, current_step)
             print("Step %s" % (current_step.name))
 
