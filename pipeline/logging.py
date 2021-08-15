@@ -26,7 +26,7 @@ def im_logging_enabled(data:dict, level=LogLevel.All):
     if get_logging_dir(data) is None or (logging_step is not None and get_current_step(data) != get_logging_step(data)):
         return False
 
-    return level & get_log_level(data)
+    return level & get_logging_level(data)
 
 def get_logging_dir(data:dict):
     return data["logging_dir"] if "logging_dir" in data else None
@@ -44,10 +44,10 @@ def set_logging_step(data:dict, step:int, current_step:int):
 def get_current_step(data:dict):
     return data["step"] if "step" in data else -1
 
-def get_log_level(data:dict):
+def get_logging_level(data:dict):
     return data["logging_level"] if "logging_level" in data else LogLevel.Nothing
 
-def set_log_level(data:dict, level:int):
+def set_logging_level(data:dict, level:int):
     data["logging_level"] = level
 
 def log_data(data:dict):

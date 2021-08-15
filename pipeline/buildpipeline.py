@@ -4,7 +4,7 @@ import time
 import subprocess
 
 from pipeline.core import schedule_and_wait, PipelineStep
-from pipeline.logging import get_unique_id, set_logging_dir, set_logging_step, log_data
+from pipeline.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, LogLevel, set_logging_level
 from pipeline.fov import PipelineCalculateFov
 from pipeline.getdata import PipelineBucketSource, PipelineFileSource
 from pipeline.primaryangle import PipelineDeterminePrimaryAngles
@@ -41,7 +41,8 @@ class Pipeline():
     def __init__(self,  mode:PipelineMode, \
                         model_path=None, semantic_model_path=None, fov_model_path=None, \
                         planes_url=None, bucket_source=None, bucket_dest=None, cpu_networks_port = 8082, \
-                        restore_step:PipelineStepIndex=None, export_step:PipelineStepIndex=None, logging_dir=None, logging_step:PipelineStepIndex=None):
+                        restore_step:PipelineStepIndex=None, export_step:PipelineStepIndex=None, \
+                        logging_dir=None, logging_level=LogLevel.Nothing, logging_step:PipelineStepIndex=None):
 
         self.mode = mode
 
@@ -55,7 +56,9 @@ class Pipeline():
         self.remote_path = "http://localhost:%d" % cpu_networks_port
         self.restore_step = restore_step
         self.export_step = export_step
+
         self.logging_dir = logging_dir
+        self.logging_level = logging_level
         self.logging_step = logging_step
 
         self.start_step = self.restore_step if self.restore_step is not None else PipelineStepIndex.Input
@@ -146,6 +149,7 @@ class Pipeline():
             logging_dir = None if self.logging_dir is None else "%s/%s" % (self.logging_dir, get_unique_id(data))
 
             set_logging_dir(data, logging_dir)
+            set_logging_level(data, self.logging_level)
 
             current_step = self.step_index(index)
             

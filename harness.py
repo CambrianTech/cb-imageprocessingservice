@@ -9,7 +9,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 from pipeline.buildpipeline import Pipeline, PipelineMode, PipelineStepIndex
-from pipeline.logging import set_log_level, LogLevel
+from pipeline.logging import LogLevel
 
 def get_file_paths(input_dir, pattern=None):
     files = []
@@ -21,7 +21,7 @@ def get_file_paths(input_dir, pattern=None):
             files.extend(Path(input_dir).glob('**/*' + ext))
     return files
 
-async def process_files(pipeline, input_dir, pattern, log_level):
+async def process_files(pipeline, input_dir, pattern):
     files = get_file_paths(input_dir, pattern)
 
     print("Importing %d files from \"%s\"" % (len(files), input_dir))
@@ -30,8 +30,6 @@ async def process_files(pipeline, input_dir, pattern, log_level):
         url = Path(path)
         unique_id = url.parents[0].name
         data = {"path": path, "unique_id": unique_id if path.suffix == ".pickle" else url.stem}
-
-        set_log_level(data, log_level)
 
         await pipeline.process(data)
 
@@ -66,11 +64,11 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     loop = asyncio.get_event_loop()
     loop.set_default_executor(ThreadPoolExecutor())
 
-    pipeline = Pipeline(mode, restore_step=restore_step, export_step=export_step, logging_dir=output_dir, logging_step=logging_step, \
+    pipeline = Pipeline(mode, restore_step=restore_step, export_step=export_step, logging_dir=output_dir, logging_level=log_level, logging_step=logging_step, \
                         model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
     pipeline.start()
 
-    loop.run_until_complete(process_files(pipeline, input_dir, pattern=file_pattern, log_level=log_level))
+    loop.run_until_complete(process_files(pipeline, input_dir, pattern=file_pattern))
     
 
 
