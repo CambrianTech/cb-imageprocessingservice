@@ -47,9 +47,10 @@ async def process_files(pipeline, input_dir, pattern):
 @click.argument("planes_url", default='http://localhost:8081/', type=click.STRING)
 @click.option('--restore', type=int, help='Pipeline step to restore from. Data pickle files expected inside input_dir')
 @click.option('--export', type=int, help='Pipeline step to export')
+@click.option("--logging_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
 @click.option('--log_level', type=int, default=LogLevel.Images|LogLevel.Segmentation, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
-def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url, restore, export, log_level, log_step):
+def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url, restore, export, logging_dir, log_level, log_step):
 
     if not os.path.exists(input_dir):
         raise Exception('The directory does not exist at path {}'.format(input_dir)) 
@@ -64,7 +65,7 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     loop = asyncio.get_event_loop()
     loop.set_default_executor(ThreadPoolExecutor())
 
-    pipeline = Pipeline(mode, restore_step=restore_step, export_step=export_step, logging_dir=output_dir, logging_level=log_level, logging_step=logging_step, \
+    pipeline = Pipeline(mode, restore_step=restore_step, export_step=export_step, logging_dir=logging_dir, logging_level=log_level, logging_step=logging_step, \
                         model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
     pipeline.start()
 
