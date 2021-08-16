@@ -529,6 +529,70 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         return segmentation_initial
 
+    # Create fan from vertical vp
+    def fan_surfaces(self, data, img_lr, locations, vp0, sure_walls, wall_mask, normals_c):
+
+        labels_fan = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
+
+        fan_normals = []
+
+        k = 1
+        for i in range(-1, len(locations)):
+            if i == -1:
+                closest = np.int32([[0, img_lr.shape[1]], [0, 0]])
+                dir = closest - vp0[:2]
+                closest_index = np.argmin(np.abs(dir[:, 1]))
+                pt1 = np.int32(2 * closest[closest_index] - vp0[:2])
+                pt2 = np.int32(2 * locations[i + 1] - vp0[:2])
+            elif i == len(locations) - 1:
+                closest = np.int32([[img_lr.shape[1], img_lr.shape[0]], [img_lr.shape[1], 0]])
+                dir = closest - vp0[:2]
+                closest_index = np.argmin(np.abs(dir[:, 1]))
+                pt2 = np.int32(2 * closest[closest_index] - vp0[:2])
+                pt1 = np.int32(2 * locations[i] - vp0[:2])
+            else:
+                pt1 = np.int32(2 * locations[i] - vp0[:2])
+                pt2 = np.int32(2 * locations[i + 1] - vp0[:2])
+
+            triangle = np.array([[[vp0[0], vp0[1]], pt1, pt2]], np.int32)
+
+            arc_mask = cv2.fillPoly(np.zeros_like(labels_fan), pts=triangle, color=1)
+
+            wall_arc = np.logical_and(sure_walls > 0, arc_mask > 0)
+            wedge = np.logical_and(wall_arc, wall_mask > .9)
+            a = np.sum(wedge)
+
+            if a > 0:
+                labels_fan[wall_arc > 0] = k
+
+                cur_normal = np.mean(normals_c[wedge], 0)
+                cur_normal /= max(np.linalg.norm(cur_normal), .00001)
+                fan_normals.append(cur_normal)
+                k += 1
+            # else:
+            #     if len(fan_normals)>0:
+            #         fan_normals.append(fan_normals[-1])
+
+        # Merge by normal angle diff
+
+        labels_fan, fan_normals_reduced, normals_wall = merge_by_angle_sweep(labels_fan, normals_c, fan_normals,
+                                                                             wall_mask > .9, angle_threshold=.85)
+
+        log_segmentation_image(data, "fan1", labels_fan, img_lr)
+
+        unique_labels = np.unique(labels_fan[labels_fan > 0])
+
+        fan_normals_reduced = np.float32([np.mean(normals_c[labels_fan == j], 0) for j in unique_labels])
+        lengths = np.sqrt(np.sum(fan_normals_reduced * fan_normals_reduced, -1))
+        fan_normals_reduced /= np.dstack((lengths, lengths, lengths))[0]
+
+        labels_fan, fan_normals_reduced, normals_wall = merge_by_angle_sweep(labels_fan, normals_wall,
+                                                                             fan_normals_reduced, wall_mask > 0,
+                                                                             angle_threshold=.8)
+        log_segmentation_image(data, "fan2", labels_fan, img_lr)
+
+        return labels_fan, fan_normals_reduced, normals_wall
+
 
     def run(self, data):
 
@@ -711,65 +775,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         locations[:, 1] *= sy
         camera, _ = camera_fov_res_to_intrinsics(fov, np.array(shape))
 
-        # Create fan from vertical vp
-
-        labels_fan = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
-
-        fan_normals = []
-
-        k = 1
-        for i in range(-1, len(locations)):
-            if i == -1:
-                closest = np.int32([[0, img_lr.shape[1]], [0, 0]])
-                dir = closest - vp0[:2]
-                closest_index = np.argmin(np.abs(dir[:, 1]))
-                pt1 = np.int32(2 * closest[closest_index] - vp0[:2])
-                pt2 = np.int32(2 * locations[i + 1] - vp0[:2])
-            elif i == len(locations) - 1:
-                closest = np.int32([[img_lr.shape[1], img_lr.shape[0]], [img_lr.shape[1], 0]])
-                dir = closest - vp0[:2]
-                closest_index = np.argmin(np.abs(dir[:, 1]))
-                pt2 = np.int32(2 * closest[closest_index] - vp0[:2])
-                pt1 = np.int32(2 * locations[i] - vp0[:2])
-            else:
-                pt1 = np.int32(2 * locations[i] - vp0[:2])
-                pt2 = np.int32(2 * locations[i + 1] - vp0[:2])
-
-            triangle = np.array([[[vp0[0], vp0[1]], pt1, pt2]], np.int32)
-
-            arc_mask = cv2.fillPoly(np.zeros_like(labels_fan), pts=triangle, color=1)
-
-            wall_arc = np.logical_and(sure_walls > 0, arc_mask > 0)
-            wedge = np.logical_and(wall_arc, isolated[SemanticKey.Wall] > .9)
-            a = np.sum(wedge)
-
-            if a > 0:
-                labels_fan[wall_arc > 0] = k
-
-                cur_normal = np.mean(normals_c[wedge], 0)
-                cur_normal /= max(np.linalg.norm(cur_normal), .00001)
-                fan_normals.append(cur_normal)
-                k += 1
-            # else:
-            #     if len(fan_normals)>0:
-            #         fan_normals.append(fan_normals[-1])
-
-        # Merge by normal angle diff
-
-        labels_fan, fan_normals_reduced, normals_wall = merge_by_angle_sweep(labels_fan, normals_c, fan_normals,
-                                                                             isolated[SemanticKey.Wall] > .9, angle_threshold=.85)
-
-        log_segmentation_image(data, "fan1", labels_fan, img_lr)
-
-        unique_labels = np.unique(labels_fan[labels_fan > 0])
-
-        fan_normals_reduced = np.float32([np.mean(normals_c[labels_fan == j], 0) for j in unique_labels])
-        lengths = np.sqrt(np.sum(fan_normals_reduced * fan_normals_reduced, -1))
-        fan_normals_reduced /= np.dstack((lengths, lengths, lengths))[0]
-
-        labels_fan, fan_normals_reduced, normals_wall = merge_by_angle_sweep(labels_fan, normals_wall,
-                                                                             fan_normals_reduced, isolated[SemanticKey.Wall] > 0,
-                                                                             angle_threshold=.8)
+        labels_fan, fan_normals_reduced, normals_wall = self.fan_surfaces(data, img_lr, locations, vp0, sure_walls, isolated[SemanticKey.Wall], normals_c)
 
         vl_image = np.zeros_like(all_lines)
         vl_image[sure_walls == 0] = 0
@@ -779,7 +785,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         ade_seg = np.argmax(ade_seg_c, -1)
 
         if im_logging_enabled(data, LogLevel.Segmentation):
-            log_segmentation_image(data, "fan2", labels_fan, img_lr)
+            
             log_image(data, "normals_wall_org", 127.5 * (normals_wall + 1))
             log_segmentation_image(data, "vl_image", vl_image, img_lr)
             log_segmentation_image(data, "ade_seg", np.int32(ade_seg), img_lr)
