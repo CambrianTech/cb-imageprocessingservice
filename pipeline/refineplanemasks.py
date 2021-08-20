@@ -657,7 +657,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         plane_geometry = PlaneGeometry(data, isolated, img_lr, shape)
 
-        vert_indices = plane_geometry.dimensions[Dimension.Horizontal].indices
+        vert_indices = plane_geometry.dimensions[Dimension.Vertical].indices
         number_planes = len(plane_geometry.plane_masks)
 
         normals_combined, normals_nn_normals = combined_normals(-plane_geometry.normals, plane_geometry.plane_normals, plane_geometry.plane_masks, plane_geometry.basis_indices, plane_geometry.cluster_prob)
