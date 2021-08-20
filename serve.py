@@ -5,6 +5,8 @@ import os
 import json
 import datetime
 import dateutil
+from time import time
+import typing
 
 import click
 from aiohttp import web
@@ -12,15 +14,7 @@ import aiohttp_cors
 import boto3
 import requests
 
-from pipeline.core import Pipeline
-from pipeline.fov import PipelineCalculateFov
-from pipeline.getdata import PipelineGetData
-from pipeline.primaryangle import PipelineDeterminePrimaryAngles
-from pipeline.refine import PipelineRefineResults
-from pipeline.runmodels import PipelineRunModels
-from pipeline.superpixels import PipelineSuperpixels
-from pipeline.uploadresults import PipelineUploadResults
-
+from pipeline.buildpipeline import Pipeline, PipelineMode
 
 def _get_instance_metadata():
     metadata = {}
@@ -49,67 +43,84 @@ def _get_instance_metadata():
 
 @click.command()
 @click.argument("model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("semantic_model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("fov_model_path", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("user_uploads_bucket", type=click.STRING)
 @click.argument("results_bucket", type=click.STRING)
+@click.argument("plane_url", type=click.STRING)
 @click.option("--image-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--results-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
-def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_local_dir, results_local_dir):
+@click.option("--logging_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
+@click.option('--log_level', type=int, default=0, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
+@click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
+def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_url, image_local_dir, results_local_dir, logging_dir, log_level, log_step):
     print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
     print("Creating pipeline")
 
-    # Setup pipeline to run on requests
-    pipeline = (Pipeline()
-                .add(PipelineGetData(user_uploads_bucket))
-                .add(PipelineRunModels(
-                    semantic_path=join(model_path, "semantic"),
-                    normals_path=join(model_path, "normals"),
-                    unlit_path=join(model_path, "unlit"),
-                    elevation_path=join(model_path, "elevation"),
-                    lighting_path=join(model_path, "lighting"),
-                    hed_path=join("hed_model", "HED_pretrained_bsds.npz")
-                ))
-                .add(PipelineDeterminePrimaryAngles())
-                .add(PipelineRefineResults())
-                .add(PipelineCalculateFov(fov_model_path))
-                .add(PipelineSuperpixels())
-                .add(PipelineUploadResults(results_bucket)))
+    if image_local_dir is not None and not os.path.exists(image_local_dir):
+        os.makedirs(image_local_dir)
 
-    print("Validating pipeline")
-    pipeline.validate(["image_s3_key"])
+    if results_local_dir is not None and not os.path.exists(results_local_dir):
+        os.makedirs(results_local_dir)
+
+    logging_step = PipelineStepIndex(log_step) if log_step is not None else None
+
+    pipeline = Pipeline(PipelineMode.Serve, 
+        model_path=model_path, 
+        semantic_model_path=semantic_model_path, 
+        fov_model_path=fov_model_path, 
+        planes_url=plane_url, 
+        bucket_source=user_uploads_bucket, 
+        bucket_dest=results_bucket,
+        logging_dir=logging_dir, 
+        logging_level=log_level, 
+        logging_step=logging_step
+        )
+
+    pipeline.start()
 
     # Setup http server
-    async def handle_segment(request):
-        print("Handle segment:", request, "(items waiting in pipeline: %d)" %
-              pipeline.num_waiting_items)
+    def get_pipeline_handler(pipeline_fn):
+        async def handle(request):
+            print("Handle segment:", request, "(items waiting in pipeline: %d)" %
+                  num_waiting_items(pipeline.steps))
 
-        # Get image S3 key from GET request
-        image_s3_key = request.match_info.get("id", None)
-        if image_s3_key is None:
-            raise web.HTTPBadRequest()
+            # Get image S3 key from GET request
+            unique_id = request.match_info.get("id", None)
+            if unique_id is None:
+                raise web.HTTPBadRequest()
 
-        data = {"image_s3_key": image_s3_key}
+            data = {"unique_id": unique_id}
 
-        # Add local directories to initial data if specified
-        if image_local_dir is not None:
-            print(
-                "WARNING: Do not use in production: image local dir set to", image_local_dir)
-            data["image_local_dir"] = image_local_dir
-        if results_local_dir is not None:
-            print(
-                "WARNING: Do not use in production: results local dir set to", results_local_dir)
-            data["results_local_dir"] = results_local_dir
+            # Add local directories to initial data if specified
+            if image_local_dir is not None:
+                print(
+                    "WARNING: Do not use in production: image local dir set to", image_local_dir)
+                data["image_local_dir"] = image_local_dir
+            if results_local_dir is not None:
+                print(
+                    "WARNING: Do not use in production: results local dir set to", results_local_dir)
+                data["results_local_dir"] = results_local_dir
 
-        data = await pipeline.run(data)
+            data = await pipeline_fn(data)
 
-        return web.json_response({
-            "lighting_url": data["lighting_url"],
-            "semantic_url": data["semantic_url"],
-            "data_url": data["data_url"],
-            "superpixels_url": data["superpixels_url"],
-        })
+            response_dict = {
+                "lighting_url": data["lighting_url"],
+                "semantic_url": data["semantic_url"],
+                "data_url": data["data_v3_url"],
+                "superpixels_url": data["superpixels_url"],
+            }
+
+            if "data_v2_url" in data:
+                response_dict["data_v2_url"] = data["data_v2_url"]
+
+            if "data_v3_url" in data:
+                response_dict["data_v3_url"] = data["data_v3_url"]
+
+            return web.json_response(response_dict)
+        return handle
 
     async def handle_healthcheck(request):
         return web.Response(text="Healthy")
@@ -117,15 +128,15 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
     async def handle_local_upload(request):
         print("Handle local file upload", request)
 
-        image_s3_key = request.match_info.get("id", None)
-        if image_s3_key is None:
-            raise web.HTTPBadRequest()
+        unique_id = request.match_info.get("id", None)
+        if unique_id is None:
+            raise web.HTTPBadRequest("id parameter not supplied")
 
         output_dir = join(image_local_dir, user_uploads_bucket)
         os.makedirs(output_dir, exist_ok=True)
 
         # Read 1MB chunks into the file
-        with open(join(output_dir, image_s3_key), "wb") as image_file:
+        with open(join(output_dir, unique_id), "wb") as image_file:
             while True:
                 chunk = await request.content.read(1024*1024)
                 if not chunk:
@@ -137,12 +148,12 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
     async def handle_get_image(request):
         print("Handle get image:", request)
 
-        image_s3_key = request.match_info.get("id", None)
+        unique_id = request.match_info.get("id", None)
         bucket = request.match_info.get("bucket", None)
-        if image_s3_key is None or bucket is None:
-            raise web.HTTPBadRequest()
+        if unique_id is None or bucket is None:
+            raise web.HTTPBadRequest("id parameter not supplied")
 
-        return web.FileResponse(os.path.join(results_local_dir, bucket, image_s3_key))
+        return web.FileResponse(os.path.join(results_local_dir, bucket, unique_id))
 
     print("Trying to get instance metadata")
 
@@ -182,10 +193,11 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
         while True:
             for _ in range(60):
                 await asyncio.sleep(1)
-                avg_waiting_items = 0.9 * avg_waiting_items + 0.1 * pipeline.num_waiting_items
+                avg_waiting_items = 0.9 * avg_waiting_items + \
+                    0.1 * num_waiting_items(pipeline.steps)
 
             print("Waiting items: %.2f (avg: %.2f)" %
-                  (pipeline.num_waiting_items, avg_waiting_items))
+                  (num_waiting_items(pipeline.steps), avg_waiting_items))
 
             if metadata is not None:
                 await loop.run_in_executor(None, push_metrics, avg_waiting_items)
@@ -206,7 +218,11 @@ def main(model_path, fov_model_path, user_uploads_bucket, results_bucket, image_
 
     # Add public (CORS) routes
     segment_resource = app.router.add_resource("/segment/{id}")
-    cors.add(segment_resource.add_route("GET", handle_segment))
+    planes_resource = app.router.add_resource("/planes/{id}")
+    cors.add(segment_resource.add_route(
+        "GET", get_pipeline_handler(pipeline.process)))
+    cors.add(planes_resource.add_route(
+        "GET", get_pipeline_handler(pipeline.process)))
 
     # Add endpoint for directly getting and uploading images if local
     # image input dir was defined

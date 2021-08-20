@@ -13,74 +13,53 @@ IM_LOGGING_ENABLED = False
 
 def _log_image(name, image):
     if IM_LOGGING_ENABLED:
-        cv2.imwrite(name, image)
+        cv2.imwrite('logging/' + name, image)
+
 
 
 class PipelineRefineResults(PipelineStep):
     @property
     def required_keys(self) -> list:
-        return ["image", "semantic_probs", "lighting", "kmeans_normals", "hed"]
+        return ["image", "semantic_probs", "hed", "normals"]
 
     @property
     def output_keys(self) -> list:
-        return ["lighting", "mask"]
+        return ["mask", "lighting"]
 
     def run(self, data):
-        shape = (1024, 1024)
-
-        img = data["image"]
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-        img = cv2.resize(img, shape)
-
-        img_bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-        lighting_rgb = np.uint8(data["lighting"])
-        lighting_rgb = cv2.resize(lighting_rgb, shape)
-        lighting = lighting_rgb[:, :, 1]
-
-        kmeans = data["kmeans_normals"]
-        kmeans = cv2.resize(kmeans, shape)
-
-        normals_up = kmeans[:, :, 2]
-        normals_up = cv2.threshold((normals_up).astype(
-            'uint8'), 127, 255, cv2.THRESH_TOZERO)[1]
-        _log_image('normals_up.png', normals_up)
 
         hed = data["hed"]
         _log_image('hed.png', hed)
+        normals = np.uint8(data["normals"])
+        _log_image('normals.png', normals)
+        w, h = hed.shape
+        shape = (h,w)
 
-        prob_mask_full = np.uint8(255*data["semantic_probs"][:, :, 0])
+        img = data["image"]
+        img = cv2.resize(img, shape)
+        img_bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        semantic_mask = data["semantic_probs"]
+
+        prob_mask_full = np.uint8(255.*(semantic_mask[3]+semantic_mask[28]))
 
         # Sometimes there are border artifacts masks
-        prob_mask_full[:, 510:512] = prob_mask_full[:, 508:510]
-        prob_mask_full[510:512, :] = prob_mask_full[508:510, :]
+        # prob_mask_full[:, 510:512] = prob_mask_full[:, 508:510]
+        # prob_mask_full[510:512, :] = prob_mask_full[508:510, :]
         prob_mask_full = cv2.resize(prob_mask_full, shape)
 
         _log_image('prob_mask_full.png', prob_mask_full)
 
         edges = cv2.Canny(img_bw, 100, 200)
-        edges = cv2.dilate(255*np.uint8(edges > 0),
-                           cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
+
         _log_image('edges_o.png', 255*np.uint8(edges > 0))
-        edges_hed = cv2.Canny(hed, 100, 200)
-        edges_hed[:, 1020:1024] = edges_hed[:, 1015:1019]
-        edges_hed[1020:1024, :] = edges_hed[1015:1019, :]
-        edges_hed = cv2.dilate(255*np.uint8(edges_hed > 0),
-                               cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
+        edges_hed = cv2.Canny(hed, 10, 250)
 
         _log_image('edges_hed.png', edges_hed)
 
-        normals_up = filters.rank.median(normals_up, disk(5))
-
-        edges_normals = cv2.Canny(normals_up, 100, 200)
-        edges_normals = cv2.dilate(
-            255*np.uint8(edges_normals > 0), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
-        _log_image('edges_normals.png', 255*np.uint8(edges_normals > 0))
-
         edges = 255*np.uint8(edges > 0)
         edges[edges_hed > 0] = 255
-        edges[edges_normals > 0] = 255
+        edges = cv2.dilate(255*np.uint8(edges > 0),
+                           cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
         _log_image('edges.png', 255*np.uint8(edges > 0))
 
         thresholds = threshold_multiotsu(prob_mask_full, classes=4)
@@ -88,6 +67,7 @@ class PipelineRefineResults(PipelineStep):
         big_mask = 255 * \
             ip.refine_mask_watershed(
                 None, edges, big_mask, None, distance=0.05, max_value=1)
+        _log_image('big_mask.png', big_mask)
 
         isolated = np.uint8(prob_mask_full > thresholds[2])
         _log_image("isolated_pre.png", 255*isolated)
@@ -132,13 +112,15 @@ class PipelineRefineResults(PipelineStep):
         watershed_mask = np.zeros(prob_mask_full.shape)
 
         avgs = ndimage.mean(trim_mask, labels=labels, index=np.unique(labels))
+        mass = ndimage.sum(trim_mask, labels=labels, index=np.unique(labels))
+        max_index = np.argmax(mass)
 
         for i in range(0, len(np.unique(labels))):
             watershed_mask[labels == i+1] = avgs[i]
 
+        _log_image('watershed_pre.png', watershed_mask)
+        watershed_mask = 255*np.uint8(watershed_mask > max(min(127,avgs[max_index]-5),45))
         _log_image('watershed.png', watershed_mask)
-
-        watershed_mask = 255*np.uint8(watershed_mask > 127)
         watershed_mask[big_mask > 0] = 0
 
         nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(
@@ -155,7 +137,7 @@ class PipelineRefineResults(PipelineStep):
         # Fill small holes
         contours, hierarchy = cv2.findContours(watershed_mask.astype(
             'uint8'), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        final_mask = np.zeros(shape)
+        final_mask = np.zeros(isolated.shape)
 
         if len(contours) > 0:
             for contour in contours:
@@ -177,10 +159,15 @@ class PipelineRefineResults(PipelineStep):
 
         _log_image('final_mask.png', data["mask"])
 
+        lighting_rgb = np.uint8(data["lighting"])
+        lighting_rgb = cv2.resize(lighting_rgb, shape)
+        lighting = lighting_rgb[:, :, 1]
+
         # Remove hard edges from lighting
         smooth_lighting = ip.remove_grooves(lighting, data["mask"])
 
         blurred_mask = cv2.GaussianBlur(data["mask"], (31, 31), 15)
+
         blurred_lighting = cv2.GaussianBlur(smooth_lighting, (21, 21), 11)
 
         lighting = ip.alpha_blend(

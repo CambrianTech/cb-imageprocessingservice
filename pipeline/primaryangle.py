@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import math
 from cambrian import image_processing as ip, transformations as T, geometry as geo
+import pickle
 
 # Z is UP
 rotX = T.rotation_matrix(0.00, [1, 0, 0])
@@ -85,6 +86,7 @@ def get_candidate_walls(floor_normal, isolated_surfaces, max_angle=20):
         normal = surface[1]
         angle = geo.angle_between(normal, floor_normal)
         vert_diff = abs(angle - RIGHT_ANGLE)
+        print(vert_diff)
 
         if vert_diff < overall_best_diff:
             overall_best_diff = vert_diff
@@ -114,16 +116,19 @@ def get_candidate_walls(floor_normal, isolated_surfaces, max_angle=20):
 class PipelineDeterminePrimaryAngles(PipelineStep):
     @property
     def required_keys(self) -> list:
-        return ["semantic_probs", "normals", "elevation"]
+        return ["semantic_probs", "normals"]
 
     @property
     def output_keys(self) -> list:
         return ["kmeans_normals", "camera_rotation", "camera_elevation", "floor_rotation"]
 
     def run(self, data):
-        mask = np.uint8(255*data["semantic_probs"][:, :, 0])
-        normals = np.uint8(255*data["normals"])
-        elevation = data["elevation"]
+        print("running primary angle")
+        # with open('results/data.pickle', 'wb') as handle:
+        #     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        mask = cv2.resize(np.uint8(255*(data["semantic_probs"][3]+data["semantic_probs"][28])),(512,512))
+
+        normals = np.uint8(data["normals"])
 
         kmeans, labels, centers = ip.kmeans_image(normals, 5)
 
@@ -138,6 +143,9 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         isolated_surfaces = []
         for color in centers:
             normal = get_normal_from_rgb(color)
+            normal_len = max(0.00001, np.linalg.norm(normal))
+            normal /= normal_len
+
             color_mask = ip.isolate_color(reduced_normals, color)
             isolated_surfaces.append((color, normal, color_mask))
 
@@ -166,6 +174,7 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
 
         floor_normal = np.mean(normals[result_prob > 127], axis=0)
 
+
         normals_mask[result_prob < 128] = 0
 
         floor_normal = (floor_normal-127.5) / 127.5
@@ -185,26 +194,13 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         if np.isnan(cam_roll):
             cam_roll = 0.0
 
-        data["camera_rotation"] = [cam_pitch, 0.0, cam_roll]
+        data["camera_rotation"] = [0.0, 0.0, 0.0]
 
-        print("camera rotation:", data["camera_rotation"])
+        # print("camera rotation:", data["camera_rotation"])
 
-        floor_elevation = np.mean(elevation[normals_mask > 0], axis=0)
-        floor_elevation_pixels = 127.5 - floor_elevation
+        data["camera_elevation"] = 0.0
 
-        pixels_per_meter = 127.5 / 300.0
-
-        floor_elevation = floor_elevation_pixels / pixels_per_meter
-
-        floor_elevation = np.clip(
-            floor_elevation, 80.0, 170.0) / 100.0  # valid range
-
-        if np.isnan(floor_elevation):
-            floor_elevation = 1.3
-
-        data["camera_elevation"] = floor_elevation
-
-        print("floor elevation:", data["camera_elevation"])
+        # print("floor elevation:", data["camera_elevation"])
 
         # find candidate wall surfaces
         candidate_walls, primary_wall_index = get_candidate_walls(
@@ -224,4 +220,4 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
 
         data["floor_rotation"] = floor_rotation
 
-        print("floor rotation:", data["floor_rotation"])
+        # print("floor rotation:", data["floor_rotation"])

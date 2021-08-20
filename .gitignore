@@ -111,11 +111,19 @@ venv.bak/
 logging
 /tools/split_dataset
 /tools/dataset
-logging*
 
 .vscode/
 
 sklearn_models/
 tensorflow_models/
+gluon_models/
 /results
 /images
+
+# Plane-RCNN
+/planercnn/planercnn/example_images
+*.c
+/scripts/models
+/scripts/refine-input
+test_images/*
+/data

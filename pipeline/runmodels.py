@@ -2,13 +2,21 @@ import numpy as np
 from scipy.special import softmax
 import cv2
 import tensorflow as tf
-from modelutils import feed_image_batched, feed_images_batched, load_model
+from modelutils import get_session_config
 from pipeline.core import PipelineStep
 import os
 from time import time
 from tensorpack import *
 from tensorpack.tfutils import gradproc, optimizer
+from tensorpack.tfutils.sesscreate import NewSessionCreator
 from tensorpack.tfutils.summary import add_moving_summary, add_param_summary
+from gluoncv.model_zoo import get_model
+from gluoncv.data.transforms.presets.segmentation import test_transform
+from gluoncv.data import batchify
+from mxnet import image
+import mxnet as mx
+
+from .combineplanemasks import combine_plane_masks, combine_plane_clusters
 
 # HED from Tensorpack examples: https://github.com/tensorpack/tensorpack/tree/master/examples/HED
 
@@ -186,18 +194,24 @@ class Model(ModelDesc):
 
 
 class PipelineRunModels(PipelineStep):
-    def __init__(self, semantic_path: str, normals_path: str, unlit_path: str,
-                 elevation_path: str, lighting_path: str, hed_path: str):
-        self.model_semantic = load_model(semantic_path)
-        self.model_normals = load_model(normals_path)
-        self.model_unlit = load_model(unlit_path)
-        self.model_elevation = load_model(elevation_path)
-        self.model_lighting = load_model(lighting_path)
+    def __init__(self, semantic_path: str, hed_path: str):
+        super().__init__()
+
+        _ = tf.Session(config=get_session_config(use_gpu=True))
+
+        self.mx_ctx = mx.gpu(0)
+        self.model_semantic = get_model(
+            "deeplab_resnest269_ade", pretrained=True,
+            root=semantic_path, ctx=self.mx_ctx
+        )
+
         self.model_hed = OfflinePredictor(PredictConfig(
             model=Model(),
             session_init=SmartInit(hed_path),
             input_names=['image'],
-            output_names=['output%d' % k for k in range(1, 7)]
+            output_names=['output%d' % k for k in range(1, 7)],
+            session_creator=NewSessionCreator(
+                config=get_session_config(use_gpu=True))
         ))
 
     @property
@@ -206,7 +220,7 @@ class PipelineRunModels(PipelineStep):
 
     @property
     def output_keys(self) -> list:
-        return ["image", "semantic", "semantic_probs", "normals", "elevation", "lighting", "normals_latents", "hed"]
+        return ["image", "semantic", "semantic_probs", "hed", "lighting", "planes"]
 
     @property
     def is_batched(self) -> bool:
@@ -215,52 +229,51 @@ class PipelineRunModels(PipelineStep):
     def run(self, data):
         images = [datum["image"] for datum in data]
 
-        def _run_single(model, key):
-            results = feed_image_batched(model, images)
-            for datum, result in zip(data, results):
-                datum[key] = result
-
         t = time()
-        _run_single(self.model_elevation, "elevation")
-        print("Elevation model took %.2f seconds" % (time() - t))
 
-        t = time()
-        _run_single(self.model_lighting, "lighting")
-        print("Lighting model took %.2f seconds" % (time() - t))
+        # Numpy to mx, resize, test-transform, batch
+        semantic_input = [
+            test_transform(
+                mx.img.resize_short(
+                    mx.nd.array(image, dtype=np.uint8),
+                    480
+                ),
+                self.mx_ctx
+            )
+            for image in images
+        ]
 
-        t = time()
-        _run_single(self.model_unlit, "unlit")
-        print("Unlit model took %.2f seconds" % (time() - t))
+        # Run semantic segmentation model
+        # TODO: Batch properly?
+        semantic_results = [
+            self.model_semantic.predict(inp).asnumpy()
+            for inp in semantic_input
+        ]
 
-        t = time()
-        semantic_input = [{"image": datum["image"],
-                           "unlit": datum["unlit"]} for datum in data]
-        semantic_results = [s["output"] for s in feed_images_batched(
-            self.model_semantic, semantic_input)]
+        # Store logit and softmaxed results
         for datum, result in zip(data, semantic_results):
             datum["semantic"] = result
-            datum["semantic_probs"] = softmax(result/255, axis=-1)
+            datum["semantic_probs"] = softmax(result[0], axis=0)
+
         print("Semantic model took %.2f seconds" % (time() - t))
 
-        # Normals output with latents
         t = time()
-        input_tensor = list(self.model_normals.feed_tensors.values())[0]
-        latent_tensors = self.model_normals.graph.get_tensor_by_name(
-            "generator/decoder_8/conv2d_transpose/BiasAdd:0")
-        output_tensor = list(self.model_normals.fetch_tensors.values())[0]
-        normals_latents, normals = self.model_normals.session.run([latent_tensors, output_tensor], feed_dict={
-            input_tensor: [cv2.resize(datum["image"], (512, 512)).astype(np.float32)/255 for datum in data]})
-        normals_latents = normals_latents[:,
-                                          :, :, :128].reshape(len(data), 1, -1)
 
-        for datum, nl, n in zip(data, normals_latents, normals):
-            datum["normals"] = n
-            datum["normals_latents"] = nl
-        print("Normals model took %.2f seconds" % (time() - t))
+        for i in range(len(images)):
+            w, h, _ = images[i].shape
+            if w < 1024 and h < 1024:
+                h = int((h // 16) * 16)
+                w = int((w//16) * 16)
+            else:
+                if w >= h:
+                    h = int((1024 / w * h // 16) * 16)
+                    w = 1024
+                else:
+                    w = int((1024 / h * w // 16) * 16)
+                    h = 1024
+            images[i] = cv2.resize(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB), (h, w)).astype(
+                'float32')
 
-        t = time()
-        images = [cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), (1024, 1024)).astype(
-            'float32') for img in images]
         print("HED resize took %.2f seconds" % (time() - t))
 
         t = time()
