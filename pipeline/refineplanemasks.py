@@ -18,6 +18,7 @@ import math
 from skimage.segmentation import watershed
 from scipy.stats import mode
 
+from pipeline.utils import resize_array
 from pipeline.planegeometry import PlaneGeometry, SemanticKey
 from skimage.morphology import remove_small_objects, remove_small_holes
 from pipeline.semanticlabels import ADE20K
@@ -361,22 +362,6 @@ def merge_by_angle_sweep(labels_fan, normals_img, fan_normals, mask, angle_thres
 
     return labels_fan, fan_normals_reduced, normals_wall
 
-
-def resize_array(array, shape):
-    length = len(array)
-
-    dim=1
-    array_lr = np.zeros((length, shape[1], shape[0]))
-
-    if array[0].ndim>2:
-        dim = array.shape[-1]
-        array_lr = np.zeros((length, shape[1], shape[0], dim))
-
-    for k in range(length):
-        array_lr[k] = cv2.resize(array[k], shape)
-
-    return array_lr
-
 def rotationMatrixToEulerAngles(R):
 
     sy = math.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
@@ -690,7 +675,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
                                                                                        plane_masks, plane_normals)
 
 
-        plane_geometry = PlaneGeometry(data, isolated, shape)
 
         # print("floor indices are: ", floor_indices, horiz_indices)
         # print("ceiling indices are: ", ceiling_indices)
@@ -718,6 +702,14 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         ceiling_normal = plane_normals[ceiling_index]
         # print("ceiling normal, floor normal", ceiling_normal, floor_normal, np.dot(ceiling_normal,floor_normal))
+
+
+
+
+        plane_geometry = PlaneGeometry(data, isolated, shape)
+
+
+
 
         normals_combined, normals_nn_normals = combined_normals(-normals, plane_normals, plane_masks, basis_indices,
                                                                 cluster_prob)
