@@ -18,6 +18,7 @@ import math
 from skimage.segmentation import watershed
 from scipy.stats import mode
 
+from pipeline.planegeometry import PlaneGeometry, SemanticKey
 from skimage.morphology import remove_small_objects, remove_small_holes
 from pipeline.semanticlabels import ADE20K
 from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
@@ -418,14 +419,6 @@ def draw_grid(img, line_color=(0, 255, 0), thickness=1, type_=cv2.LINE_AA, pxste
 
 #labels for ade20k, subtract = 1 for output number. 
 
-class SemanticKey(Enum):
-    Wall = "wall"
-    Floor = "floor"
-    Ceiling = "ceiling"
-    WallLike = "wall-like"
-    Other = "other"
-
-
 class PipelineRefinePlaneMasks(PipelineStep):
     @property
     def required_keys(self) -> list:
@@ -695,6 +688,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         floor_indices, ceiling_indices, horiz_indices, floor_angs = find_floor_indices(isolated[SemanticKey.Floor], isolated[SemanticKey.Ceiling],
                                                                                        plane_masks, plane_normals)
+
+
+        plane_geometry = PlaneGeometry(data, isolated, shape)
 
         # print("floor indices are: ", floor_indices, horiz_indices)
         # print("ceiling indices are: ", ceiling_indices)
