@@ -23,7 +23,7 @@ from pipeline.planegeometry import PlaneGeometry, SemanticKey, Dimension
 from skimage.morphology import remove_small_objects, remove_small_holes
 from pipeline.semanticlabels import ADE20K
 from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
-from pipeline.fovestimator import calcPlaneXYZ, camera_fov_res_to_intrinsics, FovEstimator
+from pipeline.fovestimator import calcPlaneXYZ, FovEstimator
 
 from enum import Enum
 
@@ -548,15 +548,13 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         
         fov_estimator = FovEstimator(data, img, lines, data["fov"], isolated[SemanticKey.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
-        fov_estimator.estimate(sx, sy)
-        
+        fov_estimator.estimate(shape)
+
         data["fov"] = fov_estimator.fov
         data["floor_rotation"] = fov_estimator.floor_rotation
         
         if plane_geometry.floor_index > -1:
             plane_geometry.plane_parameters[plane_geometry.floor_index] = fov_estimator.floor_normal * fov_estimator.floor_offset
-
-        camera, _ = camera_fov_res_to_intrinsics(fov_estimator.fov, np.array(shape))
 
         labels_fan, fan_normals_reduced, normals_wall = self.fan_surfaces(data, img_lr, fov_estimator.edgelets[0], fov_estimator.vp0, sure_walls, isolated[SemanticKey.Wall], plane_geometry.normals_c)
 
@@ -588,9 +586,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         for k in range(number_planes):
             # print("cluster", plane_geometry.cluster_prob[k])
             a = np.int32(plane_classes[k])
-
-            name = "plane_" + str(k)
-            name += "_" + str(a)
 
             if a == 3 or a == 5:
                 if k not in wall_like_indices:
@@ -681,7 +676,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                         print("if no good match just take the closest by angle", all_vertical,
                               plane_geometry.plane_parameters[all_vertical[wall_index]], all_vertical[wall_index])
 
-        plane_XYZ, plane_depth = calcPlaneXYZ(plane_geometry.plane_parameters, width=w, height=h, camera=camera, max_depth=10)
+        plane_XYZ, plane_depth = calcPlaneXYZ(plane_geometry.plane_parameters, width=w, height=h, camera=fov_estimator.camera, max_depth=10)
         log_segmentation_image(data, 'labels_arg', labels_arg, img_lr)
 
 

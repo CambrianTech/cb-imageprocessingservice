@@ -15,7 +15,7 @@ class FovEstimator:
         self.floor_offset = floor_offset
 
 
-    def estimate(self, sx, sy):
+    def estimate(self, shape):
         self.estimate_fov()
 
         self.vp0 = self.vps[0] / self.vps[0][2]
@@ -36,11 +36,16 @@ class FovEstimator:
 
         locations = locations[s]
 
+        sx = shape[0] / self.image.shape[1]
+        sy = shape[1] / self.image.shape[0]
+
         self.vp0[:2] *= [sx, sy]
         locations[:, 0] *= sx
         locations[:, 1] *= sy
 
         self.edgelets = (locations, directions, strengths)
+
+        self.camera, _ = camera_fov_res_to_intrinsics(self.fov, np.array(shape))
 
 
     def estimate_fov(self):
