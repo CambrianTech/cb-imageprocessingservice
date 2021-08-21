@@ -3,197 +3,241 @@ from time import time
 import cv2
 from cambrian import geometry
 
-def compute_normal_from_vps(edgelets,img, fov, floor_normal, floor_offset, floor_mask):
-    e_lines = edgelet_lines(edgelets)
+class FovEstimator:
+    def __init__(self, data, image, lines, fov, floor_mask, floor_normal, floor_offset):
+        super().__init__()
+        self.data = data
+        self.image = image
+        self.fov = fov
+        self.edgelets = compute_edgelets(lines)
+        self.floor_mask = floor_mask
+        self.floor_normal = floor_normal
+        self.floor_offset = floor_offset
 
-    pp = [img.shape[1]/2, img.shape[0]/2]
-    vps=[]
-    inliers = []
 
-    vertical_edgelet_indices = get_edgelets_close_to_dir(edgelets,[0,1],.03)
-    vp_vertical, votes, inliers_vertical = ransac_vanishing_point(edgelets, e_lines, 2000, threshold_inlier=1, max_time=1.0, line_indices=vertical_edgelet_indices)
+    def estimate(self, sx, sy):
+        self.estimate_fov()
 
-    if vp_vertical is not None:
-        vps.append(vp_vertical)
-        inliers.append(inliers_vertical)
+        self.vp0 = self.vps[0] / self.vps[0][2]
 
-    horizontal1_edgelet_indices = get_edgelets_close_to_dir(edgelets, [1, 0], .5)
+        vertical_line_inliers = self.inliers[0]
+        locations, directions, strengths = self.edgelets
 
-    vp_horizontal1, votes, inliers_horizontal1 = ransac_vanishing_point(edgelets, e_lines, 2000, threshold_inlier=1, max_time=1.0, line_indices=horizontal1_edgelet_indices)
+        self.edgelets = (locations[vertical_line_inliers], directions[vertical_line_inliers], strengths[vertical_line_inliers])
 
-    if vp_horizontal1 is not None:
-        vps.append(vp_horizontal1)
-        inliers.append(inliers_horizontal1)
+        locations, directions, strengths = self.edgelets
 
-    horizontal2_edgelet_indices = get_edgelets_close_to_dir(edgelets, [1, 0], .95)
-    horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices, np.nonzero(compute_votes(edgelets,vp_horizontal1,10))[0])
-    horizontal2_edgelet_indices = np.setdiff1d( horizontal2_edgelet_indices, np.nonzero(compute_votes(edgelets,vp_vertical,10))[0])
+        vp_directions = locations - self.vp0[:2]
 
-    vp_horizontal2, votes, inliers_horizontal2 = ransac_vanishing_point(edgelets, e_lines, 2000, threshold_inlier=2,
-                                                                      max_time=1.0,
-                                                                      line_indices=horizontal2_edgelet_indices)
+        # arrange lines from left to right relative to vertical vp
+        angles = np.arctan2(vp_directions[:, 1], vp_directions[:, 0])
 
-    if vp_horizontal2 is not None:
-        vps.append(vp_horizontal2)
-        inliers.append(inliers_horizontal2)
+        s = np.argsort(np.sign(self.vp0[1]) * angles)
 
-    horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices,
-                                               np.nonzero(compute_votes(edgelets, vp_horizontal2,5))[0])
+        locations = locations[s]
 
-    vp_horizontal3, votes, inliers_horizontal3 = ransac_vanishing_point(edgelets, e_lines, 2000, threshold_inlier=1,
-                                                                        max_time=1.0,
-                                                                        line_indices=horizontal2_edgelet_indices)
-    if vp_horizontal3 is not None:
-        vps.append(vp_horizontal3)
-        inliers.append(inliers_horizontal3)
+        self.vp0[:2] *= [sx, sy]
+        locations[:, 0] *= sx
+        locations[:, 1] *= sy
 
-    vps = np.float32(vps)
+        self.edgelets = (locations, directions, strengths)
 
-    axes = [None, None, None]
-    axes_indices = []
-    max_det = .9
 
-    centered = (vps[:,:2]/np.dstack((vps[:,2],vps[:,2]))-pp)/pp
-    forward_indices = np.logical_and((centered[0,:,0]<2.0), (centered[0,:,1]<2.0))
+    def estimate_fov(self):
+        
+        e_lines = edgelet_lines(self.edgelets)
 
-    index1 = [True,True,True,True]
-    if np.sum(forward_indices)>0:
-        index1 = forward_indices
+        pp = [self.image.shape[1]/2, self.image.shape[0]/2]
+        vps=[]
+        self.inliers = []
 
-    for i in range(len(vps)):
-        for j in range(len(vps)):
-            if i>=j: continue
-            for k in range(len(vps)):
-                if j>=k: continue
-                s = index1[i] + index1[j] + index1[k]
-                if s==0: continue
+        vertical_edgelet_indices = get_edgelets_close_to_dir(self.edgelets,[0,1],.03)
+        vp_vertical, votes, inliers_vertical = ransac_vanishing_point(self.edgelets, e_lines, 2000, threshold_inlier=1, max_time=1.0, line_indices=vertical_edgelet_indices)
 
-                vp0 = vps[i]
-                vp1 = vps[j]
-                vp2 = vps[k]
-                fov_pos = [50,70,90]
+        if vp_vertical is not None:
+            vps.append(vp_vertical)
+            self.inliers.append(inliers_vertical)
 
-                for f in fov_pos:
-                    K = camera_fov_to_intrinsic_matrix(f, w=img.shape[1], h=img.shape[0])
+        horizontal1_edgelet_indices = get_edgelets_close_to_dir(self.edgelets, [1, 0], .5)
+
+        vp_horizontal1, votes, inliers_horizontal1 = ransac_vanishing_point(self.edgelets, e_lines, 2000, threshold_inlier=1, max_time=1.0, line_indices=horizontal1_edgelet_indices)
+
+        if vp_horizontal1 is not None:
+            vps.append(vp_horizontal1)
+            self.inliers.append(inliers_horizontal1)
+
+        horizontal2_edgelet_indices = get_edgelets_close_to_dir(self.edgelets, [1, 0], .95)
+        horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices, np.nonzero(compute_votes(self.edgelets,vp_horizontal1,10))[0])
+        horizontal2_edgelet_indices = np.setdiff1d( horizontal2_edgelet_indices, np.nonzero(compute_votes(self.edgelets,vp_vertical,10))[0])
+
+        vp_horizontal2, votes, inliers_horizontal2 = ransac_vanishing_point(self.edgelets, e_lines, 2000, threshold_inlier=2,
+                                                                          max_time=1.0,
+                                                                          line_indices=horizontal2_edgelet_indices)
+
+        if vp_horizontal2 is not None:
+            vps.append(vp_horizontal2)
+            self.inliers.append(inliers_horizontal2)
+
+        horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices,
+                                                   np.nonzero(compute_votes(self.edgelets, vp_horizontal2,5))[0])
+
+        vp_horizontal3, votes, inliers_horizontal3 = ransac_vanishing_point(self.edgelets, e_lines, 2000, threshold_inlier=1,
+                                                                            max_time=1.0,
+                                                                            line_indices=horizontal2_edgelet_indices)
+        if vp_horizontal3 is not None:
+            vps.append(vp_horizontal3)
+            self.inliers.append(inliers_horizontal3)
+
+        vps = np.float32(vps)
+
+        axes = [None, None, None]
+        axes_indices = []
+        max_det = .9
+
+        centered = (vps[:,:2]/np.dstack((vps[:,2],vps[:,2]))-pp)/pp
+        forward_indices = np.logical_and((centered[0,:,0]<2.0), (centered[0,:,1]<2.0))
+
+        index1 = [True,True,True,True]
+        if np.sum(forward_indices)>0:
+            index1 = forward_indices
+
+        for i in range(len(vps)):
+            for j in range(len(vps)):
+                if i>=j: continue
+                for k in range(len(vps)):
+                    if j>=k: continue
+                    s = index1[i] + index1[j] + index1[k]
+                    if s==0: continue
+
+                    vp0 = vps[i]
+                    vp1 = vps[j]
+                    vp2 = vps[k]
+                    fov_pos = [50,70,90]
+
+                    for f in fov_pos:
+                        K = camera_fov_to_intrinsic_matrix(f, w=self.image.shape[1], h=self.image.shape[0])
+                        K_inv = np.linalg.inv(K)
+
+                        new_vps = [vp0, vp1, vp2]
+                        axes_new = np.dot(K_inv, np.transpose(new_vps)).transpose()
+                        lengths = np.linalg.norm(axes_new, axis=-1)
+                        axes_new = np.float32(axes_new / np.dstack((lengths, lengths, lengths)))[0]
+                        coors = np.argmax(abs(axes_new), 0)
+                        axes_new = axes_new[coors]
+                        DET = abs(np.linalg.det(axes_new))
+
+                        if DET > max_det:
+
+                            max_det = DET
+                            axes_indices = np.int32([i,j,k])
+                            axes_indices = axes_indices[coors]
+                            axes = np.zeros_like(axes_new)
+                            axes = axes_new
+
+                            axes[2] = geometry.unit_vector(np.cross(axes[0],axes[1]))
+                            self.fov=f
+
+
+        if axes[2] is not None:
+            j, k,_ = axes_indices
+            vp1 = vps[j]
+            vp2 = vps[k]
+            v1 = vp1[:2] / vp1[2] - pp
+            v2 = vp2[:2] / vp2[2] - pp
+            p_f = -v1[0] * v2[0] - v1[1] * v2[1]
+
+            if p_f > 0:
+                focal_length = np.sqrt(p_f)
+                fov_new = np.degrees(focal_to_fov(focal_length, 2 * pp[0]))
+                if fov_new>40 and fov_new<110:
+                    self.fov = fov_new
+                    K = camera_fov_to_intrinsic_matrix(self.fov, w=self.image.shape[1], h=self.image.shape[0])
                     K_inv = np.linalg.inv(K)
 
-                    new_vps = [vp0, vp1, vp2]
+                    new_vps = [vp1, vp2]
                     axes_new = np.dot(K_inv, np.transpose(new_vps)).transpose()
                     lengths = np.linalg.norm(axes_new, axis=-1)
                     axes_new = np.float32(axes_new / np.dstack((lengths, lengths, lengths)))[0]
-                    coors = np.argmax(abs(axes_new), 0)
-                    axes_new = axes_new[coors]
-                    DET = abs(np.linalg.det(axes_new))
+                    axes = np.float32([axes_new[0], axes_new[1], geometry.unit_vector(np.cross(axes_new[0], axes_new[1]))])
+                    print("axes1", axes)
+            self.floor_normal = axes[2]
+            self.floor_normal = -np.sign(self.floor_normal[2])*self.floor_normal
 
-                    if DET > max_det:
+        new_cam, _ = camera_fov_res_to_intrinsics(self.fov, np.array([self.image.shape[1], self.image.shape[0]]))
 
-                        max_det = DET
-                        axes_indices = np.int32([i,j,k])
-                        axes_indices = axes_indices[coors]
-                        axes = np.zeros_like(axes_new)
-                        axes = axes_new
+        plane, depth = calcPlaneXYZ([self.floor_normal*self.floor_offset], width=self.image.shape[1], height=self.image.shape[0], camera=new_cam, max_depth=10)
+        plane = plane[0]
 
-                        axes[2] = geometry.unit_vector(np.cross(axes[0],axes[1]))
-                        fov=f
+        fm = cv2.resize(self.floor_mask, (self.image.shape[1], self.image.shape[0]))
+
+        plane_center = np.mean(plane[fm>.5], axis=0)
+        self.floor_offset = np.dot(plane_center, self.floor_normal)
+
+        basis_forward = geometry.unit_vector(np.float32([0, self.floor_normal[2], -self.floor_normal[1]]))
+        basis_right = geometry.unit_vector(np.cross(basis_forward, self.floor_normal))
+
+        self.floor_rotation = 0
+        if axes[1] is not None:
+            self.floor_rotation = -geometry.angle_between(axes[1], np.sign(basis_forward[1] - axes[1,1]) * np.sign(
+            basis_forward[0] - axes[1,0])*basis_forward)
 
 
-    if axes[2] is not None:
-        j, k,_ = axes_indices
-        vp1 = vps[j]
-        vp2 = vps[k]
-        v1 = vp1[:2] / vp1[2] - pp
-        v2 = vp2[:2] / vp2[2] - pp
-        p_f = -v1[0] * v2[0] - v1[1] * v2[1]
+        self.vps = vps
 
-        if p_f > 0:
-            focal_length = np.sqrt(p_f)
-            fov_new = np.degrees(focal_to_fov(focal_length, 2 * pp[0]))
-            if fov_new>40 and fov_new<110:
-                fov=fov_new
-                K = camera_fov_to_intrinsic_matrix(fov, w=img.shape[1], h=img.shape[0])
-                K_inv = np.linalg.inv(K)
+        print("fov", self.fov, self.floor_normal)
 
-                new_vps = [vp1, vp2]
-                axes_new = np.dot(K_inv, np.transpose(new_vps)).transpose()
-                lengths = np.linalg.norm(axes_new, axis=-1)
-                axes_new = np.float32(axes_new / np.dstack((lengths, lengths, lengths)))[0]
-                axes = np.float32([axes_new[0], axes_new[1], geometry.unit_vector(np.cross(axes_new[0], axes_new[1]))])
-                print("axes1", axes)
-        floor_normal = axes[2]
-        floor_normal = -np.sign(floor_normal[2])*floor_normal
+        # M = np.eye(3)
+        # from cambrian import utils
+        #
+        # M = utils.axisAngleToRotationMatrix(floor_normal,floor_rotation)
+        #
+        # basis_right = np.dot(M, basis_right)
+        # basis_forward = np.dot(M, basis_forward)
+        #
+        # uv_center = np.int32(xyz_to_uv(plane_center, width=img.shape[1], height=img.shape[0], camera=new_cam))
+        # pre_pos = np.int32(xyz_to_uv(plane_center, width=img.shape[1], height=img.shape[0], camera=new_cam))
+        # color = np.int32(np.random.randint([127, 127, 127], [254, 254, 235]))
+        # color = (int(color[0]), int(color[1]), int(color[2]))
+        # mask = np.zeros_like(img_dir)
+        # a = 50
+        # scale = 4.
+        #
+        #
+        # # plane_center = plane_center +.33 * basis_right-.68*basis_forward
+        # print(plane_center)
+        # for l in range(-a, a):
+        #     for k in range(-a, a):
+        #
+        #         pos = plane_center + l / scale * basis_right + k / scale * basis_forward
+        #         pos2 = plane_center + (l + 1) / scale * basis_right + (k - 1) / scale * basis_forward
+        #
+        #         uv_pos = np.int32(xyz_to_uv(pos, width=img.shape[1], height=img.shape[0], camera=new_cam))
+        #         uv_pos2 = np.int32(xyz_to_uv(pos2,width=img.shape[1], height=img.shape[0], camera=new_cam))
+        #
+        #         if np.isnan(uv_pos[0]) or np.isnan(uv_pos[1]) or np.isnan(uv_pos2[1]) or np.isnan(uv_pos2[0]): continue
+        #         if k < a - 1 and k >= -a + 1 and l < a - 1 and l >= -a + 1:
+        #             cv2.circle(mask, (int(plane_center[0]), int(plane_center[1])), 3, color, thickness=-1)
+        #             cv2.circle(mask, (uv_pos[0], uv_pos[1]), 3, color, thickness=-1)
+        #             cv2.line(mask, (pre_pos[0], pre_pos[1]), (uv_pos[0], uv_pos[1]), color=(255, 0, 255), thickness=2)
+        #             cv2.line(mask, (pre_pos[0], pre_pos[1]), (uv_pos2[0], uv_pos2[1]), color=(0, 255, 255),
+        #                      thickness=2)
+        #         pre_pos = uv_pos
+        # img_dir[np.logical_and(mask[:, :, 2] > 0, fm>.5)] = mask[np.logical_and(mask[:, :, 2] > 0, fm>.5)]
+        #
+        # color_index = 0
+        # for i in axes_indices:
+        #     uv_center = pp
+        #     vp =vps[i]/vps[i, 2]
+        #     color = [0,0,0]
+        #     color[color_index] = 255
+        #     color_index += 1
+        #     cv2.polylines(img_dir, pts=np.array([[[uv_center[0], uv_center[1]], [vp[0], vp[1]]]], np.int32),
+        #                   isClosed=False, color=color, thickness=2)
 
-    print("fov", fov, floor_normal)
-    new_cam, _ = camera_fov_res_to_intrinsics(fov, np.array([img.shape[1], img.shape[0]]))
+        # save_dir = '/Users/derrickhart/cb-base/client-visualizers/cambrianar-sites/divinefloor/scenes/bedroom/2-bedroom/'
+        # cv2.imwrite(save_dir + "image.jpg", img_dir)
 
-    plane, depth = calcPlaneXYZ([floor_normal*floor_offset], width=img.shape[1], height=img.shape[0], camera=new_cam, max_depth=10)
-    plane = plane[0]
-
-    fm = cv2.resize(floor_mask, (img.shape[1], img.shape[0]))
-
-    plane_center = np.mean(plane[fm>.5], axis=0)
-    floor_offset = np.dot(plane_center, floor_normal)
-
-    basis_forward = geometry.unit_vector(np.float32([0, floor_normal[2], -floor_normal[1]]))
-    basis_right = geometry.unit_vector(np.cross(basis_forward, floor_normal))
-
-    floor_rotation = 0
-    if axes[1] is not None:
-        floor_rotation = -geometry.angle_between(axes[1], np.sign(basis_forward[1] - axes[1,1]) * np.sign(
-        basis_forward[0] - axes[1,0])*basis_forward)
-
-    img_dir = img.copy()
-    # M = np.eye(3)
-    # from cambrian import utils
-    #
-    # M = utils.axisAngleToRotationMatrix(floor_normal,floor_rotation)
-    #
-    # basis_right = np.dot(M, basis_right)
-    # basis_forward = np.dot(M, basis_forward)
-    #
-    # uv_center = np.int32(xyz_to_uv(plane_center, width=img.shape[1], height=img.shape[0], camera=new_cam))
-    # pre_pos = np.int32(xyz_to_uv(plane_center, width=img.shape[1], height=img.shape[0], camera=new_cam))
-    # color = np.int32(np.random.randint([127, 127, 127], [254, 254, 235]))
-    # color = (int(color[0]), int(color[1]), int(color[2]))
-    # mask = np.zeros_like(img_dir)
-    # a = 50
-    # scale = 4.
-    #
-    #
-    # # plane_center = plane_center +.33 * basis_right-.68*basis_forward
-    # print(plane_center)
-    # for l in range(-a, a):
-    #     for k in range(-a, a):
-    #
-    #         pos = plane_center + l / scale * basis_right + k / scale * basis_forward
-    #         pos2 = plane_center + (l + 1) / scale * basis_right + (k - 1) / scale * basis_forward
-    #
-    #         uv_pos = np.int32(xyz_to_uv(pos, width=img.shape[1], height=img.shape[0], camera=new_cam))
-    #         uv_pos2 = np.int32(xyz_to_uv(pos2,width=img.shape[1], height=img.shape[0], camera=new_cam))
-    #
-    #         if np.isnan(uv_pos[0]) or np.isnan(uv_pos[1]) or np.isnan(uv_pos2[1]) or np.isnan(uv_pos2[0]): continue
-    #         if k < a - 1 and k >= -a + 1 and l < a - 1 and l >= -a + 1:
-    #             cv2.circle(mask, (int(plane_center[0]), int(plane_center[1])), 3, color, thickness=-1)
-    #             cv2.circle(mask, (uv_pos[0], uv_pos[1]), 3, color, thickness=-1)
-    #             cv2.line(mask, (pre_pos[0], pre_pos[1]), (uv_pos[0], uv_pos[1]), color=(255, 0, 255), thickness=2)
-    #             cv2.line(mask, (pre_pos[0], pre_pos[1]), (uv_pos2[0], uv_pos2[1]), color=(0, 255, 255),
-    #                      thickness=2)
-    #         pre_pos = uv_pos
-    # img_dir[np.logical_and(mask[:, :, 2] > 0, fm>.5)] = mask[np.logical_and(mask[:, :, 2] > 0, fm>.5)]
-    #
-    # color_index = 0
-    # for i in axes_indices:
-    #     uv_center = pp
-    #     vp =vps[i]/vps[i, 2]
-    #     color = [0,0,0]
-    #     color[color_index] = 255
-    #     color_index += 1
-    #     cv2.polylines(img_dir, pts=np.array([[[uv_center[0], uv_center[1]], [vp[0], vp[1]]]], np.int32),
-    #                   isClosed=False, color=color, thickness=2)
-
-    # save_dir = '/Users/derrickhart/cb-base/client-visualizers/cambrianar-sites/divinefloor/scenes/bedroom/2-bedroom/'
-    # cv2.imwrite(save_dir + "image.jpg", img_dir)
-
-    return vps, inliers, floor_normal, floor_offset, floor_rotation, fov, img_dir
+        
 
 def get_edgelets_close_to_dir(edgelets, direction, threshold):
 

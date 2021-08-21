@@ -23,7 +23,7 @@ from pipeline.planegeometry import PlaneGeometry, SemanticKey, Dimension
 from skimage.morphology import remove_small_objects, remove_small_holes
 from pipeline.semanticlabels import ADE20K
 from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
-from pipeline.fovestimator import compute_edgelets, compute_normal_from_vps, calcPlaneXYZ, camera_fov_res_to_intrinsics
+from pipeline.fovestimator import calcPlaneXYZ, camera_fov_res_to_intrinsics, FovEstimator
 
 from enum import Enum
 
@@ -546,47 +546,19 @@ class PipelineRefinePlaneMasks(PipelineStep):
         ######################################## Initial refinement work
         sure_walls = segmentation_initial = self._refine_surfaces(data, isolated, line_data, img_lr, hed_lr, sx, sy)
 
-        edgelets = compute_edgelets(lines)
-
-        vps, inliers, floor_normal, floor_offset, floor_rotation, fov, img_dir = compute_normal_from_vps(edgelets, img,
-                                                                                                         data["fov"],
-                                                                                                         plane_geometry.floor_normal,
-                                                                                                         plane_geometry.floor_offset,
-                                                                                                         isolated[SemanticKey.Floor])
-
-        data["fov"] = fov
-
-        #refine plane geometry, need to be in class, but getting there:
+        
+        fov_estimator = FovEstimator(data, img, lines, data["fov"], isolated[SemanticKey.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
+        fov_estimator.estimate(sx, sy)
+        
+        data["fov"] = fov_estimator.fov
+        data["floor_rotation"] = fov_estimator.floor_rotation
+        
         if plane_geometry.floor_index > -1:
-            plane_geometry.plane_parameters[plane_geometry.floor_index] = floor_normal * floor_offset
+            plane_geometry.plane_parameters[plane_geometry.floor_index] = fov_estimator.floor_normal * fov_estimator.floor_offset
 
-        log_image(data, "img_dir", img_dir)
+        camera, _ = camera_fov_res_to_intrinsics(fov_estimator.fov, np.array(shape))
 
-        vp0 = vps[0] / vps[0][2]
-
-        vertical_line_inliers = inliers[0]
-        locations, directions, strengths = edgelets
-
-        edgelets = (
-            locations[vertical_line_inliers], directions[vertical_line_inliers], strengths[vertical_line_inliers])
-
-        locations, directions, strengths = edgelets
-
-        vp_directions = locations - vp0[:2]
-
-        # arrange lines from left to right relative to vertical vp
-        angles = np.arctan2(vp_directions[:, 1], vp_directions[:, 0])
-
-        s = np.argsort(np.sign(vp0[1]) * angles)
-
-        locations = locations[s]
-
-        vp0[:2] *= [sx, sy]
-        locations[:, 0] *= sx
-        locations[:, 1] *= sy
-        camera, _ = camera_fov_res_to_intrinsics(fov, np.array(shape))
-
-        labels_fan, fan_normals_reduced, normals_wall = self.fan_surfaces(data, img_lr, locations, vp0, sure_walls, isolated[SemanticKey.Wall], plane_geometry.normals_c)
+        labels_fan, fan_normals_reduced, normals_wall = self.fan_surfaces(data, img_lr, fov_estimator.edgelets[0], fov_estimator.vp0, sure_walls, isolated[SemanticKey.Wall], plane_geometry.normals_c)
 
         vl_image = np.zeros_like(all_lines)
         vl_image[sure_walls == 0] = 0
@@ -963,9 +935,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         data["mask"] = np.zeros_like(data["planes"]["masks"][0])
         if len(data["planes"]["masks"]) > 2:
             data["mask"] = data["planes"]["masks"][-2]
-
-        if abs(floor_rotation) > 0:
-            data["floor_rotation"] = floor_rotation
 
         if im_logging_enabled(data, LogLevel.Segmentation):
             log_segmentation_image(data, "final_labels", np.int32(final_labels) - 1, img)
