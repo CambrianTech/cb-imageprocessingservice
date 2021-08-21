@@ -1,10 +1,11 @@
 import cv2
 import numpy as np
 from scipy import ndimage
+from scipy.stats import mode
 from enum import Enum, IntEnum
 
 from pipeline.utils import resize_array
-from pipeline.logging import log_image, log_ply, im_logging_enabled, LogLevel
+from pipeline.logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 
 
 class SemanticKey(Enum):
@@ -41,14 +42,17 @@ class PlaneGeometry:
         super().__init__()
 
         self.isolated_masks = isolated_masks
-
-        self.digest_data(data, image, shape)
+        self.data = data
+        self.image = image
+        self.digest_data(shape)
+        
+    def process(self):
         self.calculate_geometry()
+        self.cluster()
 
+    def digest_data(self, shape):
 
-    def digest_data(self, data, image, shape):
-
-        planes_data = data["planes"]
+        planes_data = self.data["planes"]
         self.plane_parameters = np.array(planes_data["detection"][:, 6:9], dtype=np.float32)
         self.plane_offsets = np.linalg.norm(self.plane_parameters, axis=-1, keepdims=True)
         self.plane_normals = self.plane_parameters / np.maximum(self.plane_offsets, 1e-4)
@@ -59,16 +63,16 @@ class PlaneGeometry:
         XYZ = planes_data["XYZ"][:, 80:-80, :].transpose(1, 2, 0)
         self.XYZ = cv2.resize(XYZ, shape)
 
-        normals = cv2.resize(data["normals"], shape)
+        normals = cv2.resize(self.data["normals"], shape)
 
-        if im_logging_enabled(data, LogLevel.Images):
-            log_image(data, "xyz", 255. * self.XYZ / np.amax(self.XYZ))
-            log_image(data, "normals", normals)
+        if im_logging_enabled(self.data, LogLevel.Images):
+            log_image(self.data, "xyz", 255. * self.XYZ / np.amax(self.XYZ))
+            log_image(self.data, "normals", normals)
 
-        if im_logging_enabled(data, LogLevel.Models):
+        if im_logging_enabled(self.data, LogLevel.Models):
             plane_XYZ = planes_data["plane_XYZ"][:, :, 80:-80, :].transpose(0, 2, 3, 1)
             plane_XYZ = resize_array(plane_XYZ, shape)
-            log_ply(data, "3D", image, plane_masks, np.float32(plane_XYZ), mult=1)
+            log_ply(self.data, "3D", self.image, plane_masks, np.float32(plane_XYZ), mult=1)
 
         self.normals = (normals - 127.5) / 127.5
         
@@ -152,7 +156,92 @@ class PlaneGeometry:
         wall_indices = np.nonzero(np.logical_and(scores > np.mean(scores), np.abs(90 - angs) < 15))[0]
 
         return VerticalDimension(wall_indices, vert_indices, angs)
+
+
+    def cluster(self):
+        normals_combined, normals_nn_normals = self.combined_normals()
+        self.normals_c = normals_combined
+
+        lengths = np.maximum(np.sqrt(np.sum(self.normals_c * self.normals_c, -1)), 1e-6)
+        self.normals_c /= np.dstack((lengths, lengths, lengths))
+
+        cluster_masks = [.03 * np.ones_like(self.plane_masks[0])]
+        cluster_mask_indices = [0]
+        vert_indices = self.dimensions[Dimension.Vertical].indices
+        for i in range(1, 8):
+            clust = np.nonzero(self.plane_clusters == i)[0]
+            clust = np.intersect1d(clust, vert_indices)
+
+            if len(clust) > 0:
+                cluster_masks.append(np.sum(self.plane_masks[clust], 0))
+                cluster_mask_indices.append((i - 1) % 3 + 1)
+
+        if im_logging_enabled(self.data, LogLevel.Images):
+            log_image(self.data, "normals_c_org", 127.5 * (self.normals_c + 1))
+            plane_cluster_seg = np.argmax(cluster_masks, 0)
+            cluster_mask_indices = np.int32(cluster_mask_indices)
+            plane_cluster_seg_rs = np.int32(
+                cv2.resize(np.uint8(plane_cluster_seg), (self.data["image"].shape[1], self.data["image"].shape[0]), interpolation=cv2.INTER_NEAREST))
+
+            log_segmentation_image(self.data, "plane_cluster_seg", plane_cluster_seg, self.data["image"])
+
+
+    def combined_normals(self):
+
+        normals = -1 * self.normals
+
+        plane_normals_nn = self.plane_normals.copy()
+        number_planes = len(self.plane_normals)
+        cluster_indices = self.cluster_prob > .5
+        # print("good clusters", cluster_indices)
+        basis_indices = self.basis_indices[cluster_indices[self.basis_indices]]
+
+        for i in range(number_planes):
+            if cluster_indices[i]:
+                plane_normals_nn[i] = mode(normals[self.plane_masks[i] > np.amax(self.plane_masks[i]) / 2.], axis=0)[0]
+                plane_normals_nn[i] /= np.linalg.norm(plane_normals_nn[i])
+
+
+        # plane_normals_nn[0] = -plane_normals_nn[0]
+
+        R, _ = self.calcTransformation(plane_normals_nn[basis_indices], self.plane_normals[basis_indices])
+        # R = np.eye(3)
+
+        nr = normals.reshape((-1, 3))
+        normals = np.matmul(R, nr.transpose()).transpose().reshape(normals.shape)
+
+        lengths = np.maximum(np.sqrt(np.sum(normals * normals, -1)), 1e-6)
+        normals /= np.dstack((lengths, lengths, lengths))
+
+        plane_normals_nn[basis_indices] = np.matmul(R,plane_normals_nn[basis_indices].transpose()).transpose()
+
+
+        for i in range(number_planes):
+            # if cluster_indices[i]:
+            m = self.plane_masks[i].copy()
+            # m[m>.5] = 1
+            mult = np.dstack((m,m,m))
+
+            normals = (1.0 - mult) * normals + mult * self.plane_normals[i]
+
+        lengths = np.maximum(np.sqrt(np.sum(normals * normals, -1)), 1e-6)
+        normals /= np.dstack((lengths, lengths, lengths))
+        return normals, plane_normals_nn
         
+    def calcTransformation(self, points_1, points_2):
+        # center_1 = points_1.mean(0) =(0,0,0)
+        # center_2 = points_2.mean(0)=(0,0,0)
+        center_1 = (0, 0, 0)
+        center_2 = (0, 0, 0)
+        H = np.matmul((points_1 - center_1).transpose(), (points_2 - center_2))
+        U, S, V = np.linalg.svd(H)
+
+        R = np.matmul(V.transpose(), U.transpose())
+        if np.linalg.det(R) < 0 and False:
+            R[:, 2] *= -1
+            pass
+        t = -np.matmul(R, center_1) + center_2
+        return R, t
 
 
 
