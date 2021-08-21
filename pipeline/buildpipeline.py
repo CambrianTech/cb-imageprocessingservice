@@ -156,7 +156,9 @@ class Pipeline():
             set_logging_step(data, self.logging_step, current_step)
             print("Step %s" % (current_step.name))
 
+            step_start = time.time()
             data = await schedule_and_wait(step.schedule, data)
+            print("Step %s took %.2f seconds" % (current_step.name, time.time() - step_start))
 
             if current_step == self.export_step and logging_dir is not None:
                 log_data(data)
