@@ -13,6 +13,7 @@ from pipeline.superpixels import PipelineSuperpixels
 from pipeline.refineplanemasks import PipelineRefinePlaneMasks
 from pipeline.combineplanemasks import PipelineCombinePlaneMasks
 from pipeline.uploadresults import PipelineUploadResults
+from pipeline.saveresults import PipelineSaveResults
 from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 
 from enum import IntEnum
@@ -89,6 +90,7 @@ class Pipeline():
                 PipelineSuperpixels(),
                 PipelineRefinePlaneMasks(),
                 PipelineCombinePlaneMasks()
+                PipelineSaveResults(self.bucket_dest)
             ]
 
         elif self.mode == PipelineMode.Restore:
