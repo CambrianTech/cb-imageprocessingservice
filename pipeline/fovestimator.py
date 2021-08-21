@@ -51,14 +51,14 @@ class FovEstimator:
         vps=[]
         self.inliers = []
 
-        vertical_edgelet_indices = get_edgelets_close_to_dir(self.edgelets,[0,1],.03)
+        vertical_edgelet_indices = self.get_edgelets_close_to_dir(self.edgelets,[0,1],.03)
         vp_vertical, votes, inliers_vertical = ransac_vanishing_point(self.edgelets, e_lines, 2000, threshold_inlier=1, max_time=1.0, line_indices=vertical_edgelet_indices)
 
         if vp_vertical is not None:
             vps.append(vp_vertical)
             self.inliers.append(inliers_vertical)
 
-        horizontal1_edgelet_indices = get_edgelets_close_to_dir(self.edgelets, [1, 0], .5)
+        horizontal1_edgelet_indices = self.get_edgelets_close_to_dir(self.edgelets, [1, 0], .5)
 
         vp_horizontal1, votes, inliers_horizontal1 = ransac_vanishing_point(self.edgelets, e_lines, 2000, threshold_inlier=1, max_time=1.0, line_indices=horizontal1_edgelet_indices)
 
@@ -66,7 +66,7 @@ class FovEstimator:
             vps.append(vp_horizontal1)
             self.inliers.append(inliers_horizontal1)
 
-        horizontal2_edgelet_indices = get_edgelets_close_to_dir(self.edgelets, [1, 0], .95)
+        horizontal2_edgelet_indices = self.get_edgelets_close_to_dir(self.edgelets, [1, 0], .95)
         horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices, np.nonzero(compute_votes(self.edgelets,vp_horizontal1,10))[0])
         horizontal2_edgelet_indices = np.setdiff1d( horizontal2_edgelet_indices, np.nonzero(compute_votes(self.edgelets,vp_vertical,10))[0])
 
@@ -239,24 +239,24 @@ class FovEstimator:
 
         
 
-def get_edgelets_close_to_dir(edgelets, direction, threshold):
+    def get_edgelets_close_to_dir(self, edgelets, direction, threshold):
 
-    dots = abs(edgelets[1] * direction)
-    close_edgelets = np.nonzero(dots>1.0-threshold)[0]
-    return close_edgelets
+        dots = abs(edgelets[1] * direction)
+        close_edgelets = np.nonzero(dots>1.0-threshold)[0]
+        return close_edgelets
 
 
-def get_edgelets_pointing_to_point(edgelets, point,threshold):
+    def get_edgelets_pointing_to_point(self, edgelets, point,threshold):
 
-    locations, directions, _ = edgelets
+        locations, directions, _ = edgelets
 
-    desiredDir = locations - point
-    dir_norm = np.linalg.norm(desiredDir, axis=1)
-    dir_norm[dir_norm == 0] = 1e-5
+        desiredDir = locations - point
+        dir_norm = np.linalg.norm(desiredDir, axis=1)
+        dir_norm[dir_norm == 0] = 1e-5
 
-    dots = abs(np.sum(desiredDir*directions, axis=1))/dir_norm
-    close_edgelets = np.nonzero(dots > 1.0 - threshold)[0]
-    return close_edgelets
+        dots = abs(np.sum(desiredDir*directions, axis=1))/dir_norm
+        close_edgelets = np.nonzero(dots > 1.0 - threshold)[0]
+        return close_edgelets
 
 ##############################################################
 # Vanishing pt functions
