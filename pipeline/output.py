@@ -15,22 +15,36 @@ surface_types = ["unknown", "floor", "wall", "horizontal", "vertical"]
 
 @abstract
 class PipelineOutput(PipelineStep):
-    def __init__(self, base_path, api_level=4):
+    def __init__(self, base_path, outfile_name="data.json", api_level=3):
         super().__init__()
         self.base_path = base_path
+        self.outfile_name = outfile_name
         self.api_level = api_level
 
     @property
+    def required_keys(self) -> list:
+        if self.api_level == 1:
+            return ["mask", "lighting", "superpixels"]
+        elif self.api_level == 2:
+            return ["lighting", "superpixels"]
+        elif self.api_level == 3:
+            return ["planes", "lighting"]
+
+        return ["planes", "lighting", "planes_alpha_mask", "planes_index_mask"]
+
+    @property
     def output_keys(self) -> list:
-        return ["semantic_url", "lighting_url", "data_url" "superpixels_url"]
+
+        if self.api_level == 1:
+            return ["api_level", "data_url", "lighting_url", "superpixels_url", "mask"]
+        elif self.api_level < 4:
+            return ["api_level", "data_url", "lighting_url", "superpixels_url"]
+
+        return ["api_level", "data_url"]
 
     @protected
     def make_url(self, path):
         return path
-
-    @property
-    def required_keys(self) -> list:
-        return ["semantic", "lighting", "superpixels"]
 
     @protected
     def make_plane_mask_url(self, plane_index):
@@ -38,10 +52,10 @@ class PipelineOutput(PipelineStep):
 
     def run(self, data):
         data["api_level"] = self.api_level
+        data["data_url"] = self.make_url("%s/%s" % (self.unique_id, self.outfile_name))
         self.unique_id = data["unique_id"]
 
         if self.api_level == 1:
-            data["data_url"] = self.make_url("%s/data.json" % self.unique_id)
             filename = "mask.png"
             mask_url = self.make_url("%s/%s" % (self.unique_id, filename))
             self.save_image(data["mask"], filename, mask_url)
@@ -82,16 +96,16 @@ class PipelineOutput(PipelineStep):
 
                 results = self.make_data_v4_dict(data, lighting_url, planes_index_mask_url, planes_alpha_mask_url)
 
-        
+        results["data_url"] = data["data_url"]
+        self.save_data(results, self.outfile_name)
+
     @abstractmethod
-    def save_image(image, filename):
+    def save_image(self, image, filename, url):
         print("Nothing to do")
 
-
     @abstractmethod
-    def save_data(self, data, data_v3_dict):
-        print(data, data_v3_dict)
-    
+    def save_data(self, data, filename, url):
+        print("Nothing to do")    
 
     def make_data_dict(self, data):
         return {

@@ -8,6 +8,7 @@ import numpy as np
 import os
 import json
 import zlib
+from pathlib import Path
 
 from pipeline.core import PipelineStep
 
@@ -15,17 +16,16 @@ from pipeline.core import PipelineStep
 class PipelineFileOutput(PipelineStep):
     def __init__(self, base_path):
         super().__init__(base_path)
-        if not os.path.exists(base_path):
-            os.makedirs(base_path)
 
-    @property
-    def required_keys(self) -> list:
-        return ["semantic", "lighting", "superpixels"]
+    def save_image(self, image, filename, url):
+        path = Path(os.path.join(self.base_path, filename))
+        path.mkdir(parents=True, exist_ok=True)
 
-    @property
-    def output_keys(self) -> list:
-        return ["semantic_url", "lighting_url", "data_url" "superpixels_url"]
+        imsave(path, image)
 
-    @abstractmethod
-    def save_image(image, filename):
-        imsave(os.path.join(self.base_path, filename), image)
+    def save_data(self, data, filename, url):
+        path = Path(os.path.join(self.base_path, filename))
+        path.mkdir(parents=True, exist_ok=True)
+
+        with open(path, "w", encoding="utf-8") as out_file:
+            json.dump(data, out_file, indent=4)

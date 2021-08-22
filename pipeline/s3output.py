@@ -17,15 +17,12 @@ class PipelineS3Output(PipelineOutput):
         self.s3_client = s3Client
         self.s3_url = s3_url
 
-    @property
-    def output_keys(self) -> list:
-        return ["semantic_url", "lighting_url", "data_url" "superpixels_url"]
-
-     @protected
     def make_url(self, path):
         return "%s/%s" % (self.s3_url, path)
 
-    @abstractmethod
-    def save_image(image, filename):
+    def save_image(self, image, filename, url):
         self.s3_client.upload_image_to_s3(image, self.base_path, filename)
+
+    def save_data(self, data, filename, url):
+        self.s3_client.upload_json_to_s3(data, self.base_path, filename)
         
