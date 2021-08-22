@@ -19,7 +19,7 @@ class Dimension(IntEnum):
     Horizontal = 0
     Vertical = 1
 
-#@abstract
+@abstract
 class PlanarDimension:
     def __init__(self, indices, angles):
         self.indices = indices

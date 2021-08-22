@@ -1,0 +1,16 @@
+from pipeline.core import PipelineStep
+
+@abstract
+class PipelineInput(PipelineStep):
+    def __init__(self, base_path):
+        super().__init__()
+        self.base_path = base_path
+
+    @property
+    def required_keys(self) -> list:
+        return ["unique_id"]
+
+    @property
+    def output_keys(self) -> list:
+        return ["image"]
+

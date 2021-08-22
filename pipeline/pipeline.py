@@ -5,15 +5,18 @@ import subprocess
 
 from pipeline.core import schedule_and_wait, PipelineStep
 from pipeline.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, LogLevel, set_logging_level
+
+from pipeline.s3input import PipelineS3Input
+from pipeline.fileinput import PipelineFileInput
+from pipeline.s3output import PipelineS3Output
+from pipeline.fileoutput import PipelineFileOutput
+
 from pipeline.fov import PipelineCalculateFov
-from pipeline.getdata import PipelineBucketSource, PipelineFileSource
 from pipeline.primaryangle import PipelineDeterminePrimaryAngles
 from pipeline.runmodels import PipelineRunModels
 from pipeline.superpixels import PipelineSuperpixels
 from pipeline.refineplanemasks import PipelineRefinePlaneMasks
 from pipeline.combineplanemasks import PipelineCombinePlaneMasks
-from pipeline.uploadresults import PipelineUploadResults
-from pipeline.saveresults import PipelineSaveResults
 from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 
 from enum import IntEnum
@@ -41,7 +44,7 @@ class Pipeline():
 
     def __init__(self,  mode:PipelineMode, \
                         model_path=None, semantic_model_path=None, fov_model_path=None, \
-                        planes_url=None, bucket_source=None, bucket_dest=None, cpu_networks_port = 8082, \
+                        planes_url=None, src_path=None, dest_path=None, cpu_networks_port = 8082, \
                         restore_step:PipelineStepIndex=None, export_step:PipelineStepIndex=None, \
                         logging_dir=None, logging_level=LogLevel.Nothing, logging_step:PipelineStepIndex=None):
 
@@ -51,8 +54,8 @@ class Pipeline():
         self.semantic_model_path = semantic_model_path
         self.fov_model_path = fov_model_path 
         self.planes_url = planes_url 
-        self.bucket_source = bucket_source 
-        self.bucket_dest = bucket_dest
+        self.src_path = src_path 
+        self.dest_path = dest_path
         self.cpu_networks_port = cpu_networks_port
         self.remote_path = "http://localhost:%d" % cpu_networks_port
         self.restore_step = restore_step
@@ -66,8 +69,9 @@ class Pipeline():
 
         # Create the steps we want to use in the pipelines
         if self.mode == PipelineMode.Serve:
+            s3Client = S3Client()
              self.steps = [
-                PipelineBucketSource(self.bucket_source),
+                PipelineS3Input(self.src_path, s3Client),
                 PipelineRemoteNetworks(self.remote_path),
                 PipelineCalculateFov(self.fov_model_path),
                 PipelineRemotePlaneDetector(self.planes_url),
@@ -76,12 +80,13 @@ class Pipeline():
                 PipelineSuperpixels(),
                 PipelineRefinePlaneMasks(),
                 PipelineCombinePlaneMasks(),
-                PipelineUploadResults(self.bucket_dest)
+                PipelineS3Output(self.dest_path, s3Client)
             ]
 
         elif self.mode == PipelineMode.Process:
+            s3Client = S3Client()
             self.steps = [
-                PipelineFileSource(),
+                PipelineFileInput(self.src_path, s3Client),
                 PipelineRemoteNetworks(self.remote_path),
                 PipelineCalculateFov(self.fov_model_path),
                 PipelineRemotePlaneDetector(self.planes_url),
@@ -90,13 +95,13 @@ class Pipeline():
                 PipelineSuperpixels(),
                 PipelineRefinePlaneMasks(),
                 PipelineCombinePlaneMasks()
-                PipelineSaveResults(self.bucket_dest)
+                PipelineFileOutput(self.dest_path, s3Client)
             ]
 
         elif self.mode == PipelineMode.Restore:
             print("Restoring from", restore_step.name)
 
-            self.steps = [PipelineFileSource()]
+            self.steps = [PipelineFileInput(self.src_path)]
 
             if restore_step <= PipelineStepIndex.RemoteNetworks:
                 self.push(PipelineRemoteNetworks(self.remote_path))
@@ -114,6 +119,9 @@ class Pipeline():
                 self.push(PipelineRefinePlaneMasks())
             if restore_step <= PipelineStepIndex.CombinePlaneMasks:
                 self.push(PipelineCombinePlaneMasks())
+
+            self.push(PipelineFileOutput(self.dest_path))
+
 
     def start(self):
         print("Starting threads")
