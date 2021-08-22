@@ -81,7 +81,7 @@ class PipelineOutput(PipelineStep):
                 self.save_image(data["planes_alpha_mask"], filename, planes_alpha_mask_url)
 
                 results = self.make_data_v4_dict(data, lighting_url, planes_index_mask_url, planes_alpha_mask_url)
-                        
+
         
     @abstractmethod
     def save_image(image, filename):
@@ -244,8 +244,7 @@ class PipelineOutput(PipelineStep):
         return {
             "formatVersion": 3,
             "name": "Room %s" % self.unique_id,
-            "id": "room-%s" % self.unique_id,
-            "floorRotation": data["floor_rotation"],
+            "id": self.unique_id,
             "images": {
                 "lighting": lighting_url,
                 "planes_alpha_mask": planes_alpha_mask_url
