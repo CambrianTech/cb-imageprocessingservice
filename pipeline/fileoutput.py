@@ -17,14 +17,16 @@ class PipelineFileOutput(PipelineOutput):
         super().__init__(base_path)
 
     def save_image(self, image, filename, url):
-        path = Path(os.path.join(self.base_path, filename))
-        path.mkdir(parents=True, exist_ok=True)
+        path = Path(os.path.join(self.base_path, url))
+        if len(path.parents) > 0:
+            path.parents[0].mkdir(parents=True, exist_ok=True)
 
         imsave(path, image)
 
     def save_data(self, data, filename, url):
-        path = Path(os.path.join(self.base_path, filename))
-        path.mkdir(parents=True, exist_ok=True)
+        path = Path(os.path.join(self.base_path, url))
+        if len(path.parents) > 0:
+            path.parents[0].mkdir(parents=True, exist_ok=True)
 
         with open(path, "w", encoding="utf-8") as out_file:
             json.dump(data, out_file, indent=4)

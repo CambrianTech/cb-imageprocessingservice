@@ -49,9 +49,10 @@ class PipelineOutput(PipelineStep):
         return self.make_url("%s/plane_masks/mask_%d.png" % (self.unique_id, plane_index))
 
     def run(self, data):
+        self.unique_id = data["unique_id"]
+
         data["api_level"] = self.api_level
         data["data_url"] = self.make_url("%s/%s" % (self.unique_id, self.outfile_name))
-        self.unique_id = data["unique_id"]
 
         if self.api_level == 1:
             filename = "mask.png"
@@ -73,7 +74,7 @@ class PipelineOutput(PipelineStep):
 
                 if "planes" in data:
                     for i, plane_mask in enumerate(data["planes"]["masks"]):
-                        filename = "plane_masks/mask_%d.png" % (self.unique_id, i)
+                        filename = "plane_masks/mask_%d.png" % i
                         mask_url = self.make_url("%s/%s" % (self.unique_id, filename))
                         self.save_image(plane_mask, filename, mask_url)
 
@@ -95,7 +96,7 @@ class PipelineOutput(PipelineStep):
                 results = self.make_data_v4_dict(data, lighting_url, planes_index_mask_url, planes_alpha_mask_url)
 
         results["data_url"] = data["data_url"]
-        self.save_data(results, self.outfile_name)
+        self.save_data(results, self.outfile_name, data["data_url"])
 
     @abstractmethod
     def save_image(self, image, filename, url):
