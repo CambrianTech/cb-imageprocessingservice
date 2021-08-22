@@ -18,10 +18,6 @@ class PipelineS3Output(PipelineOutput):
         self.s3_url = s3_url
 
     @property
-    def required_keys(self) -> list:
-        return ["semantic", "lighting", "superpixels"]
-
-    @property
     def output_keys(self) -> list:
         return ["semantic_url", "lighting_url", "data_url" "superpixels_url"]
 
