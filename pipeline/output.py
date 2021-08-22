@@ -15,9 +15,10 @@ surface_types = ["unknown", "floor", "wall", "horizontal", "vertical"]
 
 @abstract
 class PipelineOutput(PipelineStep):
-    def __init__(self, base_path):
+    def __init__(self, base_path, api_level=4):
         super().__init__()
         self.base_path = base_path
+        self.api_level = api_level
 
     @property
     def output_keys(self) -> list:
@@ -27,70 +28,89 @@ class PipelineOutput(PipelineStep):
     def make_url(self, path):
         return path
 
-    def _make_url(self, path):
-        return self.make_url("%s/%s" % (self.base_path, path))
-
     @protected
     def make_plane_mask_url(self, plane_index):
         return self.make_url("%s/plane_masks/mask_%d.png" % (self.unique_id, plane_index))
 
     def run(self, data):
+        data["api_level"] = self.api_level
         self.unique_id = data["unique_id"]
+        data["data_url"] = self.make_url("%s/data_v%d.json" % (self.unique_id, self.api_level))
 
-        key_semantic = "%s/mask.png" % self.unique_id
-        key_lighting = "%s/lighting.png" % self.unique_id
-        key_data = "%s/data.json" % self.unique_id
-        key_data_v2 = "%s/data_v2.json" % self.unique_id
-        key_data_v3 = "%s/data_v3.json" % self.unique_id
-        key_superpixels = "%s/superpixels.png" % self.unique_id
-        key_planes_index_mask = "%s/planes_index_mask.zz" % self.unique_id
-        key_planes_alpha_mask = "%s/planes_alpha_mask.png" % self.unique_id
+        if self.api_level == 1:
+            results = self.make_data_dict(data, self.make_url)
+        else:
+            filename = "lighting.png"
+            lighting_url = self.make_url("%s/%s" % (self.unique_id, filename))
+            self.save_image(data["lighting"], filename, lighting_url)
 
-        mask_image = data["mask"]
-        lighting_image = data["lighting"]
-        superpixels_image = data["superpixels"]
+            filename = "planes_index_mask.zz"
+            planes_index_url = self.make_url("%s/%s" % (self.unique_id, filename))
+            image = self.get_compressed_index_mask(data["planes_index_mask"])
+            self.save_image(image, filename, planes_index_url)
 
-        # json_dict = _make_data_dict(data, _make_url)
-        # data_v2_dict = _make_data_v2_dict(data,
-        #                                   _make_url(key_lighting),
-        #                                   _make_url(key_superpixels),
-        #                                   _make_url(key_semantic),
-        #                                   _make_url(key_planes_index_mask),
-        #                                   _make_url(key_planes_alpha_mask))
+            filename = "planes_alpha_mask.png"
+            planes_alpha_url = self.make_url("%s/%s" % (self.unique_id, filename))
+            self.save_image(data["planes_alpha_mask"], filename, fileurl)
 
-        data_v3_dict = self.make_data_v3_dict(data,
-                                              _make_url(key_lighting),
-                                              _make_url(key_superpixels),
-                                              _make_url(key_semantic),
-                                              _make_url(key_planes_index_mask),
-                                              _make_url(key_planes_alpha_mask))
+            if self.api_level < 4:
+                filename = "semantic.png"
+                semantic_url = self.make_url("%s/%s" % (self.unique_id, filename))
+                self.save_image(data["semantic"], filename, semantic_url)
 
-        data["semantic_url"] = _make_url(key_semantic)
-        data["lighting_url"] = _make_url(key_lighting)
-        # data["data_url"] = _make_url(key_data)
-        # data["data_v2_url"] = _make_url(key_data_v2)
-        data["data_v3_url"] = _make_url(key_data_v3)
-        data["superpixels_url"] = _make_url(key_superpixels)
+                
+
+            if self.api_level == 2:
+                results = self.make_data_v2_dict(
+                    data,
+                    lighting_path,
+                    self.make_url(key_superpixels),
+                    self.make_url(key_semantic),
+                    self.make_url(key_planes_index_mask),
+                    self.make_url(key_planes_alpha_mask)
+                )
+            elif self.api_level == 3:
+                results = self.make_data_v3_dict(
+                    data,
+                    lighting_path,
+                    self.make_url(key_superpixels),
+                    self.make_url(key_semantic),
+                    self.make_url(key_planes_index_mask),
+                    self.make_url(key_planes_alpha_mask)
+                )
+            else:
+                results = self.make_data_v4_dict(
+                    data,
+                    self.make_url(key_lighting),
+                    self.make_url(key_superpixels),
+                    self.make_url(key_semantic),
+                    self.make_url(key_planes_index_mask),
+                    self.make_url(key_planes_alpha_mask)
+                )
+
+        #data["semantic_url"] = self.make_url(key_semantic)
+        #data["lighting_url"] = self.make_url(key_lighting)
+
+        # data["data_url"] = self.make_url(key_data)
+        # data["data_v2_url"] = self.make_url(key_data_v2)
+        
+        #data["superpixels_url"] = self.make_url(key_superpixels)
 
         # Upload to S3 or write to local folder if local dir is set.
-        self.s3_client.upload_image_to_s3(mask_image, self.base_path, key_semantic)
-        self.s3_client.upload_image_to_s3(lighting_image, self.base_path, key_lighting)
-        self.s3_client.upload_json_to_s3(data_v3_dict, self.base_path, key_data_v3)
-        self.s3_client.upload_image_to_s3(superpixels_image, self.base_path, key_superpixels)
-
+        
         if "planes_alpha_mask" in data:
-            self.s3_client.upload_image_to_s3(data["planes_alpha_mask"], self.base_path, key_planes_alpha_mask)
+            self.save_image(data["planes_alpha_mask"], self.base_path, key_planes_alpha_mask)
 
         if "planes_index_mask" in data:
             compressed_index_mask = self.get_compressed_index_mask(data["planes_index_mask"])
-            self.s3_client.upload_bytes_to_s3(compressed_index_mask, self.base_path, key_planes_index_mask)
+            self.save_image(compressed_index_mask, self.base_path, key_planes_index_mask)
 
         if "planes" in data:
             for i, plane_mask in enumerate(data["planes"]["masks"]):
-                self.s3_client.upload_image_to_s3(plane_mask, self.base_path, "%s/plane_masks/mask_%d.png" % (self.unique_id, i))
+                self.save_image(plane_mask, self.base_path, "%s/plane_masks/mask_%d.png" % (self.unique_id, i))
         
     @abstractmethod
-    def save_image(filename, image):
+    def save_image(image, filename):
         print("Nothing to do")
 
 
@@ -218,6 +238,40 @@ class PipelineOutput(PipelineStep):
 
 
     def make_data_v3_dict(self, data, lighting_url, superpixels_url, semantic_url, planes_index_mask_url, planes_alpha_mask_url):
+        all_plane_data = data["planes"]["detection"].tolist(
+        ) if "planes" in data else []
+
+        contour_plane_data = data["planes"]["contours"] if "planes" in data else []
+
+        return {
+            "formatVersion": 3,
+            "name": "Room %s" % self.unique_id,
+            "id": "room-%s" % self.unique_id,
+            "floorRotation": data["floor_rotation"],
+            "images": {
+                "lighting": lighting_url,
+                "superpixels": superpixels_url,
+                "semantic": semantic_url,
+                "planes_alpha_mask": planes_alpha_mask_url
+            },
+            "compressed": {
+                "planes_index_mask": planes_index_mask_url,
+            },
+            "camera": {
+                "fov": data["fov"],
+                "position": [0, 0, 0],  # Planes are relative to camera so the
+                "rotation": [0, 0, 0]  # camera is all zeros.
+            },
+            "geometry": {
+                "surfaces": [
+                    self.encode_plane_surface_v3(i, plane_data, contour_data, self.make_plane_mask_url(i)) for i, (plane_data, contour_data
+                                                                                    ) in enumerate(zip(all_plane_data, contour_plane_data))
+                ]
+            },
+            "assets": []
+        }
+
+    def make_data_v4_dict(self, data, lighting_url, semantic_url, planes_index_mask_url, planes_alpha_mask_url):
         all_plane_data = data["planes"]["detection"].tolist(
         ) if "planes" in data else []
 

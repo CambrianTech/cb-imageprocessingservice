@@ -8,9 +8,8 @@ except:
     from scipy.misc import imread, imsave
 
 class S3Client:
-    def __init__(self, base_url="https://s3.amazonaws.com"):
+    def __init__(self):
         super().__init__()
-        self.base_url = base_url
         self.s3_client = boto3.client("s3")
 
     def get_image_from_s3(self, bucket: str, key: str) -> np.ndarray:
