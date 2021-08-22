@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from io import BytesIO
 try:
     from imageio import imsave
@@ -13,7 +14,6 @@ from pipeline.core import PipelineStep
 
 surface_types = ["unknown", "floor", "wall", "horizontal", "vertical"]
 
-@abstract
 class PipelineOutput(PipelineStep):
     def __init__(self, base_path, outfile_name="data.json", api_level=3):
         super().__init__()
@@ -42,11 +42,9 @@ class PipelineOutput(PipelineStep):
 
         return ["api_level", "data_url"]
 
-    @protected
     def make_url(self, path):
         return path
 
-    @protected
     def make_plane_mask_url(self, plane_index):
         return self.make_url("%s/plane_masks/mask_%d.png" % (self.unique_id, plane_index))
 
@@ -101,11 +99,11 @@ class PipelineOutput(PipelineStep):
 
     @abstractmethod
     def save_image(self, image, filename, url):
-        print("Nothing to do")
+        return
 
     @abstractmethod
     def save_data(self, data, filename, url):
-        print("Nothing to do")    
+        return
 
     def make_data_dict(self, data):
         return {

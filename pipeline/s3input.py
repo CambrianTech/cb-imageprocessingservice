@@ -1,5 +1,5 @@
 from pipeline.input import PipelineInput
-from pipeline.s3Client import S3Client
+from pipeline.s3client import S3Client
 try:
     from imageio import imread
 except:

@@ -1,7 +1,7 @@
+import abc
 from pipeline.core import PipelineStep
 
-@abstract
-class PipelineInput(PipelineStep):
+class PipelineInput(PipelineStep, metaclass=abc.ABCMeta):
     def __init__(self, base_path):
         super().__init__()
         self.base_path = base_path

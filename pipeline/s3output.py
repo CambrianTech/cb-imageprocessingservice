@@ -9,6 +9,7 @@ import os
 import json
 import zlib
 
+from pipeline.s3client import S3Client
 from pipeline.output import PipelineOutput
 
 class PipelineS3Output(PipelineOutput):

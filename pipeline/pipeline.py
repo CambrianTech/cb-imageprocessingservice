@@ -38,6 +38,7 @@ class PipelineStepIndex(IntEnum):
     Superpixels = 6
     RefinePlaneMasks = 7
     CombinePlaneMasks = 8
+    Output = 9
 
 
 class Pipeline():
@@ -70,7 +71,7 @@ class Pipeline():
         # Create the steps we want to use in the pipelines
         if self.mode == PipelineMode.Serve:
             s3Client = S3Client()
-             self.steps = [
+            self.steps = [
                 PipelineS3Input(self.src_path, s3Client),
                 PipelineRemoteNetworks(self.remote_path),
                 PipelineCalculateFov(self.fov_model_path),
@@ -94,7 +95,7 @@ class Pipeline():
                 PipelineDeterminePrimaryAngles(),
                 PipelineSuperpixels(),
                 PipelineRefinePlaneMasks(),
-                PipelineCombinePlaneMasks()
+                PipelineCombinePlaneMasks(),
                 PipelineFileOutput(self.dest_path, s3Client)
             ]
 

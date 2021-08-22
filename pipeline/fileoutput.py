@@ -10,10 +10,9 @@ import json
 import zlib
 from pathlib import Path
 
-from pipeline.core import PipelineStep
+from pipeline.output import PipelineOutput
 
-@abstract
-class PipelineFileOutput(PipelineStep):
+class PipelineFileOutput(PipelineOutput):
     def __init__(self, base_path):
         super().__init__(base_path)
 
