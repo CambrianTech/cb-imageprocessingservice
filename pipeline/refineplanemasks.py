@@ -355,76 +355,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         return all_lines
 
-    def _refine_surfaces(self, data, isolated, line_data, img_lr, hed_lr, sx, sy):
-        other_markers = np.int32(
-            refine_surface(isolated[SemanticKey.Other], img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.03, gradient=False))
-
-        wall_markers = np.int32(
-            refine_surface(isolated[SemanticKey.Wall], hed_lr, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True))
-
-        floor_markers = np.int32(
-            refine_surface(isolated[SemanticKey.Floor], img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
-
-        wall_like_markers = np.int32(
-            refine_surface(isolated[SemanticKey.WallLike], img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
-
-        ceiling_markers = np.int32(
-            refine_surface(isolated[SemanticKey.Ceiling], hed_lr, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True))
-
-        ceiling_prob = get_segmentation_image(ceiling_markers + 1, isolated[SemanticKey.Ceiling], avg=True)
-        wall_like_prob = get_segmentation_image(wall_like_markers + 1, isolated[SemanticKey.WallLike], avg=True)
-        wall_like_prob[wall_like_prob < .25] = 0
-        wall_prob = get_segmentation_image(wall_markers + 1, isolated[SemanticKey.Wall], avg=True)
-
-        ade_skel = skeletonize(isolated[SemanticKey.Other] > .5)
-        isolated[SemanticKey.Floor][ade_skel > 0] = 0
-        floor_prob = get_segmentation_image(floor_markers + 1, isolated[SemanticKey.Floor], avg=True)
-        floor_prob[floor_prob < .25] = 0
-        floor_markers[floor_prob < .25] = 100
-        other_markers = join_segmentations(floor_markers, other_markers)
-
-        isolated[SemanticKey.Other][ade_skel > 0] = 1
-        other_prob = get_segmentation_image(other_markers + 1, isolated[SemanticKey.Other], avg=True)
-
-        if im_logging_enabled(data, LogLevel.Images):
-            log_image(data, "floor_markers", 255. * floor_prob)
-            log_image(data, "other_markers", 255. * other_prob)
-            log_image(data, "ceiling_markers", 255. * ceiling_prob)
-            log_image(data, "wall_like_markers", 255. * wall_like_prob)
-            log_image(data, "wall_markers", 255. * wall_prob)
-
-        segmentation_initial = np.int32(np.argmax(np.dstack(
-            (.05 * np.ones_like(isolated[SemanticKey.Other]), other_prob, floor_prob, wall_prob, ceiling_prob, wall_like_prob)), -1))
-
-        segmentation_initial[np.logical_and(segmentation_initial == 3, wall_prob < .5)] = 6
-        m = np.logical_and(segmentation_initial == 2, other_prob > .5)
-        segmentation_initial[m] = 1
-
-
-        for i in range(1, 7):
-            pruned = remove_small_objects(segmentation_initial == i, min_size=32)
-            segmentation_initial[np.logical_and(segmentation_initial == i, pruned == 0)] = 0
-
-        line_mask = Line.draw_all(line_data,
-                                  np.zeros((segmentation_initial.shape[0], segmentation_initial.shape[1])),
-                                  color=255,
-                                  thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
-
-        segmentation_initial = watershed(hed_lr, segmentation_initial,
-                                         mask=line_mask == 0)
-        segmentation_initial = cv2.watershed(img_lr, segmentation_initial)
-
-        segmentation_initial[line_mask > 0] = 0
-        distances = cv2.distanceTransform(np.uint8(line_mask), cv2.DIST_L1, 3)
-
-        distances = np.uint8(distances)
-        segmentation_initial = cv2.watershed(cv2.cvtColor(np.uint8(distances), cv2.COLOR_GRAY2BGR),
-                                             segmentation_initial)
-
-        log_segmentation_image(data, "segmentation_initial", segmentation_initial, img_lr)
-
-        return segmentation_initial
-
     # Create fan from vertical vp
     def fan_surfaces(self, data, img_lr, locations, vp0, sure_walls, wall_mask, normals_c):
 
@@ -527,9 +457,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
         #get labeled lines image
         all_lines = self._get_lines_image(data, img_lr, lines, sx, sy)
 
+        #draw lines in BW
+        merged_lines = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
+        Line.draw_all(line_data, merged_lines, color=255, thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
+
         if im_logging_enabled(data, LogLevel.Segmentation):
-            merged_lines = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
-            Line.draw_all(line_data, merged_lines, color=255, thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
             l_image_rgb = img_lr.copy()
             l_image_rgb[merged_lines > 0] = 255
             log_segmentation_image(data, "l_image", all_lines, img_lr)
@@ -544,9 +476,84 @@ class PipelineRefinePlaneMasks(PipelineStep):
         
 
         ######################################## Initial refinement work
-        sure_walls = segmentation_initial = self._refine_surfaces(data, isolated, line_data, img_lr, hed_lr, sx, sy)
+        w_mask = (merged_lines == 0)
 
-        
+        def refine_surfaces():
+            other_markers = np.int32(
+                refine_surface(isolated[SemanticKey.Other], img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.03, gradient=False))
+
+            wall_markers = np.int32(
+                refine_surface(isolated[SemanticKey.Wall], hed_lr, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=w_mask))
+
+            floor_markers = np.int32(
+                refine_surface(isolated[SemanticKey.Floor], img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
+
+            wall_like_markers = np.int32(
+                refine_surface(isolated[SemanticKey.WallLike], img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
+
+            ceiling_markers = np.int32(
+                refine_surface(isolated[SemanticKey.Ceiling], hed_lr, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=w_mask))
+
+            ceiling_prob = get_segmentation_image(ceiling_markers + 1, isolated[SemanticKey.Ceiling], avg=True)
+            wall_like_prob = get_segmentation_image(wall_like_markers + 1, isolated[SemanticKey.WallLike], avg=True)
+            wall_like_prob[wall_like_prob < .25] = 0
+            wall_prob = get_segmentation_image(wall_markers + 1, isolated[SemanticKey.Wall], avg=True)
+
+            ade_skel = skeletonize(isolated[SemanticKey.Other] > .5)
+            isolated[SemanticKey.Floor][ade_skel > 0] = 0
+            floor_prob = get_segmentation_image(floor_markers + 1, isolated[SemanticKey.Floor], avg=True)
+            floor_prob[floor_prob < .25] = 0
+            floor_markers[floor_prob < .25] = 100
+            other_markers = join_segmentations(floor_markers, other_markers)
+
+            isolated[SemanticKey.Other][ade_skel > 0] = 1
+            other_prob = get_segmentation_image(other_markers + 1, isolated[SemanticKey.Other], avg=True)
+
+            if im_logging_enabled(data, LogLevel.Images):
+                log_image(data, "floor_markers", 255. * floor_prob)
+                log_image(data, "other_markers", 255. * other_prob)
+                log_image(data, "ceiling_markers", 255. * ceiling_prob)
+                log_image(data, "wall_like_markers", 255. * wall_like_prob)
+                log_image(data, "wall_markers", 255. * wall_prob)
+
+            segmentation_initial = np.int32(np.argmax(np.dstack(
+                (.05 * np.ones_like(isolated[SemanticKey.Other]), other_prob, floor_prob, wall_prob, ceiling_prob, wall_like_prob)), -1))
+
+            segmentation_initial[np.logical_and(segmentation_initial == 3, wall_prob < .5)] = 6
+            m = np.logical_and(segmentation_initial == 2, other_prob > .5)
+            segmentation_initial[merged_lines > 0] = 0
+            segmentation_initial[m] = 1
+
+
+            for i in range(1, 7):
+                pruned = remove_small_objects(segmentation_initial == i, min_size=32)
+                segmentation_initial[np.logical_and(segmentation_initial == i, pruned == 0)] = 0
+
+            line_mask = Line.draw_all(line_data,
+                                      np.zeros((segmentation_initial.shape[0], segmentation_initial.shape[1])),
+                                      color=255,
+                                      thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
+
+            segmentation_initial = watershed(hed_lr, segmentation_initial,
+                                             mask=line_mask == 0)
+            segmentation_initial = cv2.watershed(img_lr, segmentation_initial)
+
+            segmentation_initial[line_mask > 0] = 0
+            distances = cv2.distanceTransform(np.uint8(line_mask), cv2.DIST_L1, 3)
+
+            distances = np.uint8(distances)
+            segmentation_initial = cv2.watershed(cv2.cvtColor(np.uint8(distances), cv2.COLOR_GRAY2BGR),
+                                                 segmentation_initial)
+
+            log_segmentation_image(data, "segmentation_initial", segmentation_initial, img_lr)
+
+
+            return segmentation_initial
+            #############################################################
+
+        segmentation_initial = refine_surfaces()
+        sure_walls = (segmentation_initial == ADE20K.floor.index)
+
         fov_estimator = FovEstimator(data, img, lines, data["fov"], isolated[SemanticKey.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
         fov_estimator.estimate(shape)
 

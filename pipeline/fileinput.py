@@ -17,10 +17,6 @@ class PipelineFileInput(PipelineInput):
 
         path = Path(data["path"])
 
-        print("\n\n\n\n\n\n\n\nPath\n", path)
-        print("\n\n\n\n\n\n\n\n")
-        
-
         if path.suffix == ".pickle":
             print("Reading data from", path)
             with open(path, 'rb') as handle:
