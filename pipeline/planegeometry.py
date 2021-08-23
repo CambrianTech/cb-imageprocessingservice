@@ -1,3 +1,4 @@
+import abc
 import cv2
 import numpy as np
 from scipy import ndimage
@@ -19,8 +20,7 @@ class Dimension(IntEnum):
     Horizontal = 0
     Vertical = 1
 
-#@abstract
-class PlanarDimension:
+class PlanarDimension(metaclass=abc.ABCMeta):
     def __init__(self, indices, angles):
         self.indices = indices
         self.angles = angles
