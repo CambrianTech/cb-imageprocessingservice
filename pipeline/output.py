@@ -9,17 +9,20 @@ import numpy as np
 import os
 import json
 import zlib
+import cv2
 
 from pipeline.core import PipelineStep
 
 surface_types = ["unknown", "floor", "wall", "horizontal", "vertical"]
 
 class PipelineOutput(PipelineStep):
-    def __init__(self, base_path, outfile_name="data.json", api_level=3):
+    def __init__(self, base_path, outfile_name="data.json", api_level=3, preview_size=1024, thumbnail_size=320):
         super().__init__()
         self.base_path = base_path
         self.outfile_name = outfile_name
         self.api_level = api_level
+        self.preview_size = preview_size
+        self.thumbnail_size = thumbnail_size
 
     @property
     def required_keys(self) -> list:
@@ -42,64 +45,81 @@ class PipelineOutput(PipelineStep):
 
         return ["api_level", "data_url"]
 
-    def make_url(self, path):
-        return path
+    def make_url(self, filename, directory=None):
+        if directory is None:
+            return filename
+        return os.path.join(directory, filename)
 
     def make_plane_mask_url(self, plane_index):
-        return self.make_url("%s/plane_masks/mask_%d.png" % (self.unique_id, plane_index))
+        return self.make_url("mask_%d.png" % plane_index, "plane_masks")
 
     def run(self, data):
         self.unique_id = data["unique_id"]
 
         data["api_level"] = self.api_level
-        data["data_url"] = self.make_url("%s/%s" % (self.unique_id, self.outfile_name))
+        data["data_url"] = self.make_url(self.outfile_name)
+
+        filename = "background.jpg"
+        image_url = self.make_url(filename)
+        self.save_image(data["image"], filename, image_url)
+
+        def scale_to_constraint(image, size, interpolation=cv2.INTER_AREA):
+            scale = min(size / image.shape[0], size / image.shape[1])
+            return cv2.resize(image, (int(scale * image.shape[1]), int(scale * image.shape[0])), interpolation)
+
+        filename = "preview.jpg"
+        preview_url = self.make_url(filename)
+        self.save_image(scale_to_constraint(data["image"], self.preview_size), filename, preview_url)
+
+        filename = "thumbnail.jpg"
+        thumbnail_url = self.make_url(filename)
+        self.save_image(scale_to_constraint(data["image"], self.thumbnail_size), filename, thumbnail_url)
 
         if self.api_level == 1:
             filename = "mask.png"
-            mask_url = self.make_url("%s/%s" % (self.unique_id, filename))
+            mask_url = self.make_url(filename)
             self.save_image(data["mask"], filename, mask_url)
-            results = self.make_data_dict(data, self.make_url)
+            results = self.make_data_dict(data)
         else:
             filename = "lighting.png"
-            lighting_url = self.make_url("%s/%s" % (self.unique_id, filename))
+            lighting_url = self.make_url(filename)
             self.save_image(data["lighting"], filename, lighting_url)
             data["lighting_url"] = lighting_url
 
             if self.api_level == 2 or self.api_level == 3:
-                data["data_url"] = self.make_url("%s/data_v%d.json" % (self.unique_id, self.api_level))
+                #data["data_url"] = self.make_url("%s/data_v%d.json" % (self.unique_id, self.api_level))
                 filename = "superpixels.png"
-                superpixels_url = self.make_url("%s/%s" % (self.unique_id, filename))
+                superpixels_url = self.make_url(filename)
                 self.save_image(data["superpixels"], filename, superpixels_url)
                 data["superpixels_url"] = self.make_url(superpixels_url)
 
                 if "planes" in data:
                     for i, plane_mask in enumerate(data["planes"]["masks"]):
-                        filename = "plane_masks/mask_%d.png" % i
-                        mask_url = self.make_url("%s/%s" % (self.unique_id, filename))
+                        mask_url = self.make_plane_mask_url(i)
                         self.save_image(plane_mask, filename, mask_url)
 
                 if self.api_level == 2:
-                    results = self.make_data_v2_dict(data, lighting_url, superpixels_url)
+                    results = self.make_data_v2_dict(data, image_url, lighting_url, superpixels_url)
                 elif self.api_level == 3:
-                    results = self.make_data_v3_dict(data, lighting_url, superpixels_url)
+                    results = self.make_data_v3_dict(data, image_url, lighting_url, superpixels_url)
             else:
 
                 filename = "planes_index_mask.zz"
-                planes_index_mask_url = self.make_url("%s/%s" % (self.unique_id, filename))
+                planes_index_mask_url = self.make_url(filename)
                 image = self.get_compressed_index_mask(data["planes_index_mask"])
                 self.save_image(image, filename, planes_index_mask_url)
 
                 filename = "planes_alpha_mask.png"
-                planes_alpha_mask_url = self.make_url("%s/%s" % (self.unique_id, filename))
+                planes_alpha_mask_url = self.make_url(filename)
                 self.save_image(data["planes_alpha_mask"], filename, planes_alpha_mask_url)
 
-                results = self.make_data_v4_dict(data, lighting_url, planes_index_mask_url, planes_alpha_mask_url)
+                results = self.make_data_v4_dict(data, image_url, lighting_url, planes_index_mask_url, planes_alpha_mask_url)
 
         results["data_url"] = data["data_url"]
         self.save_data(results, self.outfile_name, data["data_url"])
 
     @abstractmethod
-    def save_image(self, image, filename, url):
+    def save_image(self, image, filename, url, quality=None):
         return
 
     @abstractmethod
@@ -152,7 +172,7 @@ class PipelineOutput(PipelineStep):
         }
 
 
-    def make_data_v2_dict(self, data, lighting_url, superpixels_url):
+    def make_data_v2_dict(self, data, image_url, lighting_url, superpixels_url):
         all_plane_data = data["planes"]["detection"].tolist(
         ) if "planes" in data else []
 
@@ -162,6 +182,7 @@ class PipelineOutput(PipelineStep):
             "id": "room-%s" % self.unique_id,
             "floorRotation": data["floor_rotation"],
             "images": {
+                "main": image_url,
                 "lighting": lighting_url,
                 "superpixels": superpixels_url
             },
@@ -219,7 +240,7 @@ class PipelineOutput(PipelineStep):
         }
 
 
-    def make_data_v3_dict(self, data, lighting_url, superpixels_url):
+    def make_data_v3_dict(self, data, image_url, lighting_url, superpixels_url):
         all_plane_data = data["planes"]["detection"].tolist(
         ) if "planes" in data else []
 
@@ -231,6 +252,7 @@ class PipelineOutput(PipelineStep):
             "id": "room-%s" % self.unique_id,
             "floorRotation": data["floor_rotation"],
             "images": {
+                "main": image_url,
                 "lighting": lighting_url,
                 "superpixels": superpixels_url,
             },
@@ -248,7 +270,7 @@ class PipelineOutput(PipelineStep):
             "assets": []
         }
 
-    def make_data_v4_dict(self, data, lighting_url, planes_index_mask_url, planes_alpha_mask_url):
+    def make_data_v4_dict(self, data, image_url, lighting_url, planes_index_mask_url, planes_alpha_mask_url):
         all_plane_data = data["planes"]["detection"].tolist(
         ) if "planes" in data else []
 
@@ -259,6 +281,7 @@ class PipelineOutput(PipelineStep):
             "name": "Room %s" % self.unique_id,
             "id": self.unique_id,
             "images": {
+                "main": image_url,
                 "lighting": lighting_url,
                 "planes_alpha_mask": planes_alpha_mask_url
             },
