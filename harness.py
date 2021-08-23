@@ -8,7 +8,7 @@ import time
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-from pipeline.buildpipeline import Pipeline, PipelineMode, PipelineStepIndex
+from pipeline.pipeline import Pipeline, PipelineMode, PipelineStepIndex
 from pipeline.logging import LogLevel
 
 def get_file_paths(input_dir, pattern=None):
@@ -38,6 +38,9 @@ async def process_files(pipeline, input_dir, pattern):
     return len(files)
 
 
+#For instance, to restore from step 7 (after refinement):
+#python -W ignore harness.py data --restore=7
+
 @click.command()
 @click.argument("input_dir", default='test_images', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("output_dir", default='output', type=click.Path(exists=False, file_okay=False, dir_okay=True))
@@ -65,7 +68,7 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     loop = asyncio.get_event_loop()
     loop.set_default_executor(ThreadPoolExecutor())
 
-    pipeline = Pipeline(mode, restore_step=restore_step, export_step=export_step, logging_dir=logging_dir, logging_level=log_level, logging_step=logging_step, \
+    pipeline = Pipeline(mode, src_path=input_dir, dest_path=output_dir, restore_step=restore_step, export_step=export_step, logging_dir=logging_dir, logging_level=log_level, logging_step=logging_step, \
                         model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
     pipeline.start()
 

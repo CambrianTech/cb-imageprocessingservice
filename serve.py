@@ -14,7 +14,7 @@ import aiohttp_cors
 import boto3
 import requests
 
-from pipeline.buildpipeline import Pipeline, PipelineMode
+from pipeline.pipeline import Pipeline, PipelineMode
 
 def _get_instance_metadata():
     metadata = {}
@@ -72,8 +72,8 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
         semantic_model_path=semantic_model_path, 
         fov_model_path=fov_model_path, 
         planes_url=plane_url, 
-        bucket_source=user_uploads_bucket, 
-        bucket_dest=results_bucket,
+        src_path=user_uploads_bucket, 
+        dest_path=results_bucket,
         logging_dir=logging_dir, 
         logging_level=log_level, 
         logging_step=logging_step
