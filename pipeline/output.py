@@ -69,11 +69,11 @@ class PipelineOutput(PipelineStep):
 
         filename = "preview.jpg"
         preview_url = self.make_url(filename)
-        self.save_image(scale_to_constraint(data["image"], self.preview_size), filename, preview_url)
+        self.save_image(scale_to_constraint(data["image"], self.preview_size), filename, preview_url, 70)
 
         filename = "thumbnail.jpg"
         thumbnail_url = self.make_url(filename)
-        self.save_image(scale_to_constraint(data["image"], self.thumbnail_size), filename, thumbnail_url)
+        self.save_image(scale_to_constraint(data["image"], self.thumbnail_size), filename, thumbnail_url, 60)
 
         if self.api_level == 1:
             filename = "mask.png"
