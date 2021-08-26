@@ -419,6 +419,35 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         return labels_fan, fan_normals_reduced, normals_wall
 
+    def transfer_labels(self, data, final_labels, final_plane_number, final_plane_parameters):
+        data["planes"]["masks"] = np.zeros((final_plane_number, final_labels.shape[0], final_labels.shape[1]),
+                                           dtype=np.uint8)
+
+        data["planes"]["detection"] = np.zeros((final_plane_number, 11), dtype=data["planes"]["detection"].dtype)
+        data["planes"]["detection"] = final_plane_parameters
+        # data["planes"]["rotation"] = final_rotations
+
+        for d in range(final_plane_number):
+            contours, hierarchy = cv2.findContours(np.uint8(final_labels == d + 2), cv2.RETR_TREE,
+                                                   cv2.CHAIN_APPROX_SIMPLE)
+
+            data["planes"]["masks"][d] = np.zeros_like(np.uint8(final_labels == d + 2))
+
+            if len(contours) > 0:
+
+                for i in range(len(contours)):
+                    area = cv2.contourArea(contours[i])
+
+                    if area > 4 * 16 * 16:
+                        if hierarchy[0, i, 3] == -1:  # this is the outer contour which we need to draw
+                            cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, -1, cv2.LINE_AA)
+                        else:
+                            cv2.drawContours(data["planes"]["masks"][d], contours, i, 0, -1)
+
+                data["planes"]["detection"][d, 0:4] = [0, 0, 0, 0]
+
+        
+
 
     def run(self, data):
 
@@ -890,57 +919,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
         final_labels_hr[final_labels_hr < 0] = 0
         final_labels = np.int32(final_labels_hr)
 
-        data["planes"]["masks"] = np.zeros((final_plane_number, final_labels.shape[0], final_labels.shape[1]),
-                                           dtype=np.uint8)
-
-        data["planes"]["detection"] = np.zeros((final_plane_number, 11), dtype=data["planes"]["detection"].dtype)
-        data["planes"]["detection"] = final_plane_parameters
-        # data["planes"]["rotation"] = final_rotations
-
-        mask_contours = []
-
-        for d in range(final_plane_number):
-            contours, hierarchy = cv2.findContours(np.uint8(final_labels == d + 2), cv2.RETR_TREE,
-                                                   cv2.CHAIN_APPROX_SIMPLE)
-
-            data["planes"]["masks"][d] = np.zeros_like(np.uint8(final_labels == d + 2))
-
-            plane_contours = []
-
-            if len(contours) > 0:
-
-                for i in range(len(contours)):
-                    area = cv2.contourArea(contours[i])
-
-                    if area > 4 * 16 * 16:
-                        if hierarchy[0, i, 3] == -1:  # this is the outer contour which we need to draw
-                            cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, -1, cv2.LINE_AA)
-                            # cv2.drawContours(data["planes"]["masks"][d], [contours[i]], -1, 255, 4,cv2.LINE_AA)
-                            # cv2.drawContours(final_labels, [contours[i]], -1, d + 2, -1, cv2.LINE_AA)
-                            # cv2.drawContours(final_labels, [contours[i]], -1, d + 2, 4, cv2.LINE_AA)
-                            plane_contours.append(np.array([[[0, 0]]]).tolist())
-
-                        else:
-                            cv2.drawContours(data["planes"]["masks"][d], contours, i, 0, -1)
-
-                # rect = cv2.boundingRect(data["planes"]["masks"][d])
-
-                data["planes"]["detection"][d, 0:4] = [
-                    0, 0, 0, 0
-                ]
-
-            mask_contours.append(plane_contours)
-
-            data["planes"]["contours"] = mask_contours
-
-        # get rid of this later
-        data["mask"] = np.zeros_like(data["planes"]["masks"][0])
-        if len(data["planes"]["masks"]) > 2:
-            data["mask"] = data["planes"]["masks"][-2]
+        self.transfer_labels(data, final_labels, final_plane_number, final_plane_parameters)
 
         if im_logging_enabled(data, LogLevel.Segmentation):
             log_segmentation_image(data, "final_labels", np.int32(final_labels) - 1, img)
-
-
 
 

@@ -201,7 +201,7 @@ class PipelineOutput(PipelineStep):
         }
 
 
-    def encode_plane_surface_v3(self, plane_index, plane_data, contour_data, mask_url):
+    def encode_plane_surface_v3(self, plane_index, plane_data, mask_url):
         # https://github.com/NVlabs/planercnn#plane-representation
         # In this project, plane parameters are of absolute scale (in terms of meters).
         # Each plane has three parameters, which equal to plane_normal * plane_offset.
@@ -235,16 +235,13 @@ class PipelineOutput(PipelineStep):
             "imageExtents": plane_image_extents,
             "images": {
                 "mask": mask_url
-            },
-            "contours": contour_data
+            }
         }
 
 
     def make_data_v3_dict(self, data, image_url, lighting_url, superpixels_url):
         all_plane_data = data["planes"]["detection"].tolist(
         ) if "planes" in data else []
-
-        contour_plane_data = data["planes"]["contours"] if "planes" in data else []
 
         return {
             "formatVersion": 3,
@@ -263,8 +260,7 @@ class PipelineOutput(PipelineStep):
             },
             "geometry": {
                 "surfaces": [
-                    self.encode_plane_surface_v3(i, plane_data, contour_data, self.make_plane_mask_url(i)) for i, (plane_data, contour_data
-                                                                                    ) in enumerate(zip(all_plane_data, contour_plane_data))
+                    self.encode_plane_surface_v3(i, plane_data, self.make_plane_mask_url(i)) for i, (plane_data) in enumerate(all_plane_data)
                 ]
             },
             "assets": []
@@ -273,8 +269,6 @@ class PipelineOutput(PipelineStep):
     def make_data_v4_dict(self, data, image_url, lighting_url, planes_index_mask_url, planes_alpha_mask_url):
         all_plane_data = data["planes"]["detection"].tolist(
         ) if "planes" in data else []
-
-        contour_plane_data = data["planes"]["contours"] if "planes" in data else []
 
         return {
             "formatVersion": 3,
@@ -295,8 +289,7 @@ class PipelineOutput(PipelineStep):
             },
             "geometry": {
                 "surfaces": [
-                    self.encode_plane_surface_v3(i, plane_data, contour_data, self.make_plane_mask_url(i)) for i, (plane_data, contour_data
-                                                                                    ) in enumerate(zip(all_plane_data, contour_plane_data))
+                   self.encode_plane_surface_v3(i, plane_data, self.make_plane_mask_url(i)) for i, (plane_data) in enumerate(all_plane_data)
                 ]
             },
             "assets": []
