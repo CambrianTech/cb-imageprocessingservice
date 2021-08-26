@@ -323,21 +323,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         return isolated
 
-    def _get_lines_image(self, data, img, lines, sx, sy):
-        all_lines = np.int32(np.zeros((img.shape[0], img.shape[1])))
-        l = 1
-
-        for line in lines:
-            for x1, y1, x2, y2 in line:
-                x1 = int(sx * x1)
-                x2 = int(sx * x2)
-                y1 = int(sy * y1)
-                y2 = int(sy * y2)
-                cv2.line(all_lines, (x1, y1), (x2, y2), l, thickness=2, lineType=cv2.LINE_8)
-                l += 1
-
-        return all_lines
-
     # Create fan from vertical vp
     def fan_surfaces(self, data, img_lr, locations, vp0, sure_walls, wall_mask, normals_c):
 
@@ -460,23 +445,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         #break masks into major groups: Floor, Wall, Ceiling, etc
         isolated = self._isolate_masks(data, output)
         
-        #get lines
-        line_data, lines = find_lines(img, cv2.resize(hed, (img.shape[1], img.shape[0])), data["normals"])
-
-        #get labeled lines image
-        all_lines = self._get_lines_image(data, img_lr, lines, sx, sy)
-
-        #draw lines in BW
-        merged_lines = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
-        Line.draw_all(line_data, merged_lines, color=255, thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
-
-        if im_logging_enabled(data, LogLevel.Segmentation):
-            l_image_rgb = img_lr.copy()
-            l_image_rgb[merged_lines > 0] = 255
-            log_segmentation_image(data, "l_image", all_lines, img_lr)
-            log_image(data, "l_image_rgb", l_image_rgb)
-
-
         plane_geometry = PlaneGeometry(data, isolated, img_lr, shape)
         plane_geometry.process()
 
@@ -485,7 +453,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
         
 
         ######################################## Initial refinement work
-        refiner = SurfaceRefinement(img_lr, hed_lr, line_data, merged_lines, isolated)
+        line_data, lines = find_lines(data["image"], cv2.resize(hed_lr, (data["image"].shape[1], data["image"].shape[0])), data["normals"])
+
+        refiner = SurfaceRefinement(img_lr, hed_lr, isolated, line_data, lines)
         segmentation_initial = refiner.refine(data, sx, sy)
         sure_walls = (segmentation_initial == ADE20K.floor.index)
 
@@ -500,7 +470,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         labels_fan, fan_normals_reduced, normals_wall = self.fan_surfaces(data, img_lr, fov_estimator.edgelets[0], fov_estimator.vp0, sure_walls, isolated[SemanticKey.Wall], plane_geometry.normals_c)
 
-        vl_image = np.zeros_like(all_lines)
+        vl_image = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
         vl_image[sure_walls == 0] = 0
 
         ade_seg_c = np.dstack(

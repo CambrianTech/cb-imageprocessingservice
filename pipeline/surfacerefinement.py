@@ -12,17 +12,31 @@ from skimage.segmentation import join_segmentations, watershed
 
 
 class SurfaceRefinement():
-    def __init__(self, image, hed, line_data, merged_lines, masks):
+    def __init__(self, image, hed, masks, line_data, lines):
         super().__init__()
         self.image = image
         self.hed = hed
-        self.line_data = line_data
-        self.merged_lines = merged_lines
-        self.watershed_mask = (merged_lines == 0)
         self.masks = masks
+        self.line_data = line_data
+        self.lines = lines
+
+    def _get_lines_image(self, data, img, lines, sx, sy):
+        all_lines = np.int32(np.zeros((img.shape[0], img.shape[1])))
+        l = 1
+
+        for line in lines:
+            for x1, y1, x2, y2 in line:
+                x1 = int(sx * x1)
+                x2 = int(sx * x2)
+                y1 = int(sy * y1)
+                y2 = int(sy * y2)
+                cv2.line(all_lines, (x1, y1), (x2, y2), l, thickness=2, lineType=cv2.LINE_8)
+                l += 1
+
+        return all_lines
         
 
-    def refine_surface(self, mask, image, big_thresh=.03, small_thresh=.97, watershed_dist=.05, watershed_mask=None, gradient=True):
+    def _refine_surface(self, mask, image, big_thresh=.03, small_thresh=.97, watershed_dist=.05, watershed_mask=None, gradient=True):
         small = ip.refine_mask_watershed(None, image, np.uint8(mask > small_thresh), None, distance=watershed_dist, gradient=gradient,
                                        watershed_mask=watershed_mask)
 
@@ -37,20 +51,35 @@ class SurfaceRefinement():
         return markers
 
     def refine(self, data, sx, sy):
+        #get labeled lines image
+        all_lines = self._get_lines_image(data, self.image, self.lines, sx, sy)
+
+        #draw lines in BW
+        merged_lines = np.int32(np.zeros((self.image.shape[0], self.image.shape[1])))
+        Line.draw_all(self.line_data, merged_lines, color=255, thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
+
+        if im_logging_enabled(data, LogLevel.Segmentation):
+            l_image_rgb = self.image.copy()
+            l_image_rgb[merged_lines > 0] = 255
+            log_segmentation_image(data, "l_image", all_lines, self.image)
+            log_image(data, "l_image_rgb", l_image_rgb)
+
+        watershed_mask = (merged_lines == 0)
+
         other_markers = np.int32(
-            self.refine_surface(self.masks[SemanticKey.Other], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.03, gradient=False))
+            self._refine_surface(self.masks[SemanticKey.Other], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.03, gradient=False))
 
         wall_markers = np.int32(
-            self.refine_surface(self.masks[SemanticKey.Wall], self.hed, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=self.watershed_mask))
+            self._refine_surface(self.masks[SemanticKey.Wall], self.hed, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=watershed_mask))
 
         floor_markers = np.int32(
-            self.refine_surface(self.masks[SemanticKey.Floor], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
+            self._refine_surface(self.masks[SemanticKey.Floor], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
 
         wall_like_markers = np.int32(
-            self.refine_surface(self.masks[SemanticKey.WallLike], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
+            self._refine_surface(self.masks[SemanticKey.WallLike], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
 
         ceiling_markers = np.int32(
-            self.refine_surface(self.masks[SemanticKey.Ceiling], self.hed, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=self.watershed_mask))
+            self._refine_surface(self.masks[SemanticKey.Ceiling], self.hed, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=watershed_mask))
 
         ceiling_prob = get_segmentation_image(ceiling_markers + 1, self.masks[SemanticKey.Ceiling], avg=True)
         wall_like_prob = get_segmentation_image(wall_like_markers + 1, self.masks[SemanticKey.WallLike], avg=True)
@@ -79,7 +108,7 @@ class SurfaceRefinement():
 
         segmentation[np.logical_and(segmentation == 3, wall_prob < .5)] = 6
         m = np.logical_and(segmentation == 2, other_prob > .5)
-        segmentation[self.merged_lines > 0] = 0
+        segmentation[merged_lines > 0] = 0
         segmentation[m] = 1
 
 
