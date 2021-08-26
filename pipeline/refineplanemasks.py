@@ -439,6 +439,13 @@ class PipelineRefinePlaneMasks(PipelineStep):
         sx = w / img.shape[1]
         sy = h / img.shape[0]
 
+        #process lighting
+        lighting_rgb = np.uint8(data["lighting"])
+        lighting_smooth = cv2.edgePreservingFilter(lighting_rgb, flags=1, sigma_s=10, sigma_r=1.0)
+        log_image(data, 'lighting_smooth', lighting_smooth)
+        data["lighting"] = lighting_smooth
+        log_image(data, 'lighting', lighting_smooth)
+
         #Include other types as part of floor: rug, earth, grass:
         self._combine_floor_masks(output)
 
@@ -456,7 +463,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         line_data, lines = find_lines(data["image"], cv2.resize(hed_lr, (data["image"].shape[1], data["image"].shape[0])), data["normals"])
 
         refiner = SurfaceRefinement(img_lr, hed_lr, isolated, line_data, lines)
-        segmentation_initial = refiner.refine(data, sx, sy)
+        segmentation_initial = refiner.refine(data)
         sure_walls = (segmentation_initial == ADE20K.floor.index)
 
         fov_estimator = FovEstimator(data, img, lines, data["fov"], isolated[SemanticKey.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
@@ -711,18 +718,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         final_labels += 1
         final_labels = np.uint8(final_labels)
 
-        lighting_rgb = np.uint8(data["lighting"])
-
-        sigma_r = 1.0
-        sigma_s = 10
-
-        lighting_smooth = cv2.edgePreservingFilter(lighting_rgb, flags=1, sigma_s=sigma_s, sigma_r=sigma_r)
-        log_image(data, 'lighting_smooth', lighting_smooth)
-
-        data["lighting"] = lighting_smooth
-
-        log_image(data, 'lighting', lighting_smooth)
-
         length_threshold = 32
         canny_aperture_size = 7
 
@@ -780,11 +775,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         for i in np.unique(final_labels_hr):
             mask = final_labels_hr == i
-            # inter = np.logical_and(mask, final_merged_lines)
-            # final_labels_hr[mask > 0] = 0
-            # mask[final_merged_lines > 0] = 0
             pruned = remove_small_objects(mask, 100)  # pruned[inter > 0] = 1
-            # filled = np.uint8(remove_small_holes(mask,10000))
             final_labels_hr[mask > 0] = 0
             final_labels_hr[pruned > 0] = i
 

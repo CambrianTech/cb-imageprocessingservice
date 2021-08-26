@@ -50,8 +50,11 @@ class SurfaceRefinement():
         markers[markers == 2] = (ndimage.label(markers == 2)[0])[markers == 2] + np.amax(markers)
         return markers
 
-    def refine(self, data, sx, sy):
+    def refine(self, data):
         #get labeled lines image
+        sx = self.image.shape[0] / data["image"].shape[0]
+        sy = self.image.shape[1] / data["image"].shape[1]
+
         all_lines = self._get_lines_image(data, self.image, self.lines, sx, sy)
 
         #draw lines in BW
