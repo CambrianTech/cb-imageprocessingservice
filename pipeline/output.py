@@ -148,15 +148,7 @@ class PipelineOutput(PipelineStep):
         plane_offset = np.maximum(1e-4, np.linalg.norm(plane_parameters))
         plane_normal = plane_parameters / plane_offset
 
-        plane_image_extents = {
-            "minY": plane_data[0],
-            "minX": plane_data[1],
-            "maxY": plane_data[2],
-            "maxX": plane_data[3]
-        }
-
         plane_type = np.uint8(plane_data[9])
-
 
         return {
             "id": "plane-%d" % plane_index,
@@ -164,11 +156,7 @@ class PipelineOutput(PipelineStep):
             "name": "Plane %d" % plane_index,
             "normal": plane_normal.tolist(),
             "offset": plane_offset,
-            "rawParams": plane_parameters.tolist(),
-            "imageExtents": plane_image_extents,
-            "images": {
-                "mask": mask_url
-            }
+            "images": {"mask": mask_url}
         }
 
 
@@ -193,8 +181,7 @@ class PipelineOutput(PipelineStep):
             },
             "geometry": {
                 "surfaces": [
-                    self.encode_plane_surface(i, plane_data, self.make_plane_mask_url(i))
-                    for i, plane_data in enumerate(all_plane_data)
+                    self.encode_plane_surface(i, plane_data, self.make_plane_mask_url(i)) for i, plane_data in enumerate(all_plane_data)
                 ]
             },
             "assets": []
@@ -213,14 +200,6 @@ class PipelineOutput(PipelineStep):
         plane_offset = np.maximum(1e-4, np.linalg.norm(plane_parameters))
         plane_normal = plane_parameters / plane_offset
         plane_rotation = plane_data[10]
-
-        plane_image_extents = {
-            "minY": plane_data[0],
-            "minX": plane_data[1],
-            "maxY": plane_data[2],
-            "maxX": plane_data[3]
-        }
-
         plane_type = np.uint8(plane_data[9])
 
 
@@ -231,8 +210,6 @@ class PipelineOutput(PipelineStep):
             "normal": plane_normal.tolist(),
             "offset": plane_offset,
             "rotation": plane_rotation,
-            "rawParams": plane_parameters.tolist(),
-            "imageExtents": plane_image_extents,
             "images": {
                 "mask": mask_url
             }

@@ -10,7 +10,6 @@ from cambrian import geometry
 from cambrian.frei_chen import frei_chen
 from cambrian.Line import Line
 from cambrian.transformations import euler_from_matrix
-from skimage.segmentation import join_segmentations
 from skimage.morphology import skeletonize
 
 import pickle
@@ -20,12 +19,11 @@ from scipy.stats import mode
 
 from pipeline.utils import resize_array
 from pipeline.planegeometry import PlaneGeometry, SemanticKey, Dimension
+from pipeline.surfacerefinement import SurfaceRefinement
 from skimage.morphology import remove_small_objects, remove_small_holes
 from pipeline.semanticlabels import ADE20K
 from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 from pipeline.fovestimator import calcPlaneXYZ, FovEstimator
-
-from enum import Enum
 
 furniture_labels = [ADE20K.table, ADE20K.armchair, ADE20K.sofa, ADE20K.coffee_table, ADE20K.ottoman, ADE20K.chest, ADE20K.wardrobe, ADE20K.chair, ADE20K.bed, ADE20K.bench, ADE20K.swivel_chair, ADE20K.pole, ADE20K.stool]
 wall_like = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen]
@@ -46,6 +44,13 @@ def rough_dilate_erode(is_dilate, mask, size=5, iterations=1, scale=0.5, maintai
         mask = cv2.resize(mask, (shape[1], shape[0]), interpolation)
     return mask
 
+def gabor_filter(bw, theta, lambd, gamma=0.0, psi=0.0):
+    ksize = lambd
+    sigma = ksize * lambd
+    result = cv2.filter2D(bw, cv2.CV_8UC1,
+                          cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_32F))
+    return result
+
 
 def find_lines(img, gradient, normals):
 
@@ -58,92 +63,50 @@ def find_lines(img, gradient, normals):
     bw_res = cv2.resize(bw, (int(width * gabor_scale), int(height * gabor_scale)),
                         cv2.INTER_CUBIC) if gabor_scale < 1.0 else bw
 
-    def gabor(theta, lambd, gamma=0.0, psi=0.0):
-        ksize = lambd
-        sigma = ksize * lambd
-        result = cv2.filter2D(bw_res, cv2.CV_8UC1,
-                              cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_32F))
-        return result
-
-    v_gabor = gabor(0, 7)
-    h_gabor = gabor(np.pi / 2.0, 9)
+    v_gabor = gabor_filter(bw_res, 0, 7)
+    h_gabor = gabor_filter(bw_res, np.pi / 2.0, 9)
+    gabor = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -20)
+    gabor = cv2.bilateralFilter(gabor, 5, 5, 5)
+    gabor = cv2.resize(gabor, (width, height), interpolation=cv2.INTER_CUBIC)
 
     contours_src = cv2.addWeighted(v_gabor, 1.0, h_gabor, 1.0, 0)
     contours_src = cv2.resize(contours_src, (width, height), interpolation=cv2.INTER_CUBIC)
 
-    edges = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -20)
-    edges = cv2.bilateralFilter(edges, 5, 5, 5)
-    edges = cv2.resize(edges, (width, height), interpolation=cv2.INTER_CUBIC)
-
-    clean_edges = frei_chen(bw)
-
-    line_data = []
-
-    lines_c = None
-
-    def is_image_edge(point_a, point_b, shape, dist=10):
-        max_0 = shape[0] - 1
-        max_1 = shape[1] - 1
-        return (abs(point_a[0]) <= dist and abs(point_b[0]) <= dist) \
-               or (abs(point_a[0] - max_0) <= dist and abs(point_b[0] - max_0) <= dist) \
-               or (abs(point_a[1]) <= dist and abs(point_b[1]) <= dist) \
-               or (abs(point_a[1] - max_1) <= dist and abs(point_b[1] - max_1) <= dist)
-
-    def add_contour_lines(contours, min_confidence):
-        epsilon = diagonal / 200.0
-        min_length = diagonal / 40.0
-        contour_group = 0
-        for contour in contours:
-
-            poly = cv2.approxPolyDP(contour, epsilon, False)
-            contour_index = 0
-            arcLen = cv2.arcLength(poly, False)
-
-            for i in range(0, len(poly) - 1):
-                point_a = poly[i][0]
-                point_b = poly[i + 1][0]
-
-                # remove contours on image edge and break them up into seperate contours (contour_group)
-                if is_image_edge(point_a, point_b, (width, height), epsilon + 1.0):
-                    contour_index = 0
-                    contour_group += 1
-                elif arcLen > min_length:
-                    new_line = Line(point_a[0], point_a[1], point_b[0], point_b[1], contour_group, contour_index)
-                    line_data.append(new_line)
-                    contour_index += 1
-
-        contour_group += 1
-
+    
     contours_src = cv2.adaptiveThreshold(contours_src, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,
                                          int(diagonal / 50) * 2 + 1, -30)
 
     contours_dilated = rough_dilate_erode(True, contours_src, 3, scale=400 / diagonal, interpolation=cv2.INTER_AREA)
 
     if gradient is None:
-        Line.prepare(img, contours_dilated, lines_c)
+        Line.prepare(img, contours_dilated, None)
     else:
-        Line.prepare(np.dstack((img, gradient)), contours_dilated, lines_c)
+        stacked = np.dstack((img, gradient))
+        Line.prepare(stacked, contours_dilated, None)
+
 
     # find all liens in the edge image
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)
-    lines1 = fld.detect(edges)
+    lines1 = fld.detect(gabor)
 
     aperture = 5
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 30.0), 1.41, 200, 220, aperture, False)
-    lines2 = fld.detect(bw - (clean_edges * 5.0).astype("uint8"))
+    lines2 = fld.detect(bw - (frei_chen(bw) * 5.0).astype("uint8"))
 
     aperture = 5
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 15.0), 1.41,_canny_aperture_size=aperture, _do_merge=False)
-    lines3 = fld.detect(edges)
+    lines3 = fld.detect(gabor)
 
-    sy = edges.shape[0] / normals.shape[0]
-    sx = edges.shape[1] / normals.shape[1]
+    sy = gabor.shape[0] / normals.shape[0]
+    sx = gabor.shape[1] / normals.shape[1]
     fld = cv2.ximgproc.createFastLineDetector(64, _canny_aperture_size=7, _do_merge=False)
     lines4 = fld.detect(cv2.cvtColor(np.uint8(normals), cv2.COLOR_BGR2GRAY))
     lines4 = lines4 * [[sx, sy, sx, sy]]
 
     lines = np.concatenate((lines1, lines2, lines3, lines4))
     confs = []
+
+    line_data = []
 
     if lines is not None:
         for line in lines:
@@ -188,21 +151,6 @@ def get_planes_class(plane_masks, class_labels):
         plane_classes.append(indices[sorted[0]])
 
     return plane_classes
-
-
-def refine_surface(mask, image, big_thresh=.03, small_thresh=.97, watershed_dist=.05, watershed_mask=None, gradient=True):
-    small = ip.refine_mask_watershed(None, image, np.uint8(mask > small_thresh), None, distance=watershed_dist, gradient=gradient,
-                                   watershed_mask=watershed_mask)
-
-    big = ip.refine_mask_watershed(None, image, np.uint8(mask > big_thresh), None, distance=watershed_dist, gradient=gradient,
-                                     watershed_mask=watershed_mask)
-
-    markers = np.dstack((np.ones_like(big), small, big))
-    markers = np.argmax(markers, -1)
-
-    markers[markers == 1] = (ndimage.label(markers == 1)[0])[markers == 1] + np.amax(markers)
-    markers[markers == 2] = (ndimage.label(markers == 2)[0])[markers == 2] + np.amax(markers)
-    return markers
 
 def merge_by_angle_sweep(labels_fan, normals_img, fan_normals, mask, angle_threshold):
 
@@ -340,21 +288,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         return isolated
 
-    def _get_lines_image(self, data, img, lines, sx, sy):
-        all_lines = np.int32(np.zeros((img.shape[0], img.shape[1])))
-        l = 1
-
-        for line in lines:
-            for x1, y1, x2, y2 in line:
-                x1 = int(sx * x1)
-                x2 = int(sx * x2)
-                y1 = int(sy * y1)
-                y2 = int(sy * y2)
-                cv2.line(all_lines, (x1, y1), (x2, y2), l, thickness=2, lineType=cv2.LINE_8)
-                l += 1
-
-        return all_lines
-
     # Create fan from vertical vp
     def fan_surfaces(self, data, img_lr, locations, vp0, sure_walls, wall_mask, normals_c):
 
@@ -446,9 +379,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
                 data["planes"]["detection"][d, 0:4] = [0, 0, 0, 0]
 
-        
-
-
     def run(self, data):
 
         img = data["image"]
@@ -474,29 +404,19 @@ class PipelineRefinePlaneMasks(PipelineStep):
         sx = w / img.shape[1]
         sy = h / img.shape[0]
 
+        #process lighting
+        lighting_rgb = np.uint8(data["lighting"])
+        lighting_smooth = cv2.edgePreservingFilter(lighting_rgb, flags=1, sigma_s=10, sigma_r=1.0)
+        log_image(data, 'lighting_smooth', lighting_smooth)
+        data["lighting"] = lighting_smooth
+        log_image(data, 'lighting', lighting_smooth)
+
         #Include other types as part of floor: rug, earth, grass:
         self._combine_floor_masks(output)
 
         #break masks into major groups: Floor, Wall, Ceiling, etc
         isolated = self._isolate_masks(data, output)
         
-        #get lines
-        line_data, lines = find_lines(img, cv2.resize(hed, (img.shape[1], img.shape[0])), data["normals"])
-
-        #get labeled lines image
-        all_lines = self._get_lines_image(data, img_lr, lines, sx, sy)
-
-        #draw lines in BW
-        merged_lines = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
-        Line.draw_all(line_data, merged_lines, color=255, thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
-
-        if im_logging_enabled(data, LogLevel.Segmentation):
-            l_image_rgb = img_lr.copy()
-            l_image_rgb[merged_lines > 0] = 255
-            log_segmentation_image(data, "l_image", all_lines, img_lr)
-            log_image(data, "l_image_rgb", l_image_rgb)
-
-
         plane_geometry = PlaneGeometry(data, isolated, img_lr, shape)
         plane_geometry.process()
 
@@ -505,82 +425,10 @@ class PipelineRefinePlaneMasks(PipelineStep):
         
 
         ######################################## Initial refinement work
-        w_mask = (merged_lines == 0)
+        line_data, lines = find_lines(data["image"], cv2.resize(hed_lr, (data["image"].shape[1], data["image"].shape[0])), data["normals"])
 
-        def refine_surfaces():
-            other_markers = np.int32(
-                refine_surface(isolated[SemanticKey.Other], img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.03, gradient=False))
-
-            wall_markers = np.int32(
-                refine_surface(isolated[SemanticKey.Wall], hed_lr, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=w_mask))
-
-            floor_markers = np.int32(
-                refine_surface(isolated[SemanticKey.Floor], img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
-
-            wall_like_markers = np.int32(
-                refine_surface(isolated[SemanticKey.WallLike], img_lr, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
-
-            ceiling_markers = np.int32(
-                refine_surface(isolated[SemanticKey.Ceiling], hed_lr, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=w_mask))
-
-            ceiling_prob = get_segmentation_image(ceiling_markers + 1, isolated[SemanticKey.Ceiling], avg=True)
-            wall_like_prob = get_segmentation_image(wall_like_markers + 1, isolated[SemanticKey.WallLike], avg=True)
-            wall_like_prob[wall_like_prob < .25] = 0
-            wall_prob = get_segmentation_image(wall_markers + 1, isolated[SemanticKey.Wall], avg=True)
-
-            ade_skel = skeletonize(isolated[SemanticKey.Other] > .5)
-            isolated[SemanticKey.Floor][ade_skel > 0] = 0
-            floor_prob = get_segmentation_image(floor_markers + 1, isolated[SemanticKey.Floor], avg=True)
-            floor_prob[floor_prob < .25] = 0
-            floor_markers[floor_prob < .25] = 100
-            other_markers = join_segmentations(floor_markers, other_markers)
-
-            isolated[SemanticKey.Other][ade_skel > 0] = 1
-            other_prob = get_segmentation_image(other_markers + 1, isolated[SemanticKey.Other], avg=True)
-
-            if im_logging_enabled(data, LogLevel.Images):
-                log_image(data, "floor_markers", 255. * floor_prob)
-                log_image(data, "other_markers", 255. * other_prob)
-                log_image(data, "ceiling_markers", 255. * ceiling_prob)
-                log_image(data, "wall_like_markers", 255. * wall_like_prob)
-                log_image(data, "wall_markers", 255. * wall_prob)
-
-            segmentation_initial = np.int32(np.argmax(np.dstack(
-                (.05 * np.ones_like(isolated[SemanticKey.Other]), other_prob, floor_prob, wall_prob, ceiling_prob, wall_like_prob)), -1))
-
-            segmentation_initial[np.logical_and(segmentation_initial == 3, wall_prob < .5)] = 6
-            m = np.logical_and(segmentation_initial == 2, other_prob > .5)
-            segmentation_initial[merged_lines > 0] = 0
-            segmentation_initial[m] = 1
-
-
-            for i in range(1, 7):
-                pruned = remove_small_objects(segmentation_initial == i, min_size=32)
-                segmentation_initial[np.logical_and(segmentation_initial == i, pruned == 0)] = 0
-
-            line_mask = Line.draw_all(line_data,
-                                      np.zeros((segmentation_initial.shape[0], segmentation_initial.shape[1])),
-                                      color=255,
-                                      thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
-
-            segmentation_initial = watershed(hed_lr, segmentation_initial,
-                                             mask=line_mask == 0)
-            segmentation_initial = cv2.watershed(img_lr, segmentation_initial)
-
-            segmentation_initial[line_mask > 0] = 0
-            distances = cv2.distanceTransform(np.uint8(line_mask), cv2.DIST_L1, 3)
-
-            distances = np.uint8(distances)
-            segmentation_initial = cv2.watershed(cv2.cvtColor(np.uint8(distances), cv2.COLOR_GRAY2BGR),
-                                                 segmentation_initial)
-
-            log_segmentation_image(data, "segmentation_initial", segmentation_initial, img_lr)
-
-
-            return segmentation_initial
-            #############################################################
-
-        segmentation_initial = refine_surfaces()
+        refiner = SurfaceRefinement(img_lr, hed_lr, isolated, line_data, lines)
+        segmentation_initial = refiner.refine(data)
         sure_walls = (segmentation_initial == ADE20K.floor.index)
 
         fov_estimator = FovEstimator(data, img, lines, data["fov"], isolated[SemanticKey.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
@@ -594,7 +442,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         labels_fan, fan_normals_reduced, normals_wall = self.fan_surfaces(data, img_lr, fov_estimator.edgelets[0], fov_estimator.vp0, sure_walls, isolated[SemanticKey.Wall], plane_geometry.normals_c)
 
-        vl_image = np.zeros_like(all_lines)
+        vl_image = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
         vl_image[sure_walls == 0] = 0
 
         ade_seg_c = np.dstack(
@@ -835,18 +683,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
         final_labels += 1
         final_labels = np.uint8(final_labels)
 
-        lighting_rgb = np.uint8(data["lighting"])
-
-        sigma_r = 1.0
-        sigma_s = 10
-
-        lighting_smooth = cv2.edgePreservingFilter(lighting_rgb, flags=1, sigma_s=sigma_s, sigma_r=sigma_r)
-        log_image(data, 'lighting_smooth', lighting_smooth)
-
-        data["lighting"] = lighting_smooth
-
-        log_image(data, 'lighting', lighting_smooth)
-
         length_threshold = 32
         canny_aperture_size = 7
 
@@ -904,11 +740,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         for i in np.unique(final_labels_hr):
             mask = final_labels_hr == i
-            # inter = np.logical_and(mask, final_merged_lines)
-            # final_labels_hr[mask > 0] = 0
-            # mask[final_merged_lines > 0] = 0
             pruned = remove_small_objects(mask, 100)  # pruned[inter > 0] = 1
-            # filled = np.uint8(remove_small_holes(mask,10000))
             final_labels_hr[mask > 0] = 0
             final_labels_hr[pruned > 0] = i
 
