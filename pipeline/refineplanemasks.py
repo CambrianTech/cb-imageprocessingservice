@@ -44,6 +44,13 @@ def rough_dilate_erode(is_dilate, mask, size=5, iterations=1, scale=0.5, maintai
         mask = cv2.resize(mask, (shape[1], shape[0]), interpolation)
     return mask
 
+def gabor_filter(bw, theta, lambd, gamma=0.0, psi=0.0):
+    ksize = lambd
+    sigma = ksize * lambd
+    result = cv2.filter2D(bw, cv2.CV_8UC1,
+                          cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_32F))
+    return result
+
 
 def find_lines(img, gradient, normals):
 
@@ -56,92 +63,50 @@ def find_lines(img, gradient, normals):
     bw_res = cv2.resize(bw, (int(width * gabor_scale), int(height * gabor_scale)),
                         cv2.INTER_CUBIC) if gabor_scale < 1.0 else bw
 
-    def gabor(theta, lambd, gamma=0.0, psi=0.0):
-        ksize = lambd
-        sigma = ksize * lambd
-        result = cv2.filter2D(bw_res, cv2.CV_8UC1,
-                              cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_32F))
-        return result
-
-    v_gabor = gabor(0, 7)
-    h_gabor = gabor(np.pi / 2.0, 9)
+    v_gabor = gabor_filter(bw_res, 0, 7)
+    h_gabor = gabor_filter(bw_res, np.pi / 2.0, 9)
+    gabor = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -20)
+    gabor = cv2.bilateralFilter(gabor, 5, 5, 5)
+    gabor = cv2.resize(gabor, (width, height), interpolation=cv2.INTER_CUBIC)
 
     contours_src = cv2.addWeighted(v_gabor, 1.0, h_gabor, 1.0, 0)
     contours_src = cv2.resize(contours_src, (width, height), interpolation=cv2.INTER_CUBIC)
 
-    edges = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -20)
-    edges = cv2.bilateralFilter(edges, 5, 5, 5)
-    edges = cv2.resize(edges, (width, height), interpolation=cv2.INTER_CUBIC)
-
-    clean_edges = frei_chen(bw)
-
-    line_data = []
-
-    lines_c = None
-
-    def is_image_edge(point_a, point_b, shape, dist=10):
-        max_0 = shape[0] - 1
-        max_1 = shape[1] - 1
-        return (abs(point_a[0]) <= dist and abs(point_b[0]) <= dist) \
-               or (abs(point_a[0] - max_0) <= dist and abs(point_b[0] - max_0) <= dist) \
-               or (abs(point_a[1]) <= dist and abs(point_b[1]) <= dist) \
-               or (abs(point_a[1] - max_1) <= dist and abs(point_b[1] - max_1) <= dist)
-
-    def add_contour_lines(contours, min_confidence):
-        epsilon = diagonal / 200.0
-        min_length = diagonal / 40.0
-        contour_group = 0
-        for contour in contours:
-
-            poly = cv2.approxPolyDP(contour, epsilon, False)
-            contour_index = 0
-            arcLen = cv2.arcLength(poly, False)
-
-            for i in range(0, len(poly) - 1):
-                point_a = poly[i][0]
-                point_b = poly[i + 1][0]
-
-                # remove contours on image edge and break them up into seperate contours (contour_group)
-                if is_image_edge(point_a, point_b, (width, height), epsilon + 1.0):
-                    contour_index = 0
-                    contour_group += 1
-                elif arcLen > min_length:
-                    new_line = Line(point_a[0], point_a[1], point_b[0], point_b[1], contour_group, contour_index)
-                    line_data.append(new_line)
-                    contour_index += 1
-
-        contour_group += 1
-
+    
     contours_src = cv2.adaptiveThreshold(contours_src, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,
                                          int(diagonal / 50) * 2 + 1, -30)
 
     contours_dilated = rough_dilate_erode(True, contours_src, 3, scale=400 / diagonal, interpolation=cv2.INTER_AREA)
 
     if gradient is None:
-        Line.prepare(img, contours_dilated, lines_c)
+        Line.prepare(img, contours_dilated, None)
     else:
-        Line.prepare(np.dstack((img, gradient)), contours_dilated, lines_c)
+        stacked = np.dstack((img, gradient))
+        Line.prepare(stacked, contours_dilated, None)
+
 
     # find all liens in the edge image
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)
-    lines1 = fld.detect(edges)
+    lines1 = fld.detect(gabor)
 
     aperture = 5
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 30.0), 1.41, 200, 220, aperture, False)
-    lines2 = fld.detect(bw - (clean_edges * 5.0).astype("uint8"))
+    lines2 = fld.detect(bw - (frei_chen(bw) * 5.0).astype("uint8"))
 
     aperture = 5
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 15.0), 1.41,_canny_aperture_size=aperture, _do_merge=False)
-    lines3 = fld.detect(edges)
+    lines3 = fld.detect(gabor)
 
-    sy = edges.shape[0] / normals.shape[0]
-    sx = edges.shape[1] / normals.shape[1]
+    sy = gabor.shape[0] / normals.shape[0]
+    sx = gabor.shape[1] / normals.shape[1]
     fld = cv2.ximgproc.createFastLineDetector(64, _canny_aperture_size=7, _do_merge=False)
     lines4 = fld.detect(cv2.cvtColor(np.uint8(normals), cv2.COLOR_BGR2GRAY))
     lines4 = lines4 * [[sx, sy, sx, sy]]
 
     lines = np.concatenate((lines1, lines2, lines3, lines4))
     confs = []
+
+    line_data = []
 
     if lines is not None:
         for line in lines:

@@ -82,9 +82,8 @@ class FovEstimator:
         if vp_horizontal2 is not None:
             vps.append(vp_horizontal2)
             self.inliers.append(inliers_horizontal2)
-
-        horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices,
-                                                   np.nonzero(compute_votes(self.edgelets, vp_horizontal2,5))[0])
+            horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices,
+                                                       np.nonzero(compute_votes(self.edgelets, vp_horizontal2,5))[0])
 
         vp_horizontal3, votes, inliers_horizontal3 = ransac_vanishing_point(self.edgelets, e_lines, 2000, threshold_inlier=1,
                                                                             max_time=1.0,
