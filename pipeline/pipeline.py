@@ -40,6 +40,23 @@ class PipelineStepIndex(IntEnum):
     CombinePlaneMasks = 8
     Output = 9
 
+class PipelineNoOp(PipelineStep):
+    @property
+    def required_keys(self) -> list:
+        return []
+
+    @property
+    def output_keys(self) -> list:
+        return []
+
+    @property
+    def is_batched(self) -> bool:
+        return True
+
+    def run(self, data):
+        print("Noop")
+        exit()
+
 
 class Pipeline():
 
@@ -69,6 +86,8 @@ class Pipeline():
 
         self.start_step = self.restore_step if self.restore_step is not None else PipelineStepIndex.Input
 
+        superpixels_step = PipelineSuperpixels() if self.api_level < 3 else PipelineNoOp()
+
         # Create the steps we want to use in the pipelines
         if self.mode == PipelineMode.Serve:
             s3Client = S3Client()
@@ -79,7 +98,7 @@ class Pipeline():
                 PipelineRemotePlaneDetector(self.planes_url),
                 PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")),
                 PipelineDeterminePrimaryAngles(),
-                PipelineSuperpixels(),
+                superpixels_step,
                 PipelineRefinePlaneMasks(),
                 PipelineCombinePlaneMasks(),
                 PipelineS3Output(self.dest_path, s3Client, api_level=self.api_level)
@@ -94,7 +113,7 @@ class Pipeline():
                 PipelineRemotePlaneDetector(self.planes_url),
                 PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")),
                 PipelineDeterminePrimaryAngles(),
-                PipelineSuperpixels(),
+                superpixels_step,
                 PipelineRefinePlaneMasks(),
                 PipelineCombinePlaneMasks(),
                 PipelineFileOutput(self.dest_path, s3Client, api_level=self.api_level)
@@ -116,7 +135,7 @@ class Pipeline():
             if restore_step <= PipelineStepIndex.DeterminePrimaryAngles:
                 self.push(PipelineDeterminePrimaryAngles())
             if restore_step <= PipelineStepIndex.Superpixels:
-                self.push(PipelineSuperpixels())
+                self.push(superpixels_step)
             if restore_step <= PipelineStepIndex.RefinePlaneMasks: 
                 self.push(PipelineRefinePlaneMasks())
             if restore_step <= PipelineStepIndex.CombinePlaneMasks:
