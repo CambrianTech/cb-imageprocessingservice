@@ -23,6 +23,7 @@ class PipelineOutput(PipelineStep):
         self.api_level = api_level
         self.preview_size = preview_size
         self.thumbnail_size = thumbnail_size
+        self.y_up = self.api_level > 3
 
     @property
     def required_keys(self) -> list:
@@ -146,7 +147,7 @@ class PipelineOutput(PipelineStep):
         # we can extract plane_normal and plane_offset from their multiplication.
         plane_parameters = np.array(plane_data[6:9], dtype=np.float32)
         plane_offset = np.maximum(1e-4, np.linalg.norm(plane_parameters))
-        plane_normal = plane_parameters / plane_offset
+        plane_normal = (plane_parameters / plane_offset).tolist()
 
         plane_type = np.uint8(plane_data[9])
 
@@ -154,7 +155,7 @@ class PipelineOutput(PipelineStep):
             "id": "plane-%d" % plane_index,
             "type": surface_types[plane_type],
             "name": "Plane %d" % plane_index,
-            "normal": plane_normal.tolist(),
+            "normal": [-plane_normal[0], -plane_normal[2], plane_normal[1]] if self.y_up else plane_normal,
             "offset": plane_offset,
             "images": {"mask": mask_url}
         }
@@ -198,7 +199,7 @@ class PipelineOutput(PipelineStep):
         # we can extract plane_normal and plane_offset from their multiplication.
         plane_parameters = np.array(plane_data[6:9], dtype=np.float32)
         plane_offset = np.maximum(1e-4, np.linalg.norm(plane_parameters))
-        plane_normal = plane_parameters / plane_offset
+        plane_normal = (plane_parameters / plane_offset).tolist()
         plane_rotation = plane_data[10]
         plane_type = np.uint8(plane_data[9])
 
@@ -207,7 +208,7 @@ class PipelineOutput(PipelineStep):
             "id": "plane-%d" % plane_index,
             "type": surface_types[plane_type],
             "name": "Plane %d" % plane_index,
-            "normal": plane_normal.tolist(),
+            "normal": [-plane_normal[0], -plane_normal[2], plane_normal[1]] if self.y_up else plane_normal,
             "offset": plane_offset,
             "rotation": plane_rotation,
             "images": {
