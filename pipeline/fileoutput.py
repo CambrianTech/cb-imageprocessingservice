@@ -18,6 +18,14 @@ class PipelineFileOutput(PipelineOutput):
         else:
             cv2.imwrite(str(path), image, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
 
+    def save_file(self, data, filename, url):
+        path = Path(os.path.join(self.base_path, self.unique_id, url))
+        if len(path.parents) > 0:
+            path.parents[0].mkdir(parents=True, exist_ok=True)
+
+        with open(str(path), "wb") as out_file:
+            out_file.write(bytearray(data))
+
     def save_data(self, data, filename, url):
         path = Path(os.path.join(self.base_path, self.unique_id, url))
         if len(path.parents) > 0:
