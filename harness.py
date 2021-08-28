@@ -48,7 +48,7 @@ async def process_files(pipeline, input_dir, pattern):
 @click.argument("semantic_model_path", default='gluon_models', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("fov_model_path", default='sklearn_models/fov_classifier_lc128.joblib', type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("planes_url", default='http://localhost:8081/', type=click.STRING)
-@click.option('--api_level', type=int, default=3, help='api level: 1-4')
+@click.option('--api_level', type=int, default=4, help='api level: 1-4')
 @click.option('--restore', type=int, help='Pipeline step to restore from. Data pickle files expected inside input_dir')
 @click.option('--export', type=int, help='Pipeline step to export')
 @click.option("--logging_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
