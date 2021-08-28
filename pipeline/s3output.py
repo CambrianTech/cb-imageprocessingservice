@@ -13,8 +13,8 @@ from pipeline.s3client import S3Client
 from pipeline.output import PipelineOutput
 
 class PipelineS3Output(PipelineOutput):
-    def __init__(self, base_path, s3Client:S3Client):
-        super().__init__(base_path)
+    def __init__(self, base_path, api_level, s3Client:S3Client):
+        super().__init__(base_path, api_level)
         self.s3_client = s3Client
 
     def save_image(self, image, filename, url, quality=None):

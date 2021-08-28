@@ -43,13 +43,14 @@ class PipelineStepIndex(IntEnum):
 
 class Pipeline():
 
-    def __init__(self,  mode:PipelineMode, \
+    def __init__(self,  mode:PipelineMode, api_level, \
                         model_path=None, semantic_model_path=None, fov_model_path=None, \
                         planes_url=None, src_path=None, dest_path=None, cpu_networks_port = 8082, \
                         restore_step:PipelineStepIndex=None, export_step:PipelineStepIndex=None, \
                         logging_dir=None, logging_level=LogLevel.Nothing, logging_step:PipelineStepIndex=None):
 
         self.mode = mode
+        self.api_level = api_level
 
         self.model_path = model_path
         self.semantic_model_path = semantic_model_path
@@ -81,7 +82,7 @@ class Pipeline():
                 PipelineSuperpixels(),
                 PipelineRefinePlaneMasks(),
                 PipelineCombinePlaneMasks(),
-                PipelineS3Output(self.dest_path, s3Client)
+                PipelineS3Output(self.dest_path, s3Client, api_level=self.api_level)
             ]
 
         elif self.mode == PipelineMode.Process:
@@ -96,7 +97,7 @@ class Pipeline():
                 PipelineSuperpixels(),
                 PipelineRefinePlaneMasks(),
                 PipelineCombinePlaneMasks(),
-                PipelineFileOutput(self.dest_path, s3Client)
+                PipelineFileOutput(self.dest_path, s3Client, api_level=self.api_level)
             ]
 
         elif self.mode == PipelineMode.Restore:
@@ -121,7 +122,7 @@ class Pipeline():
             if restore_step <= PipelineStepIndex.CombinePlaneMasks:
                 self.push(PipelineCombinePlaneMasks())
 
-            self.push(PipelineFileOutput(self.dest_path))
+            self.push(PipelineFileOutput(self.dest_path, api_level=self.api_level))
 
 
     def start(self):

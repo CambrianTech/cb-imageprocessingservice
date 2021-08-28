@@ -5,8 +5,8 @@ from pipeline.output import PipelineOutput
 import cv2
 
 class PipelineFileOutput(PipelineOutput):
-    def __init__(self, base_path):
-        super().__init__(base_path)
+    def __init__(self, base_path, api_level):
+        super().__init__(base_path, api_level)
 
     def save_image(self, image, filename, url, quality=90):
         path = Path(os.path.join(self.base_path, self.unique_id, url))

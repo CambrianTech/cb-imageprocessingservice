@@ -48,18 +48,21 @@ async def process_files(pipeline, input_dir, pattern):
 @click.argument("semantic_model_path", default='gluon_models', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("fov_model_path", default='sklearn_models/fov_classifier_lc128.joblib', type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("planes_url", default='http://localhost:8081/', type=click.STRING)
+@click.option('--api_level', type=int, default=3, help='api level: 1-4')
 @click.option('--restore', type=int, help='Pipeline step to restore from. Data pickle files expected inside input_dir')
 @click.option('--export', type=int, help='Pipeline step to export')
 @click.option("--logging_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
 @click.option('--log_level', type=int, default=LogLevel.Images|LogLevel.Segmentation, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
-def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url, restore, export, logging_dir, log_level, log_step):
+def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url, 
+         api_level, restore, export, logging_dir, log_level, log_step):
 
     if not os.path.exists(input_dir):
         raise Exception('The directory does not exist at path {}'.format(input_dir)) 
 
     
     mode = PipelineMode.Restore if restore is not None else PipelineMode.Process
+
     file_pattern = "*.pickle" if restore is not None else None
     restore_step = PipelineStepIndex(restore) if restore is not None else None
     export_step = PipelineStepIndex(export) if export is not None else None
@@ -68,7 +71,7 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     loop = asyncio.get_event_loop()
     loop.set_default_executor(ThreadPoolExecutor())
 
-    pipeline = Pipeline(mode, src_path=input_dir, dest_path=output_dir, restore_step=restore_step, export_step=export_step, logging_dir=logging_dir, logging_level=log_level, logging_step=logging_step, \
+    pipeline = Pipeline(mode, api_level, src_path=input_dir, dest_path=output_dir, restore_step=restore_step, export_step=export_step, logging_dir=logging_dir, logging_level=log_level, logging_step=logging_step, \
                         model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
     pipeline.start()
 

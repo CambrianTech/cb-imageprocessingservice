@@ -16,7 +16,7 @@ from pipeline.core import PipelineStep
 surface_types = ["unknown", "floor", "wall", "horizontal", "vertical"]
 
 class PipelineOutput(PipelineStep):
-    def __init__(self, base_path, outfile_name="data.json", api_level=3, preview_size=1024, thumbnail_size=320):
+    def __init__(self, base_path, api_level, outfile_name="data.json", preview_size=1024, thumbnail_size=320):
         super().__init__()
         self.base_path = base_path
         self.outfile_name = outfile_name

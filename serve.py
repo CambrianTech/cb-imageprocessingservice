@@ -48,12 +48,15 @@ def _get_instance_metadata():
 @click.argument("user_uploads_bucket", type=click.STRING)
 @click.argument("results_bucket", type=click.STRING)
 @click.argument("plane_url", type=click.STRING)
+@click.option('--api_level', type=int, default=3, help='api level: 1-4')
 @click.option("--image-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--results-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--logging_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
 @click.option('--log_level', type=int, default=0, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
-def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_url, image_local_dir, results_local_dir, logging_dir, log_level, log_step):
+def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_url, 
+         api_level, image_local_dir, results_local_dir, logging_dir, log_level, log_step):
+
     print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
@@ -67,7 +70,7 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
 
     logging_step = PipelineStepIndex(log_step) if log_step is not None else None
 
-    pipeline = Pipeline(PipelineMode.Serve, 
+    pipeline = Pipeline(PipelineMode.Serve, api_level, 
         model_path=model_path, 
         semantic_model_path=semantic_model_path, 
         fov_model_path=fov_model_path, 
