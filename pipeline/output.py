@@ -101,14 +101,13 @@ class PipelineOutput(PipelineStep):
 
                 if self.api_level == 2:
                     results = self.make_data_v2_dict(data, image_url, lighting_url, superpixels_url)
-                elif self.api_level == 3:
+                else:
                     results = self.make_data_v3_dict(data, image_url, lighting_url, superpixels_url)
             else:
-
                 filename = "planes_index_mask.zz"
                 planes_index_mask_url = self.make_url(filename)
                 image = self.get_compressed_index_mask(data["planes_index_mask"])
-                self.save_image(image, filename, planes_index_mask_url)
+                self.save_file(image, filename, planes_index_mask_url)
 
                 filename = "planes_alpha_mask.png"
                 planes_alpha_mask_url = self.make_url(filename)
@@ -121,6 +120,10 @@ class PipelineOutput(PipelineStep):
 
     @abstractmethod
     def save_image(self, image, filename, url, quality=None):
+        return
+
+    @abstractmethod
+    def save_file(self, bytes, filename, url):
         return
 
     @abstractmethod
