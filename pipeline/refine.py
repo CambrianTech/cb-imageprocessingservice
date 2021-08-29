@@ -62,8 +62,8 @@ class PipelineRefineResults(PipelineStep):
         plane_geometry = PlaneGeometry(data, isolated, img_lr, shape)
         plane_geometry.process()
 
-        #fov_estimator = FovEstimator(data, self.img, lines, data["fov"], isolated[Groupings.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
-        #fov_estimator.estimate(shape)
+        fov_estimator = FovEstimator(data, self.img, lines, data["fov"], isolated[Groupings.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
+        fov_estimator.estimate(shape)
 
         #vanishing points, may not be present!:
         

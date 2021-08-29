@@ -20,7 +20,7 @@ class FovEstimator:
 
         if shape is None:
             shape = self.image.shape
-            
+
         self.vp0 = self.vps[0] / self.vps[0][2]
 
         vertical_line_inliers = self.inliers[0]
@@ -295,8 +295,8 @@ def compute_edgelets(lines):
     # if len(class_labels)>0:
     #     check_class = True
 
-    for l in lines:
-        l = l[0]
+    for line in lines:
+        l = line.reshape(4)
         p0, p1 = np.array([l[0], l[1]]), np.array([l[2], l[3]])
         c = (p0 + p1) / 2
         # if check_class:

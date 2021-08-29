@@ -29,6 +29,9 @@ class Line(Sequence):
     def draw(self, img, color=(255,0,0,255), thickness=1):
         cv2.line(img, self.point_a, self.point_b, color, thickness)
 
+    def reshape(self, *args):
+        return self.data.reshape(*args)
+
 
     def recalculate(self):
         self.midpoint = ((self.point_a[0] + self.point_b[0]) / 2, (self.point_a[1] + self.point_b[1]) / 2)
