@@ -18,14 +18,14 @@ from skimage.segmentation import watershed
 from scipy.stats import mode
 
 from pipeline.utils import resize_array
-from pipeline.planegeometry import PlaneGeometry, SemanticKey, Dimension
+from pipeline.planegeometry import PlaneGeometry, Dimension
 from pipeline.surfacerefinement import SurfaceRefinement
 from skimage.morphology import remove_small_objects, remove_small_holes
-from pipeline.semanticlabels import ADE20K
+
+from pipeline.ade20k import ADE20K
+from pipeline.semantics import combine_floor_masks, isolate_masks, Groupings
 from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 from pipeline.fovestimator import calcPlaneXYZ, FovEstimator
-
-wall_like = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen]
 
 def rough_dilate_erode(is_dilate, mask, size=5, iterations=1, scale=0.5, maintain_size=True, interpolation=cv2.INTER_NEAREST):
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(size,size))
@@ -248,38 +248,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
     def output_keys(self) -> list:
         return ["planes", "mask", "lighting", "floor_rotation"]
 
-    def _combine_floor_masks(self, output):
-        
-        output[ADE20K.floor.index] += output[ADE20K.rug.index]
-        output[ADE20K.rug.index] = 0
-
-        output[ADE20K.floor.index] += output[ADE20K.earth.index]
-        output[ADE20K.earth.index] = 0
-
-        output[ADE20K.floor.index] += output[ADE20K.grass.index]
-        output[ADE20K.grass.index] = 0
-
-
-    def _isolate_masks(self, data, output):
-
-        isolated = {}
-
-        isolated[SemanticKey.Wall] = output[ADE20K.wall.index].copy()
-        isolated[SemanticKey.Floor] = output[ADE20K.floor.index].copy()
-        isolated[SemanticKey.Ceiling] = output[ADE20K.ceiling.index].copy()
-        isolated[SemanticKey.WallLike] = np.zeros_like(isolated[SemanticKey.Wall])
-
-        for label in wall_like:
-            isolated[SemanticKey.WallLike] += output[label.index]
-
-        isolated[SemanticKey.Other] = 1.0 - isolated[SemanticKey.Floor] - isolated[SemanticKey.Wall] - isolated[SemanticKey.WallLike] - isolated[SemanticKey.Ceiling]
-
-        if im_logging_enabled(data, LogLevel.Segmentation):
-            for key in isolated.keys():
-                log_image(data, key.value, 255. * isolated[key])
-
-        return isolated
-
     # Create fan from vertical vp
     def fan_surfaces(self, data, img_lr, locations, vp0, sure_walls, wall_mask, normals_c):
 
@@ -404,10 +372,10 @@ class PipelineRefinePlaneMasks(PipelineStep):
         log_image(data, 'lighting', lighting_smooth)
 
         #Include other types as part of floor: rug, earth, grass:
-        self._combine_floor_masks(output)
+        combine_floor_masks(output)
 
         #break masks into major groups: Floor, Wall, Ceiling, etc
-        isolated = self._isolate_masks(data, output)
+        isolated = isolate_masks(data, output)
         
         plane_geometry = PlaneGeometry(data, isolated, img_lr, shape)
         plane_geometry.process()
@@ -423,7 +391,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         segmentation_initial = refiner.refine(data)
         sure_walls = (segmentation_initial == ADE20K.floor.index)
 
-        fov_estimator = FovEstimator(data, img, lines, data["fov"], isolated[SemanticKey.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
+        fov_estimator = FovEstimator(data, img, lines, data["fov"], isolated[Groupings.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
         fov_estimator.estimate(shape)
 
         data["fov"] = fov_estimator.fov
@@ -432,13 +400,13 @@ class PipelineRefinePlaneMasks(PipelineStep):
         if plane_geometry.floor_index > -1:
             plane_geometry.plane_parameters[plane_geometry.floor_index] = fov_estimator.floor_normal * fov_estimator.floor_offset
 
-        labels_fan, fan_normals_reduced, normals_wall = self.fan_surfaces(data, img_lr, fov_estimator.edgelets[0], fov_estimator.vp0, sure_walls, isolated[SemanticKey.Wall], plane_geometry.normals_c)
+        labels_fan, fan_normals_reduced, normals_wall = self.fan_surfaces(data, img_lr, fov_estimator.edgelets[0], fov_estimator.vp0, sure_walls, isolated[Groupings.Wall], plane_geometry.normals_c)
 
         vl_image = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
         vl_image[sure_walls == 0] = 0
 
         ade_seg_c = np.dstack(
-            (.95 * np.ones_like(isolated[SemanticKey.Other]), isolated[SemanticKey.Other], isolated[SemanticKey.Floor], isolated[SemanticKey.Wall], isolated[SemanticKey.Ceiling], isolated[SemanticKey.WallLike]))
+            (.95 * np.ones_like(isolated[Groupings.Other]), isolated[Groupings.Other], isolated[Groupings.Floor], isolated[Groupings.Wall], isolated[Groupings.Ceiling], isolated[Groupings.WallLike]))
         ade_seg = np.argmax(ade_seg_c, -1)
 
         if im_logging_enabled(data, LogLevel.Segmentation):
@@ -633,9 +601,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         # add floor
         if len(floor_indices) > 0:
-            isolated[SemanticKey.Floor] = np.uint8(segmentation_initial == 2)
+            isolated[Groupings.Floor] = np.uint8(segmentation_initial == 2)
             # floor_mask = cv2.dilate(floor_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
-            final_masks.append(255 * isolated[SemanticKey.Floor])
+            final_masks.append(255 * isolated[Groupings.Floor])
 
             plane_parameter = np.zeros((11))
             plane_parameter[:9] = data["planes"]["detection"][floor_indices[0]][:9]
@@ -649,8 +617,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         # add ceiling
         if len(ceiling_indices) > 0:
-            isolated[SemanticKey.Ceiling] = 255 * np.uint8(segmentation_initial == 4)
-            final_masks.append(isolated[SemanticKey.Ceiling])
+            isolated[Groupings.Ceiling] = 255 * np.uint8(segmentation_initial == 4)
+            final_masks.append(isolated[Groupings.Ceiling])
             plane_parameter = np.zeros((11))
             plane_parameter[:9] = data["planes"]["detection"][ceiling_indices[0]][:9]
             plane_parameter[6:9] = plane_geometry.plane_parameters[ceiling_indices[0]]

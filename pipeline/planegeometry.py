@@ -5,16 +5,9 @@ from scipy import ndimage
 from scipy.stats import mode
 from enum import Enum, IntEnum
 
+from pipeline.semantics import Groupings
 from pipeline.utils import resize_array
 from pipeline.logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
-
-
-class SemanticKey(Enum):
-    Wall = "wall"
-    Floor = "floor"
-    Ceiling = "ceiling"
-    WallLike = "wall-like"
-    Other = "other"
 
 class Dimension(IntEnum):
     Horizontal = 0
@@ -93,8 +86,8 @@ class PlaneGeometry:
             # print("floor_normal", floor_normal)
 
     def find_floor_indices(self):
-        floor_mask = cv2.resize(self.isolated_masks[SemanticKey.Floor], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
-        ceiling_mask = cv2.resize(self.isolated_masks[SemanticKey.Ceiling], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
+        floor_mask = cv2.resize(self.isolated_masks[Groupings.Floor], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
+        ceiling_mask = cv2.resize(self.isolated_masks[Groupings.Ceiling], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
 
         floor_intersections = []
         ceiling_intersections = []
@@ -141,7 +134,7 @@ class PlaneGeometry:
 
     def find_wall_indices(self):
 
-        wall_mask = cv2.resize(self.isolated_masks[SemanticKey.Wall], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
+        wall_mask = cv2.resize(self.isolated_masks[Groupings.Wall], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
 
         wall_intersections = []
         dots = []
