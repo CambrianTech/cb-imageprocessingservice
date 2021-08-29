@@ -15,7 +15,7 @@ from pipeline.fov import PipelineCalculateFov
 from pipeline.primaryangle import PipelineDeterminePrimaryAngles
 from pipeline.runmodels import PipelineRunModels
 from pipeline.superpixels import PipelineSuperpixels
-from pipeline.refineplanemasks import PipelineRefinePlaneMasks
+from pipeline.refine import PipelineRefineResults
 from pipeline.combineplanemasks import PipelineCombinePlaneMasks
 from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 
@@ -109,7 +109,7 @@ class Pipeline():
                 PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")),
                 PipelineDeterminePrimaryAngles(),
                 superpixels_step,
-                PipelineRefinePlaneMasks(),
+                PipelineRefineResults(),
                 PipelineCombinePlaneMasks(),
                 output_step
             ]
@@ -123,7 +123,7 @@ class Pipeline():
                 PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")),
                 PipelineDeterminePrimaryAngles(),
                 superpixels_step,
-                PipelineRefinePlaneMasks(),
+                PipelineRefineResults(),
                 PipelineCombinePlaneMasks(),
                 output_step
             ]
@@ -146,7 +146,7 @@ class Pipeline():
             if restore_step <= PipelineStepIndex.Superpixels:
                 self.push(superpixels_step)
             if restore_step <= PipelineStepIndex.Refine: 
-                self.push(PipelineRefinePlaneMasks())
+                self.push(PipelineRefineResults())
             if restore_step <= PipelineStepIndex.CombinePlaneMasks:
                 self.push(PipelineCombinePlaneMasks())
 
