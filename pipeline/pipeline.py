@@ -167,6 +167,11 @@ class Pipeline():
         for step in self.steps:
             step.start()
 
+    def stop(self):
+        print("Stopping threads")
+        for step in self.steps:
+            step.stop()
+
     def step_index(self, pos:int):
         return PipelineStepIndex(self.start_step + pos - 1)
 

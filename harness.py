@@ -6,8 +6,10 @@ import pickle
 import click
 import time
 import asyncio
+import signal
 from concurrent.futures import ThreadPoolExecutor
 
+from pipeline.core import ask_exit
 from pipeline.pipeline import Pipeline, PipelineMode, PipelineStepIndex
 from pipeline.logging import LogLevel
 
@@ -68,15 +70,22 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     export_step = PipelineStepIndex(export) if export is not None else None
     logging_step = PipelineStepIndex(log_step) if log_step is not None else None
 
-    loop = asyncio.get_event_loop()
-    loop.set_default_executor(ThreadPoolExecutor())
-
     pipeline = Pipeline(mode, api_level, src_path=input_dir, dest_path=output_dir, restore_step=restore_step, export_step=export_step, logging_dir=logging_dir, logging_level=log_level, logging_step=logging_step, \
-                        model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
-    pipeline.start()
+                            model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
 
-    loop.run_until_complete(process_files(pipeline, input_dir, pattern=file_pattern))
-    
+    try:
+        loop = asyncio.get_event_loop()
+        loop.set_default_executor(ThreadPoolExecutor())
+
+        for sig in (signal.SIGINT, signal.SIGTERM):          
+            loop.add_signal_handler(sig, ask_exit)  
+
+        pipeline.start()
+        loop.run_until_complete(process_files(pipeline, input_dir, pattern=file_pattern))
+    except Exception:
+        pass
+    finally:
+        pipeline.stop()
 
 
 if __name__ == "__main__":
