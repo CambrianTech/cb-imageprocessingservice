@@ -1,11 +1,19 @@
 import cv2
 import numpy as np
+import random
 
 from pipeline.core import PipelineStep
 from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 from pipeline.ade20k import ADE20K
 from pipeline.semantics import combine_floor_masks, isolate_masks, Groupings
 from pipeline.linefinder import LineFinder
+from cambrian.VanishingPointFinder import VanishingPointFinder
+
+
+def random_color():
+    rgbl=[255,0,0]
+    random.shuffle(rgbl)
+    return tuple(rgbl)
 
 class PipelineRefineResults(PipelineStep):
 
@@ -41,4 +49,22 @@ class PipelineRefineResults(PipelineStep):
         self.isolated = isolate_masks(data, self.output) #break masks into major groups: Floor, Wall, Ceiling, etc
 
         line_finder = LineFinder(self.img, self.bw)
-        line_finder.detect(data)
+        lines = line_finder.detect(data)
+
+        #vanishing points, may not be present!:
+        vpf = VanishingPointFinder(lines)
+        vanishing_points = vpf.compute()
+
+        if vanishing_points is None or len(vanishing_points) == 0:
+            return
+    
+        if im_logging_enabled(data, LogLevel.Lines):
+            debug = self.img.copy()
+
+            for vp in vanishing_points:
+                color = random_color()
+                inliers = np.array(lines)[vp.votes > 0]
+                [line.draw(debug, color=color) for line in inliers]
+
+            log_image(data, "vanishing_points", debug)
+                
