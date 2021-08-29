@@ -8,7 +8,8 @@ from pipeline.ade20k import ADE20K
 from pipeline.semantics import combine_floor_masks, isolate_masks, Groupings
 from pipeline.linefinder import LineFinder
 from cambrian.VanishingPointFinder import VanishingPointFinder
-
+from pipeline.fovestimator import calcPlaneXYZ, FovEstimator
+from pipeline.planegeometry import PlaneGeometry, Dimension
 
 def random_color():
     rgbl=[255,0,0]
@@ -46,25 +47,24 @@ class PipelineRefineResults(PipelineStep):
         self.height, self.width = self.img.shape[:2]
         self.diagonal = np.hypot(self.width, self.height)
 
-        self.isolated = isolate_masks(data, self.output) #break masks into major groups: Floor, Wall, Ceiling, etc
+        h, w = self.output[0].shape
+        shape = (w, h)
 
+        img_lr = cv2.resize(self.img, shape)
+
+        # get all lines:
         line_finder = LineFinder(self.img, self.bw)
         lines = line_finder.detect(data)
 
+        #calculate fov and surface vanishing points:
+        isolated = isolate_masks(data, self.output) #break masks into major groups: Floor, Wall, Ceiling, etc
+
+        plane_geometry = PlaneGeometry(data, isolated, img_lr, shape)
+        plane_geometry.process()
+
+        #fov_estimator = FovEstimator(data, self.img, lines, data["fov"], isolated[Groupings.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
+        #fov_estimator.estimate(shape)
+
         #vanishing points, may not be present!:
-        vpf = VanishingPointFinder(lines)
-        vanishing_points = vpf.compute()
-
-        if vanishing_points is None or len(vanishing_points) == 0:
-            return
-    
-        if im_logging_enabled(data, LogLevel.Lines):
-            debug = self.img.copy()
-
-            for vp in vanishing_points:
-                color = random_color()
-                inliers = np.array(lines)[vp.votes > 0]
-                [line.draw(debug, color=color) for line in inliers]
-
-            log_image(data, "vanishing_points", debug)
+        
                 

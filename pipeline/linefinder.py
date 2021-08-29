@@ -1,15 +1,22 @@
 import cv2
 import numpy as np
 from scipy.spatial import distance
+from collections.abc import Sequence
 
 import math
 from cambrian.LineFunctions import LineFunctions
 from pipeline.logging import log_image, im_logging_enabled, LogLevel
 
-class Line():
+class Line(Sequence):
     def __init__(self, data):
+        super().__init__()
         self.data = data
         self.recalculate()
+
+    def __getitem__(self, i):
+        return self.data[i]
+    def __len__(self):
+        return len(self.data)
 
     @property
     def point_a(self):
@@ -42,7 +49,7 @@ class LineFinder():
 
         fld = cv2.ximgproc.createFastLineDetector(int(self.diagonal / 60.0), 1.41, 200, 240, 3, False)
 
-        lines = list(map(lambda x: Line(x[0]), fld.detect(self.bw)))
+        lines = list(map(lambda x: Line(x.reshape(4)), fld.detect(self.bw)))
 
         if im_logging_enabled(data, LogLevel.Lines):
             debug = self.img.copy()

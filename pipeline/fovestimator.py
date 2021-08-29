@@ -15,9 +15,12 @@ class FovEstimator:
         self.floor_offset = floor_offset
 
 
-    def estimate(self, shape):
+    def estimate(self, shape=None):
         self.estimate_fov()
 
+        if shape is None:
+            shape = self.image.shape
+            
         self.vp0 = self.vps[0] / self.vps[0][2]
 
         vertical_line_inliers = self.inliers[0]
