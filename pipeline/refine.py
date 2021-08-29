@@ -1,21 +1,8 @@
-from pipeline.core import PipelineStep
 import cv2
 import numpy as np
-from scipy import ndimage
-from cambrian import image_processing as ip
-from skimage.morphology import watershed, disk
-from skimage import filters
-from skimage.filters import threshold_multiotsu
 
-
-IM_LOGGING_ENABLED = False
-
-
-def _log_image(name, image):
-    if IM_LOGGING_ENABLED:
-        cv2.imwrite('logging/' + name, image)
-
-
+from pipeline.core import PipelineStep
+from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 
 class PipelineRefineResults(PipelineStep):
     @property
@@ -27,5 +14,10 @@ class PipelineRefineResults(PipelineStep):
         return ["mask", "lighting"]
 
     def run(self, data):
-        
-        print("Refinement!")
+        img = data["image"]
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        if img.shape[1] > 1024:
+            img = cv2.resize(img, (1024, int(img.shape[0] / img.shape[1] * 1024)))
+
+        log_image(data, "image", img)
