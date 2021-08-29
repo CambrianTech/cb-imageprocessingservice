@@ -203,8 +203,13 @@ class PipelineOutput(PipelineStep):
         plane_parameters = np.array(plane_data[6:9], dtype=np.float32)
         plane_offset = np.maximum(1e-4, np.linalg.norm(plane_parameters))
         plane_normal = (plane_parameters / plane_offset).tolist()
-        plane_rotation = plane_data[10]
-        plane_type = np.uint8(plane_data[9])
+
+        plane_rotation = 0
+        plane_type = 0
+
+        if len(plane_data) > 9:
+            plane_rotation = plane_data[10]
+            plane_type = np.uint8(plane_data[9])
 
 
         return {
