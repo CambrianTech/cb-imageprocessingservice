@@ -115,7 +115,6 @@ class Pipeline():
             ]
 
         elif self.mode == PipelineMode.Process:
-            s3Client = S3Client()
             self.steps = [
                 input_step,
                 PipelineRemoteNetworks(self.remote_path),
