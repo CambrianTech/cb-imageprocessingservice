@@ -52,7 +52,7 @@ async def process_files(pipeline, input_dir, pattern):
 @click.option('--restore', type=int, help='Pipeline step to restore from. Data pickle files expected inside input_dir')
 @click.option('--export', type=int, help='Pipeline step to export')
 @click.option("--logging_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
-@click.option('--log_level', type=int, default=LogLevel.Images|LogLevel.Segmentation, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
+@click.option('--log_level', type=int, default=LogLevel.All, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
 def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url, 
          api_level, restore, export, logging_dir, log_level, log_step):

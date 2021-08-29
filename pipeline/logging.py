@@ -7,9 +7,10 @@ class LogLevel(IntFlag):
     Nothing = 0
     Images = 0x1 << 0
     Segmentation = 0x1 << 1
-    Models = 0x1 << 2
+    Lines = 0x1 << 2
+    Models = 0x1 << 3
 
-    All = 0x1 << 15
+    All = 0xff
 
 _logging_index = 0
 
@@ -62,14 +63,16 @@ def log_data(data:dict):
     with open(data_filename, 'wb') as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
                 
-
 def log_image(data:dict, name:str, image, extension=".jpg"):
-    global _logging_index
     if im_logging_enabled(data, LogLevel.Images):
-        path = make_log_path(data, name, extension)
-        print("Saving image", path)
-        cv2.imwrite(path, image)
-        _logging_index += 1
+        _log_image(data, name, cv2.cvtColor(image, cv2.COLOR_BGR2RGB) if len(image.shape)==3 and (extension==".jpg" or extension==".jpeg") else image, extension)
+
+def _log_image(data:dict, name:str, image, extension=".jpg"):
+    global _logging_index
+    path = make_log_path(data, name, extension)
+    print("Saving image", path)
+    cv2.imwrite(path, image)
+    _logging_index += 1
 
 def get_segmentation_image(labels, image, avg=False, resize=True):
     img_seg = image
@@ -83,12 +86,8 @@ def get_segmentation_image(labels, image, avg=False, resize=True):
     return img_seg
 
 def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg"):
-    global _logging_index
     if im_logging_enabled(data, LogLevel.Segmentation):
-        seg = get_segmentation_image(segmentation, image, avg)
-        path = make_log_path(data, name, extension)
-        cv2.imwrite(path, seg)
-        _logging_index += 1
+        _log_image(data, name, get_segmentation_image(segmentation, image, avg), extension)
 
 def log_ply(data:dict, name, image, masks, plane_XYZ, write_occlusion=False, mult=1.0):
     global _logging_index
