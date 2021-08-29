@@ -86,13 +86,23 @@ class Pipeline():
 
         self.start_step = self.restore_step if self.restore_step is not None else PipelineStepIndex.Input
 
+        #todo: consolidate steps around start_step and eliminate three if statements below
+        if self.mode == PipelineMode.Serve:
+            s3Client = S3Client()
+            input_step = PipelineS3Input(self.src_path, s3Client)
+            output_step = PipelineS3Output(self.dest_path, s3Client, api_level=self.api_level)
+        else:
+            input_step = PipelineFileInput(self.src_path)
+            output_step = PipelineFileOutput(self.dest_path, api_level=self.api_level)
+
+
         superpixels_step = PipelineSuperpixels() if self.api_level < 3 else PipelineNoOp()
 
         # Create the steps we want to use in the pipelines
         if self.mode == PipelineMode.Serve:
-            s3Client = S3Client()
+            
             self.steps = [
-                PipelineS3Input(self.src_path, s3Client),
+                input_step,
                 PipelineRemoteNetworks(self.remote_path),
                 PipelineCalculateFov(self.fov_model_path),
                 PipelineRemotePlaneDetector(self.planes_url),
@@ -101,13 +111,13 @@ class Pipeline():
                 superpixels_step,
                 PipelineRefinePlaneMasks(),
                 PipelineCombinePlaneMasks(),
-                PipelineS3Output(self.dest_path, s3Client, api_level=self.api_level)
+                output_step
             ]
 
         elif self.mode == PipelineMode.Process:
             s3Client = S3Client()
             self.steps = [
-                PipelineFileInput(self.src_path, s3Client),
+                input_step,
                 PipelineRemoteNetworks(self.remote_path),
                 PipelineCalculateFov(self.fov_model_path),
                 PipelineRemotePlaneDetector(self.planes_url),
@@ -116,13 +126,13 @@ class Pipeline():
                 superpixels_step,
                 PipelineRefinePlaneMasks(),
                 PipelineCombinePlaneMasks(),
-                PipelineFileOutput(self.dest_path, s3Client, api_level=self.api_level)
+                output_step
             ]
 
         elif self.mode == PipelineMode.Restore:
             print("Restoring from", restore_step.name)
 
-            self.steps = [PipelineFileInput(self.src_path)]
+            self.steps = [input_step]
 
             if restore_step <= PipelineStepIndex.RemoteNetworks:
                 self.push(PipelineRemoteNetworks(self.remote_path))
@@ -141,7 +151,7 @@ class Pipeline():
             if restore_step <= PipelineStepIndex.CombinePlaneMasks:
                 self.push(PipelineCombinePlaneMasks())
 
-            self.push(PipelineFileOutput(self.dest_path, api_level=self.api_level))
+            self.push(output_step)
 
 
     def start(self):
