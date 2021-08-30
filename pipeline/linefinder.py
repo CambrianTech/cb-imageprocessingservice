@@ -5,6 +5,7 @@ from collections.abc import Sequence
 
 import math
 from cambrian.LineFunctions import LineFunctions
+from pipeline.core import PipelineStep
 from pipeline.logging import log_image, im_logging_enabled, LogLevel
 
 class Line(Sequence):
@@ -39,14 +40,29 @@ class Line(Sequence):
         self.length = math.sqrt(self.length_sq)
         self.angle = LineFunctions.line_angle(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
 
-class LineFinder():
+class PipelineLineFinder(PipelineStep):
 
-    def __init__(self, img, bw):
+    def __init__(self, max_size=1024):
         super().__init__()
-        self.img = img
-        self.bw = bw
+        self.max_size = max_size
 
-    def detect(self, data):
+    @property
+    def required_keys(self) -> list:
+        return ["image"]
+
+    @property
+    def output_keys(self) -> list:
+        return ["downscaled", "lines"]
+
+    def run(self, data):
+
+        self.img = data["image"]
+
+        if self.img.shape[1] > self.max_size:
+            data["downscaled"] = self.img = cv2.resize(self.img.copy(), (self.max_size, int(self.img.shape[0] / self.img.shape[1] * self.max_size)))
+
+        self.bw = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
+
         self.height, self.width = self.img.shape[:2]
         self.diagonal = np.hypot(self.width, self.height)
 
@@ -59,4 +75,4 @@ class LineFinder():
             [line.draw(debug) for line in lines]
             log_image(data, "lines", debug)
 
-        return lines
+        data["lines"] = lines
