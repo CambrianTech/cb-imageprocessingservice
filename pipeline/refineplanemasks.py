@@ -18,7 +18,7 @@ from skimage.segmentation import watershed
 from scipy.stats import mode
 
 from pipeline.utils import resize_array
-from pipeline.planegeometry import PlaneGeometry, Dimension
+from pipeline.planegeometry import PipelinePlaneGeometry, Dimension
 from pipeline.surfacerefinement import SurfaceRefinement
 from skimage.morphology import remove_small_objects, remove_small_holes
 
@@ -376,7 +376,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         #break masks into major groups: Floor, Wall, Ceiling, etc
         isolated = isolate_masks(data, output)
         
-        plane_geometry = PlaneGeometry(data, isolated, img_lr, shape)
+        plane_geometry = PipelinePlaneGeometry(data, isolated, img_lr)
         plane_geometry.process()
 
         vert_indices = plane_geometry.dimensions[Dimension.Vertical].indices

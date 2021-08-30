@@ -5,7 +5,8 @@ from scipy import ndimage
 from scipy.stats import mode
 from enum import Enum, IntEnum
 
-from pipeline.semantics import Groupings
+from pipeline.core import PipelineStep
+from pipeline.semantics import Groupings, isolate_masks, combine_floor_masks
 from pipeline.utils import resize_array
 from pipeline.logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 
@@ -30,20 +31,47 @@ class VerticalDimension(PlanarDimension):
         self.wall_indices = wall_indices
         
 
-class PlaneGeometry:
-    def __init__(self, data, isolated_masks, image, shape):
+class PipelinePlaneGeometry(PipelineStep):
+    def __init__(self, data=None, isolated_masks=None, image=None):
         super().__init__()
 
-        self.isolated_masks = isolated_masks
         self.data = data
+        self.isolated_masks = isolated_masks
         self.image = image
-        self.digest_data(shape)
+
+    @property
+    def required_keys(self) -> list:
+        return ["image", "semantic_probs", "normals"]
+
+    @property
+    def output_keys(self) -> list:
+        return ["output", "isolated", "floor_normal", "floor_offset", "floor_index"]
+
+    def run(self, data):
+        self.data = data
+        self.image = self.data["downscaled"] if "downscaled" in self.data else self.data["image"]
+
+        #Consolidate types: Include other types as part of floor: rug, earth, grass
+        self.output = np.float32(self.data["semantic_probs"])
+        combine_floor_masks(self.output)
+        self.isolated_masks = isolate_masks(self.data, self.output) #break masks into major groups: Floor, Wall, Ceiling, etc
+
+        self.process()
+
+        data["output"] = self.output
+        data["isolated"] = self.isolated_masks
+        data["floor_normal"] = self.floor_normal
+        data["floor_offset"] = self.floor_offset
+        data["floor_index"] = self.floor_index
         
     def process(self):
+        self.digest_data()
         self.calculate_geometry()
         self.cluster()
 
-    def digest_data(self, shape):
+    def digest_data(self):
+
+        shape = (self.image.shape[1], self.image.shape[0])
 
         planes_data = self.data["planes"]
         self.plane_parameters = np.array(planes_data["detection"][:, 6:9], dtype=np.float32)
@@ -82,8 +110,6 @@ class PlaneGeometry:
         ceiling_indices = self.dimensions[Dimension.Horizontal].ceiling_indices
         
         self.basis_indices = np.int32(np.concatenate([floor_indices, ceiling_indices, wall_indices]))
-
-            # print("floor_normal", floor_normal)
 
     def find_floor_indices(self):
         floor_mask = cv2.resize(self.isolated_masks[Groupings.Floor], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
