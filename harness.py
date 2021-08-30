@@ -30,7 +30,7 @@ async def process_files(pipeline, input_dir, pattern):
 
     for path in files:
         url = Path(path)
-        unique_id = url.parents[0].name
+        unique_id = url.parents[0].name if len(url.parents) > 0 else url.name
         data = {"path": path, "unique_id": unique_id if path.suffix == ".pickle" else url.stem}
 
         await pipeline.process(data)
@@ -83,7 +83,7 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
         pipeline.start()
         loop.run_until_complete(process_files(pipeline, input_dir, pattern=file_pattern))
     except Exception:
-        pass
+        pass #might consider print here
     finally:
         pipeline.stop()
 
