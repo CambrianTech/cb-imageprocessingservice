@@ -5,7 +5,7 @@ from cambrian import geometry
 from pipeline.core import PipelineStep
 from pipeline.semantics import Groupings
 
-class FovEstimator:
+class PoseEstimator:
     def __init__(self, data, image, lines, fov, floor_mask, floor_normal, floor_offset):
         super().__init__()
         self.data = data
@@ -499,33 +499,6 @@ def ransac_vanishing_point(edgelets, lines, num_ransac_iter=2000, threshold_inli
     return best_models, best_votes, inlier_indices
 
 
-class PipelineEstimateFov(PipelineStep):
-
-    def __init__(self):
-        super().__init__()
-
-    @property
-    def required_keys(self) -> list:
-        return ["image", "lines", "fov", "isolated", "floor_normal", "floor_offset"]
-
-    @property
-    def output_keys(self) -> list:
-        return ["fov", "floor_rotation", "floor_normal", "floor_offset"]
-
-    def run(self, data):
-
-        fov_estimator = FovEstimator(data, data["image"], data["lines"], data["fov"], data["isolated"][Groupings.Floor], data["floor_normal"], data["floor_offset"])
-        fov_estimator.estimate()
-
-        data["fov"] = fov_estimator.fov
-        data["floor_rotation"] = fov_estimator.floor_rotation
-        data["floor_normal"] = fov_estimator.floor_normal
-        data["floor_offset"] = fov_estimator.floor_offset
-        data["fov_edgelets"] = fov_estimator.edgelets
-        data["vp0"] = fov_estimator.vp0
-        data["camera"] = fov_estimator.camera
-
-
 def fov_to_focal(fov, length):
     return length / (2 * np.tan(np.radians(fov) / 2))
 
@@ -623,4 +596,29 @@ def proj(points, plane):
     return s
 
 
+class PipelinePoseEstimator(PipelineStep):
+
+    def __init__(self):
+        super().__init__()
+
+    @property
+    def required_keys(self) -> list:
+        return ["image", "lines", "fov", "isolated", "floor_normal", "floor_offset"]
+
+    @property
+    def output_keys(self) -> list:
+        return ["fov", "floor_rotation", "floor_normal", "floor_offset", "fov_edgelets", "vp0", "camera"]
+
+    def run(self, data):
+
+        fov_estimator = PoseEstimator(data, data["image"], data["lines"], data["fov"], data["isolated"][Groupings.Floor], data["floor_normal"], data["floor_offset"])
+        fov_estimator.estimate()
+
+        data["fov"] = fov_estimator.fov
+        data["floor_rotation"] = fov_estimator.floor_rotation
+        data["floor_normal"] = fov_estimator.floor_normal
+        data["floor_offset"] = fov_estimator.floor_offset
+        data["fov_edgelets"] = fov_estimator.edgelets
+        data["vp0"] = fov_estimator.vp0
+        data["camera"] = fov_estimator.camera
 

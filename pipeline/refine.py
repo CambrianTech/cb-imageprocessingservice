@@ -7,7 +7,7 @@ from pipeline.logging import get_segmentation_image, log_image, log_segmentation
 from pipeline.ade20k import ADE20K
 from pipeline.semantics import combine_floor_masks, isolate_masks, Groupings
 from cambrian.VanishingPointFinder import VanishingPointFinder
-from pipeline.fovestimator import calcPlaneXYZ, FovEstimator
+from pipeline.poseestimator import calcPlaneXYZ
 
 def random_color():
     rgbl=[255,0,0]

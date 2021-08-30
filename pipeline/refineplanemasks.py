@@ -25,7 +25,7 @@ from skimage.morphology import remove_small_objects, remove_small_holes
 from pipeline.ade20k import ADE20K
 from pipeline.semantics import combine_floor_masks, isolate_masks, Groupings
 from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
-from pipeline.fovestimator import calcPlaneXYZ, FovEstimator
+from pipeline.poseestimator import calcPlaneXYZ, PoseEstimator
 
 def rough_dilate_erode(is_dilate, mask, size=5, iterations=1, scale=0.5, maintain_size=True, interpolation=cv2.INTER_NEAREST):
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(size,size))
@@ -390,16 +390,16 @@ class PipelineRefinePlaneMasks(PipelineStep):
         segmentation_initial = refiner.refine(data)
         sure_walls = (segmentation_initial == ADE20K.floor.index)
 
-        fov_estimator = FovEstimator(data, img, lines, data["fov"], isolated[Groupings.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
-        fov_estimator.estimate()
+        pose_estimator = PoseEstimator(data, img, lines, data["fov"], isolated[Groupings.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
+        pose_estimator.estimate()
 
-        data["fov"] = fov_estimator.fov
-        data["floor_rotation"] = fov_estimator.floor_rotation
+        data["fov"] = pose_estimator.fov
+        data["floor_rotation"] = pose_estimator.floor_rotation
         
         if plane_geometry.floor_index > -1:
-            plane_geometry.plane_parameters[plane_geometry.floor_index] = fov_estimator.floor_normal * fov_estimator.floor_offset
+            plane_geometry.plane_parameters[plane_geometry.floor_index] = pose_estimator.floor_normal * pose_estimator.floor_offset
 
-        labels_fan, fan_normals_reduced, normals_wall = self.fan_surfaces(data, img_lr, fov_estimator.edgelets[0], fov_estimator.vp0, sure_walls, isolated[Groupings.Wall], plane_geometry.normals_c)
+        labels_fan, fan_normals_reduced, normals_wall = self.fan_surfaces(data, img_lr, pose_estimator.edgelets[0], pose_estimator.vp0, sure_walls, isolated[Groupings.Wall], plane_geometry.normals_c)
 
         vl_image = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
         vl_image[sure_walls == 0] = 0
@@ -519,7 +519,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                         print("if no good match just take the closest by angle", all_vertical,
                               plane_geometry.plane_parameters[all_vertical[wall_index]], all_vertical[wall_index])
 
-        plane_XYZ, plane_depth = calcPlaneXYZ(plane_geometry.plane_parameters, width=w, height=h, camera=fov_estimator.camera, max_depth=10)
+        plane_XYZ, plane_depth = calcPlaneXYZ(plane_geometry.plane_parameters, width=w, height=h, camera=pose_estimator.camera, max_depth=10)
         log_segmentation_image(data, 'labels_arg', labels_arg, img_lr)
 
 

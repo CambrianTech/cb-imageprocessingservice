@@ -21,7 +21,7 @@ from pipeline.linefinder import PipelineLineFinder
 from pipeline.refine import PipelineRefineResults
 from pipeline.combineplanemasks import PipelineCombinePlaneMasks
 from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
-from pipeline.fovestimator import PipelineEstimateFov
+from pipeline.poseestimator import PipelinePoseEstimator
 
 from enum import IntEnum
 
@@ -42,7 +42,7 @@ class PipelineStepIndex(IntEnum):
     Superpixels = 6
     FindLines = 7
     Geometry = 8
-    EstimateFov = 9
+    EstimatePose = 9
     Refine = 10
     CombinePlaneMasks = 11
     Output = 12
@@ -105,12 +105,12 @@ class Pipeline():
         if self.api_level < 4:
             lines_step = PipelineNoOp
             geometry_step = PipelineNoOp
-            estimate_fov_step = PipelineNoOp
+            estimate_pose_step = PipelineNoOp
             refine_step = PipelineRefinePlaneMasks
         else:
             lines_step = PipelineLineFinder
             geometry_step = PipelinePlaneGeometry
-            estimate_fov_step = PipelineEstimateFov
+            estimate_pose_step = PipelinePoseEstimator
             refine_step = PipelineRefineResults
 
         # Create the steps we want to use in the pipelines
@@ -126,7 +126,7 @@ class Pipeline():
                 superpixels_step(),
                 lines_step(),
                 geometry_step(),
-                estimate_fov_step(),
+                estimate_pose_step(),
                 refine_step(),
                 PipelineCombinePlaneMasks(),
                 output_step
@@ -143,7 +143,7 @@ class Pipeline():
                 superpixels_step(),
                 lines_step(),
                 geometry_step(),
-                estimate_fov_step(),
+                estimate_pose_step(),
                 refine_step(),
                 PipelineCombinePlaneMasks(),
                 output_step
@@ -170,8 +170,8 @@ class Pipeline():
                 self.push(lines_step())
             if restore_step <= PipelineStepIndex.Geometry: 
                 self.push(geometry_step())
-            if restore_step <= PipelineStepIndex.EstimateFov: 
-                self.push(estimate_fov_step())
+            if restore_step <= PipelineStepIndex.EstimatePose: 
+                self.push(estimate_pose_step())
             if restore_step <= PipelineStepIndex.Refine: 
                 self.push(refine_step())
             if restore_step <= PipelineStepIndex.CombinePlaneMasks:
