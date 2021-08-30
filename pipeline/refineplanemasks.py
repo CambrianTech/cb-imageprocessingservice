@@ -391,7 +391,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         sure_walls = (segmentation_initial == ADE20K.floor.index)
 
         fov_estimator = FovEstimator(data, img, lines, data["fov"], isolated[Groupings.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
-        fov_estimator.estimate(shape)
+        fov_estimator.estimate()
 
         data["fov"] = fov_estimator.fov
         data["floor_rotation"] = fov_estimator.floor_rotation

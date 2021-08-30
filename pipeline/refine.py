@@ -36,15 +36,7 @@ class PipelineRefineResults(PipelineStep):
         self.height, self.width = self.img.shape[:2]
         self.diagonal = np.hypot(self.width, self.height)
 
-        img_lr = data["downscaled"] if "downscaled" in data else self.img
-        shape = (img_lr.shape[1], img_lr.shape[0])
-
-        self.isolated = data["isolated"]
-
-        #calculate fov and surface vanishing points:
-        fov_estimator = FovEstimator(data, self.img, data["lines"], data["fov"], self.isolated[Groupings.Floor], data["floor_normal"], data["floor_offset"])
-        fov_estimator.estimate(shape)
-
+        print("vanishing point:", data["vp0"])
         #vanishing points, may not be present!:
         
                 

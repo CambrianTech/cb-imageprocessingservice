@@ -2,6 +2,8 @@ import numpy as np
 from time import time
 import cv2
 from cambrian import geometry
+from pipeline.core import PipelineStep
+from pipeline.semantics import Groupings
 
 class FovEstimator:
     def __init__(self, data, image, lines, fov, floor_mask, floor_normal, floor_offset):
@@ -15,11 +17,11 @@ class FovEstimator:
         self.floor_offset = floor_offset
 
 
-    def estimate(self, shape=None):
+    def estimate(self):
         self.estimate_fov()
 
-        if shape is None:
-            shape = self.image.shape
+        img_lr = self.data["downscaled"] if "downscaled" in self.data else self.data["image"]
+        shape = (img_lr.shape[1], img_lr.shape[0])
 
         self.vp0 = self.vps[0] / self.vps[0][2]
 
@@ -495,6 +497,33 @@ def ransac_vanishing_point(edgelets, lines, num_ransac_iter=2000, threshold_inli
         print("ransac 2 line", np.int32(best_models / best_models[2]))
 
     return best_models, best_votes, inlier_indices
+
+
+class PipelineEstimateFov(PipelineStep):
+
+    def __init__(self):
+        super().__init__()
+
+    @property
+    def required_keys(self) -> list:
+        return ["image", "lines", "fov", "isolated", "floor_normal", "floor_offset"]
+
+    @property
+    def output_keys(self) -> list:
+        return ["fov", "floor_rotation", "floor_normal", "floor_offset"]
+
+    def run(self, data):
+
+        fov_estimator = FovEstimator(data, data["image"], data["lines"], data["fov"], data["isolated"][Groupings.Floor], data["floor_normal"], data["floor_offset"])
+        fov_estimator.estimate()
+
+        data["fov"] = fov_estimator.fov
+        data["floor_rotation"] = fov_estimator.floor_rotation
+        data["floor_normal"] = fov_estimator.floor_normal
+        data["floor_offset"] = fov_estimator.floor_offset
+        data["fov_edgelets"] = fov_estimator.edgelets
+        data["vp0"] = fov_estimator.vp0
+        data["camera"] = fov_estimator.camera
 
 
 def fov_to_focal(fov, length):

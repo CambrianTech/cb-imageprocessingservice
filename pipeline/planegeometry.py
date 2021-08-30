@@ -259,9 +259,21 @@ class PipelinePlaneGeometry(PipelineStep):
 
         data["output"] = output
         data["isolated"] = isolated_masks
+
+        #might cut this down:
+        data["dimensions"] = plane_geometry.dimensions
         data["floor_normal"] = plane_geometry.floor_normal
         data["floor_offset"] = plane_geometry.floor_offset
         data["floor_index"] = plane_geometry.floor_index
+
+        data["normals_c"] = plane_geometry.normals_c
+        data["plane_masks"] = plane_geometry.plane_masks
+        data["cluster_prob"] = plane_geometry.cluster_prob
+        data["xyz"] = plane_geometry.XYZ
+        data["plane_parameters"] = plane_geometry.plane_parameters
+        data["plane_normals"] = plane_geometry.plane_normals
+        data["plane_offsets"] = plane_geometry.plane_offsets
+        data["plane_clusters"] = plane_geometry.plane_clusters
         
     
 
