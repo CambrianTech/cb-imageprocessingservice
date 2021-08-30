@@ -7,7 +7,7 @@ from pipeline.logging import get_segmentation_image, log_image, log_segmentation
 from pipeline.ade20k import ADE20K
 from pipeline.extractsurfaces import Groupings
 from cambrian.VanishingPointFinder import VanishingPointFinder
-from pipeline.poseestimator import calcPlaneXYZ
+from pipeline.poseestimator import calcPlaneXYZ, fan_surfaces
 
 def random_color():
     rgbl=[255,0,0]
@@ -42,5 +42,15 @@ class PipelineRefineResults(PipelineStep):
         log_image(data, 'lighting_smooth', lighting_smooth)
         data["lighting"] = lighting_smooth
         log_image(data, 'lighting', lighting_smooth)
+
+        #finalize angles
+        isolated = data["isolated"]
+        img_lr = data["downscaled"]
+        segmentation_initial = data["segmentation"]
+        sure_floor = (segmentation_initial == ADE20K.floor.index)
+
+
+        labels_fan, fan_normals_reduced, normals_wall = fan_surfaces(data, img_lr, data["edgelets"][0], data["vp0"], sure_floor, isolated[Groupings.Wall], data["normals_c"])
+
         
                 

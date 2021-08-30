@@ -25,7 +25,7 @@ from skimage.morphology import remove_small_objects, remove_small_holes
 from pipeline.ade20k import ADE20K
 from pipeline.extractsurfaces import Groupings
 from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
-from pipeline.poseestimator import calcPlaneXYZ, PoseEstimator
+from pipeline.poseestimator import calcPlaneXYZ, PoseEstimator, fan_surfaces
 
 def rough_dilate_erode(is_dilate, mask, size=5, iterations=1, scale=0.5, maintain_size=True, interpolation=cv2.INTER_NEAREST):
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(size,size))
@@ -143,59 +143,6 @@ def get_planes_class(plane_masks, class_labels):
 
     return plane_classes
 
-def merge_by_angle_sweep(labels_fan, normals_img, fan_normals, mask, angle_threshold):
-
-    k=1
-    normals_wall = normals_img.copy()
-    fan_normals_reduced = []
-
-    for i in range(len(fan_normals) - 1):
-
-        cur_normal = fan_normals[i]
-        next_normal = fan_normals[i + 1]
-        ang1 = abs(np.dot(cur_normal, next_normal))
-        labels_fan[labels_fan == i + 1] = k
-
-        if ang1 > angle_threshold:
-            # print('angle threshold met', ang_threshold, ang1)
-
-            labels_fan[labels_fan == i + 2] = k
-            wedge = np.logical_and(labels_fan == k, mask)
-            norm = np.mean(normals_img[wedge], 0)
-
-            if ~np.isnan(norm[0]):
-                norm /= max(np.linalg.norm(norm), .00001)
-
-                fan_normals[i] = norm
-                fan_normals[i + 1] = norm
-
-                normals_wall[labels_fan == k] = norm
-
-                if i==len(fan_normals) - 2:
-                    fan_normals_reduced.append(norm)
-                    k += 1
-            else:
-                normals_wall[labels_fan == k] = cur_normal
-
-                if i == len(fan_normals) - 2:
-                    fan_normals_reduced.append(norm)
-                    k += 1
-        else:
-            # print('angle threshold not met', angle_threshold, ang1)
-            wedge = np.logical_and(labels_fan == k, mask)
-            norm = np.mean(normals_img[wedge], 0)
-
-            if ~np.isnan(norm[0]):
-                norm /= max(np.linalg.norm(norm), .00001)
-                fan_normals_reduced.append(norm)
-            else:
-                fan_normals_reduced.append(norm)
-            k += 1
-
-    fan_normals_reduced = np.float32(fan_normals_reduced)
-
-    return labels_fan, fan_normals_reduced, normals_wall
-
 def rotationMatrixToEulerAngles(R):
 
     sy = math.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
@@ -246,70 +193,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
     @property
     def output_keys(self) -> list:
         return ["planes", "mask", "lighting", "floor_rotation"]
-
-    # Create fan from vertical vp
-    def fan_surfaces(self, data, img_lr, locations, vp0, sure_walls, wall_mask, normals_c):
-
-        labels_fan = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
-
-        fan_normals = []
-
-        k = 1
-        for i in range(-1, len(locations)):
-            if i == -1:
-                closest = np.int32([[0, img_lr.shape[1]], [0, 0]])
-                dir = closest - vp0[:2]
-                closest_index = np.argmin(np.abs(dir[:, 1]))
-                pt1 = np.int32(2 * closest[closest_index] - vp0[:2])
-                pt2 = np.int32(2 * locations[i + 1] - vp0[:2])
-            elif i == len(locations) - 1:
-                closest = np.int32([[img_lr.shape[1], img_lr.shape[0]], [img_lr.shape[1], 0]])
-                dir = closest - vp0[:2]
-                closest_index = np.argmin(np.abs(dir[:, 1]))
-                pt2 = np.int32(2 * closest[closest_index] - vp0[:2])
-                pt1 = np.int32(2 * locations[i] - vp0[:2])
-            else:
-                pt1 = np.int32(2 * locations[i] - vp0[:2])
-                pt2 = np.int32(2 * locations[i + 1] - vp0[:2])
-
-            triangle = np.array([[[vp0[0], vp0[1]], pt1, pt2]], np.int32)
-
-            arc_mask = cv2.fillPoly(np.zeros_like(labels_fan), pts=triangle, color=1)
-
-            wall_arc = np.logical_and(sure_walls > 0, arc_mask > 0)
-            wedge = np.logical_and(wall_arc, wall_mask > .9)
-            a = np.sum(wedge)
-
-            if a > 0:
-                labels_fan[wall_arc > 0] = k
-
-                cur_normal = np.mean(normals_c[wedge], 0)
-                cur_normal /= max(np.linalg.norm(cur_normal), .00001)
-                fan_normals.append(cur_normal)
-                k += 1
-            # else:
-            #     if len(fan_normals)>0:
-            #         fan_normals.append(fan_normals[-1])
-
-        # Merge by normal angle diff
-
-        labels_fan, fan_normals_reduced, normals_wall = merge_by_angle_sweep(labels_fan, normals_c, fan_normals,
-                                                                             wall_mask > .9, angle_threshold=.85)
-
-        log_segmentation_image(data, "fan1", labels_fan, img_lr)
-
-        unique_labels = np.unique(labels_fan[labels_fan > 0])
-
-        fan_normals_reduced = np.float32([np.mean(normals_c[labels_fan == j], 0) for j in unique_labels])
-        lengths = np.sqrt(np.sum(fan_normals_reduced * fan_normals_reduced, -1))
-        fan_normals_reduced /= np.dstack((lengths, lengths, lengths))[0]
-
-        labels_fan, fan_normals_reduced, normals_wall = merge_by_angle_sweep(labels_fan, normals_wall,
-                                                                             fan_normals_reduced, wall_mask > 0,
-                                                                             angle_threshold=.8)
-        log_segmentation_image(data, "fan2", labels_fan, img_lr)
-
-        return labels_fan, fan_normals_reduced, normals_wall
 
     def transfer_labels(self, data, final_labels, final_plane_number, final_plane_parameters):
         data["planes"]["masks"] = np.zeros((final_plane_number, final_labels.shape[0], final_labels.shape[1]),
@@ -384,7 +267,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         refiner = SurfaceRefinement(img_lr, hed_lr, isolated, lines)
         segmentation_initial = refiner.refine(data)
-        sure_walls = (segmentation_initial == ADE20K.floor.index)
+        sure_walls = (segmentation_initial == ADE20K.floor.index) #shouldn't this be == ADE20K.wall.index
 
         pose_estimator = PoseEstimator(data, img, lines, data["fov"], isolated[Groupings.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
         pose_estimator.estimate()
@@ -395,7 +278,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         if plane_geometry.floor_index > -1:
             plane_geometry.plane_parameters[plane_geometry.floor_index] = pose_estimator.floor_normal * pose_estimator.floor_offset
 
-        labels_fan, fan_normals_reduced, normals_wall = self.fan_surfaces(data, img_lr, pose_estimator.edgelets[0], pose_estimator.vp0, sure_walls, isolated[Groupings.Wall], plane_geometry.normals_c)
+        labels_fan, fan_normals_reduced, normals_wall = fan_surfaces(data, img_lr, pose_estimator.edgelets[0], pose_estimator.vp0, sure_walls, isolated[Groupings.Wall], plane_geometry.normals_c)
 
         vl_image = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
         vl_image[sure_walls == 0] = 0
