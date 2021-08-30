@@ -65,7 +65,7 @@ def log_data(data:dict):
                 
 def log_image(data:dict, name:str, image, extension=".jpg"):
     if im_logging_enabled(data, LogLevel.Images):
-        _log_image(data, name, cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB) if len(image.shape)==3 and (extension==".jpg" or extension==".jpeg") else image.astype(np.uint8), extension)
+        _log_image(data, name, image.astype(np.uint8), extension)
 
 def _log_image(data:dict, name:str, image, extension=".jpg"):
     global _logging_index
