@@ -36,7 +36,11 @@ class PipelineRefineResults(PipelineStep):
         self.height, self.width = self.img.shape[:2]
         self.diagonal = np.hypot(self.width, self.height)
 
-        #print("vanishing point:", data["vp0"])
-        #vanishing points, may not be present!:
+        #process lighting
+        lighting_rgb = np.uint8(data["lighting"])
+        lighting_smooth = cv2.edgePreservingFilter(lighting_rgb, flags=1, sigma_s=10, sigma_r=1.0)
+        log_image(data, 'lighting_smooth', lighting_smooth)
+        data["lighting"] = lighting_smooth
+        log_image(data, 'lighting', lighting_smooth)
         
                 
