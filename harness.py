@@ -40,8 +40,8 @@ async def process_files(pipeline, input_dir, pattern):
     return len(files)
 
 
-#For instance, to restore from step 7 (after refinement):
-#python -W ignore harness.py data --restore=7
+#For instance, to restore from step 6 (before refinement):
+#python -W ignore harness.py data --restore=6
 
 @click.command()
 @click.argument("input_dir", default='test_images', type=click.Path(exists=True, file_okay=False, dir_okay=True))
