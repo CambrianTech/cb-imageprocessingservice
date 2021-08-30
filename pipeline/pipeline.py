@@ -46,6 +46,10 @@ class PipelineStepIndex(IntEnum):
     Output = 11
 
 class PipelineNoOp(PipelineStep):
+
+    def __init__(self):
+        super().__init__()
+
     @property
     def required_keys(self) -> list:
         return []
@@ -54,14 +58,8 @@ class PipelineNoOp(PipelineStep):
     def output_keys(self) -> list:
         return []
 
-    @property
-    def is_batched(self) -> bool:
-        return True
-
     def run(self, data):
-        print("Noop")
-        exit()
-
+        print("No Operation")
 
 class Pipeline():
 

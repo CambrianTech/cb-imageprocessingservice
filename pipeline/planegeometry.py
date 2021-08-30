@@ -30,40 +30,12 @@ class VerticalDimension(PlanarDimension):
         super().__init__(vert_indices, angles)
         self.wall_indices = wall_indices
         
-
-class PipelinePlaneGeometry(PipelineStep):
-    def __init__(self, data=None, isolated_masks=None, image=None):
-        super().__init__()
-
+class PlaneGeometry():
+    def __init__(self, data, isolated_masks, image):
         self.data = data
         self.isolated_masks = isolated_masks
         self.image = image
 
-    @property
-    def required_keys(self) -> list:
-        return ["image", "semantic_probs", "normals"]
-
-    @property
-    def output_keys(self) -> list:
-        return ["output", "isolated", "floor_normal", "floor_offset", "floor_index"]
-
-    def run(self, data):
-        self.data = data
-        self.image = self.data["downscaled"] if "downscaled" in self.data else self.data["image"]
-
-        #Consolidate types: Include other types as part of floor: rug, earth, grass
-        self.output = np.float32(self.data["semantic_probs"])
-        combine_floor_masks(self.output)
-        self.isolated_masks = isolate_masks(self.data, self.output) #break masks into major groups: Floor, Wall, Ceiling, etc
-
-        self.process()
-
-        data["output"] = self.output
-        data["isolated"] = self.isolated_masks
-        data["floor_normal"] = self.floor_normal
-        data["floor_offset"] = self.floor_offset
-        data["floor_index"] = self.floor_index
-        
     def process(self):
         self.digest_data()
         self.calculate_geometry()
@@ -261,6 +233,37 @@ class PipelinePlaneGeometry(PipelineStep):
             pass
         t = -np.matmul(R, center_1) + center_2
         return R, t
+
+class PipelinePlaneGeometry(PipelineStep):
+    def __init__(self):
+        super().__init__()
+
+    @property
+    def required_keys(self) -> list:
+        return ["image", "semantic_probs", "normals"]
+
+    @property
+    def output_keys(self) -> list:
+        return ["output", "isolated", "floor_normal", "floor_offset", "floor_index"]
+
+    def run(self, data):
+        img_lr = data["downscaled"] if "downscaled" in data else data["image"]
+
+        #Consolidate types: Include other types as part of floor: rug, earth, grass
+        output = np.float32(data["semantic_probs"])
+        combine_floor_masks(output)
+        isolated_masks = isolate_masks(data, output) #break masks into major groups: Floor, Wall, Ceiling, etc
+
+        plane_geometry = PlaneGeometry(data, isolated_masks, img_lr)
+        plane_geometry.process()
+
+        data["output"] = output
+        data["isolated"] = isolated_masks
+        data["floor_normal"] = plane_geometry.floor_normal
+        data["floor_offset"] = plane_geometry.floor_offset
+        data["floor_index"] = plane_geometry.floor_index
+        
+    
 
 
 
