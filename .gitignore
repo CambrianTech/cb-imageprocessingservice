@@ -127,3 +127,4 @@ gluon_models/
 /scripts/refine-input
 test_images/*
 /data
+/single

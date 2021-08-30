@@ -9,7 +9,7 @@ class PipelineStep(metaclass=ABCMeta):
         self.batch_max_wait_time = batch_max_wait_time
         self.batch_debounce_time = batch_debounce_time
         self.batch_max_size = batch_max_size
-        self._started = False
+        self._running = False
         self._input_queue = asyncio.Queue()
 
     @abstractmethod
@@ -30,26 +30,35 @@ class PipelineStep(metaclass=ABCMeta):
 
     @property
     def started(self) -> bool:
-        return self._started
+        return self._running
 
     @property
     def num_waiting_items(self) -> int:
         return self._input_queue.qsize()
 
     def schedule(self, input_dict, future):
+        self.future = future
         self._input_queue.put_nowait((input_dict, future))
 
     def start(self):
-        if not self._started:
-            self._started = True
+        if not self._running:
+            self._running = True
             for _ in range(1 if self.is_batched else cpu_count()):
                 asyncio.ensure_future(self.run_step_in_background())
+
+    def stop(self):
+        self._running = False
 
     async def run_step_in_background(self):
         loop = asyncio.get_event_loop()
 
-        while True:
-            datum, result_future = await self._input_queue.get()
+        while self._running:
+            #sleep on running and entries
+            if self._input_queue.empty():
+                await asyncio.sleep(0.0001)
+                continue
+
+            datum, result_future = self._input_queue.get_nowait()
             self._input_queue.task_done()
 
             if result_future.cancelled():
@@ -97,6 +106,7 @@ class PipelineStep(metaclass=ABCMeta):
                 if not result_future.cancelled():
                     result_future.set_result(datum)
 
+        print("Task is finished")
 
 def schedule_and_wait(func: typing.Callable[[typing.Dict, asyncio.Future], None], input_dict: typing.Dict) -> asyncio.Future:
     """Calls a function and returns a future that the function is supposed to fullfil."""
@@ -116,5 +126,17 @@ async def merge_future_dicts(*futures) -> typing.Dict:
 def num_waiting_items(steps: typing.List[PipelineStep]) -> int:
     """Counts the number of waiting items in a list of pipeline steps."""
     return sum([step.num_waiting_items for step in steps])
+
+@asyncio.coroutine                                       
+def exit():                                              
+    loop = asyncio.get_event_loop()                      
+    print("Stop")                                        
+    loop.stop()                                          
+
+
+def ask_exit():                          
+    for task in asyncio.all_tasks():
+        task.cancel()                    
+    asyncio.ensure_future(exit()) 
 
 

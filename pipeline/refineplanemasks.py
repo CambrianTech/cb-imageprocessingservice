@@ -39,8 +39,7 @@ def rough_dilate_erode(is_dilate, mask, size=5, iterations=1, scale=0.5, maintai
 def gabor_filter(bw, theta, lambd, gamma=0.0, psi=0.0):
     ksize = lambd
     sigma = ksize * lambd
-    result = cv2.filter2D(bw, cv2.CV_8UC1,
-                          cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_32F))
+    result = cv2.filter2D(bw, cv2.CV_8UC1, cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_32F))
     return result
 
 
