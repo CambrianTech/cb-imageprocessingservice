@@ -247,7 +247,7 @@ class PipelinePlaneGeometry(PipelineStep):
         return ["isolated", "floor_normal", "floor_offset", "floor_index"]
 
     def run(self, data):
-        img_lr = data["downscaled"] if "downscaled" in data else data["image"]
+        img_lr = data["downscaled"]
 
         plane_geometry = PlaneGeometry(data, data["isolated"], img_lr)
         plane_geometry.process()

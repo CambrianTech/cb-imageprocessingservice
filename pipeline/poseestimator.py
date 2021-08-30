@@ -20,7 +20,7 @@ class PoseEstimator:
     def estimate(self):
         self.estimate_fov()
 
-        img_lr = self.data["downscaled"] if "downscaled" in self.data else self.data["image"]
+        img_lr = self.data["downscaled"]
         shape = (img_lr.shape[1], img_lr.shape[0])
 
         self.vp0 = self.vps[0] / self.vps[0][2]

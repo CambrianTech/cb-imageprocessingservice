@@ -21,7 +21,7 @@ class PipelineRefineResults(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["image", "output", "lines", "isolated"]
+        return ["image", "output", "lines", "isolated", "segmentation"]
 
     @property
     def output_keys(self) -> list:
@@ -36,7 +36,7 @@ class PipelineRefineResults(PipelineStep):
         self.height, self.width = self.img.shape[:2]
         self.diagonal = np.hypot(self.width, self.height)
 
-        print("vanishing point:", data["vp0"])
+        #print("vanishing point:", data["vp0"])
         #vanishing points, may not be present!:
         
                 

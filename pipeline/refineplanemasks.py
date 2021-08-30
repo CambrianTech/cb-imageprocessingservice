@@ -382,7 +382,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         ######################################## Initial refinement work
         line_data, lines = find_lines(data["image"], cv2.resize(hed_lr, (data["image"].shape[1], data["image"].shape[0])), data["normals"])
 
-        refiner = SurfaceRefinement(img_lr, hed_lr, isolated, line_data, lines)
+        refiner = SurfaceRefinement(img_lr, hed_lr, isolated, lines)
         segmentation_initial = refiner.refine(data)
         sure_walls = (segmentation_initial == ADE20K.floor.index)
 

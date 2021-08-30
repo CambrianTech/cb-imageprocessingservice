@@ -23,6 +23,7 @@ from pipeline.combineplanemasks import PipelineCombinePlaneMasks
 from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 from pipeline.poseestimator import PipelinePoseEstimator
 from pipeline.extractsurfaces import PipelineExtractSurfaces
+from pipeline.surfacerefinement import PipelineSurfaceRefinement
 
 from enum import IntEnum
 
@@ -43,11 +44,12 @@ class PipelineStepIndex(IntEnum):
     ExtractSurfaces = 6
     Superpixels = 7
     FindLines = 8
-    Geometry = 9
-    EstimatePose = 10
-    Refine = 11
-    CombinePlaneMasks = 12
-    Output = 13
+    RefineSurfaces = 9
+    Geometry = 10
+    EstimatePose = 11
+    Refine = 12
+    CombinePlaneMasks = 13
+    Output = 14
 
 class PipelineNoOp(PipelineStep):
 
@@ -106,12 +108,14 @@ class Pipeline():
 
         extract_step = PipelineExtractSurfaces
 
-        if self.api_level < 4:
+        if self.api_level < 3.5:
+            refine_surfaces_step = PipelineNoOp
             lines_step = PipelineNoOp
             geometry_step = PipelineNoOp
             estimate_pose_step = PipelineNoOp
             refine_step = PipelineRefinePlaneMasks
         else:
+            refine_surfaces_step = PipelineSurfaceRefinement
             lines_step = PipelineLineFinder
             geometry_step = PipelinePlaneGeometry
             estimate_pose_step = PipelinePoseEstimator
@@ -128,6 +132,7 @@ class Pipeline():
                 PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")),
                 PipelineDeterminePrimaryAngles(),
                 extract_step(),
+                refine_surfaces_step(),
                 superpixels_step(),
                 lines_step(),
                 geometry_step(),
@@ -146,6 +151,7 @@ class Pipeline():
                 PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")),
                 PipelineDeterminePrimaryAngles(),
                 extract_step(),
+                refine_surfaces_step(),
                 superpixels_step(),
                 lines_step(),
                 geometry_step(),
@@ -176,6 +182,8 @@ class Pipeline():
                 self.push(superpixels_step())
             if restore_step <= PipelineStepIndex.FindLines: 
                 self.push(lines_step())
+            if restore_step <= PipelineStepIndex.RefineSurfaces:
+                self.push(refine_surfaces_step())
             if restore_step <= PipelineStepIndex.Geometry: 
                 self.push(geometry_step())
             if restore_step <= PipelineStepIndex.EstimatePose: 

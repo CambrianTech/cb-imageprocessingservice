@@ -1,5 +1,6 @@
 from enum import Enum
 import numpy as np
+import cv2
 
 from pipeline.core import PipelineStep
 from pipeline.logging import im_logging_enabled, log_image, LogLevel
@@ -50,13 +51,14 @@ class PipelineExtractSurfaces(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["semantic_probs"]
+        return ["image", "semantic_probs"]
 
     @property
     def output_keys(self) -> list:
         return ["output", "isolated"]
 
     def run(self, data):
+
         #Consolidate types: Include other types as part of floor: rug, earth, grass
         output = np.float32(data["semantic_probs"])
         combine_floor_masks(output)
@@ -64,3 +66,13 @@ class PipelineExtractSurfaces(PipelineStep):
 
         data["output"] = output
         data["isolated"] = isolated_masks
+
+        h, w = output[0].shape
+        shape = (w, h)
+
+        if data["image"].shape[0] > shape[0] or data["image"].shape[1] > shape[1]:
+            data["downscaled"] = cv2.resize(data["image"].copy(), shape)
+        else:
+            data["downscaled"] = data["image"]
+
+        

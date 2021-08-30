@@ -42,36 +42,27 @@ class Line(Sequence):
 
 class PipelineLineFinder(PipelineStep):
 
-    def __init__(self, max_size=1024):
-        super().__init__()
-        self.max_size = max_size
-
     @property
     def required_keys(self) -> list:
         return ["image"]
 
     @property
     def output_keys(self) -> list:
-        return ["downscaled", "lines"]
+        return ["lines"]
 
     def run(self, data):
 
-        self.img = data["image"]
+        bw = cv2.cvtColor(data["image"], cv2.COLOR_BGR2GRAY)
 
-        if self.img.shape[1] > self.max_size:
-            data["downscaled"] = self.img = cv2.resize(self.img.copy(), (self.max_size, int(self.img.shape[0] / self.img.shape[1] * self.max_size)))
-
-        self.bw = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
-
-        self.height, self.width = self.img.shape[:2]
+        self.height, self.width = bw.shape[:2]
         self.diagonal = np.hypot(self.width, self.height)
 
         fld = cv2.ximgproc.createFastLineDetector(int(self.diagonal / 60.0), 1.41, 200, 240, 3, False)
 
-        lines = list(map(lambda x: Line(x.reshape(4)), fld.detect(self.bw)))
+        lines = list(map(lambda x: Line(x.reshape(4)), fld.detect(bw)))
 
         if im_logging_enabled(data, LogLevel.Lines):
-            debug = self.img.copy()
+            debug = data["image"].copy()
             [line.draw(debug) for line in lines]
             log_image(data, "lines", debug)
 
