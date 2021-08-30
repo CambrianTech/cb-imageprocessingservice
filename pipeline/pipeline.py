@@ -15,6 +15,7 @@ from pipeline.fov import PipelineCalculateFov
 from pipeline.primaryangle import PipelineDeterminePrimaryAngles
 from pipeline.runmodels import PipelineRunModels
 from pipeline.superpixels import PipelineSuperpixels
+from pipeline.refineplanemasks import PipelineRefinePlaneMasks
 from pipeline.refine import PipelineRefineResults
 from pipeline.combineplanemasks import PipelineCombinePlaneMasks
 from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
@@ -95,8 +96,8 @@ class Pipeline():
             input_step = PipelineFileInput(self.src_path)
             output_step = PipelineFileOutput(self.dest_path, api_level=self.api_level)
 
-
-        superpixels_step = PipelineSuperpixels() if self.api_level < 3 else PipelineNoOp()
+        superpixels_step = PipelineSuperpixels if self.api_level < 3 else PipelineNoOp
+        refine_step = PipelineRefinePlaneMasks
 
         # Create the steps we want to use in the pipelines
         if self.mode == PipelineMode.Serve:
@@ -108,8 +109,8 @@ class Pipeline():
                 PipelineRemotePlaneDetector(self.planes_url),
                 PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")),
                 PipelineDeterminePrimaryAngles(),
-                superpixels_step,
-                PipelineRefineResults(),
+                superpixels_step(),
+                refine_step(),
                 PipelineCombinePlaneMasks(),
                 output_step
             ]
@@ -122,8 +123,8 @@ class Pipeline():
                 PipelineRemotePlaneDetector(self.planes_url),
                 PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")),
                 PipelineDeterminePrimaryAngles(),
-                superpixels_step,
-                PipelineRefineResults(),
+                superpixels_step(),
+                refine_step(),
                 PipelineCombinePlaneMasks(),
                 output_step
             ]
@@ -146,7 +147,7 @@ class Pipeline():
             if restore_step <= PipelineStepIndex.Superpixels:
                 self.push(superpixels_step)
             if restore_step <= PipelineStepIndex.Refine: 
-                self.push(PipelineRefineResults())
+                self.push(refine_step())
             if restore_step <= PipelineStepIndex.CombinePlaneMasks:
                 self.push(PipelineCombinePlaneMasks())
 

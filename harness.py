@@ -73,19 +73,16 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     pipeline = Pipeline(mode, api_level, src_path=input_dir, dest_path=output_dir, restore_step=restore_step, export_step=export_step, logging_dir=logging_dir, logging_level=log_level, logging_step=logging_step, \
                             model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
 
-    try:
-        loop = asyncio.get_event_loop()
-        loop.set_default_executor(ThreadPoolExecutor())
 
-        for sig in (signal.SIGINT, signal.SIGTERM):          
-            loop.add_signal_handler(sig, ask_exit)  
+    loop = asyncio.get_event_loop()
+    loop.set_default_executor(ThreadPoolExecutor())
 
-        pipeline.start()
-        loop.run_until_complete(process_files(pipeline, input_dir, pattern=file_pattern))
-    except Exception:
-        pass #might consider print here
-    finally:
-        pipeline.stop()
+    for sig in (signal.SIGINT, signal.SIGTERM):          
+        loop.add_signal_handler(sig, ask_exit)  
+
+    pipeline.start()
+    loop.run_until_complete(process_files(pipeline, input_dir, pattern=file_pattern))
+    pipeline.stop()
 
 
 if __name__ == "__main__":
