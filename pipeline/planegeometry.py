@@ -5,8 +5,8 @@ from scipy import ndimage
 from scipy.stats import mode
 from enum import Enum, IntEnum
 
+from pipeline.extractsurfaces import Groupings
 from pipeline.core import PipelineStep
-from pipeline.semantics import Groupings, isolate_masks, combine_floor_masks
 from pipeline.utils import resize_array
 from pipeline.logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 
@@ -240,25 +240,17 @@ class PipelinePlaneGeometry(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["image", "semantic_probs", "normals"]
+        return ["image", "normals", "isolated"]
 
     @property
     def output_keys(self) -> list:
-        return ["output", "isolated", "floor_normal", "floor_offset", "floor_index"]
+        return ["isolated", "floor_normal", "floor_offset", "floor_index"]
 
     def run(self, data):
         img_lr = data["downscaled"] if "downscaled" in data else data["image"]
 
-        #Consolidate types: Include other types as part of floor: rug, earth, grass
-        output = np.float32(data["semantic_probs"])
-        combine_floor_masks(output)
-        isolated_masks = isolate_masks(data, output) #break masks into major groups: Floor, Wall, Ceiling, etc
-
-        plane_geometry = PlaneGeometry(data, isolated_masks, img_lr)
+        plane_geometry = PlaneGeometry(data, data["isolated"], img_lr)
         plane_geometry.process()
-
-        data["output"] = output
-        data["isolated"] = isolated_masks
 
         #might cut this down:
         data["dimensions"] = plane_geometry.dimensions

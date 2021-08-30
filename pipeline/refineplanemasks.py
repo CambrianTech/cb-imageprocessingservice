@@ -23,7 +23,7 @@ from pipeline.surfacerefinement import SurfaceRefinement
 from skimage.morphology import remove_small_objects, remove_small_holes
 
 from pipeline.ade20k import ADE20K
-from pipeline.semantics import combine_floor_masks, isolate_masks, Groupings
+from pipeline.extractsurfaces import Groupings
 from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 from pipeline.poseestimator import calcPlaneXYZ, PoseEstimator
 
@@ -241,7 +241,7 @@ def draw_grid(img, line_color=(0, 255, 0), thickness=1, type_=cv2.LINE_AA, pxste
 class PipelineRefinePlaneMasks(PipelineStep):
     @property
     def required_keys(self) -> list:
-        return ["image", "semantic_probs", "hed", "mask", "floor_rotation"]
+        return ["image", "output", "hed", "mask", "isolated"]
 
     @property
     def output_keys(self) -> list:
@@ -348,7 +348,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         log_image(data, "image", img)
 
-        output = np.float32(data["semantic_probs"])
+        output = data["output"]
 
         hed = data["hed"]
         log_image(data, 'hed', hed)
@@ -370,18 +370,14 @@ class PipelineRefinePlaneMasks(PipelineStep):
         data["lighting"] = lighting_smooth
         log_image(data, 'lighting', lighting_smooth)
 
-        #Include other types as part of floor: rug, earth, grass:
-        combine_floor_masks(output)
-
         #break masks into major groups: Floor, Wall, Ceiling, etc
-        isolated = isolate_masks(data, output)
+        isolated = data["isolated"]
         
         plane_geometry = PlaneGeometry(data, isolated, img_lr)
         plane_geometry.process()
 
         vert_indices = plane_geometry.dimensions[Dimension.Vertical].indices
         number_planes = len(plane_geometry.plane_masks)
-        
 
         ######################################## Initial refinement work
         line_data, lines = find_lines(data["image"], cv2.resize(hed_lr, (data["image"].shape[1], data["image"].shape[0])), data["normals"])

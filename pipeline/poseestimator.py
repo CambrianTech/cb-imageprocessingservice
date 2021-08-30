@@ -3,7 +3,7 @@ from time import time
 import cv2
 from cambrian import geometry
 from pipeline.core import PipelineStep
-from pipeline.semantics import Groupings
+from pipeline.extractsurfaces import Groupings
 
 class PoseEstimator:
     def __init__(self, data, image, lines, fov, floor_mask, floor_normal, floor_offset):

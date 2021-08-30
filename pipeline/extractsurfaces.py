@@ -1,6 +1,7 @@
 from enum import Enum
 import numpy as np
 
+from pipeline.core import PipelineStep
 from pipeline.logging import im_logging_enabled, log_image, LogLevel
 from pipeline.ade20k import ADE20K, wall_like
 
@@ -42,3 +43,24 @@ def isolate_masks(data, output):
             log_image(data, key.value, 255. * isolated[key])
 
     return isolated
+
+class PipelineExtractSurfaces(PipelineStep):
+    def __init__(self):
+        super().__init__()
+
+    @property
+    def required_keys(self) -> list:
+        return ["semantic_probs"]
+
+    @property
+    def output_keys(self) -> list:
+        return ["output", "isolated"]
+
+    def run(self, data):
+        #Consolidate types: Include other types as part of floor: rug, earth, grass
+        output = np.float32(data["semantic_probs"])
+        combine_floor_masks(output)
+        isolated_masks = isolate_masks(data, output) #break masks into major groups: Floor, Wall, Ceiling, etc
+
+        data["output"] = output
+        data["isolated"] = isolated_masks

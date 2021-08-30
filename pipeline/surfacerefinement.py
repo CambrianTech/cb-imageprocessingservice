@@ -5,7 +5,7 @@ import cv2
 import cambrian.image_processing as ip
 from cambrian.Line import Line
 
-from pipeline.semantics import Groupings
+from pipeline.extractsurfaces import Groupings
 from pipeline.logging import get_segmentation_image, log_segmentation_image, im_logging_enabled, log_image, LogLevel
 from skimage.morphology import skeletonize, remove_small_objects
 from skimage.segmentation import join_segmentations, watershed

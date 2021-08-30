@@ -5,7 +5,7 @@ import random
 from pipeline.core import PipelineStep
 from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 from pipeline.ade20k import ADE20K
-from pipeline.semantics import combine_floor_masks, isolate_masks, Groupings
+from pipeline.extractsurfaces import Groupings
 from cambrian.VanishingPointFinder import VanishingPointFinder
 from pipeline.poseestimator import calcPlaneXYZ
 
@@ -21,7 +21,7 @@ class PipelineRefineResults(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["image", "semantic_probs", "lines", "isolated"]
+        return ["image", "output", "lines", "isolated"]
 
     @property
     def output_keys(self) -> list:

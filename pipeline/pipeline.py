@@ -22,6 +22,7 @@ from pipeline.refine import PipelineRefineResults
 from pipeline.combineplanemasks import PipelineCombinePlaneMasks
 from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 from pipeline.poseestimator import PipelinePoseEstimator
+from pipeline.extractsurfaces import PipelineExtractSurfaces
 
 from enum import IntEnum
 
@@ -39,13 +40,14 @@ class PipelineStepIndex(IntEnum):
     RemotePlaneDetector = 3
     RunModels = 4
     DeterminePrimaryAngles = 5
-    Superpixels = 6
-    FindLines = 7
-    Geometry = 8
-    EstimatePose = 9
-    Refine = 10
-    CombinePlaneMasks = 11
-    Output = 12
+    ExtractSurfaces = 6
+    Superpixels = 7
+    FindLines = 8
+    Geometry = 9
+    EstimatePose = 10
+    Refine = 11
+    CombinePlaneMasks = 12
+    Output = 13
 
 class PipelineNoOp(PipelineStep):
 
@@ -102,6 +104,8 @@ class Pipeline():
 
         superpixels_step = PipelineSuperpixels if self.api_level < 3 else PipelineNoOp
 
+        extract_step = PipelineExtractSurfaces
+
         if self.api_level < 4:
             lines_step = PipelineNoOp
             geometry_step = PipelineNoOp
@@ -123,6 +127,7 @@ class Pipeline():
                 PipelineRemotePlaneDetector(self.planes_url),
                 PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")),
                 PipelineDeterminePrimaryAngles(),
+                extract_step(),
                 superpixels_step(),
                 lines_step(),
                 geometry_step(),
@@ -140,6 +145,7 @@ class Pipeline():
                 PipelineRemotePlaneDetector(self.planes_url),
                 PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")),
                 PipelineDeterminePrimaryAngles(),
+                extract_step(),
                 superpixels_step(),
                 lines_step(),
                 geometry_step(),
@@ -164,6 +170,8 @@ class Pipeline():
                 self.push(PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")))
             if restore_step <= PipelineStepIndex.DeterminePrimaryAngles:
                 self.push(PipelineDeterminePrimaryAngles())
+            if restore_step <= PipelineStepIndex.ExtractSurfaces:
+                self.push(extract_step())
             if restore_step <= PipelineStepIndex.Superpixels:
                 self.push(superpixels_step())
             if restore_step <= PipelineStepIndex.FindLines: 
