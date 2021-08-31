@@ -6,7 +6,7 @@ from scipy.stats import mode
 from enum import Enum, IntEnum
 
 from pipeline.extractsurfaces import Groupings
-from pipeline.core import PipelineStep
+from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.utils import resize_array
 from pipeline.logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 
@@ -235,8 +235,10 @@ class PlaneGeometry():
         return R, t
 
 class PipelinePlaneGeometry(PipelineStep):
-    def __init__(self):
-        super().__init__()
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.Geometry
 
     @property
     def required_keys(self) -> list:

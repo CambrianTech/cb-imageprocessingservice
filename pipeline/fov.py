@@ -1,11 +1,10 @@
 from pipeline.core import PipelineStep
 import joblib
 
-
 class PipelineCalculateFov(PipelineStep):
-    def __init__(self, fov_model_path):
-        super().__init__()
-        self.classifier = joblib.load(fov_model_path)
+    def __init__(self, pipeline):
+        super().__init__(pipeline)
+        self.classifier = joblib.load(self.pipeline.fov_model_path)
 
     @property
     def required_keys(self) -> list:

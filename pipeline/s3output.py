@@ -13,16 +13,13 @@ from pipeline.s3client import S3Client
 from pipeline.output import PipelineOutput
 
 class PipelineS3Output(PipelineOutput):
-    def __init__(self, base_path, api_level, s3Client:S3Client):
-        super().__init__(base_path, api_level)
-        self.s3_client = s3Client
 
     def save_image(self, image, filename, url, quality=None):
-        self.s3_client.upload_image_to_s3(image, self.base_path, os.path.join(self.unique_id, url))
+        self.pipeline.s3_client.upload_image_to_s3(image, self.pipeline.dest_path, os.path.join(self.unique_id, url))
 
     def save_file(self, data, filename, url):
-        self.s3_client.upload_bytes_to_s3(data, self.base_path, os.path.join(self.unique_id, url))
+        self.pipeline.s3_client.upload_bytes_to_s3(data, self.pipeline.dest_path, os.path.join(self.unique_id, url))
 
     def save_data(self, data, filename, url):
-        self.s3_client.upload_json_to_s3(data, self.base_path, os.path.join(self.unique_id, url))
+        self.pipeline.s3_client.upload_json_to_s3(data, self.pipeline.dest_path, os.path.join(self.unique_id, url))
         

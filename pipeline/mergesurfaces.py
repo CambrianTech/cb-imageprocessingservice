@@ -6,7 +6,7 @@ from scipy.stats import mode
 from skimage.morphology import skeletonize
 from skimage.segmentation import watershed
 
-from pipeline.core import PipelineStep
+from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 from pipeline.ade20k import ADE20K
 from pipeline.extractsurfaces import Groupings
@@ -20,9 +20,10 @@ def random_color():
     return tuple(rgbl)
 
 class PipelineMergeSurfaces(PipelineStep):
-
-    def __init__(self):
-        super().__init__()
+    
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.MergeSurfaces
 
     @property
     def required_keys(self) -> list:

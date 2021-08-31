@@ -5,11 +5,9 @@ from pipeline.output import PipelineOutput
 import cv2
 
 class PipelineFileOutput(PipelineOutput):
-    def __init__(self, base_path, api_level):
-        super().__init__(base_path, api_level)
 
     def save_image(self, image, filename, url, quality=90):
-        path = Path(os.path.join(self.base_path, self.unique_id, url))
+        path = Path(os.path.join(self.pipeline.dest_path, self.unique_id, url))
         if len(path.parents) > 0:
             path.parents[0].mkdir(parents=True, exist_ok=True)
 
@@ -19,7 +17,7 @@ class PipelineFileOutput(PipelineOutput):
             cv2.imwrite(str(path), image, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
 
     def save_file(self, data, filename, url):
-        path = Path(os.path.join(self.base_path, self.unique_id, url))
+        path = Path(os.path.join(self.pipeline.dest_path, self.unique_id, url))
         if len(path.parents) > 0:
             path.parents[0].mkdir(parents=True, exist_ok=True)
 
@@ -27,7 +25,7 @@ class PipelineFileOutput(PipelineOutput):
             out_file.write(bytearray(data))
 
     def save_data(self, data, filename, url):
-        path = Path(os.path.join(self.base_path, self.unique_id, url))
+        path = Path(os.path.join(self.pipeline.dest_path, self.unique_id, url))
         if len(path.parents) > 0:
             path.parents[0].mkdir(parents=True, exist_ok=True)
 

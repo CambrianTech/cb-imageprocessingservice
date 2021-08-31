@@ -1,5 +1,5 @@
 import numpy as np
-from pipeline.core import PipelineStep
+from pipeline.core import PipelineStep, PipelineStepIndex
 
 
 def combine_plane_masks(plane_masks: np.ndarray) -> np.ndarray:
@@ -60,6 +60,10 @@ class PipelineCombinePlaneMasks(PipelineStep):
     @property
     def output_keys(self) -> list:
         return ["planes"]
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.CombinePlaneMasks
 
     @property
     def is_batched(self) -> bool:

@@ -3,9 +3,29 @@ from time import time
 import asyncio
 import typing
 from multiprocessing import cpu_count
+from enum import IntEnum
+
+class PipelineStepIndex(IntEnum):
+    Input = 0
+    RemoteNetworks = 1
+    CalculateFov = 2
+    RemotePlaneDetector = 3
+    RunModels = 4
+    DeterminePrimaryAngles = 5
+    ExtractSurfaces = 6
+    Superpixels = 7
+    FindLines = 8
+    RefineSurfaces = 9
+    Geometry = 10
+    EstimatePose = 11
+    MergeSurfaces = 12
+    Refine = 13
+    CombinePlaneMasks = 14
+    Output = 15
 
 class PipelineStep(metaclass=ABCMeta):
-    def __init__(self, batch_max_wait_time=1.0, batch_debounce_time=0.2, batch_max_size=4):
+    def __init__(self, pipeline, batch_max_wait_time=1.0, batch_debounce_time=0.2, batch_max_size=4):
+        self.pipeline = pipeline
         self.batch_max_wait_time = batch_max_wait_time
         self.batch_debounce_time = batch_debounce_time
         self.batch_max_size = batch_max_size
@@ -23,6 +43,10 @@ class PipelineStep(metaclass=ABCMeta):
     @abstractproperty
     def output_keys(self) -> list:
         return {}
+
+    @abstractproperty
+    def index(self) -> PipelineStepIndex:
+        return None
 
     @property
     def is_batched(self) -> bool:

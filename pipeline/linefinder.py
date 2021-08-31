@@ -5,7 +5,8 @@ from collections.abc import Sequence
 
 import math
 from cambrian.LineFunctions import LineFunctions
-from pipeline.core import PipelineStep
+
+from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.logging import log_image, im_logging_enabled, LogLevel
 
 class Line(Sequence):
@@ -41,6 +42,10 @@ class Line(Sequence):
         self.angle = LineFunctions.line_angle(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
 
 class PipelineLineFinder(PipelineStep):
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.FindLines
 
     @property
     def required_keys(self) -> list:

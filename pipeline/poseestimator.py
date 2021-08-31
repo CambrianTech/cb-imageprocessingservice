@@ -2,7 +2,7 @@ import numpy as np
 from time import time
 import cv2
 from cambrian import geometry
-from pipeline.core import PipelineStep
+from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.extractsurfaces import Groupings
 from pipeline.logging import log_segmentation_image
 
@@ -717,8 +717,9 @@ def merge_by_angle_sweep(labels_fan, normals_img, fan_normals, mask, angle_thres
 
 class PipelinePoseEstimator(PipelineStep):
 
-    def __init__(self):
-        super().__init__()
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.EstimatePose
 
     @property
     def required_keys(self) -> list:

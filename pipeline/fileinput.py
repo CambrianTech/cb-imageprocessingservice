@@ -10,8 +10,6 @@ import pickle
 from pathlib import Path
 
 class PipelineFileInput(PipelineInput):
-    def __init__(self, base_path):
-        super().__init__(base_path)
 
     def run(self, data):
 

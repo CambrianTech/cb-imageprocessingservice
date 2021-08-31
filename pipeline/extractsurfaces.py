@@ -2,7 +2,7 @@ from enum import Enum
 import numpy as np
 import cv2
 
-from pipeline.core import PipelineStep
+from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.logging import im_logging_enabled, log_image, LogLevel
 from pipeline.ade20k import ADE20K, wall_like
 
@@ -46,8 +46,10 @@ def isolate_masks(data, output):
     return isolated
 
 class PipelineExtractSurfaces(PipelineStep):
-    def __init__(self):
-        super().__init__()
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.ExtractSurfaces
 
     @property
     def required_keys(self) -> list:

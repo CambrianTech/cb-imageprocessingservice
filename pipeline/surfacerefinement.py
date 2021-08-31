@@ -4,7 +4,7 @@ import cv2
 
 import cambrian.image_processing as ip
 
-from pipeline.core import PipelineStep
+from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.extractsurfaces import Groupings
 from pipeline.logging import get_segmentation_image, log_segmentation_image, im_logging_enabled, log_image, LogLevel
 from skimage.morphology import skeletonize, remove_small_objects
@@ -148,8 +148,9 @@ def draw_lines(line_data, image, color=None, thickness=None, lineType=cv2.LINE_8
 
 class PipelineSurfaceRefinement(PipelineStep):
 
-    def __init__(self):
-        super().__init__()
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.RefineSurfaces
 
     @property
     def required_keys(self) -> list:
