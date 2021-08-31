@@ -23,10 +23,7 @@ def get_file_paths(input_dir, pattern=None):
             files.extend(Path(input_dir).glob('**/*' + ext))
     return files
 
-async def process_files(pipeline, input_dir, pattern):
-    files = get_file_paths(input_dir, pattern)
-
-    print("Importing %d files from \"%s\"" % (len(files), input_dir))
+async def process_files(pipeline, files):
 
     for path in files:
         url = Path(path)
@@ -54,11 +51,12 @@ async def process_files(pipeline, input_dir, pattern):
 @click.option('--api', type=int, default=3, help='api level: 1-4')
 @click.option('--restore', type=int, help='Pipeline step to restore from. Data pickle files expected inside input_dir')
 @click.option('--export', type=int, help='Pipeline step to export')
+@click.option('--stop', type=int, default=None, help='Stop after step')
 @click.option("--logging_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
 @click.option('--log_level', type=int, default=LogLevel.All, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
 def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, hed_model_path, planes_url, 
-         api, restore, export, logging_dir, log_level, log_step):
+         api, restore, export, stop, logging_dir, log_level, log_step):
 
     if not os.path.exists(input_dir):
         raise Exception('The directory does not exist at path {}'.format(input_dir)) 
@@ -67,11 +65,21 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     mode = PipelineMode.Restore if restore is not None else PipelineMode.Process
 
     file_pattern = "*.pickle" if restore is not None else None
+
+    files = get_file_paths(input_dir, file_pattern)
+
+    if len(files) == 0:
+        raise Exception('No files found at path {}'.format(input_dir)) 
+
+    print("\nImporting %d files from \"%s\"" % (len(files), input_dir))
+    
     restore_step = PipelineStepIndex(restore) if restore is not None else None
     export_step = PipelineStepIndex(export) if export is not None else None
+    stop_step = PipelineStepIndex(stop) if stop is not None else None
+
     logging_step = PipelineStepIndex(log_step) if log_step is not None else None
 
-    pipeline = Pipeline(mode, api, src_path=input_dir, dest_path=output_dir, restore_step=restore_step, export_step=export_step, \
+    pipeline = Pipeline(mode, api, src_path=input_dir, dest_path=output_dir, restore_step=restore_step, export_step=export_step, stop_step=stop_step, \
                         logging_dir=logging_dir, logging_level=log_level, logging_step=logging_step, \
                         model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, hed_model_path=hed_model_path, planes_url=planes_url)
 
@@ -82,10 +90,16 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     for sig in (signal.SIGINT, signal.SIGTERM):          
         loop.add_signal_handler(sig, ask_exit)  
 
+    start_time = time.time()
+
     pipeline.start()
-    loop.run_until_complete(process_files(pipeline, input_dir, pattern=file_pattern))
+    loop.run_until_complete(process_files(pipeline, files))
     pipeline.stop()
 
+    elapsed = (time.time() - start_time)
+    avg = elapsed / len(files)
+    
+    print("\nTotal processing time: %.2fs, average: %.2fs \n" % (elapsed, avg))
 
 if __name__ == "__main__":
     main()

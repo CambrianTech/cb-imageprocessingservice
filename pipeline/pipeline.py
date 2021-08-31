@@ -63,7 +63,7 @@ class Pipeline():
     def __init__(self,  mode:PipelineMode, api_level, \
                         model_path=None, semantic_model_path=None, fov_model_path=None, hed_model_path=None, \
                         planes_url=None, src_path=None, dest_path=None, cpu_networks_port = 8082, \
-                        restore_step:PipelineStepIndex=None, export_step:PipelineStepIndex=None, \
+                        restore_step:PipelineStepIndex=None, export_step:PipelineStepIndex=None, stop_step=None, \
                         logging_dir=None, logging_level=LogLevel.Nothing, logging_step:PipelineStepIndex=None):
 
         self.mode = mode
@@ -88,7 +88,11 @@ class Pipeline():
         self.logging_step = logging_step
 
         self.start_step = PipelineStepIndex(self.restore_step - 1 if self.restore_step is not None else PipelineStepIndex.Input + 1)
-        self.stop_step = PipelineStepIndex(self.export_step if self.export_step is not None else PipelineStepIndex.Output)
+
+        self.stop_step = stop_step
+        
+        if self.stop_step is None:
+            self.stop_step = PipelineStepIndex(self.export_step if self.export_step is not None else PipelineStepIndex.Output)
 
         self.assemble()
 
@@ -179,7 +183,7 @@ class Pipeline():
         if self.logging_dir is not None and not os.path.exists(self.logging_dir):
             os.makedirs(self.logging_dir)
 
-        total_start_time = time.time()
+        start_time = time.time()
 
         print("\n##### Running stages %s through %s #####" % (self.steps[1].description, self.steps[len(self.steps)-1].description))
 
@@ -203,6 +207,6 @@ class Pipeline():
             if step.index == self.export_step and logging_dir is not None:
                 log_data(data)
 
-        print("##### Planes total pipeline time: %.2f seconds #####\n" %
-              (time.time() - total_start_time))
+        print("##### All stages time: %.2f seconds #####\n" % (time.time() - start_time))
+
         return data
