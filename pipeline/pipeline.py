@@ -24,6 +24,8 @@ from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 from pipeline.poseestimator import PipelinePoseEstimator
 from pipeline.extractsurfaces import PipelineExtractSurfaces
 from pipeline.surfacerefinement import PipelineSurfaceRefinement
+from pipeline.mergesurfaces import PipelineMergeSurfaces
+
 
 from enum import IntEnum
 
@@ -47,9 +49,10 @@ class PipelineStepIndex(IntEnum):
     RefineSurfaces = 9
     Geometry = 10
     EstimatePose = 11
-    Refine = 12
-    CombinePlaneMasks = 13
-    Output = 14
+    MergeSurfaces = 12
+    Refine = 13
+    CombinePlaneMasks = 14
+    Output = 15
 
 class PipelineNoOp(PipelineStep):
 
@@ -77,6 +80,7 @@ class Pipeline():
 
         self.mode = mode
         self.api_level = api_level
+        self._running = False
 
         self.model_path = model_path
         self.semantic_model_path = semantic_model_path
@@ -113,12 +117,14 @@ class Pipeline():
             lines_step = PipelineNoOp
             geometry_step = PipelineNoOp
             estimate_pose_step = PipelineNoOp
+            merge_step = PipelineNoOp
             refine_step = PipelineRefinePlaneMasks
         else:
             refine_surfaces_step = PipelineSurfaceRefinement
             lines_step = PipelineLineFinder
             geometry_step = PipelinePlaneGeometry
             estimate_pose_step = PipelinePoseEstimator
+            merge_step = PipelineMergeSurfaces
             refine_step = PipelineRefineResults
 
         # Create the steps we want to use in the pipelines
@@ -137,6 +143,7 @@ class Pipeline():
                 lines_step(),
                 geometry_step(),
                 estimate_pose_step(),
+                merge_step(),
                 refine_step(),
                 PipelineCombinePlaneMasks(),
                 output_step
@@ -156,6 +163,7 @@ class Pipeline():
                 lines_step(),
                 geometry_step(),
                 estimate_pose_step(),
+                merge_step(),
                 refine_step(),
                 PipelineCombinePlaneMasks(),
                 output_step
@@ -188,6 +196,8 @@ class Pipeline():
                 self.push(geometry_step())
             if restore_step <= PipelineStepIndex.EstimatePose: 
                 self.push(estimate_pose_step())
+            if restore_step <= PipelineStepIndex.MergeSurfaces: 
+                self.push(merge_step())
             if restore_step <= PipelineStepIndex.Refine: 
                 self.push(refine_step())
             if restore_step <= PipelineStepIndex.CombinePlaneMasks:
@@ -198,6 +208,7 @@ class Pipeline():
 
     def start(self):
         print("Starting threads")
+        self._running = True
 
         if self.logging_step is not None:
             print("Logging is enabled for step", self.logging_step.name)
@@ -212,8 +223,13 @@ class Pipeline():
 
     def stop(self):
         print("Stopping threads")
+        self._running = False
         for step in self.steps:
             step.stop()
+
+    @property
+    def running(self):
+        return self._running
 
     def step_index(self, pos:int):
         return PipelineStepIndex(self.start_step + pos - 1)
@@ -232,6 +248,8 @@ class Pipeline():
         index = 0
 
         for step in self.steps:
+
+            if not self.running: break
 
             #consider perhaps passing logging down into steps, trigger off that
             logging_dir = None if self.logging_dir is None else "%s/%s" % (self.logging_dir, get_unique_id(data))
