@@ -181,7 +181,7 @@ class Pipeline():
 
         total_start_time = time.time()
 
-        print("\n\n##### Running stages %s through %s #####\n" % (self.steps[1].description, self.steps[len(self.steps)-1].description))
+        print("\n##### Running stages %s through %s #####" % (self.steps[1].description, self.steps[len(self.steps)-1].description))
 
         for step in self.steps:
 
