@@ -176,9 +176,6 @@ class Pipeline():
             os.makedirs(self.logging_dir)
 
         total_start_time = time.time()
-        index = 0
-
-        print("\n##### Processing %d steps: %s(%d) - %s(%d) #####" % (len(self.steps), self.start_step.name, int(self.start_step), self.stop_step.name, int(self.stop_step)))
 
         for step in self.steps:
 
@@ -198,13 +195,7 @@ class Pipeline():
             print("%s(%d) took %.2f seconds" % (step.index.name, int(step.index), time.time() - step_start))
 
             if step.index == self.export_step and logging_dir is not None:
-                print("Exporting")
                 log_data(data)
-
-            print("export:", self.export_step)
-            exit()
-
-            index += 1
 
         print("##### Planes total pipeline time: %.2f seconds #####\n" %
               (time.time() - total_start_time))

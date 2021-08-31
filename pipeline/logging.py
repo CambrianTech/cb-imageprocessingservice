@@ -1,6 +1,7 @@
 import cv2
 import os.path
 import numpy as np
+import pickle
 from enum import IntFlag
 
 class LogLevel(IntFlag):
