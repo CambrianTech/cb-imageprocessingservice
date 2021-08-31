@@ -221,6 +221,94 @@ class PipelineMergeSurfaces(PipelineStep):
 
         log_segmentation_image(data, "labels_wall_merge2", labels_wall_2, img_lr, avg=False)
 
+        final_masks = []
+
+        final_plane_parameters = []
+        final_rotations = []
+        final_plane_XYZ = []
+
+        wall_areas = []
+        plane_rotations = np.zeros(number_planes, dtype=np.float32)
+
+        for l in np.unique(labels_wall_2):
+            if l == 0: continue
+
+            mask = np.uint8(labels_wall_2 == l)
+            area = np.sum(mask)
+
+            if area > 16 * 12:
+                wall_areas.append((area))
+                final_masks.append(255 * mask)
+
+                l = int(np.median(labels_arg[mask > 0])) - 1
+
+                plane_parameter = np.zeros(11)
+                plane_parameter[:9] = data["planes"]["detection"][l][:9]
+                plane_parameter[6:9] = plane_parameters[l]
+                plane_parameter[9] = 2
+                plane_parameter[10] = plane_rotations[l]
+
+                # log_image(data, str(l) + "plane_masks", 255. * plane_masks[l])
+
+                final_plane_parameters.append(plane_parameter)
+                final_plane_XYZ.append(plane_XYZ[l])
+                final_rotations.append(plane_rotations[l])
+
+        # sort wall planes, largest to smallest/ugly due to sheer laziness
+        area_sort = np.argsort(wall_areas)[::-1]
+        final_masks = np.array(final_masks)[area_sort].tolist()
+        final_plane_parameters = np.array(final_plane_parameters)[area_sort].tolist()
+        final_plane_XYZ = np.array(final_plane_XYZ)[area_sort].tolist()
+
+        # add floor
+        if len(floor_indices) > 0:
+            isolated[Groupings.Floor] = np.uint8(segmentation_initial == 2)
+            # floor_mask = cv2.dilate(floor_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+            final_masks.append(255 * isolated[Groupings.Floor])
+
+            plane_parameter = np.zeros((11))
+            plane_parameter[:9] = data["planes"]["detection"][floor_indices[0]][:9]
+            plane_parameter[6:9] = plane_parameters[floor_indices[0]]
+            plane_parameter[9] = 1
+            plane_parameter[10] = plane_rotations[floor_indices[0]]
+
+            final_plane_parameters.append(plane_parameter)
+            final_plane_XYZ.append(plane_XYZ[floor_indices[0]])
+            final_rotations.append(plane_rotations[floor_indices[0]])
+
+        # add ceiling
+        if len(ceiling_indices) > 0:
+            isolated[Groupings.Ceiling] = 255 * np.uint8(segmentation_initial == 4)
+            final_masks.append(isolated[Groupings.Ceiling])
+            plane_parameter = np.zeros((11))
+            plane_parameter[:9] = data["planes"]["detection"][ceiling_indices[0]][:9]
+            plane_parameter[6:9] = plane_parameters[ceiling_indices[0]]
+            plane_parameter[9] = 3
+            plane_parameter[10] = plane_rotations[ceiling_indices[0]]
+            final_plane_parameters.append(plane_parameter)
+            final_plane_XYZ.append(plane_XYZ[ceiling_indices[0]])
+            final_rotations.append(plane_rotations[ceiling_indices[0]])
+
+        data["plane_parameters"] = np.float32(final_plane_parameters)
+        data["plane_rotations"] = np.float32(final_rotations)
+
+        final_plane_number = len(final_masks)
+
+        # print("final_plane_number", final_plane_number)
+        final_masks = np.uint8(final_masks)
+
+        final_labels = np.argmax(final_masks, 0)
+
+        final_labels[final_labels > 0] += 1
+        final_labels[final_masks[0] > 0] = 1
+        final_labels += 1
+        final_labels = np.uint8(final_labels)
+        final_labels[vl_image > 0] = 0
+
+        data["final_labels"] = final_labels
+        data["final_masks"] = final_masks
+
+
 def get_planes_class(plane_masks, class_labels):
     plane_classes = []
 

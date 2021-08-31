@@ -241,11 +241,18 @@ class Pipeline():
 
     async def process(self, data):
 
+        if (len(self.steps) == 0): return
+
         if self.logging_dir is not None and not os.path.exists(self.logging_dir):
             os.makedirs(self.logging_dir)
 
         total_start_time = time.time()
         index = 0
+
+        first_step = self.step_index(0)
+        last_step = self.step_index(len(self.steps)-1)
+
+        print("\n##### Processing %d steps: %s(%d) - %s(%d) #####" % (len(self.steps), first_step.name, int(first_step), last_step.name, int(last_step)))
 
         for step in self.steps:
 
@@ -260,17 +267,17 @@ class Pipeline():
             current_step = self.step_index(index)
             
             set_logging_step(data, self.logging_step, current_step)
-            print("Step %s" % (current_step.name))
+            print("%d) %s" % (int(current_step), current_step.name))
 
             step_start = time.time()
             data = await schedule_and_wait(step.schedule, data)
-            print("Step %s took %.2f seconds" % (current_step.name, time.time() - step_start))
+            print("%s(%d) took %.2f seconds" % (current_step.name, int(current_step), time.time() - step_start))
 
             if current_step == self.export_step and logging_dir is not None:
                 log_data(data)
 
             index += 1
 
-        print("Planes total pipeline time: %.2fs" %
+        print("##### Planes total pipeline time: %.2f seconds #####\n" %
               (time.time() - total_start_time))
         return data
