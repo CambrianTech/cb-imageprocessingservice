@@ -50,7 +50,7 @@ class PipelineNoOp(PipelineStep):
 
     @property
     def description(self) -> str:
-        return "%d) %s (No Operation)" % (int(self.index), self.index.name) 
+        return "%d) %s (noop)" % (int(self.index), self.index.name) 
 
 class PipelineMode(IntEnum):
     Serve = 0
@@ -90,7 +90,7 @@ class Pipeline():
         self.start_step = PipelineStepIndex(self.restore_step - 1 if self.restore_step is not None else PipelineStepIndex.Input + 1)
 
         self.stop_step = stop_step
-        
+
         if self.stop_step is None:
             self.stop_step = PipelineStepIndex(self.export_step if self.export_step is not None else PipelineStepIndex.Output)
 

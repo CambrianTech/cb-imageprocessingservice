@@ -193,7 +193,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
     @property
     def description(self) -> str:
-        return super().description + " (deprecated)"
+        return super().description + " (legacy)"
 
     @property
     def required_keys(self) -> list:

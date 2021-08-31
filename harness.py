@@ -25,16 +25,16 @@ def get_file_paths(input_dir, pattern=None):
 
 async def process_files(pipeline, files):
 
+    index = 1
+
     for path in files:
         url = Path(path)
         unique_id = url.parents[0].name if len(url.parents) > 0 else url.name
         data = {"path": path, "unique_id": unique_id if path.suffix == ".pickle" else url.stem}
 
+        print("\nProcessing file %d of %d\n" % (index, len(files)))
         await pipeline.process(data)
-
-    index = 0
-
-    return len(files)
+        index += 1
 
 
 #For instance, to restore from step 6 (before refinement):
@@ -68,10 +68,13 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     files = get_file_paths(input_dir, file_pattern)
 
+    if file_pattern is None:
+        print("\nProcessing %d images from \"%s\"" % (len(files), input_dir))
+    else:
+        print("\nProcessing %d files from \"%s/**/%s\"" % (len(files), input_dir, file_pattern))
+
     if len(files) == 0:
         raise Exception('No files found at path {}'.format(input_dir)) 
-
-    print("\nImporting %d files from \"%s\"" % (len(files), input_dir))
     
     restore_step = PipelineStepIndex(restore) if restore is not None else None
     export_step = PipelineStepIndex(export) if export is not None else None
@@ -99,7 +102,7 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     elapsed = (time.time() - start_time)
     avg = elapsed / len(files)
     
-    print("\nTotal processing time: %.2fs, average: %.2fs \n" % (elapsed, avg))
+    print("\n[Total processing time: %.2fs, average: %.2fs] \n" % (elapsed, avg))
 
 if __name__ == "__main__":
     main()
