@@ -1,4 +1,4 @@
-from pipeline.core import PipelineStep
+from pipeline.core import PipelineStep, PipelineStepIndex
 import cv2
 import numpy as np
 from scipy import ndimage
@@ -186,6 +186,15 @@ def draw_grid(img, line_color=(0, 255, 0), thickness=1, type_=cv2.LINE_AA, pxste
 #labels for ade20k, subtract = 1 for output number. 
 
 class PipelineRefinePlaneMasks(PipelineStep):
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.Refine
+
+    @property
+    def description(self) -> str:
+        return super().description + " (deprecated)"
+
     @property
     def required_keys(self) -> list:
         return ["image", "output", "hed", "mask", "isolated"]

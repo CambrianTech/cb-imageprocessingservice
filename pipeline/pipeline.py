@@ -46,7 +46,11 @@ class PipelineNoOp(PipelineStep):
         return []
 
     def run(self, data):
-        print("No Operation")
+        print("Passthrough")
+
+    @property
+    def description(self) -> str:
+        return "%d) %s (No Operation)" % (int(self.index), self.index.name) 
 
 class PipelineMode(IntEnum):
     Serve = 0
@@ -126,7 +130,7 @@ class Pipeline():
         combine_step = PipelineCombinePlaneMasks
 
         all_steps = [remote_step, fov_step, planes_step, models_step, angles_step, \
-                     extract_step, lines_step, refine_surfaces_step, superpixels_step, \
+                     extract_step, superpixels_step, lines_step, refine_surfaces_step, \
                      geometry_step, estimate_pose_step, merge_step, refine_step, combine_step, output_step]
 
         self.steps = []
@@ -135,7 +139,7 @@ class Pipeline():
 
         for index in range(self.start_step, self.stop_step):
             initializer = all_steps[index]
-            step = PipelineNoOp(self, index) if initializer is None else initializer(self)
+            step = PipelineNoOp(self, index+1) if initializer is None else initializer(self)
             self.push(step)
 
 
@@ -165,7 +169,7 @@ class Pipeline():
         return self._running
 
     def push(self, step:PipelineStep):
-        print("Appending step %s(%d)" % (step.index.name, int(step.index)))
+        print("Appending step %s" % step.description)
         self.steps.append(step)
 
     async def process(self, data):
@@ -177,22 +181,24 @@ class Pipeline():
 
         total_start_time = time.time()
 
+        print("\n\n##### Running stages %s through %s #####\n" % (self.steps[1].description, self.steps[len(self.steps)-1].description))
+
         for step in self.steps:
 
             if not self.running: break
 
             #consider perhaps passing logging down into steps, trigger off that
-            logging_dir = None if self.logging_dir is None else "%s/%s" % (self.logging_dir, get_unique_id(data))
+            logging_dir = None if self.logging_dir is None else os.path.join(self.logging_dir, get_unique_id(data))
 
             set_logging_dir(data, logging_dir)
             set_logging_level(data, self.logging_level)
             
             set_logging_step(data, self.logging_step, step.index)
-            print("%d) %s" % (int(step.index), step.index.name))
+            print(step.description)
 
             step_start = time.time()
             data = await schedule_and_wait(step.schedule, data)
-            print("%s(%d) took %.2f seconds" % (step.index.name, int(step.index), time.time() - step_start))
+            print("%s took %.2f seconds" % (step.description, time.time() - step_start))
 
             if step.index == self.export_step and logging_dir is not None:
                 log_data(data)

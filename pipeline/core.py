@@ -49,6 +49,10 @@ class PipelineStep(metaclass=ABCMeta):
         return None
 
     @property
+    def description(self) -> str:
+        return "%d) %s" % (int(self.index), self.index.name) 
+
+    @property
     def is_batched(self) -> bool:
         return False
 
