@@ -4,7 +4,7 @@ import pickle
 from time import time
 import cv2
 
-from .core import PipelineStep
+from .core import PipelineStep, PipelineStepIndex
 
 
 def _camera_fov_res_to_intrinsics(fov: float, res: np.ndarray):
@@ -38,9 +38,10 @@ def _remote_networks(address, data):
 
 
 class PipelineRemotePlaneDetector(PipelineStep):
-    def __init__(self, address: str):
-        super().__init__()
-        self.address = address
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.RemoteNetworks
 
     @property
     def required_keys(self) -> list:
@@ -56,7 +57,7 @@ class PipelineRemotePlaneDetector(PipelineStep):
 
     def run(self, data):
         t = time()
-        plane_rcnn_outputs = _remote_plane_detect(self.address, data)
+        plane_rcnn_outputs = _remote_plane_detect(self.pipeline.planes_url, data)
         print("Remote planes took %.2f seconds" % (time() - t))
 
         for datum, plane_rcnn_output in zip(data, plane_rcnn_outputs):
@@ -75,9 +76,6 @@ class PipelineRemotePlaneDetector(PipelineStep):
 
 
 class PipelineRemoteNetworks(PipelineStep):
-    def __init__(self, address: str):
-        super().__init__()
-        self.address = address
 
     @property
     def required_keys(self) -> list:
@@ -93,7 +91,7 @@ class PipelineRemoteNetworks(PipelineStep):
 
     def run(self, data: dict) -> None:
         t = time()
-        response_dict = _remote_networks(self.address, data)
+        response_dict = _remote_networks(self.pipeline.remote_path, data)
         print("Remote networks took %.2f seconds" % (time() - t))
 
         for datum, lighting, normals in zip(data, response_dict["lighting"], response_dict["normals"]):

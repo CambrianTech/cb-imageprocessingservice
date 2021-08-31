@@ -5,6 +5,8 @@ from collections.abc import Sequence
 
 import math
 from cambrian.LineFunctions import LineFunctions
+
+from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.logging import log_image, im_logging_enabled, LogLevel
 
 class Line(Sequence):
@@ -39,24 +41,34 @@ class Line(Sequence):
         self.length = math.sqrt(self.length_sq)
         self.angle = LineFunctions.line_angle(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
 
-class LineFinder():
+class PipelineLineFinder(PipelineStep):
 
-    def __init__(self, img, bw):
-        super().__init__()
-        self.img = img
-        self.bw = bw
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.FindLines
 
-    def detect(self, data):
-        self.height, self.width = self.img.shape[:2]
+    @property
+    def required_keys(self) -> list:
+        return ["image"]
+
+    @property
+    def output_keys(self) -> list:
+        return ["lines"]
+
+    def run(self, data):
+
+        bw = cv2.cvtColor(data["image"], cv2.COLOR_BGR2GRAY)
+
+        self.height, self.width = bw.shape[:2]
         self.diagonal = np.hypot(self.width, self.height)
 
         fld = cv2.ximgproc.createFastLineDetector(int(self.diagonal / 60.0), 1.41, 200, 240, 3, False)
 
-        lines = list(map(lambda x: Line(x.reshape(4)), fld.detect(self.bw)))
+        lines = list(map(lambda x: Line(x.reshape(4)), fld.detect(bw)))
 
         if im_logging_enabled(data, LogLevel.Lines):
-            debug = self.img.copy()
+            debug = data["image"].copy()
             [line.draw(debug) for line in lines]
             log_image(data, "lines", debug)
 
-        return lines
+        data["lines"] = lines

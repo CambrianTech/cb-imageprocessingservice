@@ -1,6 +1,7 @@
 import cv2
 import os.path
 import numpy as np
+import pickle
 from enum import IntFlag
 
 class LogLevel(IntFlag):
@@ -65,13 +66,12 @@ def log_data(data:dict):
                 
 def log_image(data:dict, name:str, image, extension=".jpg"):
     if im_logging_enabled(data, LogLevel.Images):
-        _log_image(data, name, image.astype(np.uint8), extension)
+        _log_image(data, name, image, extension)
 
 def _log_image(data:dict, name:str, image, extension=".jpg"):
     global _logging_index
     path = make_log_path(data, name, extension)
-    print("Saving image", path)
-    cv2.imwrite(path, image)
+    cv2.imwrite(path, cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB) if len(image.shape) == 3 else image.astype(np.uint8))
     _logging_index += 1
 
 def get_segmentation_image(labels, image, avg=False, resize=True):

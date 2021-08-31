@@ -2,8 +2,9 @@
 import os
 import time
 import subprocess
+from enum import IntEnum
 
-from pipeline.core import schedule_and_wait, PipelineStep
+from pipeline.core import schedule_and_wait, PipelineStep, PipelineStepIndex
 from pipeline.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, LogLevel, set_logging_level
 
 from pipeline.s3input import PipelineS3Input
@@ -15,33 +16,27 @@ from pipeline.fov import PipelineCalculateFov
 from pipeline.primaryangle import PipelineDeterminePrimaryAngles
 from pipeline.runmodels import PipelineRunModels
 from pipeline.superpixels import PipelineSuperpixels
+from pipeline.planegeometry import PipelinePlaneGeometry
 from pipeline.refineplanemasks import PipelineRefinePlaneMasks
+from pipeline.linefinder import PipelineLineFinder
 from pipeline.refine import PipelineRefineResults
 from pipeline.combineplanemasks import PipelineCombinePlaneMasks
 from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
-
-from enum import IntEnum
-
-#labels for ade20k, subtract = 1 for output number. 
-
-class PipelineMode(IntEnum):
-    Serve = 0
-    Process = 1
-    Restore = 2
-
-class PipelineStepIndex(IntEnum):
-    Input = 0
-    RemoteNetworks = 1
-    CalculateFov = 2
-    RemotePlaneDetector = 3
-    RunModels = 4
-    DeterminePrimaryAngles = 5
-    Superpixels = 6
-    Refine = 7
-    CombinePlaneMasks = 8
-    Output = 9
+from pipeline.poseestimator import PipelinePoseEstimator
+from pipeline.extractsurfaces import PipelineExtractSurfaces
+from pipeline.surfacerefinement import PipelineSurfaceRefinement
+from pipeline.mergesurfaces import PipelineMergeSurfaces
 
 class PipelineNoOp(PipelineStep):
+
+    def __init__(self, pipeline, index):
+        super().__init__(pipeline)
+        self._index = PipelineStepIndex(index)
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return self._index
+
     @property
     def required_keys(self) -> list:
         return []
@@ -50,28 +45,35 @@ class PipelineNoOp(PipelineStep):
     def output_keys(self) -> list:
         return []
 
-    @property
-    def is_batched(self) -> bool:
-        return True
-
     def run(self, data):
-        print("Noop")
-        exit()
+        print("Passthrough")
 
+    @property
+    def description(self) -> str:
+        return "%d) %s (noop)" % (int(self.index), self.index.name) 
 
+class PipelineMode(IntEnum):
+    Serve = 0
+    Process = 1
+    Restore = 2
+
+#labels for ade20k, subtract = 1 for output number. 
 class Pipeline():
 
     def __init__(self,  mode:PipelineMode, api_level, \
-                        model_path=None, semantic_model_path=None, fov_model_path=None, \
+                        model_path=None, semantic_model_path=None, fov_model_path=None, hed_model_path=None, \
                         planes_url=None, src_path=None, dest_path=None, cpu_networks_port = 8082, \
-                        restore_step:PipelineStepIndex=None, export_step:PipelineStepIndex=None, \
+                        restore_step:PipelineStepIndex=None, export_step:PipelineStepIndex=None, stop_step=None, \
                         logging_dir=None, logging_level=LogLevel.Nothing, logging_step:PipelineStepIndex=None):
 
         self.mode = mode
         self.api_level = api_level
+        self._running = False
 
         self.model_path = model_path
         self.semantic_model_path = semantic_model_path
+        self.hed_model_path = hed_model_path
+
         self.fov_model_path = fov_model_path 
         self.planes_url = planes_url 
         self.src_path = src_path 
@@ -85,77 +87,69 @@ class Pipeline():
         self.logging_level = logging_level
         self.logging_step = logging_step
 
-        self.start_step = self.restore_step if self.restore_step is not None else PipelineStepIndex.Input
+        self.start_step = PipelineStepIndex(self.restore_step - 1 if self.restore_step is not None else PipelineStepIndex.Input + 1)
 
-        #todo: consolidate steps around start_step and eliminate three if statements below
+        self.stop_step = stop_step
+
+        if self.stop_step is None:
+            self.stop_step = PipelineStepIndex(self.export_step if self.export_step is not None else PipelineStepIndex.Output)
+
+        self.assemble()
+
+    def assemble(self):
+
+
         if self.mode == PipelineMode.Serve:
-            s3Client = S3Client()
-            input_step = PipelineS3Input(self.src_path, s3Client)
-            output_step = PipelineS3Output(self.dest_path, s3Client, api_level=self.api_level)
+            self.s3_client = S3Client()
+            input_step = PipelineS3Input
+            output_step = PipelineS3Output
         else:
-            input_step = PipelineFileInput(self.src_path)
-            output_step = PipelineFileOutput(self.dest_path, api_level=self.api_level)
+            input_step = PipelineFileInput
+            output_step = PipelineFileOutput
 
-        superpixels_step = PipelineSuperpixels if self.api_level < 3 else PipelineNoOp
-        refine_step = PipelineRefinePlaneMasks
+        remote_step = PipelineRemoteNetworks
+        fov_step = PipelineCalculateFov
+        planes_step = PipelineRemotePlaneDetector
+        models_step = PipelineRunModels
+        angles_step = PipelineDeterminePrimaryAngles
+        extract_step = PipelineExtractSurfaces
 
-        # Create the steps we want to use in the pipelines
-        if self.mode == PipelineMode.Serve:
-            
-            self.steps = [
-                input_step,
-                PipelineRemoteNetworks(self.remote_path),
-                PipelineCalculateFov(self.fov_model_path),
-                PipelineRemotePlaneDetector(self.planes_url),
-                PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")),
-                PipelineDeterminePrimaryAngles(),
-                superpixels_step(),
-                refine_step(),
-                PipelineCombinePlaneMasks(),
-                output_step
-            ]
+        superpixels_step = PipelineSuperpixels if self.api_level < 3 else None
+        
+        if self.api_level < 3.5:
+            refine_surfaces_step = None
+            lines_step = None
+            geometry_step = None
+            estimate_pose_step = None
+            merge_step = None
+            refine_step = PipelineRefinePlaneMasks
+        else:
+            refine_surfaces_step = PipelineSurfaceRefinement
+            lines_step = PipelineLineFinder
+            geometry_step = PipelinePlaneGeometry
+            estimate_pose_step = PipelinePoseEstimator
+            merge_step = PipelineMergeSurfaces
+            refine_step = PipelineRefineResults
 
-        elif self.mode == PipelineMode.Process:
-            self.steps = [
-                input_step,
-                PipelineRemoteNetworks(self.remote_path),
-                PipelineCalculateFov(self.fov_model_path),
-                PipelineRemotePlaneDetector(self.planes_url),
-                PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")),
-                PipelineDeterminePrimaryAngles(),
-                superpixels_step(),
-                refine_step(),
-                PipelineCombinePlaneMasks(),
-                output_step
-            ]
+        combine_step = PipelineCombinePlaneMasks
 
-        elif self.mode == PipelineMode.Restore:
-            print("Restoring from", restore_step.name)
+        all_steps = [remote_step, fov_step, planes_step, models_step, angles_step, \
+                     extract_step, superpixels_step, lines_step, refine_surfaces_step, \
+                     geometry_step, estimate_pose_step, merge_step, refine_step, combine_step, output_step]
 
-            self.steps = [input_step]
+        self.steps = []
 
-            if restore_step <= PipelineStepIndex.RemoteNetworks:
-                self.push(PipelineRemoteNetworks(self.remote_path))
-            if restore_step <= PipelineStepIndex.CalculateFov:
-                self.push(PipelineCalculateFov(self.fov_model_path))
-            if restore_step <= PipelineStepIndex.RemotePlaneDetector:
-                self.push(PipelineRemotePlaneDetector(self.planes_url))
-            if restore_step <= PipelineStepIndex.RunModels:
-                self.push(PipelineRunModels(semantic_path=self.semantic_model_path, hed_path=os.path.join("hed_model", "HED_pretrained_bsds.npz")))
-            if restore_step <= PipelineStepIndex.DeterminePrimaryAngles:
-                self.push(PipelineDeterminePrimaryAngles())
-            if restore_step <= PipelineStepIndex.Superpixels:
-                self.push(superpixels_step)
-            if restore_step <= PipelineStepIndex.Refine: 
-                self.push(refine_step())
-            if restore_step <= PipelineStepIndex.CombinePlaneMasks:
-                self.push(PipelineCombinePlaneMasks())
+        self.push(input_step(self))
 
-            self.push(output_step)
+        for index in range(self.start_step, self.stop_step):
+            initializer = all_steps[index]
+            step = PipelineNoOp(self, index+1) if initializer is None else initializer(self)
+            self.push(step)
 
 
     def start(self):
         print("Starting threads")
+        self._running = True
 
         if self.logging_step is not None:
             print("Logging is enabled for step", self.logging_step.name)
@@ -170,47 +164,49 @@ class Pipeline():
 
     def stop(self):
         print("Stopping threads")
+        self._running = False
         for step in self.steps:
             step.stop()
 
-    def step_index(self, pos:int):
-        return PipelineStepIndex(self.start_step + pos - 1)
+    @property
+    def running(self):
+        return self._running
 
     def push(self, step:PipelineStep):
-        index = self.step_index(len(self.steps))
-        print("Appending step", index.name)
+        print("Appending step %s" % step.description)
         self.steps.append(step)
 
     async def process(self, data):
 
+        if (len(self.steps) == 0): return
+
         if self.logging_dir is not None and not os.path.exists(self.logging_dir):
             os.makedirs(self.logging_dir)
 
-        total_start_time = time.time()
-        index = 0
+        start_time = time.time()
+
+        print("\n##### Running stages %s through %s #####" % (self.steps[1].description, self.steps[len(self.steps)-1].description))
 
         for step in self.steps:
 
+            if not self.running: break
+
             #consider perhaps passing logging down into steps, trigger off that
-            logging_dir = None if self.logging_dir is None else "%s/%s" % (self.logging_dir, get_unique_id(data))
+            logging_dir = None if self.logging_dir is None else os.path.join(self.logging_dir, get_unique_id(data))
 
             set_logging_dir(data, logging_dir)
             set_logging_level(data, self.logging_level)
-
-            current_step = self.step_index(index)
             
-            set_logging_step(data, self.logging_step, current_step)
-            print("Step %s" % (current_step.name))
+            set_logging_step(data, self.logging_step, step.index)
+            print(step.description)
 
             step_start = time.time()
             data = await schedule_and_wait(step.schedule, data)
-            print("Step %s took %.2f seconds" % (current_step.name, time.time() - step_start))
+            print("%s took %.2f seconds" % (step.description, time.time() - step_start))
 
-            if current_step == self.export_step and logging_dir is not None:
+            if step.index == self.export_step and logging_dir is not None:
                 log_data(data)
 
-            index += 1
+        print("##### All stages time: %.2f seconds #####\n" % (time.time() - start_time))
 
-        print("Planes total pipeline time: %.2fs" %
-              (time.time() - total_start_time))
         return data

@@ -3,7 +3,7 @@ from scipy.special import softmax
 import cv2
 import tensorflow as tf
 from modelutils import get_session_config
-from pipeline.core import PipelineStep
+from pipeline.core import PipelineStep, PipelineStepIndex
 import os
 from time import time
 from tensorpack import *
@@ -194,25 +194,29 @@ class Model(ModelDesc):
 
 
 class PipelineRunModels(PipelineStep):
-    def __init__(self, semantic_path: str, hed_path: str):
-        super().__init__()
+    def __init__(self, pipeline):
+        super().__init__(pipeline)
 
         _ = tf.Session(config=get_session_config(use_gpu=True))
 
         self.mx_ctx = mx.gpu(0)
         self.model_semantic = get_model(
             "deeplab_resnest269_ade", pretrained=True,
-            root=semantic_path, ctx=self.mx_ctx
+            root=self.pipeline.semantic_model_path, ctx=self.mx_ctx
         )
 
         self.model_hed = OfflinePredictor(PredictConfig(
             model=Model(),
-            session_init=SmartInit(hed_path),
+            session_init=SmartInit(self.pipeline.hed_model_path),
             input_names=['image'],
             output_names=['output%d' % k for k in range(1, 7)],
             session_creator=NewSessionCreator(
                 config=get_session_config(use_gpu=True))
         ))
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.RemoteNetworks
 
     @property
     def required_keys(self) -> list:

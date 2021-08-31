@@ -5,7 +5,8 @@ from scipy import ndimage
 from scipy.stats import mode
 from enum import Enum, IntEnum
 
-from pipeline.semantics import Groupings
+from pipeline.extractsurfaces import Groupings
+from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.utils import resize_array
 from pipeline.logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 
@@ -29,21 +30,20 @@ class VerticalDimension(PlanarDimension):
         super().__init__(vert_indices, angles)
         self.wall_indices = wall_indices
         
-
-class PlaneGeometry:
-    def __init__(self, data, isolated_masks, image, shape):
-        super().__init__()
-
-        self.isolated_masks = isolated_masks
+class PlaneGeometry():
+    def __init__(self, data, isolated_masks, image):
         self.data = data
+        self.isolated_masks = isolated_masks
         self.image = image
-        self.digest_data(shape)
-        
+
     def process(self):
+        self.digest_data()
         self.calculate_geometry()
         self.cluster()
 
-    def digest_data(self, shape):
+    def digest_data(self):
+
+        shape = (self.image.shape[1], self.image.shape[0])
 
         planes_data = self.data["planes"]
         self.plane_parameters = np.array(planes_data["detection"][:, 6:9], dtype=np.float32)
@@ -82,8 +82,6 @@ class PlaneGeometry:
         ceiling_indices = self.dimensions[Dimension.Horizontal].ceiling_indices
         
         self.basis_indices = np.int32(np.concatenate([floor_indices, ceiling_indices, wall_indices]))
-
-            # print("floor_normal", floor_normal)
 
     def find_floor_indices(self):
         floor_mask = cv2.resize(self.isolated_masks[Groupings.Floor], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
@@ -235,6 +233,43 @@ class PlaneGeometry:
             pass
         t = -np.matmul(R, center_1) + center_2
         return R, t
+
+class PipelinePlaneGeometry(PipelineStep):
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.Geometry
+
+    @property
+    def required_keys(self) -> list:
+        return ["image", "normals", "isolated"]
+
+    @property
+    def output_keys(self) -> list:
+        return ["isolated", "floor_normal", "floor_offset", "floor_index"]
+
+    def run(self, data):
+        img_lr = data["downscaled"]
+
+        plane_geometry = PlaneGeometry(data, data["isolated"], img_lr)
+        plane_geometry.process()
+
+        #might cut this down:
+        data["dimensions"] = plane_geometry.dimensions
+        data["floor_normal"] = plane_geometry.floor_normal
+        data["floor_offset"] = plane_geometry.floor_offset
+        data["floor_index"] = plane_geometry.floor_index
+
+        data["normals_c"] = plane_geometry.normals_c
+        data["plane_masks"] = plane_geometry.plane_masks
+        data["cluster_prob"] = plane_geometry.cluster_prob
+        data["xyz"] = plane_geometry.XYZ
+        data["plane_parameters"] = plane_geometry.plane_parameters
+        data["plane_normals"] = plane_geometry.plane_normals
+        data["plane_offsets"] = plane_geometry.plane_offsets
+        data["plane_clusters"] = plane_geometry.plane_clusters
+        
+    
 
 
 

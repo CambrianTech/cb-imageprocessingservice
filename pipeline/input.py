@@ -1,10 +1,11 @@
 import abc
-from pipeline.core import PipelineStep
+from pipeline.core import PipelineStep, PipelineStepIndex
 
 class PipelineInput(PipelineStep, metaclass=abc.ABCMeta):
-    def __init__(self, base_path):
-        super().__init__()
-        self.base_path = base_path
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.Input
 
     @property
     def required_keys(self) -> list:

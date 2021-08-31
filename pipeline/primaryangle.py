@@ -1,4 +1,4 @@
-from pipeline.core import PipelineStep
+from pipeline.core import PipelineStep, PipelineStepIndex
 import cv2
 import numpy as np
 import math
@@ -114,6 +114,11 @@ def get_candidate_walls(floor_normal, isolated_surfaces, max_angle=20):
 
 
 class PipelineDeterminePrimaryAngles(PipelineStep):
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.DeterminePrimaryAngles
+        
     @property
     def required_keys(self) -> list:
         return ["semantic_probs", "normals"]

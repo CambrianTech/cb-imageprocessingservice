@@ -3,20 +3,19 @@ from scipy import ndimage
 import cv2
 
 import cambrian.image_processing as ip
-from cambrian.Line import Line
 
-from pipeline.semantics import Groupings
+from pipeline.core import PipelineStep, PipelineStepIndex
+from pipeline.extractsurfaces import Groupings
 from pipeline.logging import get_segmentation_image, log_segmentation_image, im_logging_enabled, log_image, LogLevel
 from skimage.morphology import skeletonize, remove_small_objects
 from skimage.segmentation import join_segmentations, watershed
 
 class SurfaceRefinement():
-    def __init__(self, image, hed, masks, line_data, lines):
+    def __init__(self, image, hed, masks, lines):
         super().__init__()
         self.image = image
         self.hed = hed
         self.masks = masks
-        self.line_data = line_data
         self.lines = lines
 
     def _get_lines_image(self, data, img, lines, sx, sy):
@@ -24,13 +23,13 @@ class SurfaceRefinement():
         l = 1
 
         for line in lines:
-            for x1, y1, x2, y2 in line:
-                x1 = int(sx * x1)
-                x2 = int(sx * x2)
-                y1 = int(sy * y1)
-                y2 = int(sy * y2)
-                cv2.line(all_lines, (x1, y1), (x2, y2), l, thickness=2, lineType=cv2.LINE_8)
-                l += 1
+            line = line.reshape(4)
+            x1 = int(sx * line[0])
+            y1 = int(sy * line[1])
+            x2 = int(sx * line[2])
+            y2 = int(sy * line[3])
+            cv2.line(all_lines, (x1, y1), (x2, y2), l, thickness=2, lineType=cv2.LINE_8)
+            l += 1
 
         return all_lines
         
@@ -54,13 +53,13 @@ class SurfaceRefinement():
         sx = self.image.shape[0] / data["image"].shape[0]
         sy = self.image.shape[1] / data["image"].shape[1]
 
-        all_lines = self._get_lines_image(data, self.image, self.lines, sx, sy)
-
         #draw lines in BW
         merged_lines = np.int32(np.zeros((self.image.shape[0], self.image.shape[1])))
-        Line.draw_all(self.line_data, merged_lines, color=255, thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
+
+        draw_lines(self.lines, merged_lines, color=255, thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
 
         if im_logging_enabled(data, LogLevel.Segmentation):
+            all_lines = self._get_lines_image(data, self.image, self.lines, sx, sy)
             l_image_rgb = self.image.copy()
             l_image_rgb[merged_lines > 0] = 255
             log_segmentation_image(data, "l_image", all_lines, self.image)
@@ -118,7 +117,7 @@ class SurfaceRefinement():
             pruned = remove_small_objects(segmentation == i, min_size=32)
             segmentation[np.logical_and(segmentation == i, pruned == 0)] = 0
 
-        line_mask = Line.draw_all(self.line_data,
+        line_mask = draw_lines(self.lines,
                                   np.zeros((segmentation.shape[0], segmentation.shape[1])),
                                   color=255,
                                   thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
@@ -138,3 +137,37 @@ class SurfaceRefinement():
 
 
         return segmentation
+
+def draw_lines(line_data, image, color=None, thickness=None, lineType=cv2.LINE_8, sx=1.0, sy=1.0):
+    for line in line_data:
+        line = line.reshape(4)
+        pt1 = (int(line[0] * sx), int(line[1] * sy))
+        pt2 = (int(line[2] * sx), int(line[3] * sy))
+        cv2.line(image, pt1, pt2, color, thickness, lineType=lineType)
+    return image
+
+class PipelineSurfaceRefinement(PipelineStep):
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.RefineSurfaces
+
+    @property
+    def required_keys(self) -> list:
+        return ["downscaled", "isolated", "lines", "hed"]
+
+    @property
+    def output_keys(self) -> list:
+        return ["segmentation"]
+
+    def run(self, data):
+
+        img_lr = data["downscaled"]
+        shape = (img_lr.shape[1], img_lr.shape[0])
+
+        log_image(data, 'hed', data["hed"])
+        hed_lr = cv2.resize(data["hed"], shape)
+
+        refiner = SurfaceRefinement(img_lr, hed_lr, data["isolated"], data["lines"])
+        data["segmentation"] = refiner.refine(data)
+

@@ -9,8 +9,8 @@ import asyncio
 import signal
 from concurrent.futures import ThreadPoolExecutor
 
-from pipeline.core import ask_exit
-from pipeline.pipeline import Pipeline, PipelineMode, PipelineStepIndex
+from pipeline.core import ask_exit, PipelineStepIndex
+from pipeline.pipeline import Pipeline, PipelineMode
 from pipeline.logging import LogLevel
 
 def get_file_paths(input_dir, pattern=None):
@@ -23,25 +23,22 @@ def get_file_paths(input_dir, pattern=None):
             files.extend(Path(input_dir).glob('**/*' + ext))
     return files
 
-async def process_files(pipeline, input_dir, pattern):
-    files = get_file_paths(input_dir, pattern)
+async def process_files(pipeline, files):
 
-    print("Importing %d files from \"%s\"" % (len(files), input_dir))
+    index = 1
 
     for path in files:
         url = Path(path)
         unique_id = url.parents[0].name if len(url.parents) > 0 else url.name
         data = {"path": path, "unique_id": unique_id if path.suffix == ".pickle" else url.stem}
 
+        print("\nProcessing file %d of %d\n" % (index, len(files)))
         await pipeline.process(data)
-
-    index = 0
-
-    return len(files)
+        index += 1
 
 
-#For instance, to restore from step 7 (after refinement):
-#python -W ignore harness.py data --restore=7
+#For instance, to restore from step 6 (before refinement):
+#python -W ignore harness.py data --restore=6
 
 @click.command()
 @click.argument("input_dir", default='test_images', type=click.Path(exists=True, file_okay=False, dir_okay=True))
@@ -49,15 +46,17 @@ async def process_files(pipeline, input_dir, pattern):
 @click.argument("model_path", default='tensorflow_models', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("semantic_model_path", default='gluon_models', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("fov_model_path", default='sklearn_models/fov_classifier_lc128.joblib', type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("hed_model_path", default='hed_model/HED_pretrained_bsds.npz', type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("planes_url", default='http://localhost:8081/', type=click.STRING)
-@click.option('--api_level', type=int, default=4, help='api level: 1-4')
+@click.option('--api', type=int, default=3, help='api level: 1-4')
 @click.option('--restore', type=int, help='Pipeline step to restore from. Data pickle files expected inside input_dir')
 @click.option('--export', type=int, help='Pipeline step to export')
+@click.option('--stop', type=int, default=None, help='Stop after step')
 @click.option("--logging_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
 @click.option('--log_level', type=int, default=LogLevel.All, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
-def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, planes_url, 
-         api_level, restore, export, logging_dir, log_level, log_step):
+def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, hed_model_path, planes_url, 
+         api, restore, export, stop, logging_dir, log_level, log_step):
 
     if not os.path.exists(input_dir):
         raise Exception('The directory does not exist at path {}'.format(input_dir)) 
@@ -66,12 +65,26 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     mode = PipelineMode.Restore if restore is not None else PipelineMode.Process
 
     file_pattern = "*.pickle" if restore is not None else None
+
+    files = get_file_paths(input_dir, file_pattern)
+
+    if file_pattern is None:
+        print("\nProcessing %d images from \"%s\"" % (len(files), input_dir))
+    else:
+        print("\nProcessing %d files from \"%s/**/%s\"" % (len(files), input_dir, file_pattern))
+
+    if len(files) == 0:
+        raise Exception('No files found at path {}'.format(input_dir)) 
+    
     restore_step = PipelineStepIndex(restore) if restore is not None else None
     export_step = PipelineStepIndex(export) if export is not None else None
+    stop_step = PipelineStepIndex(stop) if stop is not None else None
+
     logging_step = PipelineStepIndex(log_step) if log_step is not None else None
 
-    pipeline = Pipeline(mode, api_level, src_path=input_dir, dest_path=output_dir, restore_step=restore_step, export_step=export_step, logging_dir=logging_dir, logging_level=log_level, logging_step=logging_step, \
-                            model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, planes_url=planes_url)
+    pipeline = Pipeline(mode, api, src_path=input_dir, dest_path=output_dir, restore_step=restore_step, export_step=export_step, stop_step=stop_step, \
+                        logging_dir=logging_dir, logging_level=log_level, logging_step=logging_step, \
+                        model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, hed_model_path=hed_model_path, planes_url=planes_url)
 
 
     loop = asyncio.get_event_loop()
@@ -80,10 +93,16 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     for sig in (signal.SIGINT, signal.SIGTERM):          
         loop.add_signal_handler(sig, ask_exit)  
 
+    start_time = time.time()
+
     pipeline.start()
-    loop.run_until_complete(process_files(pipeline, input_dir, pattern=file_pattern))
+    loop.run_until_complete(process_files(pipeline, files))
     pipeline.stop()
 
+    elapsed = (time.time() - start_time)
+    avg = elapsed / len(files)
+    
+    print("\n[Total processing time: %.2fs, average: %.2fs] \n" % (elapsed, avg))
 
 if __name__ == "__main__":
     main()
