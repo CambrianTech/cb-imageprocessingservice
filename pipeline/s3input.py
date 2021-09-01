@@ -1,9 +1,5 @@
-from pipeline.input import PipelineInput
-from pipeline.s3client import S3Client
-try:
-    from imageio import imread
-except:
-    from scipy.misc import imread
+from .input import PipelineInput
+from .s3client import S3Client
 
 class PipelineS3Input(PipelineInput):
 

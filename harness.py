@@ -9,7 +9,7 @@ import asyncio
 import signal
 from concurrent.futures import ThreadPoolExecutor
 
-from pipeline.core import ask_exit, PipelineStepIndex
+from pipeline.core import ask_exit
 from pipeline.pipeline import Pipeline, PipelineMode
 from pipeline.logging import LogLevel
 
@@ -76,14 +76,9 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     if len(files) == 0:
         raise Exception('No files found at path {}'.format(input_dir)) 
     
-    restore_step = PipelineStepIndex(restore) if restore is not None else None
-    export_step = PipelineStepIndex(export) if export is not None else None
-    stop_step = PipelineStepIndex(stop) if stop is not None else None
 
-    logging_step = PipelineStepIndex(log_step) if log_step is not None else None
-
-    pipeline = Pipeline(mode, api, src_path=input_dir, dest_path=output_dir, restore_step=restore_step, export_step=export_step, stop_step=stop_step, \
-                        logging_dir=logging_dir, logging_level=log_level, logging_step=logging_step, \
+    pipeline = Pipeline(mode, api, src_path=input_dir, dest_path=output_dir, restore_step=restore, export_step=export, stop_step=stop, \
+                        logging_dir=logging_dir, logging_level=log_level, logging_step=log_step, \
                         model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, hed_model_path=hed_model_path, planes_url=planes_url)
 
 

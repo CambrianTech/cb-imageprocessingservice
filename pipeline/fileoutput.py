@@ -1,8 +1,7 @@
 import os
 import json
 from pathlib import Path
-from pipeline.output import PipelineOutput
-import cv2
+from .output import PipelineOutput
 
 class PipelineFileOutput(PipelineOutput):
 
@@ -13,6 +12,8 @@ class PipelineFileOutput(PipelineOutput):
 
         if len(image.shape) == 3:
             cv2.imwrite(str(path), cv2.cvtColor(image, cv2.COLOR_RGB2BGR), [int(cv2.IMWRITE_JPEG_QUALITY), quality])
+        elif len(image.shape) == 4:
+            cv2.imwrite(str(path), cv2.cvtColor(image, cv2.COLOR_RGBA2BGRA), [int(cv2.IMWRITE_JPEG_QUALITY), quality])
         else:
             cv2.imwrite(str(path), image, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
 

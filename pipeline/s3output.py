@@ -1,16 +1,7 @@
-from io import BytesIO
-try:
-    from imageio import imsave
-except:
-    from scipy.misc import imsave
-import boto3
-import numpy as np
 import os
-import json
-import zlib
 
-from pipeline.s3client import S3Client
-from pipeline.output import PipelineOutput
+from .s3client import S3Client
+from .output import PipelineOutput
 
 class PipelineS3Output(PipelineOutput):
 

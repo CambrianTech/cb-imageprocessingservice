@@ -5,10 +5,10 @@ from scipy import ndimage
 from scipy.stats import mode
 from enum import Enum, IntEnum
 
-from pipeline.extractsurfaces import Groupings
-from pipeline.core import PipelineStep, PipelineStepIndex
-from pipeline.utils import resize_array
-from pipeline.logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
+from .core import PipelineStep, PipelineStepIndex
+from .extractsurfaces import Groupings
+from .utils import resize_array
+from .logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 
 class Dimension(IntEnum):
     Horizontal = 0

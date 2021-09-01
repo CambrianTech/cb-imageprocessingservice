@@ -1,4 +1,3 @@
-from pipeline.core import PipelineStep
 import cv2
 import numpy as np
 from scipy import ndimage
@@ -7,15 +6,9 @@ from skimage.morphology import watershed, disk
 from skimage import filters
 from skimage.filters import threshold_multiotsu
 
-
-IM_LOGGING_ENABLED = False
-
-
-def _log_image(name, image):
-    if IM_LOGGING_ENABLED:
-        cv2.imwrite(name, image)
-
-
+from .core import PipelineStep
+from .pipeline import PipelineStepIndex
+from .logging import log_image
 
 class PipelineRefineLighting(PipelineStep):
     @property
@@ -44,4 +37,4 @@ class PipelineRefineLighting(PipelineStep):
 
         data["lighting"] = lighting
 
-        _log_image('lighting.png', lighting)
+        log_image(data, 'lighting.jpg', lighting)

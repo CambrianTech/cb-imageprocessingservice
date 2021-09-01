@@ -2,10 +2,10 @@ import numpy as np
 from time import time
 import cv2
 from cambrian import geometry
-from pipeline.core import PipelineStep, PipelineStepIndex
-from pipeline.extractsurfaces import Groupings
-from pipeline.logging import log_segmentation_image
 
+from .core import PipelineStep, PipelineStepIndex
+from .extractsurfaces import Groupings
+from .logging import log_segmentation_image
 
 class PoseEstimator:
     def __init__(self, data, image, lines, fov, floor_mask, floor_normal, floor_offset):
@@ -555,7 +555,7 @@ def calcPlaneXYZ(planes, width, height, camera, max_depth=10):
         planeDepths = np.clip(planeDepths, 0, max_depth)
         pass
     XYZ = (np.expand_dims(planeDepths, -1) * np.expand_dims(ranges, 2))
-    # cv2.imwrite("n.png", cv2.normalize(XYZ.transpose(2, 0, 1, 3)[0], None, 0, 255, cv2.NORM_MINMAX))
+    
     return XYZ.transpose(2, 0, 1, 3), planeDepths.transpose(2, 0, 1)
 
 

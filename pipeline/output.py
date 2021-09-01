@@ -1,9 +1,6 @@
 from abc import abstractmethod
 from io import BytesIO
-try:
-    from imageio import imsave
-except:
-    from scipy.misc import imsave
+
 import boto3
 import numpy as np
 import os
@@ -11,7 +8,7 @@ import json
 import zlib
 import cv2
 
-from pipeline.core import PipelineStep, PipelineStepIndex
+from .core import PipelineStep, PipelineStepIndex
 
 surface_types = ["unknown", "floor", "wall", "horizontal", "vertical"]
 

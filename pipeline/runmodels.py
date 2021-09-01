@@ -3,7 +3,7 @@ from scipy.special import softmax
 import cv2
 import tensorflow as tf
 from modelutils import get_session_config
-from pipeline.core import PipelineStep, PipelineStepIndex
+
 import os
 from time import time
 from tensorpack import *
@@ -17,6 +17,8 @@ from mxnet import image
 import mxnet as mx
 
 from .combineplanemasks import combine_plane_masks, combine_plane_clusters
+from .core import PipelineStep
+from .pipeline import PipelineStepIndex
 
 # HED from Tensorpack examples: https://github.com/tensorpack/tensorpack/tree/master/examples/HED
 

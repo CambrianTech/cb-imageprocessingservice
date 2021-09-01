@@ -6,13 +6,14 @@ from scipy.stats import mode
 from skimage.morphology import skeletonize
 from skimage.segmentation import watershed
 
-from pipeline.core import PipelineStep, PipelineStepIndex
-from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
-from pipeline.ade20k import ADE20K
-from pipeline.extractsurfaces import Groupings
 from cambrian.VanishingPointFinder import VanishingPointFinder
-from pipeline.poseestimator import calcPlaneXYZ, fan_surfaces
-from pipeline.planegeometry import Dimension
+
+from .core import PipelineStep, PipelineStepIndex
+from .logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
+from .ade20k import ADE20K
+from .extractsurfaces import Groupings
+from .poseestimator import calcPlaneXYZ, fan_surfaces
+from .planegeometry import Dimension
 
 def random_color():
     rgbl=[255,0,0]

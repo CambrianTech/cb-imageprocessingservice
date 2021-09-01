@@ -1,4 +1,3 @@
-from pipeline.core import PipelineStep, PipelineStepIndex
 import cv2
 import numpy as np
 from scipy import ndimage
@@ -10,22 +9,22 @@ from cambrian import geometry
 from cambrian.frei_chen import frei_chen
 from cambrian.Line import Line
 from cambrian.transformations import euler_from_matrix
-from skimage.morphology import skeletonize
+from skimage.morphology import skeletonize, remove_small_objects
 
 import pickle
 import math
 from skimage.segmentation import watershed
 from scipy.stats import mode
 
-from pipeline.utils import resize_array
-from pipeline.planegeometry import PlaneGeometry, Dimension
-from pipeline.surfacerefinement import SurfaceRefinement
-from skimage.morphology import remove_small_objects, remove_small_holes
+from .core import PipelineStep, PipelineStepIndex
+from .utils import resize_array
+from .planegeometry import PlaneGeometry, Dimension
+from .surfacerefinement import SurfaceRefinement
 
-from pipeline.ade20k import ADE20K
-from pipeline.extractsurfaces import Groupings
-from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
-from pipeline.poseestimator import calcPlaneXYZ, PoseEstimator, fan_surfaces
+from .ade20k import ADE20K
+from .extractsurfaces import Groupings
+from .logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
+from .poseestimator import calcPlaneXYZ, PoseEstimator, fan_surfaces
 
 def rough_dilate_erode(is_dilate, mask, size=5, iterations=1, scale=0.5, maintain_size=True, interpolation=cv2.INTER_NEAREST):
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(size,size))

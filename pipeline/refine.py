@@ -5,14 +5,9 @@ from skimage.morphology import remove_small_objects
 
 import cambrian.image_processing as ip
 
-from pipeline.core import PipelineStep, PipelineStepIndex
-from pipeline.logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
-from pipeline.ade20k import ADE20K
-from pipeline.extractsurfaces import Groupings
-from cambrian.VanishingPointFinder import VanishingPointFinder
-from pipeline.poseestimator import calcPlaneXYZ, fan_surfaces
-from pipeline.utils import resize_array
-
+from .core import PipelineStep, PipelineStepIndex
+from .logging import log_image, log_segmentation_image, im_logging_enabled, LogLevel
+from .utils import resize_array
 
 def random_color():
     rgbl=[255,0,0]
@@ -112,16 +107,14 @@ class PipelineRefineResults(PipelineStep):
             pruned = remove_small_objects(mask, 100)  # pruned[inter > 0] = 1
             final_labels_hr[mask > 0] = 0
             final_labels_hr[pruned > 0] = i
-
-        if im_logging_enabled(data, LogLevel.Segmentation):
-            log_segmentation_image(data, "pre_final_labels", final_labels_hr - 1, img)
+        
+        log_segmentation_image(data, "pre_final_labels", final_labels_hr - 1, img)
 
         final_labels_hr[final_labels_hr < 0] = 0
         final_labels = np.int32(final_labels_hr)
 
         self.transfer_labels(data, final_labels, len(final_masks), final_plane_parameters, final_rotations)
 
-        if im_logging_enabled(data, LogLevel.Segmentation):
-            log_segmentation_image(data, "final_labels", np.int32(final_labels) - 1, img)
+        log_segmentation_image(data, "final_labels", np.int32(final_labels) - 1, img)
         
                 
