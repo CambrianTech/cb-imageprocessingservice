@@ -39,9 +39,8 @@ def _remote_networks(address, data):
 
 class PipelineRemotePlaneDetector(PipelineStep):
 
-    @property
     def index(self) -> PipelineStepIndex:
-        return PipelineStepIndex.RemoteNetworks
+        return PipelineStepIndex.RemotePlaneDetector
 
     @property
     def required_keys(self) -> list:
@@ -76,6 +75,9 @@ class PipelineRemotePlaneDetector(PipelineStep):
 
 
 class PipelineRemoteNetworks(PipelineStep):
+
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.RemoteNetworks
 
     @property
     def required_keys(self) -> list:

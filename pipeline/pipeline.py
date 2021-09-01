@@ -98,7 +98,7 @@ class Pipeline():
 
     def assemble(self):
 
-
+        #Important: some devices may not be able to instantiate a class, so a list is first built
         if self.mode == PipelineMode.Serve:
             self.s3_client = S3Client()
             input_step = PipelineS3Input
@@ -138,13 +138,12 @@ class Pipeline():
                      geometry_step, estimate_pose_step, merge_step, refine_step, combine_step, output_step]
 
         self.steps = []
-
         self.push(input_step(self))
 
         for index in range(self.start_step, self.stop_step):
             initializer = all_steps[index]
-            step = PipelineNoOp(self, index+1) if initializer is None else initializer(self)
-            self.push(step)
+            if not initializer is None:
+                self.push(initializer(self))            
 
 
     def start(self):
