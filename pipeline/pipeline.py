@@ -66,7 +66,7 @@ class Pipeline():
                         restore_step:PipelineStepIndex=None, export_step:PipelineStepIndex=None, stop_step=None, \
                         logging_dir=None, logging_level=LogLevel.Nothing, logging_step:PipelineStepIndex=None):
 
-        self.mode = mode
+        self.mode = PipelineMode(mode)
         self.api_level = api_level
         self._running = False
 
@@ -80,19 +80,19 @@ class Pipeline():
         self.dest_path = dest_path
         self.cpu_networks_port = cpu_networks_port
         self.remote_path = "http://localhost:%d" % cpu_networks_port
-        self.restore_step = restore_step
-        self.export_step = export_step
+        self.restore_step = None if restore_step is None else PipelineStepIndex(restore_step)
+        self.export_step = None if export_step is None else PipelineStepIndex(export_step)
 
         self.logging_dir = logging_dir
         self.logging_level = logging_level
-        self.logging_step = logging_step
+        self.logging_step = None if logging_step is None else PipelineStepIndex(logging_step)
 
         self.start_step = PipelineStepIndex(self.restore_step - 1 if self.restore_step is not None else PipelineStepIndex.Input + 1)
 
-        self.stop_step = stop_step
-
-        if self.stop_step is None:
+        if stop_step is None:
             self.stop_step = PipelineStepIndex(self.export_step if self.export_step is not None else PipelineStepIndex.Output)
+        else:
+            self.stop_step = PipelineStepIndex(stop_step)
 
         self.assemble()
 
