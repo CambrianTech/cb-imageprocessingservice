@@ -19,6 +19,8 @@ class Line(Sequence):
         self.data[3] *= sy
         self.recalculate()
 
+        self.dead = False
+
     def __getitem__(self, i):
         return self.data[i]
     def __len__(self):
@@ -38,12 +40,14 @@ class Line(Sequence):
     def reshape(self, *args):
         return self.data.reshape(*args)
 
-
     def recalculate(self):
         self.midpoint = ((self.point_a[0] + self.point_b[0]) / 2, (self.point_a[1] + self.point_b[1]) / 2)
         self.length_sq = distance.sqeuclidean(self.point_a, self.point_b)
         self.length = math.sqrt(self.length_sq)
         self.angle = LineFunctions.line_angle(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
+
+    def bounding_box(self, width=10, length_multiplier=1.0, length_offset=0.0):
+        return (self.midpoint, (max(self.length * length_multiplier, self.length + length_offset), width), np.degrees(self.angle))
 
 class PipelineLineFinder(PipelineStep):
 
@@ -58,6 +62,49 @@ class PipelineLineFinder(PipelineStep):
     @property
     def output_keys(self) -> list:
         return ["lines"]
+
+    def merge(self, lines, search_width=5, search_length=1.1, angle_threshold=math.radians(3)):
+
+        i=0
+        while i < len(lines):
+            line_a = lines[i]
+            i += 1
+
+            if line_a.dead: continue
+
+            rect_a = line_a.bounding_box(search_width, length_multiplier=search_length)
+            data = (line_a.point_a, line_a.point_b)
+
+            parallel_lines = []
+            max_length = line_a.length
+
+            for j in range(i, len(lines)):
+                line_b = lines[j]
+
+                if line_b.dead: continue
+
+                angle_diff = LineFunctions.line_angle_difference(line_a.angle, line_b.angle)
+
+                if angle_diff <= angle_threshold:
+                    rect_b = line_b.bounding_box(2, length_multiplier=search_length)
+                    result, intersections = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+
+                    if not intersections is None:
+                        parallel_lines.append(line_b)
+                        data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
+
+            if len(parallel_lines) > 0:
+                parallel_lines.append(line_a)
+                source_lines = parallel_lines
+                new_line = Line(np.array([(data[0][0], data[0][1], data[1][0], data[1][1])], dtype=np.int).reshape(4))
+
+                for line in parallel_lines:
+                    line.dead = True
+
+                lines.append(new_line)
+
+        return list(filter(lambda x: not x.dead, lines))
+
 
     def run(self, data):
 
@@ -74,6 +121,12 @@ class PipelineLineFinder(PipelineStep):
 
         lines.extend(list(map(lambda x: Line(x.reshape(4), sx, sy), fld.detect(data["hed"]))))
 
+        if im_logging_enabled(data, LogLevel.Lines):
+            debug = data["image"].copy()
+            [line.draw(debug) for line in lines]
+            log_image(data, "raw_lines", debug)
+
+        lines = self.merge(lines, search_width=self.diagonal/200)
 
         if im_logging_enabled(data, LogLevel.Lines):
             debug = data["image"].copy()
