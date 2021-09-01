@@ -63,6 +63,7 @@ class PipelineLineFinder(PipelineStep):
     def output_keys(self) -> list:
         return ["lines"]
 
+    #todo: write in C or lambda
     def merge(self, lines, search_width=5, search_length=1.1, angle_threshold=math.radians(3)):
 
         i=0
