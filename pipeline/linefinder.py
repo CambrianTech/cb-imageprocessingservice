@@ -1,13 +1,21 @@
 import cv2
 import numpy as np
+import math
 from scipy.spatial import distance
 from collections.abc import Sequence
+from bisect import bisect_left
 
-import math
 from cambrian.LineFunctions import LineFunctions
 
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.logging import log_image, im_logging_enabled, LogLevel
+
+#a[pos].angle == x.angle
+
+def binary_search(lines, x, angle_threshold, lo=0, hi=None):
+    if hi is None: hi = len(lines)
+    pos = bisect_left(lines, x, lo, hi)                  # find insertion position
+    return pos if pos != hi and LineFunctions.line_angle_difference(lines[pos].angle, x.angle) < angle_threshold else -1  # don't walk off the end
 
 class Line(Sequence):
     def __init__(self, data, sx=1, sy=1):
@@ -23,8 +31,15 @@ class Line(Sequence):
 
     def __getitem__(self, i):
         return self.data[i]
+
     def __len__(self):
         return len(self.data)
+
+    def __lt__(self, other):
+        return self.angle < other.angle
+    
+    def __eq__(self, other):
+        return self.angle == other.angle
 
     @property
     def point_a(self):
@@ -34,7 +49,7 @@ class Line(Sequence):
     def point_b(self):
         return (self.data[2], self.data[3])
 
-    def draw(self, img, color=(180,255,100,255), thickness=1):
+    def draw(self, img, color=(180,0,255,255), thickness=1):
         cv2.line(img, self.point_a, self.point_b, color, thickness)
 
     def reshape(self, *args):
@@ -57,14 +72,18 @@ class PipelineLineFinder(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["image"]
+        return ["image", "hed", "normals"]
 
     @property
     def output_keys(self) -> list:
         return ["lines"]
 
+
     #todo: write in C or lambda
     def merge(self, lines, search_width=5, search_length=1.1, angle_threshold=math.radians(3)):
+
+        lines = sorted(lines)
+        angles = list(map(lambda x: x.angle, lines))
 
         i=0
         while i < len(lines):
@@ -79,8 +98,10 @@ class PipelineLineFinder(PipelineStep):
             parallel_lines = []
             max_length = line_a.length
 
-            for j in range(i, len(lines)):
-                line_b = lines[j]
+            stop_index = len(lines) - 1
+            #stop_index = bisect_left(angles, line_a.angle + angle_threshold, i)
+
+            for line_b in lines[i:stop_index]:
 
                 if line_b.dead: continue
 
@@ -102,14 +123,15 @@ class PipelineLineFinder(PipelineStep):
                 for line in parallel_lines:
                     line.dead = True
 
-                lines.append(new_line)
+                #todo: bisect_right()
+                lines.insert(i, new_line) #place one past where we are
 
         return list(filter(lambda x: not x.dead, lines))
 
 
     def run(self, data):
 
-        bw = cv2.cvtColor(data["image"], cv2.COLOR_BGR2GRAY)
+        bw = cv2.cvtColor(data["image"], cv2.COLOR_RGB2GRAY)
 
         self.height, self.width = bw.shape[:2]
         self.diagonal = np.hypot(self.width, self.height)
@@ -122,12 +144,18 @@ class PipelineLineFinder(PipelineStep):
 
         lines.extend(list(map(lambda x: Line(x.reshape(4), sx, sy), fld.detect(data["hed"]))))
 
+        normals = cv2.split(data["normals"].astype(np.uint8))
+        sx = data["image"].shape[1] / data["normals"][0].shape[1]
+        sy = data["image"].shape[0] / data["normals"][0].shape[0]
+        for i in range(0,3):
+            lines.extend(list(map(lambda x: Line(x.reshape(4), sx, sy), fld.detect(normals[i]))))
+
         if im_logging_enabled(data, LogLevel.Lines):
             debug = data["image"].copy()
             [line.draw(debug) for line in lines]
             log_image(data, "raw_lines", debug)
 
-        lines = self.merge(lines, search_width=self.diagonal/200)
+        lines = self.merge(lines, search_width=self.diagonal/100)
 
         if im_logging_enabled(data, LogLevel.Lines):
             debug = data["image"].copy()
