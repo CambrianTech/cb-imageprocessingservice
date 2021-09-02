@@ -80,10 +80,12 @@ class PipelineLineFinder(PipelineStep):
 
 
     #todo: write in C or lambda
-    def merge(self, lines, search_width, search_length=1.1, angle_threshold=math.radians(3)):
+    def merge(self, lines, search_width, search_length=1.1, angle_threshold=math.radians(4)):
 
         lines = sorted(lines)
         angles = list(map(lambda x: x.angle, lines))
+
+        min_dist_sq = search_width * search_width
 
         i=0
         while i < len(lines):
@@ -104,8 +106,16 @@ class PipelineLineFinder(PipelineStep):
 
                 if line_b.dead: continue
 
-                rect_b = line_b.bounding_box(search_width, length_multiplier=search_length)
-                result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+                dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
+
+                if dist_sq <= min_dist_sq:
+                    result = 1
+                else:
+                    rect_b = line_b.bounding_box(search_width, length_multiplier=search_length)
+                    result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+
+                # rect_b = line_b.bounding_box(search_width, length_multiplier=search_length)
+                # result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
 
                 if result != 0:
                     parallel_lines.append(line_b)
@@ -132,7 +142,7 @@ class PipelineLineFinder(PipelineStep):
         bw = cv2.cvtColor(data["image"], cv2.COLOR_RGB2GRAY)
 
         self.height, self.width = bw.shape[:2]
-        self.diagonal = np.hypot(self.width, self.height)
+        diagonal = np.hypot(self.width, self.height)
 
         def log_lines(lines, name):
             if im_logging_enabled(data, LogLevel.Lines):
@@ -140,19 +150,17 @@ class PipelineLineFinder(PipelineStep):
                 [line.draw(debug) for line in lines]
                 log_image(data, name, debug)
 
-        fld = cv2.ximgproc.createFastLineDetector(int(self.diagonal / 60.0), 1.41, 200, 240, 3, False)
+        fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)
 
         lines = list(map(lambda x: Line(x.reshape(4)), fld.detect(bw)))
         log_lines(lines, "bw_lines")
 
-        fld = cv2.ximgproc.createFastLineDetector(int(self.diagonal / 100.0), 1.41, 80, 240, 3, False)
         sx = data["image"].shape[1] / data["hed"].shape[1]
         sy = data["image"].shape[0] / data["hed"].shape[0]
         hed_lines = list(map(lambda x: Line(x.reshape(4), sx, sy), fld.detect(data["hed"])))
         log_lines(hed_lines, "hed_lines")
         lines.extend(hed_lines)
 
-        fld = cv2.ximgproc.createFastLineDetector(int(self.diagonal / 60.0), 1.41, 200, 240, 3, False)
         normals = np.uint8(data["normals"])
         sx = data["image"].shape[1] / normals.shape[1]
         sy = data["image"].shape[0] / normals.shape[0]
@@ -160,11 +168,10 @@ class PipelineLineFinder(PipelineStep):
         normals_lines = []
         for i in range(0, 3):
             normals_lines.extend(list(map(lambda x: Line(x.reshape(4), sx, sy), fld.detect(normals[i]))))
+        log_lines(normals_lines, "normals_lines")
         lines.extend(normals_lines)
-        
-        log_lines(normals_lines, "normals")
 
-        lines = self.merge(lines, search_width=self.diagonal/200)
+        lines = self.merge(lines, search_width=diagonal/180)
 
         log_lines(lines, "merged_lines")
 
