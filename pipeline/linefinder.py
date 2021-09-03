@@ -159,32 +159,44 @@ class PipelineLineFinder(PipelineStep):
 
         fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)
 
-        lines = list(map(lambda x: Line(x.reshape(4)), fld.detect(bw)))
+        lines = []
+        result = fld.detect(bw)
+        if result is not None and len(result) > 0: 
+            lines.extend(list(map(lambda x: Line(x.reshape(4)), result)))
         log_lines(lines, "bw_lines")
+
+        transform_result = lambda x: list(map(lambda x: Line(x.reshape(4), sx, sy), result))
 
         sx = data["image"].shape[1] / data["hed"].shape[1]
         sy = data["image"].shape[0] / data["hed"].shape[0]
 
-        hed = data["hed"]
-        hed_lines = list(map(lambda x: Line(x.reshape(4), sx, sy), fld.detect(hed)))
-        before = len(hed_lines)
-        hed_lines = self.merge(hed_lines, search_width=diagonal/100)
-        #print("before: %d, after: %d" % (before, len(hed_lines)))
+        result = fld.detect(data["hed"])
+        if result is not None and len(result) > 0: 
+            #lines are made parallel by thickness of source image edges
+            hed_lines = self.merge(transform_result(result), search_width=diagonal/100)
+            log_lines(hed_lines, "hed_lines")
+            lines.extend(hed_lines)
 
-        log_lines(hed_lines, "hed_lines")
-        lines.extend(hed_lines)
 
+        fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 20.0), 1.41, 200, 240, 3, False)
         normals = np.uint8(data["normals"])
+        #log_image(data, "normals", normals)
         sx = data["image"].shape[1] / normals.shape[1]
         sy = data["image"].shape[0] / normals.shape[0]
         normals = cv2.split(normals)
         normals_lines = []
         for i in range(0, 3):
-            normals_lines.extend(list(map(lambda x: Line(x.reshape(4), sx, sy), fld.detect(normals[i]))))
-        normals_lines = self.merge(normals_lines, search_width=diagonal/100)
-        log_lines(normals_lines, "normals_lines")
-        lines.extend(normals_lines)
+            result = fld.detect(normals[i])
+            if result is not None and len(result) > 0:
+                normals_lines.extend(transform_result(result))
+        
+        if len(normals_lines) > 0:
+            #cleanup normals
+            normals_lines = self.merge(normals_lines, search_width=diagonal/300)
+            log_lines(normals_lines, "normals_lines")
+            lines.extend(normals_lines)
 
+        #merge all
         lines = self.merge(lines, search_width=diagonal/200)
 
         log_lines(lines, "merged_lines")
