@@ -1,5 +1,5 @@
-
-
+import numba as nb
+from numba.experimental import jitclass
 
 @jitclass(spec=[
             ("x0", nb.types.float32), ("y0", nb.types.float32), ("x1", nb.types.float32), ("y1", nb.types.float32), 
