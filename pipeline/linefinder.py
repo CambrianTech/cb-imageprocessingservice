@@ -105,8 +105,6 @@ class PipelineLineFinder(PipelineStep):
     def merge(self, lines, search_width, search_length=1.1, angle_threshold=math.radians(3)):
 
         lines = sorted(lines)
-        angles = list(map(lambda x: x.angle, lines))
-
         min_dist_sq = search_width * search_width
 
         i=0
@@ -140,10 +138,7 @@ class PipelineLineFinder(PipelineStep):
 
             if line_a.dead:
                 new_line = Line(np.array([(data[0][0], data[0][1], data[1][0], data[1][1])], dtype=np.int).reshape(4))
-                insert = bisect_left(angles, new_line.angle)
-                lines.insert(insert, new_line)
-                angles.insert(insert, new_line.angle)
-                i = min(insert, i)
+                lines.insert(i, new_line)
 
         return list(filter(lambda x: not x.dead, lines))
 
