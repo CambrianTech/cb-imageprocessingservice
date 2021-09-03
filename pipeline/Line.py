@@ -3,6 +3,7 @@ import numpy as np
 import numba as nb
 import cv2
 from numba.experimental import jitclass
+from cambrian.LineFunctions import LineFunctions
 
 @jitclass(spec=[
             ("x0", nb.types.float32), ("y0", nb.types.float32), ("x1", nb.types.float32), ("y1", nb.types.float32), 
@@ -24,7 +25,7 @@ class Line:
         self.dx = self.x1 - self.x0
         self.dy = self.y1 - self.y0
         self.length = math.sqrt(self.dx * self.dx + self.dy * self.dy)
-        self.angle = line_angle(x0, y0, x1, y1)
+        self.angle = math.atan2(self.dy, self.dx)
         self.midpoint = ((x0 + x1) / 2, (y0 + y1) / 2)
 
     def __getitem__(self, i):
@@ -41,27 +42,28 @@ class Line:
     def point_b(self):
         return (self.x1, self.y1)
 
-    def draw(self, img, color=(255,50,255,255), thickness=2):
-        cv2.line(img, self.point_a, self.point_b, color, thickness) 
- 
+    def bounding_box(self, width, length_multiplier=1.0):
+        return (self.midpoint, (self.length * length_multiplier, width), np.degrees(self.angle))
 
 #todo: write in C or lambda
 def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
 
     min_dist_sq = search_width * search_width
 
-    for i in range(len(lines)):
+    i=0
+    while i < len(lines):
         line_a = lines[i]
-        
+        i += 1
+
         if line_a.dead: continue
 
         rect_a = bounding_box(line_a, search_width, length_multiplier=search_length)
         data = (line_a.point_a, line_a.point_b)
 
-        for j in range(len(lines)):
-            line_b = lines[j]
+        for line_b in lines:
+
             #Optimization possible: line_angle_difference should not be required by bisect methods above returning only angles in range
-            if i == j or line_b.dead or line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
+            if line_a == line_b or line_b.dead or LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
 
             dist_sq = sqeuclidean(line_a.midpoint, line_b.midpoint)
 
@@ -74,7 +76,7 @@ def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(
             if result != 0:
                 line_a.dead = True
                 line_b.dead = True
-                data = merge_line_pair(data, (line_b.point_a, line_b.point_b))
+                data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
 
 
         if line_a.dead:
@@ -84,6 +86,13 @@ def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(
     return list(filter(lambda x: not x.dead, lines))
 
 @nb.jit(nopython=True)
+def line_angle(x0, y0, x1, y1):
+    return math.atan2(float(y1 - y0), float(x1 - x0))
+
+def draw_line(line, img, color=(255,50,255,255), thickness=2):
+    cv2.line(img, (int(line.point_a[0]), int(line.point_a[1])), (int(line.point_b[0]), int(line.point_b[1])), color, thickness)
+
+@nb.jit(nopython=True)
 def line_angle_difference(x, y): #minimum angle between lines segments cannot differ by more than 90 degrees
     diff = abs(math.atan2(math.sin(x-y), math.cos(x-y)))
     if diff > 0.5 * math.pi:
@@ -91,7 +100,6 @@ def line_angle_difference(x, y): #minimum angle between lines segments cannot di
 
     return diff
 
-@nb.jit(nopython=True)
 def line_angle(x0, y0, x1, y1):
     #return np.arctan2(y1 - y0, x1 - x0)
     return math.atan2(float(y1 - y0), float(x1 - x0))
