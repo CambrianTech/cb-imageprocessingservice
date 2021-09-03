@@ -119,10 +119,7 @@ class PipelineLineFinder(PipelineStep):
             rect_a = line_a.bounding_box(search_width, length_multiplier=search_length)
             data = (line_a.point_a, line_a.point_b)
 
-            start_index = bisect_right(angles, line_a.angle - angle_threshold, 0, i)
-            stop_index = bisect_left(angles, line_a.angle + angle_threshold, i)
-
-            for line_b in lines[start_index:stop_index]:
+            for line_b in lines:
 
                 #Optimization possible: line_angle_difference should not be required by bisect methods above returning only angles in range
                 if line_a == line_b or line_b.dead or LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
