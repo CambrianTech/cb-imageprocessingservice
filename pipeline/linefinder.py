@@ -35,6 +35,12 @@ def point_segment_distance(px, py, x1, y1, x2, y2):
 
   return math.hypot(dx, dy)
 
+def gabor(bw, theta, lambd, gamma = 0.0, psi = 0.0):
+    ksize = lambd
+    sigma = ksize * lambd
+    result = cv2.filter2D(bw, cv2.CV_8UC1, cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_32F))
+    return result
+
 def sharpen(img, alpha=1.5, beta=-1.0, kernel_size = 21):
     smoothed = cv2.GaussianBlur(img, (kernel_size, kernel_size), kernel_size)
     return cv2.addWeighted(img, alpha, smoothed, beta, 0)
@@ -102,7 +108,7 @@ class PipelineLineFinder(PipelineStep):
 
 
     #todo: write in C or lambda
-    def merge(self, lines, search_width, search_length=1.1, angle_threshold=math.radians(3)):
+    def merge(self, lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
 
         lines = sorted(lines)
         min_dist_sq = search_width * search_width
@@ -157,16 +163,21 @@ class PipelineLineFinder(PipelineStep):
                 [line.draw(debug,  thickness=thickness) for line in lines]
                 log_image(data, name, debug)
 
-        fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)
-
-        lines = []
-        result = fld.detect(bw)
-        if result is not None and len(result) > 0: 
-            lines.extend(list(map(lambda x: Line(x.reshape(4)), result)))
-        log_lines(lines, "bw_lines")
-
         transform_result = lambda x: list(map(lambda x: Line(x.reshape(4), sx, sy), result))
 
+        fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)
+        lines = []
+
+        #find lines in BW image
+        sx = data["image"].shape[1] / bw.shape[1]
+        sy = data["image"].shape[0] / bw.shape[0]
+        result = fld.detect(bw)
+        if result is not None and len(result) > 0: 
+            lines.extend(transform_result(result))
+        log_lines(lines, "bw_lines")
+
+
+        #find lines in hed hed edges
         sx = data["image"].shape[1] / data["hed"].shape[1]
         sy = data["image"].shape[0] / data["hed"].shape[0]
 
@@ -177,7 +188,7 @@ class PipelineLineFinder(PipelineStep):
             log_lines(hed_lines, "hed_lines")
             lines.extend(hed_lines)
 
-
+        #find lines in normals
         fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 20.0), 1.41, 200, 240, 3, False)
         normals = np.uint8(data["normals"])
         #log_image(data, "normals", normals)
@@ -195,6 +206,23 @@ class PipelineLineFinder(PipelineStep):
             normals_lines = self.merge(normals_lines, search_width=diagonal/300)
             log_lines(normals_lines, "normals_lines")
             lines.extend(normals_lines)
+
+        #find lines in gabor edges:
+        gabor_scale = 1500.0 / diagonal
+        bw_res = cv2.resize(bw, (int(self.width * gabor_scale), int(self.height * gabor_scale)), cv2.INTER_CUBIC) if gabor_scale < 1.0 else bw
+        v_gabor = gabor(bw_res, 0, 7)
+        h_gabor = gabor(bw_res, np.pi/2.0, 9)
+        edges = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -20)
+        edges = cv2.bilateralFilter(edges, 5, 5, 5)
+        edges = cv2.resize(edges, (self.width, self.height), interpolation = cv2.INTER_CUBIC)
+
+        sx = data["image"].shape[1] / edges.shape[1]
+        sy = data["image"].shape[0] / edges.shape[0]
+        result = fld.detect(edges)
+        if result is not None and len(result) > 0: 
+            gabor_lines = self.merge(transform_result(result), search_width=diagonal/100)
+            log_lines(gabor_lines, "gabor_lines")
+            lines.extend(gabor_lines)
 
         #merge all
         lines = self.merge(lines, search_width=diagonal/200)

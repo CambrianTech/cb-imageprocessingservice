@@ -68,7 +68,7 @@ def log_image(data:dict, name:str, image, extension=".jpg"):
     if im_logging_enabled(data, LogLevel.Images):
         _log_image(data, name, image, extension)
 
-def _log_image(data:dict, name:str, image, extension=".jpg", quality=70):
+def _log_image(data:dict, name:str, image, extension=".jpg", quality=90):
     global _logging_index
     path = make_log_path(data, name, extension)
     cv2.imwrite(path, cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB) if len(image.shape) == 3 else image.astype(np.uint8), [int(cv2.IMWRITE_JPEG_QUALITY), quality])
