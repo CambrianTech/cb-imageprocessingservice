@@ -86,8 +86,7 @@ class Line(Sequence):
 
     def recalculate(self):
         self.midpoint = ((self.point_a[0] + self.point_b[0]) / 2, (self.point_a[1] + self.point_b[1]) / 2)
-        self.length_sq = distance.sqeuclidean(self.point_a, self.point_b)
-        self.length = math.sqrt(self.length_sq)
+        self.length = distance.euclidean(self.point_a, self.point_b)
         self.angle = LineFunctions.line_angle(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
 
     def bounding_box(self, width, length_multiplier=1.0):
