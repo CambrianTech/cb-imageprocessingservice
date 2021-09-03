@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import numba as nb
+import cv2
 from numba.experimental import jitclass
 
 @jitclass(spec=[
@@ -41,8 +42,46 @@ class Line:
         return (self.x1, self.y1)
 
     def draw(self, img, color=(255,50,255,255), thickness=2):
-        cv2.line(img, self.point_a, self.point_b, color, thickness)  
+        cv2.line(img, self.point_a, self.point_b, color, thickness) 
+ 
 
+#todo: write in C or lambda
+def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
+
+    min_dist_sq = search_width * search_width
+
+    for i in range(len(lines)):
+        line_a = lines[i]
+        
+        if line_a.dead: continue
+
+        rect_a = bounding_box(line_a, search_width, length_multiplier=search_length)
+        data = (line_a.point_a, line_a.point_b)
+
+        for j in range(len(lines)):
+            line_b = lines[j]
+            #Optimization possible: line_angle_difference should not be required by bisect methods above returning only angles in range
+            if i == j or line_b.dead or line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
+
+            dist_sq = sqeuclidean(line_a.midpoint, line_b.midpoint)
+
+            if dist_sq <= min_dist_sq:
+                result = 1
+            else:
+                rect_b = bounding_box(line_b, search_width, length_multiplier=search_length)
+                result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+
+            if result != 0:
+                line_a.dead = True
+                line_b.dead = True
+                data = merge_line_pair(data, (line_b.point_a, line_b.point_b))
+
+
+        if line_a.dead:
+            new_line = Line(data[0][0], data[0][1], data[1][0], data[1][1])
+            lines.insert(i, new_line)
+
+    return list(filter(lambda x: not x.dead, lines))
 
 @nb.jit(nopython=True)
 def line_angle_difference(x, y): #minimum angle between lines segments cannot differ by more than 90 degrees
@@ -62,6 +101,12 @@ def bounding_box(line, width, length_multiplier=1.0):
     return (line.midpoint, (line.length * length_multiplier, width), np.degrees(line.angle))
 
 @nb.jit(nopython=True)
+def sqeuclidean(point_a, point_b):
+    dx = point_b[0] - point_a[0]
+    dy = point_b[1] - point_a[1]
+    return dx * dx + dy * dy
+
+@nb.jit(nopython=True)
 def merge_line_pair(line_a, line_b):
 
     ax = line_a[0][0]
@@ -73,10 +118,6 @@ def merge_line_pair(line_a, line_b):
     cy = line_b[0][1]
     dx = line_b[1][0]
     dy = line_b[1][1]
-    
-    thi = 0.0; 
-    thj = 0.0; 
-    thr = 0.0;
 
     dlix = (bx - ax);
     dliy = (by - ay);

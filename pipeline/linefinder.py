@@ -10,7 +10,7 @@ from cambrian.frei_chen import frei_chen
 
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.logging import log_image, im_logging_enabled, LogLevel
-from pipeline.Line import Line, line_angle_difference, bounding_box
+from pipeline.Line import Line, merge
 
 def point_segment_distance(px, py, x1, y1, x2, y2):
   dx = x2 - x1
@@ -60,46 +60,6 @@ class PipelineLineFinder(PipelineStep):
     @property
     def output_keys(self) -> list:
         return ["lines"]
-
-
-    #todo: write in C or lambda
-    def merge(self, lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
-
-        min_dist_sq = search_width * search_width
-
-        for i in range(len(lines)):
-            line_a = lines[i]
-            
-            if line_a.dead: continue
-
-            rect_a = bounding_box(line_a, search_width, length_multiplier=search_length)
-            data = (line_a.point_a, line_a.point_b)
-
-            for j in range(len(lines)):
-                line_b = lines[j]
-                #Optimization possible: line_angle_difference should not be required by bisect methods above returning only angles in range
-                if i == j or line_b.dead or line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
-
-                dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
-
-                if dist_sq <= min_dist_sq:
-                    result = 1
-                else:
-                    rect_b = bounding_box(line_b, search_width, length_multiplier=search_length)
-                    result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
-
-                if result != 0:
-                    line_a.dead = True
-                    line_b.dead = True
-                    data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
-
-
-            if line_a.dead:
-                new_line = Line(data[0][0], data[0][1], data[1][0], data[1][1])
-                lines.insert(i, new_line)
-
-        return list(filter(lambda x: not x.dead, lines))
-
     
     def run(self, data):
 
@@ -137,7 +97,7 @@ class PipelineLineFinder(PipelineStep):
         result = fld.detect(data["hed"])
         if result is not None and len(result) > 0: 
             #lines are made parallel by thickness of source image edges
-            hed_lines = self.merge(transform_result(result), search_width=diagonal/100)
+            hed_lines = merge(transform_result(result), search_width=diagonal/100)
             log_lines(hed_lines, "hed_lines")
             lines.extend(hed_lines)
 
@@ -156,7 +116,7 @@ class PipelineLineFinder(PipelineStep):
         
         if len(normals_lines) > 0:
             #cleanup normals
-            normals_lines = self.merge(normals_lines, search_width=diagonal/300)
+            normals_lines = merge(normals_lines, search_width=diagonal/300)
             log_lines(normals_lines, "normals_lines")
             lines.extend(normals_lines)
 
@@ -173,7 +133,7 @@ class PipelineLineFinder(PipelineStep):
         sy = data["image"].shape[0] / edges.shape[0]
         result = fld.detect(edges)
         if result is not None and len(result) > 0: 
-            gabor_lines = self.merge(transform_result(result), search_width=diagonal/100)
+            gabor_lines = merge(transform_result(result), search_width=diagonal/100)
             log_lines(gabor_lines, "gabor_lines")
             lines.extend(gabor_lines)
 
@@ -187,7 +147,7 @@ class PipelineLineFinder(PipelineStep):
 
 
         #merge all
-        lines = self.merge(lines, search_width=diagonal/200)
+        lines = merge(lines, search_width=diagonal/200)
 
         log_lines(lines, "merged_lines")
 
