@@ -3,7 +3,7 @@ import numpy as np
 import math
 from scipy.spatial import distance
 from collections.abc import Sequence
-from bisect import bisect_left
+from bisect import bisect_left, bisect_right
 
 from cambrian.LineFunctions import LineFunctions
 
@@ -119,28 +119,21 @@ class PipelineLineFinder(PipelineStep):
             rect_a = line_a.bounding_box(search_width, length_multiplier=search_length)
             data = (line_a.point_a, line_a.point_b)
 
+            start_index = bisect_right(angles, line_a.angle - angle_threshold, 0, i)
             stop_index = bisect_left(angles, line_a.angle + angle_threshold, i)
 
-            for line_b in lines:
+            for line_b in lines[start_index:stop_index]:
 
-                if line_a == line_b or line_b.dead: continue
-
-                if LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold:
-                    continue
+                #Optimization possible: line_angle_difference should not be required by bisect methods above returning only angles in range
+                if line_a == line_b or line_b.dead or LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
 
                 dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
-
 
                 if dist_sq <= min_dist_sq:
                     result = 1
                 else:
-                    dist = point_segment_distance(line_a.midpoint[0], line_a.midpoint[1], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3])
-
-                    if dist < math.sqrt(min_dist_sq):
-                        result = 1
-                    else: 
-                        rect_b = line_b.bounding_box(search_width, length_multiplier=search_length)
-                        result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+                    rect_b = line_b.bounding_box(search_width, length_multiplier=search_length)
+                    result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
 
                 if result != 0:
                     line_a.dead = True
@@ -150,7 +143,7 @@ class PipelineLineFinder(PipelineStep):
 
             if line_a.dead:
                 new_line = Line(np.array([(data[0][0], data[0][1], data[1][0], data[1][1])], dtype=np.int).reshape(4))
-                insert = bisect_left(angles, new_line.angle, i)
+                insert = bisect_left(angles, new_line.angle)
                 lines.insert(insert, new_line)
                 angles.insert(insert, new_line.angle)
                 i = min(insert, i)
@@ -168,7 +161,8 @@ class PipelineLineFinder(PipelineStep):
         def log_lines(lines, name):
             if im_logging_enabled(data, LogLevel.Lines):
                 debug = data["image"].copy()
-                [line.draw(debug) for line in lines]
+                thickness = max(int(math.hypot(debug.shape[0], debug.shape[1]) / 600), 1)
+                [line.draw(debug,  thickness=thickness) for line in lines]
                 log_image(data, name, debug)
 
         fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)
@@ -183,7 +177,7 @@ class PipelineLineFinder(PipelineStep):
         hed_lines = list(map(lambda x: Line(x.reshape(4), sx, sy), fld.detect(hed)))
         before = len(hed_lines)
         hed_lines = self.merge(hed_lines, search_width=diagonal/100)
-        print("before: %d, after: %d" % (before, len(hed_lines)))
+        #print("before: %d, after: %d" % (before, len(hed_lines)))
 
         log_lines(hed_lines, "hed_lines")
         lines.extend(hed_lines)
@@ -195,6 +189,7 @@ class PipelineLineFinder(PipelineStep):
         normals_lines = []
         for i in range(0, 3):
             normals_lines.extend(list(map(lambda x: Line(x.reshape(4), sx, sy), fld.detect(normals[i]))))
+        normals_lines = self.merge(normals_lines, search_width=diagonal/100)
         log_lines(normals_lines, "normals_lines")
         lines.extend(normals_lines)
 
