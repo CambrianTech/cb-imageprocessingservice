@@ -50,20 +50,20 @@ def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(
 
     min_dist_sq = search_width * search_width
 
-    i=0
-    while i < len(lines):
+    for i in range(len(lines)):
         line_a = lines[i]
-        i += 1
 
         if line_a.dead: continue
 
         rect_a = bounding_box(line_a, search_width, length_multiplier=search_length)
         data = (line_a.point_a, line_a.point_b)
 
-        for line_b in lines:
+        for j in range(len(lines)):
+            if i == j: continue
 
+            line_b = lines[j]
             #Optimization possible: line_angle_difference should not be required by bisect methods above returning only angles in range
-            if line_a == line_b or line_b.dead or LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
+            if line_b.dead or LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
 
             dist_sq = sqeuclidean(line_a.midpoint, line_b.midpoint)
 
@@ -81,7 +81,7 @@ def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(
 
         if line_a.dead:
             new_line = Line(data[0][0], data[0][1], data[1][0], data[1][1])
-            lines.insert(i, new_line)
+            lines.append(new_line)
 
     return list(filter(lambda x: not x.dead, lines))
 
