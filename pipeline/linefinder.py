@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from bisect import bisect_left, bisect_right
 
 from cambrian.LineFunctions import LineFunctions
+from cambrian.frei_chen import frei_chen
 
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.logging import log_image, im_logging_enabled, LogLevel
@@ -223,6 +224,15 @@ class PipelineLineFinder(PipelineStep):
             gabor_lines = self.merge(transform_result(result), search_width=diagonal/100)
             log_lines(gabor_lines, "gabor_lines")
             lines.extend(gabor_lines)
+
+        #frei chen edges:
+        clean_edges = frei_chen(bw)
+        result = fld.detect(bw - (clean_edges * 5.0).astype("uint8"))
+        if result is not None and len(result) > 0: 
+            frei_lines = transform_result(result)
+            log_lines(frei_lines, "frei_lines")
+            lines.extend(frei_lines)
+
 
         #merge all
         lines = self.merge(lines, search_width=diagonal/200)
