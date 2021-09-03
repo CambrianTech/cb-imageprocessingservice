@@ -163,7 +163,8 @@ class PipelineLineFinder(PipelineStep):
                 [line.draw(debug,  thickness=thickness) for line in lines]
                 log_image(data, name, debug)
 
-        transform_result = lambda x: list(map(lambda x: Line(x.reshape(4), sx, sy), result))
+        #transform_result = lambda x: list(map(lambda x: Line(x.reshape(4), sx, sy), result))
+        transform_lines = lambda result: list(map(lambda x: Line(x[0][0] * sx, x[0][1] * sy, x[0][2] * sx, x[0][3] * sy), result))
 
         fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)
         lines = []
