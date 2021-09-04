@@ -152,5 +152,6 @@ class ADE20K(SemanticLabel):
     clock = 149
     flag = 150
 
+floor_like = [ADE20K.earth, ADE20K.grass, ADE20K.rug]
 wall_like = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen]
 

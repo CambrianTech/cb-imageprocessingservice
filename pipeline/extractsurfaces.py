@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 
 from pipeline.core import PipelineStep, PipelineStepIndex
-from pipeline.logging import im_logging_enabled, log_image, LogLevel
+from pipeline.logging import im_logging_enabled, log_image, LogLevel, log_segmentation_image
 from pipeline.ade20k import ADE20K, wall_like
 
 class Groupings(Enum):
@@ -63,18 +63,29 @@ class PipelineExtractSurfaces(PipelineStep):
 
         #Consolidate types: Include other types as part of floor: rug, earth, grass
         output = np.float32(data["semantic_probs"])
-        combine_floor_masks(output)
-        isolated_masks = isolate_masks(data, output) #break masks into major groups: Floor, Wall, Ceiling, etc
-
         data["output"] = output
-        data["isolated"] = isolated_masks
 
         h, w = output[0].shape
         shape = (w, h)
 
         if data["image"].shape[0] > shape[0] or data["image"].shape[1] > shape[1]:
-            data["downscaled"] = cv2.resize(data["image"].copy(), shape)
+            data["downscaled"] = cv2.resize(data["image"], shape)
         else:
             data["downscaled"] = data["image"]
+
+        if im_logging_enabled(data, LogLevel.Segmentation):
+            probs = np.dstack((tuple(output)))
+            log_segmentation_image(data, "segmentation_raw", np.argmax(probs, -1), data["downscaled"])
+
+        combine_floor_masks(output)
+        isolated_masks = isolate_masks(data, output) #break masks into major groups: Floor, Wall, Ceiling, etc
+
+        if im_logging_enabled(data, LogLevel.Segmentation):
+            isolated_probs = np.dstack((isolated_masks[Groupings.Other], isolated_masks[Groupings.Floor], isolated_masks[Groupings.Wall], isolated_masks[Groupings.Ceiling], isolated_masks[Groupings.WallLike]))
+            log_segmentation_image(data, "segmentation_isolated", np.argmax(isolated_probs, -1), data["downscaled"])
+
+        data["isolated"] = isolated_masks
+
+        
 
         

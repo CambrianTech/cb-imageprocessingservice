@@ -133,7 +133,7 @@ class SurfaceRefinement():
         segmentation = cv2.watershed(cv2.cvtColor(np.uint8(distances), cv2.COLOR_GRAY2BGR),
                                              segmentation)
 
-        log_segmentation_image(data, "segmentation_initial", segmentation, self.image)
+        log_segmentation_image(data, "segmentation_refined", segmentation, self.image)
 
 
         return segmentation

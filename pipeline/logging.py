@@ -75,11 +75,12 @@ def _log_image(data:dict, name:str, image, extension=".jpg", quality=90):
     _logging_index += 1
 
 def get_segmentation_image(labels, image, avg=False, resize=True):
-    img_seg = image
     if resize:
         img_seg = cv2.resize(image, (labels.shape[1], labels.shape[0]))
+    else:
+        img_seg = image.copy()
 
-    for label in range(1, np.amax(labels) + 1):
+    for label in range(0, np.amax(labels) + 1):
         color = np.random.randint([0, 0, 10], [254, 254, 235])
         if avg: color = np.mean(img_seg[labels == label], axis=0)
         img_seg[labels == label] = color
@@ -87,7 +88,8 @@ def get_segmentation_image(labels, image, avg=False, resize=True):
 
 def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg"):
     if im_logging_enabled(data, LogLevel.Segmentation):
-        _log_image(data, name, get_segmentation_image(segmentation, image, avg), extension)
+        debug = cv2.addWeighted(get_segmentation_image(segmentation, image, avg), 0.5, image, 0.5, 0)
+        _log_image(data, name, debug, extension)
 
 def log_ply(data:dict, name, image, masks, plane_XYZ, write_occlusion=False, mult=1.0):
     global _logging_index
