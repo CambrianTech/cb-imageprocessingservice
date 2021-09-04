@@ -5,13 +5,14 @@ import cv2
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.logging import im_logging_enabled, log_image, LogLevel, log_segmentation_image
 from pipeline.ade20k import ADE20K, wall_like
+from pipeline.semanticlabel import SemanticLabel
 
-class Groupings(Enum):
-    Wall = "wall"
-    Floor = "floor"
-    Ceiling = "ceiling"
-    WallLike = "wall-like"
-    Other = "other"
+class Groupings(SemanticLabel):
+    Wall=0
+    Floor=1
+    Ceiling=2
+    WallLike=3
+    Other=4
 
 #Exported from https://github.com/CSAILVision/sceneparsing/blob/master/objectInfo = 150.csv 
 def combine_floor_masks(output):
@@ -82,7 +83,7 @@ class PipelineExtractSurfaces(PipelineStep):
 
         if im_logging_enabled(data, LogLevel.Segmentation):
             isolated_probs = np.dstack((isolated_masks[Groupings.Other], isolated_masks[Groupings.Floor], isolated_masks[Groupings.Wall], isolated_masks[Groupings.Ceiling], isolated_masks[Groupings.WallLike]))
-            log_segmentation_image(data, "segmentation_isolated", np.argmax(isolated_probs, -1), data["downscaled"])
+            log_segmentation_image(data, "segmentation_isolated", np.argmax(isolated_probs, -1), data["downscaled"], labelset=Groupings)
 
         data["isolated"] = isolated_masks
 

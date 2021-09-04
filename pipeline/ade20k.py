@@ -1,6 +1,11 @@
 from pipeline.semanticlabel import SemanticLabel
 
 class ADE20K(SemanticLabel):
+
+    @classmethod
+    def value_offset(cls):
+        return 1
+
     wall = 1
     building = 2
     sky = 3

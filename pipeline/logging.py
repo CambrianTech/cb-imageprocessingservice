@@ -3,6 +3,7 @@ import os.path
 import numpy as np
 import pickle
 from enum import IntFlag
+from pipeline.ade20k import ADE20K
 
 class LogLevel(IntFlag):
     Nothing = 0
@@ -74,21 +75,59 @@ def _log_image(data:dict, name:str, image, extension=".jpg", quality=90):
     cv2.imwrite(path, cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB) if len(image.shape) == 3 else image.astype(np.uint8), [int(cv2.IMWRITE_JPEG_QUALITY), quality])
     _logging_index += 1
 
-def get_segmentation_image(labels, image, avg=False, resize=True):
+def get_segmentation_image(labels, image, avg=False, resize=True, get_legend=False, min_matches=100, labelset=ADE20K):
     if resize:
         img_seg = cv2.resize(image, (labels.shape[1], labels.shape[0]))
     else:
         img_seg = image.copy()
 
+    legend = []
+
     for label in range(0, np.amax(labels) + 1):
         color = np.random.randint([0, 0, 10], [254, 254, 235])
-        if avg: color = np.mean(img_seg[labels == label], axis=0)
+        if avg: color = np.mean(matches, axis=0)
         img_seg[labels == label] = color
+
+        if get_legend and label <= labelset.max_index() and len(img_seg[labels == label]) > min_matches:
+            legend.append((labelset(label+labelset.value_offset()), (int(color[0]), int(color[1]), int(color[2]))))
+    if get_legend:
+        return img_seg, legend
     return img_seg
 
-def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg"):
+def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", show_legend=True, labelset=ADE20K,  opacity=0.6):
+    
     if im_logging_enabled(data, LogLevel.Segmentation):
-        debug = cv2.addWeighted(get_segmentation_image(segmentation, image, avg), 0.5, image, 0.5, 0)
+        debug, legend = get_segmentation_image(segmentation, image, avg, get_legend=True, labelset=labelset)
+        debug = cv2.addWeighted(debug, opacity, image, 1.0 - opacity, 0)
+
+        if show_legend:
+            #draw legend
+            radius = 7
+            padding = 10
+            line_height = 20
+            text_color = (50,50,50)
+            
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.5
+
+            text_height = cv2.getTextSize(text=str("Just Some Text"), fontFace=font, fontScale=font_scale, thickness=1)[0][1]
+
+            start_location = (padding + radius, padding + line_height // 2)
+            
+            x = start_location[0]
+            y = start_location[1]
+            
+            for label, color in legend:
+                cv2.circle(debug, (x+radius, y+radius), radius, color, cv2.FILLED) 
+                cv2.circle(debug, (x+radius, y+radius), radius, text_color, 1)
+                x += 2 * radius + padding
+
+                cv2.putText(debug, label.name, (x, y + text_height), font, font_scale, text_color, 1, cv2.LINE_AA)
+
+                x = start_location[0]
+                y += line_height
+
+        
         _log_image(data, name, debug, extension)
 
 def log_ply(data:dict, name, image, masks, plane_XYZ, write_occlusion=False, mult=1.0):
