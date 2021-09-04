@@ -3,7 +3,6 @@ import numpy as np
 import numba as nb
 import cv2
 from numba.experimental import jitclass
-from cambrian.LineFunctions import LineFunctions
 
 @jitclass(spec=[
             ("x0", nb.types.float32), ("y0", nb.types.float32), ("x1", nb.types.float32), ("y1", nb.types.float32), 
@@ -45,39 +44,42 @@ class Line:
     def bounding_box(self, width, length_multiplier=1.0):
         return (self.midpoint, (self.length * length_multiplier, width), np.degrees(self.angle))
 
+    # def bounding_box_points(self, width, length_multiplier=1.0):
+    #     return rotated_rects_points(self.midpoint, (self.length * length_multiplier, width), self.angle)
+
 #todo: write in C or lambda
+@nb.jit(nopython=True)
 def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
 
     min_dist_sq = search_width * search_width
+    area = search_width * search_length
 
     for i in range(len(lines)):
         line_a = lines[i]
 
         if line_a.dead: continue
 
-        rect_a = bounding_box(line_a, search_width, length_multiplier=search_length)
+        #todo: calc these only once per line:
+        rect_a_pts = rotated_rects_points(line_a.midpoint, (line_a.length * search_length, search_width), line_a.angle)
+
         data = (line_a.point_a, line_a.point_b)
 
         for j in range(len(lines)):
             if i == j: continue
 
             line_b = lines[j]
+
             #Optimization possible: line_angle_difference should not be required by bisect methods above returning only angles in range
-            if line_b.dead or LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
+            if line_b.dead or line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
 
             dist_sq = sqeuclidean(line_a.midpoint, line_b.midpoint)
 
-            if dist_sq <= min_dist_sq:
-                result = 1
-            else:
-                rect_b = bounding_box(line_b, search_width, length_multiplier=search_length)
-                result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+            rect_b_pts = rotated_rects_points(line_b.midpoint, (line_b.length * search_length, search_width), line_b.angle)
 
-            if result != 0:
+            if dist_sq <= min_dist_sq or rotated_rects_intersect(rect_a_pts, area, rect_b_pts, area):
                 line_a.dead = True
                 line_b.dead = True
-                data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
-
+                data = merge_line_pair(data, (line_b.point_a, line_b.point_b))
 
         if line_a.dead:
             new_line = Line(data[0][0], data[0][1], data[1][0], data[1][1])
@@ -167,5 +169,114 @@ def merge_line_pair(line_a, line_b):
     delta2x = delta2xg * cos_thr + xg;
     delta2y = delta2xg * sin_thr + yg;
 
-    return (delta1x, delta1y), (delta2x, delta2y)  
+    return (delta1x, delta1y), (delta2x, delta2y) 
+
+#(line.midpoint, (line.length * length_multiplier, width), np.degrees(line.angle))
+@nb.jit(nopython=True)
+def rotated_rects_points(center, size, angle):
+    b = math.cos(angle)
+    a = math.sin(angle)
+
+    pt = np.empty((4,2))
+    width = size[0]
+    height = size[1]
+
+    pt[0][0] = center[0] - a*height - b*width
+    pt[0][1] = center[1] + b*height - a*width
+    pt[1][0] = center[0] + a*height - b*width
+    pt[1][1] = center[1] - b*height - a*width
+    pt[2][0] = 2*center[0] - pt[0][0]
+    pt[2][1] = 2*center[1] - pt[0][1]
+    pt[3][0] = 2*center[0] - pt[1][0]
+    pt[3][1] = 2*center[1] - pt[1][1]
+    return pt
+
+@nb.jit(nopython=True)
+def rotated_rects_intersect(pts1, area1, pts2, area2):
+    # L2 metric const float samePointEps = std::max(1e-16f, 1e-6f * (float)std::max(rect1.size.area(), rect2.size.area()));
+    samePointEps = max(1e-16, 1e-6 * max(area1, area2));
+
+    same = True;
+    for i in range(4):
+        if (abs(pts1[i][0] - pts2[i][0]) > samePointEps or (abs(pts1[i][1] - pts2[i][1]) > samePointEps) ):
+            same = False;
+            break;        
+    
+    if same: 
+        return True
+
+    vec1 = np.empty((4,2))
+    vec2 = np.empty((4,2))
+
+    # Line vector
+    # A line from p1 to p2 is: p1 + (p2-p1)*t, t=[0,1]
+    for i in range(4):
+        _i = (i+1)%4
+        test = pts1[_i][0] - pts1[i][0]
+        vec1[i][0] = pts1[_i][0] - pts1[i][0];
+        vec1[i][1] = pts1[_i][1] - pts1[i][1];
+
+        vec2[i][0] = pts2[_i][0] - pts2[i][0];
+        vec2[i][1] = pts2[_i][1] - pts2[i][1];
+
+    # Line test - test all line combos for intersection
+    for i in range(4):
+        for j in range(4):
+            #// Solve for 2x2 Ax=b
+            x21 = pts2[j][0] - pts1[i][0];
+            y21 = pts2[j][1] - pts1[i][1];
+
+            vx1 = vec1[i][0];
+            vy1 = vec1[i][1];
+
+            vx2 = vec2[j][0];
+            vy2 = vec2[j][1];
+
+            det = vx2*vy1 - vx1*vy2;
+
+            if (det == 0):
+                continue
+
+            t1 = (vx2*y21 - vy2*x21) / det
+            t2 = (vx1*y21 - vy1*x21) / det
+
+            if (np.isnan(t1) or np.isnan(t2)):
+                continue
+            
+            #// This takes care of parallel lines
+            if ( t1 >= 0.0 and t1 <= 1.0 and t2 >= 0.0 and t2 <= 1.0 ):
+                xi = pts1[i][0] + vec1[i][0]*t1
+                return True
+
+    return verts_inside(pts2, pts1, vec2) or verts_inside(pts1, pts2, vec1)
+
+@nb.jit(nopython=True)
+def verts_inside(pts1, pts2, vec1):
+    for i in range(4):
+        #// We do a sign test to see which side the point lies.
+        #// If the point all lie on the same sign for all 4 sides of the rect,
+        #// then there's an intersection
+        posSign = 0;
+        negSign = 0;
+
+        x = pts2[i][0];
+        y = pts2[i][1];
+
+        for j in range(4):
+            #// line equation: Ax + By + C = 0
+            #// see which side of the line this point is at
+            A = -vec1[j][1];
+            B = vec1[j][0];
+            C = -(A*pts1[j][0] + B*pts1[j][1]);
+
+            s = A*x + B*y + C;
+
+            if ( s >= 0 ): posSign+=1;
+            else: negSign+=1;
+
+        if ( posSign == 4 or negSign == 4 ):
+            return True
+
+    return False
+
 
