@@ -2,14 +2,11 @@ import cv2
 import numpy as np
 import math
 
-from collections.abc import Sequence
-from bisect import bisect_left, bisect_right
-
+from pipeline.Line import Line, merge
 from cambrian.frei_chen import frei_chen
 
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.logging import log_image, im_logging_enabled, LogLevel
-from pipeline.Line import Line, bounding_box, draw_line, sqeuclidean, merge
 
 def gabor(bw, theta, lambd, gamma = 0.0, psi = 0.0):
     ksize = lambd
@@ -46,11 +43,10 @@ class PipelineLineFinder(PipelineStep):
             if im_logging_enabled(data, LogLevel.Lines):
                 debug = data["image"].copy()
                 thickness = max(int(math.hypot(debug.shape[0], debug.shape[1]) / 600), 1)
-                [draw_line(line, debug,  thickness=thickness) for line in lines]
+                [line.draw(debug,  thickness=thickness) for line in lines]
                 log_image(data, name, debug)
 
-        #transform_result = lambda x: list(map(lambda x: Line(x.reshape(4), sx, sy), result))
-        transform_result = lambda result: list(map(lambda x: Line(int(x[0][0] * sx), int(x[0][1] * sy), int(x[0][2] * sx), int(x[0][3] * sy)), result))
+        transform_result = lambda x: list(map(lambda x: Line(x.reshape(4), sx, sy), result))
 
         fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)
         lines = []

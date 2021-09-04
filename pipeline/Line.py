@@ -3,29 +3,31 @@ import numpy as np
 import numba as nb
 import cv2
 from numba.experimental import jitclass
+from collections.abc import Sequence
+from scipy.spatial import distance
+from bisect import bisect_left, bisect_right
+from cambrian.LineFunctions import LineFunctions
 
-@jitclass(spec=[
-            ("x0", nb.types.float32), ("y0", nb.types.float32), ("x1", nb.types.float32), ("y1", nb.types.float32), 
-            ("dx", nb.types.float32), ("dy", nb.types.float32),
-            ("dead", nb.types.boolean),
-            ("length", nb.types.float32),
-            ("angle", nb.types.float32),
-            ("midpoint", nb.types.UniTuple(nb.types.float32, 2)),
-            ])
-class Line:
-    def __init__(self, x0, y0, x1, y1):
-        self.x0 = x0
-        self.y0 = y0
-        self.x1 = x1
-        self.y1 = y1
+# @jitclass(spec=[
+#             ("x0", nb.types.float32), ("y0", nb.types.float32), ("x1", nb.types.float32), ("y1", nb.types.float32), 
+#             ("dx", nb.types.float32), ("dy", nb.types.float32),
+#             ("dead", nb.types.boolean),
+#             ("length", nb.types.float32),
+#             ("angle", nb.types.float32),
+#             ("midpoint", nb.types.UniTuple(nb.types.float32, 2)),
+#             ])
+
+class Line(Sequence):
+    def __init__(self, data, sx=1, sy=1):
+        super().__init__()
+        self.data = data
+        self.data[0] *= sx
+        self.data[2] *= sx
+        self.data[1] *= sy
+        self.data[3] *= sy
+        self.recalculate()
 
         self.dead = False
-
-        self.dx = self.x1 - self.x0
-        self.dy = self.y1 - self.y0
-        self.length = math.sqrt(self.dx * self.dx + self.dy * self.dy)
-        self.angle = math.atan2(self.dy, self.dx)
-        self.midpoint = ((x0 + x1) / 2, (y0 + y1) / 2)
 
     def __getitem__(self, i):
         return self.data[i]
@@ -33,35 +35,50 @@ class Line:
     def __len__(self):
         return len(self.data)
 
+    def __lt__(self, other):
+        return self.angle < other.angle
+    
+    def __eq__(self, other):
+        return self.angle == other.angle
+
     @property
     def point_a(self):
-        return (self.x0, self.y0)
+        return (self.data[0], self.data[1])
 
     @property
     def point_b(self):
-        return (self.x1, self.y1)
+        return (self.data[2], self.data[3])
+
+    def draw(self, img, color=(255,50,255,255), thickness=2):
+        cv2.line(img, self.point_a, self.point_b, color, thickness)
+
+    def reshape(self, *args):
+        return self.data.reshape(*args)
+
+    def recalculate(self):
+        self.midpoint = ((self.point_a[0] + self.point_b[0]) / 2, (self.point_a[1] + self.point_b[1]) / 2)
+        self.length = distance.euclidean(self.point_a, self.point_b)
+        self.angle = LineFunctions.line_angle(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
 
     def bounding_box(self, width, length_multiplier=1.0):
         return (self.midpoint, (self.length * length_multiplier, width), np.degrees(self.angle))
+
 
     # def bounding_box_points(self, width, length_multiplier=1.0):
     #     return rotated_rects_points(self.midpoint, (self.length * length_multiplier, width), self.angle)
 
 #todo: write in C or lambda
-@nb.jit(nopython=True)
 def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
 
+    #lines = sorted(lines)
     min_dist_sq = search_width * search_width
-    area = search_width * search_length
 
     for i in range(len(lines)):
         line_a = lines[i]
 
         if line_a.dead: continue
 
-        #todo: calc these only once per line:
-        rect_a_pts = rotated_rects_points(line_a.midpoint, (line_a.length * search_length, search_width), line_a.angle)
-
+        rect_a = line_a.bounding_box(search_width, length_multiplier=search_length)
         data = (line_a.point_a, line_a.point_b)
 
         for j in range(len(lines)):
@@ -70,22 +87,28 @@ def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(
             line_b = lines[j]
 
             #Optimization possible: line_angle_difference should not be required by bisect methods above returning only angles in range
-            if line_b.dead or line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
+            if line_b.dead or LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
 
-            dist_sq = sqeuclidean(line_a.midpoint, line_b.midpoint)
+            dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
 
-            rect_b_pts = rotated_rects_points(line_b.midpoint, (line_b.length * search_length, search_width), line_b.angle)
+            if dist_sq <= min_dist_sq:
+                result = 1
+            else:
+                rect_b = line_b.bounding_box(search_width, length_multiplier=search_length)
+                result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
 
-            if dist_sq <= min_dist_sq or rotated_rects_intersect(rect_a_pts, area, rect_b_pts, area):
+            if result != 0:
                 line_a.dead = True
                 line_b.dead = True
-                data = merge_line_pair(data, (line_b.point_a, line_b.point_b))
+                data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
+
 
         if line_a.dead:
-            new_line = Line(data[0][0], data[0][1], data[1][0], data[1][1])
-            lines.append(new_line)
+            new_line = Line(np.array([(data[0][0], data[0][1], data[1][0], data[1][1])], dtype=np.int).reshape(4))
+            lines.insert(i, new_line)
 
     return list(filter(lambda x: not x.dead, lines))
+
 
 @nb.jit(nopython=True)
 def line_angle(x0, y0, x1, y1):
