@@ -7,8 +7,8 @@ from .logging import im_logging_enabled, log_image, LogLevel, log_segmentation_i
 from .ade20k import ADE20K
 from .semanticlabel import SemanticLabel
 
-floor_like = [ADE20K.earth, ADE20K.grass, ADE20K.rug]
-wall_like = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen]
+floor_like = [ADE20K.earth, ADE20K.grass, ADE20K.rug, ADE20K.light]
+wall_like = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.mirror, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen]
 ceiling_like = [ADE20K.fan, ADE20K.chandelier]
 
 #Keep major (floor, wall, ceiling) even, "Like" versions odd. 
