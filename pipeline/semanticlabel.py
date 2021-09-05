@@ -8,9 +8,19 @@ class SemanticLabel(IntEnum):
         return self.value - self.value_offset()
 
     @classmethod
+    def keys(cls):
+        """Get list of all values."""
+        return list(map(lambda c: c.name, cls))
+
+    @classmethod
     def values(cls):
         """Get list of all values."""
         return list(map(lambda c: c.value, cls))
+
+    @classmethod
+    def all(cls):
+        """Get list of all values."""
+        return list(map(lambda c: c, cls))
 
     @classmethod
     def max_value(cls):
@@ -25,3 +35,10 @@ class SemanticLabel(IntEnum):
     @classmethod
     def value_offset(cls):
         return 0
+
+
+class SemanticLabel_OneIndexed(SemanticLabel):
+    
+    @classmethod
+    def value_offset(cls):
+        return 1

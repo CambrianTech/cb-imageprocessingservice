@@ -85,7 +85,7 @@ def get_segmentation_image(labels, image, avg=False, resize=True, get_legend=Fal
 
     for label in range(0, np.amax(labels) + 1):
         color = np.random.randint([0, 0, 10], [254, 254, 235])
-        if avg: color = np.mean(matches, axis=0)
+        if avg: color = np.mean(img_seg[labels == label], axis=0)
         img_seg[labels == label] = color
 
         if get_legend and label <= labelset.max_index() and len(img_seg[labels == label]) > min_matches:
@@ -98,7 +98,10 @@ def log_segmentation_image(data:dict, name, segmentation, image, avg=False, exte
     
     if im_logging_enabled(data, LogLevel.Segmentation):
         debug, legend = get_segmentation_image(segmentation, image, avg, get_legend=True, labelset=labelset)
-        debug = cv2.addWeighted(debug, opacity, image, 1.0 - opacity, 0)
+        if debug.shape != image.shape:
+            debug = cv2.resize(debug, (image.shape[1], image.shape[0]))
+            
+        debug = cv2.addWeighted(debug, opacity, image, 1.0 - opacity, 0)    
 
         if show_legend:
             #draw legend

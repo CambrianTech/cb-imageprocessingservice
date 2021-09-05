@@ -28,7 +28,7 @@ def combine_floor_masks(output):
 
 def isolate_masks(data, output):
 
-    isolated = {}
+    isolated = list([None] * (Groupings.max_index() + 1))
 
     isolated[Groupings.Wall] = output[ADE20K.wall.index].copy()
     isolated[Groupings.Floor] = output[ADE20K.floor.index].copy()
@@ -41,8 +41,8 @@ def isolate_masks(data, output):
     isolated[Groupings.Other] = 1.0 - isolated[Groupings.Floor] - isolated[Groupings.Wall] - isolated[Groupings.WallLike] - isolated[Groupings.Ceiling]
 
     if im_logging_enabled(data, LogLevel.Segmentation):
-        for key in isolated.keys():
-            log_image(data, key.value, 255. * isolated[key])
+        for element in Groupings.all():
+            log_image(data, element.name, 255. * isolated[element])
 
     return isolated
 
@@ -82,7 +82,7 @@ class PipelineExtractSurfaces(PipelineStep):
         isolated_masks = isolate_masks(data, output) #break masks into major groups: Floor, Wall, Ceiling, etc
 
         if im_logging_enabled(data, LogLevel.Segmentation):
-            isolated_probs = np.dstack((isolated_masks[Groupings.Other], isolated_masks[Groupings.Floor], isolated_masks[Groupings.Wall], isolated_masks[Groupings.Ceiling], isolated_masks[Groupings.WallLike]))
+            isolated_probs = np.dstack(isolated_masks)
             log_segmentation_image(data, "segmentation_isolated", np.argmax(isolated_probs, -1), data["downscaled"], labelset=Groupings)
 
         data["isolated"] = isolated_masks

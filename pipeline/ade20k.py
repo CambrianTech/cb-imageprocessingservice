@@ -1,10 +1,6 @@
-from pipeline.semanticlabel import SemanticLabel
+from pipeline.semanticlabel import SemanticLabel_OneIndexed
 
-class ADE20K(SemanticLabel):
-
-    @classmethod
-    def value_offset(cls):
-        return 1
+class ADE20K(SemanticLabel_OneIndexed):
 
     wall = 1
     building = 2
