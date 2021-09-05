@@ -108,12 +108,16 @@ class PipelineLineFinder(PipelineStep):
             lines.extend(gabor_lines)
 
         #frei chen edges:
-        clean_edges = frei_chen(bw)
-        result = fld.detect(bw - (clean_edges * 5.0).astype("uint8"))
+        clean_edges = (frei_chen(bw) * 255.0 * 5.0).astype(np.float32)
+        clean_edges = cv2.bilateralFilter(clean_edges, 5, 5, 5).astype(np.uint8)
+        log_image(data, "frei_chen", clean_edges)
+        result = fld.detect(clean_edges)
         if result is not None and len(result) > 0: 
             frei_lines = transform_result(result)
+            frei_lines = merge(transform_result(result), search_width=diagonal/200, search_length=1.4, angle_threshold=math.radians(5))
             log_lines(frei_lines, "frei_lines")
             lines.extend(frei_lines)
+
 
 
         #merge all

@@ -107,8 +107,7 @@ def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(
 
 
         if line_a.dead:
-            new_line = Line(np.array([(data[0][0], data[0][1], data[1][0], data[1][1])], dtype=np.int).reshape(4))
-            lines.insert(i, new_line)
+            lines[i] = Line(np.array([(data[0][0], data[0][1], data[1][0], data[1][1])], dtype=np.int).reshape(4))
 
     return list(filter(lambda x: not x.dead, lines))
 
