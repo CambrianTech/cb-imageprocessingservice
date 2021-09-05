@@ -17,23 +17,7 @@ class SurfaceRefinement():
         self.hed = hed
         self.masks = masks
         self.lines = lines
-
-    def _get_lines_image(self, data, img, lines, sx, sy):
-        all_lines = np.int32(np.zeros((img.shape[0], img.shape[1])))
-        l = 1
-
-        for line in lines:
-            line = line.reshape(4)
-            x1 = int(sx * line[0])
-            y1 = int(sy * line[1])
-            x2 = int(sx * line[2])
-            y2 = int(sy * line[3])
-            cv2.line(all_lines, (x1, y1), (x2, y2), l, thickness=2, lineType=cv2.LINE_8)
-            l += 1
-
-        return all_lines
         
-
     def _refine_surface(self, mask, image, big_thresh=.03, small_thresh=.97, watershed_dist=.05, watershed_mask=None, gradient=True):
         small = ip.refine_mask_watershed(None, image, np.uint8(mask > small_thresh), None, distance=watershed_dist, gradient=gradient,
                                        watershed_mask=watershed_mask)
@@ -57,13 +41,6 @@ class SurfaceRefinement():
         merged_lines = np.int32(np.zeros((self.image.shape[0], self.image.shape[1])))
 
         draw_lines(self.lines, merged_lines, color=255, thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
-
-        if im_logging_enabled(data, LogLevel.Segmentation):
-            all_lines = self._get_lines_image(data, self.image, self.lines, sx, sy)
-            l_image_rgb = self.image.copy()
-            l_image_rgb[merged_lines > 0] = 255
-            log_segmentation_image(data, "l_image", all_lines, self.image, show_legend=False)
-            log_image(data, "l_image_rgb", l_image_rgb)
 
         watershed_mask = (merged_lines == 0)
 
