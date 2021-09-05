@@ -44,7 +44,7 @@ def isolate_masks(data, output):
     combine_outputs(Groupings.CeilingLike, ceiling_like)
 
     #label everything else as other
-    isolated[Groupings.Other] = 1.0 - isolated[Groupings.Floor] - isolated[Groupings.Wall] - isolated[Groupings.WallLike] - isolated[Groupings.Ceiling]
+    isolated[Groupings.Other] = 1.0 - sum(isolated[:-1])
 
     return isolated
 
@@ -78,7 +78,7 @@ class PipelineExtractSurfaces(PipelineStep):
 
         if im_logging_enabled(data, LogLevel.Segmentation):
             probs = np.dstack((tuple(output)))
-            log_segmentation_image(data, "segmentation_raw", np.argmax(probs, -1), data["downscaled"])
+            log_segmentation_image(data, "segmentation", np.argmax(probs, -1), data["downscaled"])
 
         #combine_floor_masks(output)
         isolated_masks = isolate_masks(data, output) #break masks into major groups: Floor, Wall, Ceiling, etc
