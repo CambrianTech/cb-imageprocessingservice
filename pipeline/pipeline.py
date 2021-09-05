@@ -87,7 +87,7 @@ class Pipeline():
         self.logging_level = logging_level
         self.logging_step = None if logging_step is None else PipelineStepIndex(logging_step)
 
-        self.start_step = PipelineStepIndex(self.restore_step - 1 if self.restore_step is not None else PipelineStepIndex.Input + 1)
+        self.start_step = PipelineStepIndex(self.restore_step if self.restore_step is not None else PipelineStepIndex.Input + 1)
 
         if stop_step is None:
             self.stop_step = PipelineStepIndex(self.export_step if self.export_step is not None else PipelineStepIndex.Output)
@@ -107,40 +107,38 @@ class Pipeline():
             input_step = PipelineFileInput
             output_step = PipelineFileOutput
 
-        remote_step = PipelineRemoteNetworks
-        fov_step = PipelineCalculateFov
-        planes_step = PipelineRemotePlaneDetector
-        models_step = PipelineRunModels
-        angles_step = PipelineDeterminePrimaryAngles
-        extract_step = PipelineExtractSurfaces
+        all_steps = list([None] * (PipelineStepIndex.Output + 1))
 
-        superpixels_step = PipelineSuperpixels if self.api_level < 3 else None
+        all_steps[PipelineStepIndex.RemoteNetworks] = PipelineRemoteNetworks
+        all_steps[PipelineStepIndex.CalculateFov] = PipelineCalculateFov
+        all_steps[PipelineStepIndex.RemotePlaneDetector] = PipelineRemotePlaneDetector
+        all_steps[PipelineStepIndex.RunModels] = PipelineRunModels
+        all_steps[PipelineStepIndex.DeterminePrimaryAngles] = PipelineDeterminePrimaryAngles
+        all_steps[PipelineStepIndex.ExtractSurfaces] = PipelineExtractSurfaces
+        all_steps[PipelineStepIndex.FindLines] = PipelineLineFinder
+        all_steps[PipelineStepIndex.Geometry] = PipelinePlaneGeometry
+        all_steps[PipelineStepIndex.EstimatePose] = PipelinePoseEstimator
+        all_steps[PipelineStepIndex.RefineSurfaces] = PipelineSurfaceRefinement
+        all_steps[PipelineStepIndex.MergeSurfaces] = PipelineMergeSurfaces
+        all_steps[PipelineStepIndex.Refine] = PipelineRefineResults
+        all_steps[PipelineStepIndex.Superpixels] = PipelineSuperpixels if self.api_level < 3 else None
+        all_steps[PipelineStepIndex.CombinePlaneMasks] = PipelineCombinePlaneMasks
+        all_steps[PipelineStepIndex.Output] = output_step
         
         if self.api_level < 3.5:
-            refine_surfaces_step = None
-            lines_step = None
-            geometry_step = None
-            estimate_pose_step = None
-            merge_step = None
-            refine_step = PipelineRefinePlaneMasks
-        else:
-            refine_surfaces_step = PipelineSurfaceRefinement
-            lines_step = PipelineLineFinder
-            geometry_step = PipelinePlaneGeometry
-            estimate_pose_step = PipelinePoseEstimator
-            merge_step = PipelineMergeSurfaces
-            refine_step = PipelineRefineResults
-
-        combine_step = PipelineCombinePlaneMasks
-
-        all_steps = [remote_step, fov_step, planes_step, models_step, angles_step, \
-                    extract_step, lines_step, geometry_step, estimate_pose_step, \
-                    refine_surfaces_step, merge_step, refine_step, superpixels_step, combine_step, output_step]
+            all_steps[PipelineStepIndex.RefineSurfaces] = None
+            all_steps[PipelineStepIndex.FindLines] = None
+            all_steps[PipelineStepIndex.Geometry] = None
+            all_steps[PipelineStepIndex.EstimatePose] = None
+            all_steps[PipelineStepIndex.MergeSurfaces] = None
+            all_steps[PipelineStepIndex.Refine] = PipelineRefinePlaneMasks
+        
 
         self.steps = []
         self.push(input_step(self))
 
-        for index in range(self.start_step, self.stop_step):
+        for index in range(self.start_step, self.stop_step + 1):
+
             initializer = all_steps[index]
             if not initializer is None:
                 self.push(initializer(self))            
