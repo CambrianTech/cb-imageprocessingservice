@@ -110,8 +110,8 @@ def log_segmentation_image(data:dict, name, segmentation, image, avg=False, exte
 
         if show_legend:
             #draw legend
-            font_scale = max(0.5, debug.shape[0] / 1000)
-
+            font_scale = min(max(0.5, debug.shape[0] / 1000), 3)
+            thickness = max(int(font_scale * 2), 1)
             radius = int(15 * font_scale)
             padding = int(12 * font_scale)
             line_height = int(40 * font_scale)
@@ -119,7 +119,7 @@ def log_segmentation_image(data:dict, name, segmentation, image, avg=False, exte
             
             font = cv2.FONT_HERSHEY_SIMPLEX
 
-            text_height = cv2.getTextSize(text=str("Just Some Text"), fontFace=font, fontScale=font_scale, thickness=1)[0][1]
+            text_height = cv2.getTextSize(text=str("Just Some Text"), fontFace=font, fontScale=font_scale, thickness=thickness)[0][1]
 
             start_location = (padding * 2 + radius, padding * 2 + line_height // 2)
             
@@ -128,10 +128,10 @@ def log_segmentation_image(data:dict, name, segmentation, image, avg=False, exte
             
             for label, color in legend:
                 cv2.circle(debug, (x+radius, y+radius), radius, color, cv2.FILLED) 
-                cv2.circle(debug, (x+radius, y+radius), radius, text_color, 1)
+                cv2.circle(debug, (x+radius, y+radius), radius, text_color, min(thickness, 2))
                 x += 2 * radius + padding
-                text_y = y + text_height + 1
-                cv2.putText(debug, label.name, (x, text_y), font, font_scale, text_color, 1, cv2.LINE_AA)
+                text_y = y + text_height + int(2 * font_scale)
+                cv2.putText(debug, label.name, (x, text_y), font, font_scale, text_color, thickness, cv2.LINE_AA)
 
                 x = start_location[0]
                 y += line_height

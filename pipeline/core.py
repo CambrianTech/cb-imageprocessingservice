@@ -13,13 +13,13 @@ class PipelineStepIndex(IntEnum):
     RunModels = 4
     DeterminePrimaryAngles = 5
     ExtractSurfaces = 6
-    Superpixels = 7
-    FindLines = 8
-    RefineSurfaces = 9
-    Geometry = 10
-    EstimatePose = 11
-    MergeSurfaces = 12
-    Refine = 13
+    FindLines = 7
+    Geometry = 8
+    EstimatePose = 9
+    RefineSurfaces = 10
+    MergeSurfaces = 11
+    Refine = 12
+    Superpixels = 13
     CombinePlaneMasks = 14
     Output = 15
 

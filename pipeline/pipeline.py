@@ -134,8 +134,8 @@ class Pipeline():
         combine_step = PipelineCombinePlaneMasks
 
         all_steps = [remote_step, fov_step, planes_step, models_step, angles_step, \
-                     extract_step, superpixels_step, lines_step, refine_surfaces_step, \
-                     geometry_step, estimate_pose_step, merge_step, refine_step, combine_step, output_step]
+                    extract_step, lines_step, geometry_step, estimate_pose_step, \
+                    refine_surfaces_step, merge_step, refine_step, superpixels_step, combine_step, output_step]
 
         self.steps = []
         self.push(input_step(self))
