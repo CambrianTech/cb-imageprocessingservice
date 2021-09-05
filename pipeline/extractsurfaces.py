@@ -59,10 +59,6 @@ def isolate_masks(data, output):
     #label everything else as other
     isolated[Groupings.Other] = 1.0 - isolated[Groupings.Floor] - isolated[Groupings.Wall] - isolated[Groupings.WallLike] - isolated[Groupings.Ceiling]
 
-    if im_logging_enabled(data, LogLevel.Segmentation):
-        for element in Groupings.all():
-            log_image(data, element.name, 255. * isolated[element])
-
     return isolated
 
 class PipelineExtractSurfaces(PipelineStep):
