@@ -1,14 +1,15 @@
 import numpy as np
 from scipy import ndimage
 import cv2
+from skimage.morphology import skeletonize, remove_small_objects
+from skimage.segmentation import join_segmentations, watershed
 
 import cambrian.image_processing as ip
 
-from pipeline.core import PipelineStep, PipelineStepIndex
-from pipeline.extractsurfaces import Groupings
-from pipeline.logging import get_segmentation_image, log_segmentation_image, im_logging_enabled, log_image, LogLevel
-from skimage.morphology import skeletonize, remove_small_objects
-from skimage.segmentation import join_segmentations, watershed
+from .core import PipelineStep, PipelineStepIndex
+from .Line import Line
+from .extractsurfaces import Groupings
+from .logging import get_segmentation_image, log_segmentation_image, im_logging_enabled, log_image, LogLevel
 
 class SurfaceRefinement():
     def __init__(self, image, hed, masks, lines):
@@ -39,8 +40,7 @@ class SurfaceRefinement():
 
         #draw lines in BW
         merged_lines = np.int32(np.zeros((self.image.shape[0], self.image.shape[1])))
-
-        draw_lines(self.lines, merged_lines, color=255, thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
+        Line.draw_all(self.lines, merged_lines, color=255, thickness=2, sx=sx, sy=sy)
 
         watershed_mask = (merged_lines == 0)
 
@@ -94,10 +94,8 @@ class SurfaceRefinement():
             pruned = remove_small_objects(segmentation == i, min_size=32)
             segmentation[np.logical_and(segmentation == i, pruned == 0)] = 0
 
-        line_mask = draw_lines(self.lines,
-                                  np.zeros((segmentation.shape[0], segmentation.shape[1])),
-                                  color=255,
-                                  thickness=2, sx=sx, sy=sy, lineType=cv2.LINE_4)
+        line_mask = np.zeros((segmentation.shape[0], segmentation.shape[1]))
+        Line.draw_all(self.lines, line_mask, color=255, thickness=2, sx=sx, sy=sy)
 
         segmentation = watershed(self.hed, segmentation,
                                          mask=line_mask == 0)
@@ -115,13 +113,6 @@ class SurfaceRefinement():
 
         return segmentation
 
-def draw_lines(line_data, image, color=None, thickness=None, lineType=cv2.LINE_8, sx=1.0, sy=1.0):
-    for line in line_data:
-        line = line.reshape(4)
-        pt1 = (int(line[0] * sx), int(line[1] * sy))
-        pt2 = (int(line[2] * sx), int(line[3] * sy))
-        cv2.line(image, pt1, pt2, color, thickness, lineType=lineType)
-    return image
 
 class PipelineSurfaceRefinement(PipelineStep):
 

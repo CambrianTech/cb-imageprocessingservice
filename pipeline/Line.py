@@ -49,8 +49,8 @@ class Line(Sequence):
     def point_b(self):
         return (self.data[2], self.data[3])
 
-    def draw(self, img, color=(255,50,255,255), thickness=2):
-        cv2.line(img, self.point_a, self.point_b, color, thickness)
+    def draw(self, img, color=(255,50,255,255), thickness=2, sx=1.0, sy=1.0):
+        cv2.line(img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness)
 
     def reshape(self, *args):
         return self.data.reshape(*args)
@@ -63,6 +63,9 @@ class Line(Sequence):
     def bounding_box(self, width, length_multiplier=1.0):
         return (self.midpoint, (self.length * length_multiplier, width), np.degrees(self.angle))
 
+    @classmethod
+    def draw_all(cls, lines, img, color=(255,50,255,255), thickness=2, sx=1.0, sy=1.0):
+        [line.draw(img, color=color, thickness=thickness, sx=sx, sy=sy) for line in lines]
 
     # def bounding_box_points(self, width, length_multiplier=1.0):
     #     return rotated_rects_points(self.midpoint, (self.length * length_multiplier, width), self.angle)
