@@ -74,8 +74,8 @@ class PipelineMergeSurfaces(PipelineStep):
 
         if im_logging_enabled(data, LogLevel.Segmentation):
             log_image(data, "normals_wall_org", 127.5 * (normals_wall + 1))
-            log_segmentation_image(data, "vl_image", vl_image, img_lr)
-            log_segmentation_image(data, "ade_seg", np.int32(ade_seg), img_lr)
+            log_segmentation_image(data, "vl_image", vl_image, img_lr, show_legend=False)
+            log_segmentation_image(data, "ade_seg", np.int32(ade_seg), img_lr, show_legend=False)
 
         plane_classes = get_planes_class(plane_masks, ade_seg)
         # print("plane_classes", plane_classes)
@@ -117,11 +117,11 @@ class PipelineMergeSurfaces(PipelineStep):
             mask = skeletonize(wall_planes_seg == i)
             wall_planes_seg[np.logical_and(mask == 0, wall_planes_seg == i)] = 0
 
-        log_segmentation_image(data, "wall_planes_seg", wall_planes_seg, img_lr)
+        log_segmentation_image(data, "wall_planes_seg", wall_planes_seg, img_lr, show_legend=False)
 
         labels_wall_1 = labels_fan
         labels_wall_1[labels_wall_1 > 0] += np.amax(wall_planes_seg) + 1
-        log_segmentation_image(data, "labels_wall_graph", labels_fan, img_lr, avg=False)
+        log_segmentation_image(data, "labels_wall_graph", labels_fan, img_lr, avg=False, show_legend=False)
 
         for i in np.unique(labels_wall_1):
             if i == 0: continue
@@ -132,7 +132,7 @@ class PipelineMergeSurfaces(PipelineStep):
             if len(m[0]) > 1:
                 labels_wall_1[mask] = m[0]
 
-        log_segmentation_image(data, "labels_wall_merge1", labels_wall_1, img_lr, avg=False)
+        log_segmentation_image(data, "labels_wall_merge1", labels_wall_1, img_lr, avg=False, show_legend=False)
 
         label_indices = np.unique(labels_wall_1)
 
@@ -184,7 +184,7 @@ class PipelineMergeSurfaces(PipelineStep):
                               plane_parameters[all_vertical[wall_index]], all_vertical[wall_index])
 
         plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=w, height=h, camera=camera, max_depth=10)
-        log_segmentation_image(data, 'labels_arg', labels_arg, img_lr)
+        log_segmentation_image(data, 'labels_arg', labels_arg, img_lr, show_legend=False)
 
 
         #END planegeometry replacement
@@ -221,7 +221,7 @@ class PipelineMergeSurfaces(PipelineStep):
 
                 labels_wall_2[l] = w[l]
 
-        log_segmentation_image(data, "labels_wall_merge2", labels_wall_2, img_lr, avg=False)
+        log_segmentation_image(data, "labels_wall_merge2", labels_wall_2, img_lr, avg=False, show_legend=False)
 
         final_masks = []
 

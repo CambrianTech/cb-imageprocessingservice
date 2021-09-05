@@ -35,10 +35,3 @@ class SemanticLabel(IntEnum):
     @classmethod
     def value_offset(cls):
         return 0
-
-
-class SemanticLabel_OneIndexed(SemanticLabel):
-    
-    @classmethod
-    def value_offset(cls):
-        return 1

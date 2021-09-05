@@ -646,7 +646,7 @@ def fan_surfaces(data, img_lr, locations, vp0, sure_walls, wall_mask, normals_c)
     labels_fan, fan_normals_reduced, normals_wall = merge_by_angle_sweep(labels_fan, normals_c, fan_normals,
                                                                          wall_mask > .9, angle_threshold=.85)
 
-    log_segmentation_image(data, "fan1", labels_fan, img_lr)
+    log_segmentation_image(data, "fan1", labels_fan, img_lr, show_legend=False)
 
     unique_labels = np.unique(labels_fan[labels_fan > 0])
 
@@ -657,7 +657,7 @@ def fan_surfaces(data, img_lr, locations, vp0, sure_walls, wall_mask, normals_c)
     labels_fan, fan_normals_reduced, normals_wall = merge_by_angle_sweep(labels_fan, normals_wall,
                                                                          fan_normals_reduced, wall_mask > 0,
                                                                          angle_threshold=.8)
-    log_segmentation_image(data, "fan2", labels_fan, img_lr)
+    log_segmentation_image(data, "fan2", labels_fan, img_lr, show_legend=False)
 
     return labels_fan, fan_normals_reduced, normals_wall
 
