@@ -97,13 +97,14 @@ class PipelineLineFinder(PipelineStep):
         h_gabor = gabor(bw_res, np.pi/2.0, 9)
         edges = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -20)
         edges = cv2.bilateralFilter(edges, 5, 5, 5)
+        log_image(data, "gabor", edges)
         edges = cv2.resize(edges, (self.width, self.height), interpolation = cv2.INTER_CUBIC)
 
         sx = data["image"].shape[1] / edges.shape[1]
         sy = data["image"].shape[0] / edges.shape[0]
         result = fld.detect(edges)
         if result is not None and len(result) > 0: 
-            gabor_lines = merge(transform_result(result), search_width=diagonal/100)
+            gabor_lines = merge(transform_result(result), search_length=1.1, search_width=diagonal/100, angle_threshold=math.radians(7))
             log_lines(gabor_lines, "gabor_lines")
             lines.extend(gabor_lines)
 
@@ -114,7 +115,7 @@ class PipelineLineFinder(PipelineStep):
         result = fld.detect(clean_edges)
         if result is not None and len(result) > 0: 
             frei_lines = transform_result(result)
-            frei_lines = merge(transform_result(result), search_width=diagonal/200, search_length=1.4, angle_threshold=math.radians(5))
+            frei_lines = merge(transform_result(result), search_width=diagonal/200, search_length=1.1, angle_threshold=math.radians(7))
             log_lines(frei_lines, "frei_lines")
             lines.extend(frei_lines)
 
