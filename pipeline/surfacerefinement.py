@@ -62,7 +62,7 @@ class SurfaceRefinement():
             all_lines = self._get_lines_image(data, self.image, self.lines, sx, sy)
             l_image_rgb = self.image.copy()
             l_image_rgb[merged_lines > 0] = 255
-            log_segmentation_image(data, "l_image", all_lines, self.image)
+            log_segmentation_image(data, "l_image", all_lines, self.image, show_legend=False)
             log_image(data, "l_image_rgb", l_image_rgb)
 
         watershed_mask = (merged_lines == 0)

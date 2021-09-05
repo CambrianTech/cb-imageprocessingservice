@@ -25,19 +25,6 @@ class Groupings(SemanticLabel):
 
     Other=6
 
-#Exported from https://github.com/CSAILVision/sceneparsing/blob/master/objectInfo = 150.csv 
-def combine_floor_masks(output):
-        
-    output[ADE20K.floor.index] += output[ADE20K.rug.index]
-    output[ADE20K.rug.index] = 0
-
-    output[ADE20K.floor.index] += output[ADE20K.earth.index]
-    output[ADE20K.earth.index] = 0
-
-    output[ADE20K.floor.index] += output[ADE20K.grass.index]
-    output[ADE20K.grass.index] = 0
-
-
 def isolate_masks(data, output):
 
     isolated = list([None] * (Groupings.max_index() + 1))

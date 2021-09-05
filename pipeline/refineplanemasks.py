@@ -297,7 +297,6 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         if im_logging_enabled(data, LogLevel.Segmentation):
             log_image(data, "normals_wall_org", 127.5 * (normals_wall + 1))
-            log_segmentation_image(data, "vl_image", vl_image, img_lr)
             log_segmentation_image(data, "ade_seg", np.int32(ade_seg), img_lr)
 
         plane_classes = get_planes_class(plane_geometry.plane_masks, ade_seg)

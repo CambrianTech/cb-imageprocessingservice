@@ -97,11 +97,16 @@ def get_segmentation_image(labels, image, avg=False, resize=True, get_legend=Fal
 def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", show_legend=True, labelset=ADE20K,  opacity=0.6):
     
     if im_logging_enabled(data, LogLevel.Segmentation):
-        debug, legend = get_segmentation_image(segmentation, image, avg, get_legend=True, labelset=labelset)
+        
+        debug = get_segmentation_image(segmentation, image, avg, get_legend=show_legend, labelset=labelset)
+
+        if show_legend:
+            debug, legend = debug
+
         if debug.shape != image.shape:
             debug = cv2.resize(debug, (image.shape[1], image.shape[0]))
             
-        debug = cv2.addWeighted(debug, opacity, image, 1.0 - opacity, 0)    
+        debug = cv2.addWeighted(debug, opacity, image, 1.0 - opacity, 0)
 
         if show_legend:
             #draw legend

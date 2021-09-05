@@ -1,5 +1,6 @@
 from pipeline.semanticlabel import SemanticLabel
 
+#Exported from https://github.com/CSAILVision/sceneparsing/blob/master/objectInfo = 150.csv
 class ADE20K(SemanticLabel):
     @classmethod
     def value_offset(cls):
