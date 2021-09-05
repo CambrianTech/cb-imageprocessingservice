@@ -85,7 +85,7 @@ class PipelineExtractSurfaces(PipelineStep):
 
         if im_logging_enabled(data, LogLevel.Segmentation):
             isolated_probs = np.dstack(isolated_masks)
-            log_segmentation_image(data, "segmentation_isolated", np.argmax(isolated_probs, -1), data["downscaled"], labelset=Groupings)
+            log_segmentation_image(data, "isolated", np.argmax(isolated_probs, -1), data["downscaled"], labelset=Groupings)
 
         data["isolated"] = isolated_masks
 
