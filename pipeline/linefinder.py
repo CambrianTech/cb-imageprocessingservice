@@ -95,8 +95,8 @@ class PipelineLineFinder(PipelineStep):
         bw_res = cv2.resize(bw, (int(self.width * gabor_scale), int(self.height * gabor_scale)), cv2.INTER_CUBIC) if gabor_scale < 1.0 else bw
         v_gabor = gabor(bw_res, 0, 7)
         h_gabor = gabor(bw_res, np.pi/2.0, 9)
-        edges = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -20)
-        edges = cv2.bilateralFilter(edges, 5, 5, 5)
+        edges = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -40)
+        edges = cv2.bilateralFilter(edges, 7, 40, 9)
         log_image(data, "gabor", edges)
         edges = cv2.resize(edges, (self.width, self.height), interpolation = cv2.INTER_CUBIC)
 

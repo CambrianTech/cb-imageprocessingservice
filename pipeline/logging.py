@@ -146,7 +146,9 @@ def log_ply(data:dict, name, image, masks, plane_XYZ, write_occlusion=False, mul
         print("Saving model", file_path)
         _logging_index += 1
 
+        image = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB)
         image = cv2.resize(image, (int(mult * 160), int(mult * 120)))
+
         width = image.shape[1]
         height = image.shape[0]
         faces = []
