@@ -49,8 +49,8 @@ class Line(Sequence):
     def point_b(self):
         return (self.data[2], self.data[3])
 
-    def draw(self, img, color=(255,50,255,255), thickness=2):
-        cv2.line(img, self.point_a, self.point_b, color, thickness)
+    def draw(self, img, color=(255,50,255,255), thickness=2, lineType=cv2.LINE_8):
+        cv2.line(img, self.point_a, self.point_b, color, thickness, lineType=lineType)
 
     def reshape(self, *args):
         return self.data.reshape(*args)
