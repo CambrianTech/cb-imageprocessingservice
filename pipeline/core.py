@@ -15,9 +15,9 @@ class PipelineStepIndex(IntEnum):
     ExtractSurfaces = 6
     Superpixels = 7
     FindLines = 8
-    RefineSurfaces = 9
-    Geometry = 10
-    EstimatePose = 11
+    Geometry = 9
+    EstimatePose = 10
+    RefineSurfaces = 11
     MergeSurfaces = 12
     Refine = 13
     CombinePlaneMasks = 14
