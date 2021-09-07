@@ -33,19 +33,27 @@ class SurfaceRefinement():
         markers[markers == 2] = (ndimage.label(markers == 2)[0])[markers == 2] + np.amax(markers)
         return markers
 
-    def refine(self, data, confidence=0.98):
+    def refine(self, data, confidence=0.95):
         #get labeled lines image
         sx = self.image.shape[0] / data["image"].shape[0]
         sy = self.image.shape[1] / data["image"].shape[1]
 
         items = self.probs.copy()
-        items.insert(0, (confidence * np.ones_like(self.probs[Groupings.Floor])))
+        items.insert(0, (confidence * np.ones_like(self.probs[Groupings.Other])))
 
         ade_seg_c = np.dstack(tuple(items))
         ade_seg = np.argmax(ade_seg_c, -1)
 
         if im_logging_enabled(data, LogLevel.Segmentation):
             log_segmentation_image(data, "probs", np.int32(ade_seg), self.image, show_legend=False)
+
+
+
+        #contours, hierarchy = cv2.findContours(np.uint8(final_labels == d + 2), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        
+
+
 
         #draw lines in BW
         merged_lines = np.int32(np.zeros((self.image.shape[0], self.image.shape[1])))
@@ -127,7 +135,7 @@ class PipelineSurfaceRefinement(PipelineStep):
 
     @property
     def index(self) -> PipelineStepIndex:
-        return PipelineStepIndex.RefineSurfaces
+        return PipelineStepIndex.SurfaceRefinement
 
     @property
     def required_keys(self) -> list:

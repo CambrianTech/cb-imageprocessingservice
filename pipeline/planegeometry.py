@@ -174,7 +174,7 @@ class PlaneGeometry():
             plane_cluster_seg_rs = np.int32(
                 cv2.resize(np.uint8(plane_cluster_seg), (self.data["image"].shape[1], self.data["image"].shape[0]), interpolation=cv2.INTER_NEAREST))
 
-            log_segmentation_image(self.data, "plane_cluster_seg", plane_cluster_seg, self.data["image"])
+            log_segmentation_image(self.data, "plane_cluster_seg", plane_cluster_seg, self.data["image"], show_legend=False)
 
 
     def combined_normals(self):
