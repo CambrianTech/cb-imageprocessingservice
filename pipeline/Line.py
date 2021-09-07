@@ -70,6 +70,12 @@ class Line(Sequence):
     # def bounding_box_points(self, width, length_multiplier=1.0):
     #     return rotated_rects_points(self.midpoint, (self.length * length_multiplier, width), self.angle)
 
+    def get_matches(self, lines, angle_threshold):
+        return list(filter(lambda line: not line.dead 
+                                        and LineFunctions.line_angle_difference(self.angle, line.angle) < angle_threshold 
+                                        and line != self, lines)) 
+
+
 #todo: write in C or lambda
 def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
 
@@ -84,13 +90,9 @@ def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(
         rect_a = line_a.bounding_box(search_width, length_multiplier=search_length)
         data = (line_a.point_a, line_a.point_b)
 
-        for j in range(len(lines)):
-            if i == j: continue
+        candidates = line_a.get_matches(lines, angle_threshold)
 
-            line_b = lines[j]
-
-            #Optimization possible: line_angle_difference should not be required by bisect methods above returning only angles in range
-            if line_b.dead or LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
+        for line_b in candidates:
 
             dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
 
