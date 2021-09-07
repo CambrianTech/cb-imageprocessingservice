@@ -110,9 +110,9 @@ def log_segmentation_image(data:dict, name, segmentation, image, avg=False, exte
 
         if show_legend:
             #draw legend
-            font_scale = min(max(0.5, debug.shape[0] / 1000), 3)
+            font_scale = min(max(0.5, debug.shape[0] / 1000), 2)
             thickness = max(int(font_scale * 2), 1)
-            radius = int(15 * font_scale)
+            radius = int(12 * font_scale)
             padding = int(12 * font_scale)
             line_height = int(40 * font_scale)
             text_color = (50,50,50)
