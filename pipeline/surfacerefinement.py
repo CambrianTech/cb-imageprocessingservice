@@ -52,12 +52,12 @@ class SurfaceRefinement():
         #contours, hierarchy = cv2.findContours(np.uint8(final_labels == d + 2), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         
-
+        
 
 
         #draw lines in BW
         merged_lines = np.int32(np.zeros((self.image.shape[0], self.image.shape[1])))
-        Line.draw_all(self.lines, merged_lines, color=255, thickness=2, sx=sx, sy=sy)
+        Line.draw_all(merged_lines, self.lines, color=255, thickness=2, sx=sx, sy=sy)
 
         watershed_mask = (merged_lines == 0)
 
@@ -112,7 +112,7 @@ class SurfaceRefinement():
             segmentation[np.logical_and(segmentation == i, pruned == 0)] = 0
 
         line_mask = np.zeros((segmentation.shape[0], segmentation.shape[1]))
-        Line.draw_all(self.lines, line_mask, color=255, thickness=2, sx=sx, sy=sy)
+        Line.draw_all(line_mask, self.lines, color=255, thickness=2, sx=sx, sy=sy)
 
         segmentation = watershed(self.hed, segmentation,
                                          mask=line_mask == 0)

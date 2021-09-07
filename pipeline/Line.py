@@ -63,10 +63,6 @@ class Line(Sequence):
     def bounding_box(self, width, length_multiplier=1.0):
         return (self.midpoint, (self.length * length_multiplier, width), np.degrees(self.angle))
 
-    @classmethod
-    def draw_all(cls, lines, img, color=(255,50,255,255), thickness=2, sx=1.0, sy=1.0):
-        [line.draw(img, color=color, thickness=thickness, sx=sx, sy=sy) for line in lines]
-
     # def bounding_box_points(self, width, length_multiplier=1.0):
     #     return rotated_rects_points(self.midpoint, (self.length * length_multiplier, width), self.angle)
 
@@ -75,46 +71,49 @@ class Line(Sequence):
                                         and LineFunctions.line_angle_difference(self.angle, line.angle) < angle_threshold 
                                         and line != self, lines)) 
 
+    @classmethod
+    def draw_all(cls, img, lines, color=(255,50,255,255), thickness=2, sx=1.0, sy=1.0):
+        [line.draw(img, color=color, thickness=thickness, sx=sx, sy=sy) for line in lines]
 
-#todo: write in C or lambda
-def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(3), max_iterations=1e5):
+    @classmethod
+    def merge(cls, lines, search_width, search_length=1.01, angle_threshold=math.radians(3), max_iterations=1e5):
     
-    min_dist_sq = search_width * search_width
+        min_dist_sq = search_width * search_width
 
-    iterations = 0
-    for i in range(len(lines)):
-        if (iterations > max_iterations): break
-        line_a = lines[i]
-        iterations += 1
-        if line_a.dead: continue
+        iterations = 0
+        for i in range(len(lines)):
+            if (iterations > max_iterations): break
+            line_a = lines[i]
+            iterations += 1
+            if line_a.dead: continue
 
-        rect_a = line_a.bounding_box(search_width, length_multiplier=search_length)
-        data = (line_a.point_a, line_a.point_b)
+            rect_a = line_a.bounding_box(search_width, length_multiplier=search_length)
+            data = (line_a.point_a, line_a.point_b)
 
-        candidates = line_a.in_range(lines, angle_threshold)
+            candidates = line_a.in_range(lines, angle_threshold)
 
-        for line_b in candidates:
+            for line_b in candidates:
 
-            dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
+                dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
 
-            if dist_sq <= min_dist_sq:
-                result = 1
-            else:
-                rect_b = line_b.bounding_box(search_width, length_multiplier=search_length)
-                result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+                if dist_sq <= min_dist_sq:
+                    result = 1
+                else:
+                    rect_b = line_b.bounding_box(search_width, length_multiplier=search_length)
+                    result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
 
-            if result != 0:
-                line_a.dead = True
-                line_b.dead = True
-                data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
-
-
-        if line_a.dead:
-            lines[i] = Line(np.array([(data[0][0], data[0][1], data[1][0], data[1][1])], dtype=np.int).reshape(4))
-
-    return list(filter(lambda x: not x.dead, lines))
+                if result != 0:
+                    line_a.dead = True
+                    line_b.dead = True
+                    data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
 
 
+            if line_a.dead:
+                lines[i] = Line(np.array([(data[0][0], data[0][1], data[1][0], data[1][1])], dtype=np.int).reshape(4))
+
+        return list(filter(lambda x: not x.dead, lines))
+
+#jit functions, unused:
 @nb.jit(nopython=True)
 def line_angle(x0, y0, x1, y1):
     return math.atan2(float(y1 - y0), float(x1 - x0))

@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import math
 
-from pipeline.Line import Line, merge
+from .Line import Line
 from cambrian.frei_chen import frei_chen
 from time import time
 
@@ -50,7 +50,7 @@ class PipelineLineFinder(PipelineStep):
             if im_logging_enabled(data, LogLevel.Lines):
                 debug = data["image"].copy()
                 thickness = max(int(math.hypot(debug.shape[0], debug.shape[1]) / 600), 1)
-                [line.draw(debug, thickness=thickness) for line in lines]
+                Line.draw_all(debug, lines, thickness=thickness)
                 log_image(data, name, debug)
 
         transform_result = lambda x: list(map(lambda x: Line(x.reshape(4), sx, sy), result))
@@ -75,7 +75,7 @@ class PipelineLineFinder(PipelineStep):
         result = fld.detect(data["hed"])
         if result is not None and len(result) > 0: 
             #lines are made parallel by thickness of source image edges
-            hed_lines = merge(transform_result(result), search_width=diagonal/100)
+            hed_lines = Line.merge(transform_result(result), search_width=diagonal/100)
             #log_lines(hed_lines, "hed_lines")
             lines.extend(hed_lines)
 
@@ -94,7 +94,7 @@ class PipelineLineFinder(PipelineStep):
         
         if len(normals_lines) > 0:
             #cleanup normals
-            normals_lines = merge(normals_lines, search_width=diagonal/300)
+            normals_lines = Line.merge(normals_lines, search_width=diagonal/300)
             #log_lines(normals_lines, "normals_lines")
             lines.extend(normals_lines)
 
@@ -111,7 +111,7 @@ class PipelineLineFinder(PipelineStep):
         sy = data["image"].shape[0] / edges.shape[0]
         result = fld.detect(edges)
         if result is not None and len(result) > 0: 
-            gabor_lines = merge(transform_result(result), search_length=1.1, search_width=diagonal/100, angle_threshold=math.radians(7))
+            gabor_lines = Line.merge(transform_result(result), search_length=1.1, search_width=diagonal/100, angle_threshold=math.radians(7))
             #log_lines(gabor_lines, "gabor_lines")
             lines.extend(gabor_lines)
 
@@ -124,15 +124,16 @@ class PipelineLineFinder(PipelineStep):
         result = fld.detect(clean_edges)
         if result is not None and len(result) > 0: 
             frei_lines = transform_result(result)
-            frei_lines = merge(frei_lines, search_width=diagonal/200, search_length=1.1, angle_threshold=math.radians(7))
+            frei_lines = Line.merge(frei_lines, search_width=diagonal/200, search_length=1.1, angle_threshold=math.radians(7))
             #log_lines(frei_lines, "frei_lines")
             lines.extend(frei_lines)
 
         #merge all
-        lines = merge(lines, search_width=diagonal/200)
+        lines = Line.merge(lines, search_width=diagonal/200)
 
         # print("8. elapsed %.2f" % (time() - start)); start = time()
 
         log_lines(lines, "merged_lines")
 
         data["lines"] = lines
+
