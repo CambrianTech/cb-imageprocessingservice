@@ -39,7 +39,12 @@ class PlaneGeometry():
     def process(self):
         self.digest_data()
         self.calculate_geometry()
-        self.cluster()
+        
+        normals_combined, normals_nn_normals = self.combined_normals()
+        self.normals_c = normals_combined
+
+        lengths = np.maximum(np.sqrt(np.sum(self.normals_c * self.normals_c, -1)), 1e-6)
+        self.normals_c /= np.dstack((lengths, lengths, lengths))
 
     def digest_data(self):
 
@@ -147,34 +152,6 @@ class PlaneGeometry():
         wall_indices = np.nonzero(np.logical_and(scores > np.mean(scores), np.abs(90 - angs) < 15))[0]
 
         return VerticalDimension(wall_indices, vert_indices, angs)
-
-
-    def cluster(self):
-        normals_combined, normals_nn_normals = self.combined_normals()
-        self.normals_c = normals_combined
-
-        lengths = np.maximum(np.sqrt(np.sum(self.normals_c * self.normals_c, -1)), 1e-6)
-        self.normals_c /= np.dstack((lengths, lengths, lengths))
-
-        cluster_masks = [.03 * np.ones_like(self.plane_masks[0])]
-        cluster_mask_indices = [0]
-        vert_indices = self.dimensions[Dimension.Vertical].indices
-        for i in range(1, 8):
-            clust = np.nonzero(self.plane_clusters == i)[0]
-            clust = np.intersect1d(clust, vert_indices)
-
-            if len(clust) > 0:
-                cluster_masks.append(np.sum(self.plane_masks[clust], 0))
-                cluster_mask_indices.append((i - 1) % 3 + 1)
-
-        if im_logging_enabled(self.data, LogLevel.Images):
-            log_image(self.data, "normals_c_org", 127.5 * (self.normals_c + 1))
-            plane_cluster_seg = np.argmax(cluster_masks, 0)
-            cluster_mask_indices = np.int32(cluster_mask_indices)
-            plane_cluster_seg_rs = np.int32(
-                cv2.resize(np.uint8(plane_cluster_seg), (self.data["image"].shape[1], self.data["image"].shape[0]), interpolation=cv2.INTER_NEAREST))
-
-            log_segmentation_image(self.data, "plane_cluster_seg", plane_cluster_seg, self.data["image"], show_legend=False)
 
 
     def combined_normals(self):

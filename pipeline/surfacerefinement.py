@@ -8,6 +8,7 @@ import cambrian.image_processing as ip
 
 from .core import PipelineStep, PipelineStepIndex
 from .Line import Line
+from .planegeometry import Dimension
 from .extractsurfaces import Groupings
 from .logging import get_segmentation_image, log_segmentation_image, im_logging_enabled, log_image, LogLevel
 
@@ -19,7 +20,7 @@ class SurfaceRefinement():
         self.probs = probs
         self.lines = lines
         
-    def _refine_surface(self, mask, image, big_thresh=.03, small_thresh=.97, watershed_dist=.05, watershed_mask=None, gradient=True):
+    def refine_surface(self, mask, image, big_thresh=.03, small_thresh=.97, watershed_dist=.05, watershed_mask=None, gradient=True):
         small = ip.refine_mask_watershed(None, image, np.uint8(mask > small_thresh), None, distance=watershed_dist, gradient=gradient,
                                        watershed_mask=watershed_mask)
 
@@ -33,11 +34,7 @@ class SurfaceRefinement():
         markers[markers == 2] = (ndimage.label(markers == 2)[0])[markers == 2] + np.amax(markers)
         return markers
 
-    def refine(self, data, confidence=0.95):
-        #get labeled lines image
-        sx = self.image.shape[0] / data["image"].shape[0]
-        sy = self.image.shape[1] / data["image"].shape[1]
-
+    def extract_surfaces(self, data, confidence=0.95):
         items = self.probs.copy()
         items.insert(0, (confidence * np.ones_like(self.probs[Groupings.Other])))
 
@@ -48,12 +45,41 @@ class SurfaceRefinement():
             log_segmentation_image(data, "probs", np.int32(ade_seg), self.image, show_legend=False)
 
 
+        plane_masks = data["plane_masks"]
+        plane_clusters = data["plane_clusters"]
+        dimensions = data["dimensions"]
+        normals_c = data["normals_c"]
+
+        cluster_masks = [.03 * np.ones_like(plane_masks[0])]
+        cluster_mask_indices = [0]
+        vert_indices = dimensions[Dimension.Vertical].indices
+        for i in range(1, 8):
+            clust = np.nonzero(plane_clusters == i)[0]
+            clust = np.intersect1d(clust, vert_indices)
+
+            if len(clust) > 0:
+                cluster_masks.append(np.sum(plane_masks[clust], 0))
+                cluster_mask_indices.append((i - 1) % 3 + 1)
+
+        if im_logging_enabled(data, LogLevel.Images):
+            log_image(data, "normals_c_org", 127.5 * (normals_c + 1))
+            plane_cluster_seg = np.argmax(cluster_masks, 0)
+            cluster_mask_indices = np.int32(cluster_mask_indices)
+            plane_cluster_seg_rs = np.int32(
+                cv2.resize(np.uint8(plane_cluster_seg), (data["image"].shape[1], data["image"].shape[0]), interpolation=cv2.INTER_NEAREST))
+
+            log_segmentation_image(data, "plane_cluster_seg", plane_cluster_seg, data["image"], show_legend=False)
 
         #contours, hierarchy = cv2.findContours(np.uint8(final_labels == d + 2), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-        
-        
 
+    def refine(self, data):
+        #get labeled lines image
+        sx = self.image.shape[0] / data["image"].shape[0]
+        sy = self.image.shape[1] / data["image"].shape[1]
+
+        
+        self.extract_surfaces(data)
 
         #draw lines in BW
         merged_lines = np.int32(np.zeros((self.image.shape[0], self.image.shape[1])))
@@ -62,19 +88,19 @@ class SurfaceRefinement():
         watershed_mask = (merged_lines == 0)
 
         other_markers = np.int32(
-            self._refine_surface(self.probs[Groupings.Other], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.03, gradient=False))
+            self.refine_surface(self.probs[Groupings.Other], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.03, gradient=False))
 
         wall_markers = np.int32(
-            self._refine_surface(self.probs[Groupings.Wall], self.hed, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=watershed_mask))
+            self.refine_surface(self.probs[Groupings.Wall], self.hed, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=watershed_mask))
 
         floor_markers = np.int32(
-            self._refine_surface(self.probs[Groupings.Floor], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
+            self.refine_surface(self.probs[Groupings.Floor], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
 
         wall_like_markers = np.int32(
-            self._refine_surface(self.probs[Groupings.WallLike], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
+            self.refine_surface(self.probs[Groupings.WallLike], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
 
         ceiling_markers = np.int32(
-            self._refine_surface(self.probs[Groupings.Ceiling], self.hed, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=watershed_mask))
+            self.refine_surface(self.probs[Groupings.Ceiling], self.hed, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=watershed_mask))
 
         ceiling_prob = get_segmentation_image(ceiling_markers + 1, self.probs[Groupings.Ceiling], avg=True)
         wall_like_prob = get_segmentation_image(wall_like_markers + 1, self.probs[Groupings.WallLike], avg=True)
