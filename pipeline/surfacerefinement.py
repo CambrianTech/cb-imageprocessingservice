@@ -10,7 +10,8 @@ from .core import PipelineStep, PipelineStepIndex
 from .Line import Line
 from .planegeometry import Dimension
 from .extractsurfaces import Groupings
-from .logging import get_segmentation_image, log_segmentation_image, im_logging_enabled, log_image, LogLevel
+from .utils import get_segmentation_image
+from .logging import log_segmentation_image, im_logging_enabled, log_image, LogLevel
 
 class SurfaceRefinement():
     def __init__(self, image, hed, probs, lines):
@@ -50,25 +51,37 @@ class SurfaceRefinement():
         dimensions = data["dimensions"]
         normals_c = data["normals_c"]
 
-        cluster_masks = [.03 * np.ones_like(plane_masks[0])]
-        cluster_mask_indices = [0]
-        vert_indices = dimensions[Dimension.Vertical].indices
-        for i in range(1, 8):
+        cluster_masks = [.05 * np.ones_like(plane_masks[0])]
+
+        #vert_indices = dimensions[Dimension.Vertical].indices
+        cluster_contours = []
+
+        for i in range(0, len(plane_clusters)):
             clust = np.nonzero(plane_clusters == i)[0]
-            clust = np.intersect1d(clust, vert_indices)
+            #clust = np.intersect1d(clust, vert_indices)
 
             if len(clust) > 0:
-                cluster_masks.append(np.sum(plane_masks[clust], 0))
-                cluster_mask_indices.append((i - 1) % 3 + 1)
+                cluster_sum = np.sum(plane_masks[clust], 0)
+                cluster_masks.append(cluster_sum)
+
+                mask = cluster_sum * 255
+                mask[mask < 127 * confidence] = 0
+                mask[mask > 0] = 255
+                log_image(data, "mask_%d" % i, mask)
+                cluster_contours.append(cv2.findContours(np.uint8(mask), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE))
 
         if im_logging_enabled(data, LogLevel.Images):
             log_image(data, "normals_c_org", 127.5 * (normals_c + 1))
             plane_cluster_seg = np.argmax(cluster_masks, 0)
-            cluster_mask_indices = np.int32(cluster_mask_indices)
-            plane_cluster_seg_rs = np.int32(
-                cv2.resize(np.uint8(plane_cluster_seg), (data["image"].shape[1], data["image"].shape[0]), interpolation=cv2.INTER_NEAREST))
 
-            log_segmentation_image(data, "plane_cluster_seg", plane_cluster_seg, data["image"], show_legend=False)
+            debug = self.image.copy()
+
+            for contours, hierarchy in cluster_contours:
+                cv2.drawContours(debug, contours, -1, (0,255,0), 3)
+
+            log_image(data, "contours", debug)
+
+            log_segmentation_image(data, "plane_cluster_seg", plane_cluster_seg, debug, show_legend=False)
 
         #contours, hierarchy = cv2.findContours(np.uint8(final_labels == d + 2), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 

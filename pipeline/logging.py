@@ -3,7 +3,8 @@ import os.path
 import numpy as np
 import pickle
 from enum import IntFlag
-from pipeline.ade20k import ADE20K
+from .ade20k import ADE20K
+from .utils import get_segmentation_image
 
 class LogLevel(IntFlag):
     Nothing = 0
@@ -75,24 +76,6 @@ def _log_image(data:dict, name:str, image, extension=".jpg", quality=95):
     cv2.imwrite(path, cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB) if len(image.shape) == 3 else image.astype(np.uint8), [int(cv2.IMWRITE_JPEG_QUALITY), quality])
     _logging_index += 1
 
-def get_segmentation_image(labels, image, avg=False, resize=True, get_legend=False, min_matches=100, labelset=ADE20K):
-    if resize:
-        img_seg = cv2.resize(image, (labels.shape[1], labels.shape[0]))
-    else:
-        img_seg = image.copy()
-
-    legend = []
-
-    for label in range(0, np.amax(labels) + 1):
-        color = np.random.randint([0, 0, 10], [254, 254, 235])
-        if avg: color = np.mean(img_seg[labels == label], axis=0)
-        img_seg[labels == label] = color
-
-        if get_legend and label <= labelset.max_index() and len(img_seg[labels == label]) > min_matches:
-            legend.append((labelset(label+labelset.value_offset()), (int(color[0]), int(color[1]), int(color[2]))))
-    if get_legend:
-        return img_seg, legend
-    return img_seg
 
 def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", show_legend=True, labelset=ADE20K,  opacity=0.6):
     

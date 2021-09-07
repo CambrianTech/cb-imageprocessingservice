@@ -9,7 +9,7 @@ from skimage.segmentation import watershed
 from cambrian.VanishingPointFinder import VanishingPointFinder
 
 from .core import PipelineStep, PipelineStepIndex
-from .logging import get_segmentation_image, log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
+from .logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 from .ade20k import ADE20K
 from .extractsurfaces import Groupings
 from .poseestimator import calcPlaneXYZ, fan_surfaces
