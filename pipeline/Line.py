@@ -78,11 +78,6 @@ class Line(Sequence):
 
 #todo: write in C or lambda
 def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(3), max_iterations=1e5):
-
-    lines = sorted(lines)
-    return lines
-
-    #print("angle_threshold: %.2f" % math.degrees(angle_threshold), [math.degrees(line.angle) for line in lines])
     
     min_dist_sq = search_width * search_width
 
@@ -97,11 +92,6 @@ def merge(lines, search_width, search_length=1.01, angle_threshold=math.radians(
         data = (line_a.point_a, line_a.point_b)
 
         candidates = line_a.in_range(lines, angle_threshold)
-
-        # if len(candidates):
-        #     print("\ncandidates for %.2f" % math.degrees(line_a.angle), [math.degrees(line.angle) for line in candidates])
-        #     exit()
-        
 
         for line_b in candidates:
 
