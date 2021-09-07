@@ -36,16 +36,7 @@ class SurfaceRefinement():
         return markers
 
     def extract_surfaces(self, data, confidence=0.95):
-        items = self.probs.copy()
-        items.insert(0, (confidence * np.ones_like(self.probs[Groupings.Other])))
-
-        ade_seg_c = np.dstack(tuple(items))
-        ade_seg = np.argmax(ade_seg_c, -1)
-
-        if im_logging_enabled(data, LogLevel.Segmentation):
-            log_segmentation_image(data, "probs", np.int32(ade_seg), self.image, show_legend=False)
-
-
+        
         plane_masks = data["plane_masks"]
         plane_clusters = data["plane_clusters"]
         dimensions = data["dimensions"]
@@ -67,21 +58,27 @@ class SurfaceRefinement():
                 mask = cluster_sum * 255
                 mask[mask < 127 * confidence] = 0
                 mask[mask > 0] = 255
-                log_image(data, "mask_%d" % i, mask)
+                #log_image(data, "mask_%d" % i, mask)
                 cluster_contours.append(cv2.findContours(np.uint8(mask), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE))
 
-        if im_logging_enabled(data, LogLevel.Images):
+
+        items = self.probs.copy()
+        items.insert(0, (confidence * np.ones_like(self.probs[Groupings.Other])))
+
+        ade_seg_c = np.dstack(tuple(items))
+        ade_seg = np.argmax(ade_seg_c, -1)
+
+        
+        if im_logging_enabled(data):
             log_image(data, "normals_c_org", 127.5 * (normals_c + 1))
             plane_cluster_seg = np.argmax(cluster_masks, 0)
 
             debug = self.image.copy()
 
             for contours, hierarchy in cluster_contours:
-                cv2.drawContours(debug, contours, -1, (0,255,0), 3)
+                cv2.drawContours(debug, contours, -1, (255,255,0), 1)
 
-            log_image(data, "contours", debug)
-
-            log_segmentation_image(data, "plane_cluster_seg", plane_cluster_seg, debug, show_legend=False)
+            log_segmentation_image(data, "probs", np.int32(ade_seg), debug, show_legend=False)
 
         #contours, hierarchy = cv2.findContours(np.uint8(final_labels == d + 2), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
