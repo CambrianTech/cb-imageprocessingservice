@@ -42,21 +42,23 @@ class PipelineLineFinder(PipelineStep):
 
         start = time()
 
+        operating_scale = 1500.0 / diagonal
+        if operating_scale < 1.0:
+            bw = cv2.resize(bw, (int(self.width * operating_scale), int(self.height * operating_scale)), cv2.INTER_CUBIC)
+
         def log_lines(lines, name):
             if im_logging_enabled(data, LogLevel.Lines):
                 debug = data["image"].copy()
                 thickness = max(int(math.hypot(debug.shape[0], debug.shape[1]) / 600), 1)
-                [line.draw(debug,  thickness=thickness) for line in lines]
+                [line.draw(debug, thickness=thickness) for line in lines]
                 log_image(data, name, debug)
 
         transform_result = lambda x: list(map(lambda x: Line(x.reshape(4), sx, sy), result))
 
-        # print("0. elapsed %.2f" % (time() - start)); start = time()
+        #print("0. elapsed %.2f" % (time() - start)); start = time()
 
         fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)
         lines = []
-
-        # print("1. elapsed %.2f" % (time() - start)); start = time()
 
         #find lines in BW image
         sx = data["image"].shape[1] / bw.shape[1]
@@ -64,10 +66,7 @@ class PipelineLineFinder(PipelineStep):
         result = fld.detect(bw)
         if result is not None and len(result) > 0: 
             lines.extend(transform_result(result))
-        log_lines(lines, "bw_lines")
-
-        # print("2. elapsed %.2f" % (time() - start)); start = time()
-
+        #log_lines(lines, "bw_lines")
 
         #find lines in hed hed edges
         sx = data["image"].shape[1] / data["hed"].shape[1]
@@ -77,10 +76,8 @@ class PipelineLineFinder(PipelineStep):
         if result is not None and len(result) > 0: 
             #lines are made parallel by thickness of source image edges
             hed_lines = merge(transform_result(result), search_width=diagonal/100)
-            log_lines(hed_lines, "hed_lines")
+            #log_lines(hed_lines, "hed_lines")
             lines.extend(hed_lines)
-
-        #print("3. elapsed %.2f" % (time() - start)); start = time()
 
         #find lines in normals
         fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 20.0), 1.41, 200, 240, 3, False)
@@ -98,46 +95,38 @@ class PipelineLineFinder(PipelineStep):
         if len(normals_lines) > 0:
             #cleanup normals
             normals_lines = merge(normals_lines, search_width=diagonal/300)
-            log_lines(normals_lines, "normals_lines")
+            #log_lines(normals_lines, "normals_lines")
             lines.extend(normals_lines)
 
-        #print("4. elapsed %.2f" % (time() - start)); start = time()
-
         #find lines in gabor edges:
-        gabor_scale = 1500.0 / diagonal
-        bw_res = cv2.resize(bw, (int(self.width * gabor_scale), int(self.height * gabor_scale)), cv2.INTER_CUBIC) if gabor_scale < 1.0 else bw
-        v_gabor = gabor(bw_res, 0, 7)
-        h_gabor = gabor(bw_res, np.pi/2.0, 9)
+        v_gabor = gabor(bw, 0, 7)
+        h_gabor = gabor(bw, np.pi/2.0, 9)
         edges = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -40)
         edges = cv2.bilateralFilter(edges, 7, 40, 9)
-        log_image(data, "gabor", edges)
+        #log_image(data, "gabor", edges)
         edges = cv2.resize(edges, (self.width, self.height), interpolation = cv2.INTER_CUBIC)
 
-        #print("5. elapsed %.2f" % (time() - start)); start = time()
 
         sx = data["image"].shape[1] / edges.shape[1]
         sy = data["image"].shape[0] / edges.shape[0]
         result = fld.detect(edges)
         if result is not None and len(result) > 0: 
             gabor_lines = merge(transform_result(result), search_length=1.1, search_width=diagonal/100, angle_threshold=math.radians(7))
-            log_lines(gabor_lines, "gabor_lines")
+            #log_lines(gabor_lines, "gabor_lines")
             lines.extend(gabor_lines)
 
-        #print("6. elapsed %.2f" % (time() - start)); start = time()
-
-        # #frei chen edges:
-        # clean_edges = (frei_chen(bw) * 255.0 * 5.0).astype(np.float32)
-        # clean_edges = cv2.bilateralFilter(clean_edges, 5, 5, 5).astype(np.uint8)
-        # log_image(data, "frei_chen", clean_edges)
-        # result = fld.detect(clean_edges)
-        # if result is not None and len(result) > 0: 
-        #     frei_lines = transform_result(result)
-        #     frei_lines = merge(transform_result(result), search_width=diagonal/200, search_length=1.1, angle_threshold=math.radians(7))
-        #     log_lines(frei_lines, "frei_lines")
-        #     lines.extend(frei_lines)
-
-        #print("7. elapsed %.2f" % (time() - start)); start = time()
-
+        #frei chen edges:
+        clean_edges = (frei_chen(bw) * 255.0 * 5.0).astype(np.float32)
+        clean_edges = cv2.bilateralFilter(clean_edges, 5, 5, 5).astype(np.uint8)
+        sx = data["image"].shape[1] / clean_edges.shape[1]
+        sy = data["image"].shape[0] / clean_edges.shape[0]
+        #log_image(data, "frei_chen", clean_edges)
+        result = fld.detect(clean_edges)
+        if result is not None and len(result) > 0: 
+            frei_lines = transform_result(result)
+            frei_lines = merge(frei_lines, search_width=diagonal/200, search_length=1.1, angle_threshold=math.radians(7))
+            #log_lines(frei_lines, "frei_lines")
+            lines.extend(frei_lines)
 
         #merge all
         lines = merge(lines, search_width=diagonal/200)
