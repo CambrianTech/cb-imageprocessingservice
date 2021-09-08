@@ -1,6 +1,13 @@
 import cv2
 import numpy as np
-from pipeline.ade20k import ADE20K
+import random
+
+from .ade20k import ADE20K
+
+def random_color():
+    rgbl=[255,0,0]
+    random.shuffle(rgbl)
+    return tuple(rgbl)
 
 def resize_array(array, shape):
     length = len(array)

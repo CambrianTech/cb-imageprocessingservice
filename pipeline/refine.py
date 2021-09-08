@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import random
 from skimage.morphology import remove_small_objects
 
 import cambrian.image_processing as ip
@@ -8,11 +7,6 @@ import cambrian.image_processing as ip
 from .core import PipelineStep, PipelineStepIndex
 from .logging import log_image, log_segmentation_image, im_logging_enabled, LogLevel
 from .utils import resize_array
-
-def random_color():
-    rgbl=[255,0,0]
-    random.shuffle(rgbl)
-    return tuple(rgbl)
 
 class PipelineRefineResults(PipelineStep):
 

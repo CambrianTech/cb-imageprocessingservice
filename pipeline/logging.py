@@ -77,7 +77,7 @@ def _log_image(data:dict, name:str, image, extension=".jpg", quality=95):
     _logging_index += 1
 
 
-def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", show_legend=True, labelset=ADE20K,  opacity=0.6):
+def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", show_legend=True, labelset=ADE20K,  opacity=0.5, get_image=False):
     
     if im_logging_enabled(data, LogLevel.Segmentation):
         
@@ -119,7 +119,9 @@ def log_segmentation_image(data:dict, name, segmentation, image, avg=False, exte
                 x = start_location[0]
                 y += line_height
 
-        
+        if get_image:
+            return debug
+
         _log_image(data, name, debug, extension)
 
 def log_ply(data:dict, name, image, masks, plane_XYZ, write_occlusion=False, mult=1.0):

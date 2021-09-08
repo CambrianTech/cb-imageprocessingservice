@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import ndimage
 import cv2
+
 from skimage.morphology import skeletonize, remove_small_objects
 from skimage.segmentation import join_segmentations, watershed
 
@@ -10,7 +11,7 @@ from .core import PipelineStep, PipelineStepIndex
 from .Line import Line
 from .planegeometry import Dimension
 from .extractsurfaces import Groupings
-from .utils import get_segmentation_image
+from .utils import get_segmentation_image, random_color
 from .logging import log_segmentation_image, im_logging_enabled, log_image, LogLevel
 
 class SurfaceRefinement():
@@ -38,27 +39,28 @@ class SurfaceRefinement():
     def extract_surfaces(self, data, confidence=0.95):
         
         plane_masks = data["plane_masks"]
-        plane_clusters = data["plane_clusters"]
-        dimensions = data["dimensions"]
-        normals_c = data["normals_c"]
+        #plane_clusters = data["plane_clusters"]
+        #dimensions = data["dimensions"]
+        #normals_c = data["normals_c"]
 
-        cluster_masks = [.05 * np.ones_like(plane_masks[0])]
+        #cluster_masks = [.05 * np.ones_like(plane_masks[0])]
 
         #vert_indices = dimensions[Dimension.Vertical].indices
         cluster_contours = []
 
-        for i in range(0, len(plane_clusters)):
-            clust = np.nonzero(plane_clusters == i)[0]
+        for i in range(0, len(plane_masks)):
             #clust = np.intersect1d(clust, vert_indices)
 
-            if len(clust) > 0:
-                cluster_sum = np.sum(plane_masks[clust], 0)
-                cluster_masks.append(cluster_sum)
+            if len(plane_masks[i]) > 50:
+                mask = plane_masks[i] * 255
+                #cluster_sum = np.sum(plane_masks[clust], 0)
+                #cluster_masks.append(mask)
 
-                mask = cluster_sum * 255
-                mask[mask < 127 * confidence] = 0
-                mask[mask > 0] = 255
-                #log_image(data, "mask_%d" % i, mask)
+                #mask = cluster_sum * 255
+                #mask[mask < 127 * confidence] = 0
+                
+
+                log_image(data, "mask_%d" % i, mask)
                 cluster_contours.append(cv2.findContours(np.uint8(mask), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE))
 
 
@@ -67,18 +69,22 @@ class SurfaceRefinement():
 
         ade_seg_c = np.dstack(tuple(items))
         ade_seg = np.argmax(ade_seg_c, -1)
+        lines = data["lines"]
 
+        sx = self.image.shape[0] / data["image"].shape[0]
+        sy = self.image.shape[1] / data["image"].shape[1]
         
         if im_logging_enabled(data):
-            log_image(data, "normals_c_org", 127.5 * (normals_c + 1))
-            plane_cluster_seg = np.argmax(cluster_masks, 0)
-
-            debug = self.image.copy()
+            debug = log_segmentation_image(data, "probs", np.int32(ade_seg), self.image, get_image=True)
 
             for contours, hierarchy in cluster_contours:
-                cv2.drawContours(debug, contours, -1, (255,255,0), 1)
+                cv2.drawContours(debug, contours, -1, random_color(), 2)
 
-            log_segmentation_image(data, "probs", np.int32(ade_seg), debug, show_legend=False)
+            Line.draw_all(debug, lines, color=(255,80,200), thickness=2, sx=sx, sy=sy)
+
+            log_image(data, "surfaces", debug)
+            
+            
 
         #contours, hierarchy = cv2.findContours(np.uint8(final_labels == d + 2), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -87,7 +93,6 @@ class SurfaceRefinement():
         #get labeled lines image
         sx = self.image.shape[0] / data["image"].shape[0]
         sy = self.image.shape[1] / data["image"].shape[1]
-
         
         self.extract_surfaces(data)
 

@@ -1,6 +1,7 @@
 import abc
 import cv2
 import numpy as np
+import math
 from scipy import ndimage
 from scipy.stats import mode
 from enum import Enum, IntEnum
@@ -89,8 +90,8 @@ class PlaneGeometry():
         self.basis_indices = np.int32(np.concatenate([floor_indices, ceiling_indices, wall_indices]))
 
     def find_floor_indices(self):
-        floor_mask = cv2.resize(self.isolated_masks[Groupings.Floor], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
-        ceiling_mask = cv2.resize(self.isolated_masks[Groupings.Ceiling], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
+        floor_mask = cv2.resize(self.isolated_masks[Groupings.Floor] + self.isolated_masks[Groupings.FloorLike], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
+        ceiling_mask = cv2.resize(self.isolated_masks[Groupings.Ceiling] + self.isolated_masks[Groupings.CeilingLike], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
 
         floor_intersections = []
         ceiling_intersections = []
@@ -135,9 +136,9 @@ class PlaneGeometry():
         return HorizontalDimension(floor_indices, ceiling_indices, horiz_indices, angs)
 
 
-    def find_wall_indices(self):
+    def find_wall_indices(self, angle_threshold=math.radians(15)):
 
-        wall_mask = cv2.resize(self.isolated_masks[Groupings.Wall], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
+        wall_mask = cv2.resize(self.isolated_masks[Groupings.Wall] + self.isolated_masks[Groupings.WallLike], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
 
         wall_intersections = []
         dots = []
@@ -145,11 +146,11 @@ class PlaneGeometry():
             wall_intersections.append(cv2.countNonZero(np.uint8(self.plane_masks[d][wall_mask > 1. / 3.] > .5)))
             dots.append(np.dot(self.floor_normal, self.plane_normals[d]))
 
-        angs = np.arccos(np.clip(dots, -1.0, 1.0)) * 180 / np.pi
-        vert_indices = np.nonzero(np.abs(90 - angs) < 15)[0]
+        angs = np.arccos(np.clip(dots, -1.0, 1.0))
+        vert_indices = np.nonzero(np.abs(math.pi * 0.5 - angs) < angle_threshold)[0]
 
         scores = np.int32(wall_intersections)
-        wall_indices = np.nonzero(np.logical_and(scores > np.mean(scores), np.abs(90 - angs) < 15))[0]
+        wall_indices = np.nonzero(np.logical_and(scores > np.mean(scores), np.abs(math.pi * 0.5 - angs) < angle_threshold))[0]
 
         return VerticalDimension(wall_indices, vert_indices, angs)
 
