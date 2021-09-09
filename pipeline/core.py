@@ -15,13 +15,14 @@ class PipelineStepIndex(IntEnum):
     ExtractSurfaces = 6
     FindLines = 7
     Geometry = 8
-    EstimatePose = 9
-    SurfaceRefinement = 10
-    MergeSurfaces = 11
-    Refine = 12
-    Superpixels = 13
-    CombinePlaneMasks = 14
-    Output = 15
+    SolveRoom = 9
+    EstimatePose = 10
+    SurfaceRefinement = 11
+    MergeSurfaces = 12
+    Refine = 13
+    Superpixels = 14
+    CombinePlaneMasks = 15
+    Output = 16
 
 class PipelineStep(metaclass=ABCMeta):
     def __init__(self, pipeline, batch_max_wait_time=1.0, batch_debounce_time=0.2, batch_max_size=4):

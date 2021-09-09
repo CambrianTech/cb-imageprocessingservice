@@ -1,31 +1,31 @@
-
 import os
 import time
 import subprocess
 from enum import IntEnum
 
-from pipeline.core import schedule_and_wait, PipelineStep, PipelineStepIndex
-from pipeline.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, LogLevel, set_logging_level
+from .core import schedule_and_wait, PipelineStep, PipelineStepIndex
+from .logging import get_unique_id, set_logging_dir, set_logging_step, log_data, LogLevel, set_logging_level
 
-from pipeline.s3input import PipelineS3Input
-from pipeline.fileinput import PipelineFileInput
-from pipeline.s3output import PipelineS3Output
-from pipeline.fileoutput import PipelineFileOutput
+from .s3input import PipelineS3Input
+from .fileinput import PipelineFileInput
+from .s3output import PipelineS3Output
+from .fileoutput import PipelineFileOutput
 
-from pipeline.fov import PipelineCalculateFov
-from pipeline.primaryangle import PipelineDeterminePrimaryAngles
-from pipeline.runmodels import PipelineRunModels
-from pipeline.superpixels import PipelineSuperpixels
-from pipeline.planegeometry import PipelinePlaneGeometry
-from pipeline.refineplanemasks import PipelineRefinePlaneMasks
-from pipeline.linefinder import PipelineLineFinder
-from pipeline.refine import PipelineRefineResults
-from pipeline.combineplanemasks import PipelineCombinePlaneMasks
-from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
-from pipeline.poseestimator import PipelinePoseEstimator
-from pipeline.extractsurfaces import PipelineExtractSurfaces
-from pipeline.surfacerefinement import PipelineSurfaceRefinement
-from pipeline.mergesurfaces import PipelineMergeSurfaces
+from .fov import PipelineCalculateFov
+from .primaryangle import PipelineDeterminePrimaryAngles
+from .runmodels import PipelineRunModels
+from .superpixels import PipelineSuperpixels
+from .planegeometry import PipelinePlaneGeometry
+from .refineplanemasks import PipelineRefinePlaneMasks
+from .linefinder import PipelineLineFinder
+from .refine import PipelineRefineResults
+from .combineplanemasks import PipelineCombinePlaneMasks
+from .remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
+from .poseestimator import PipelinePoseEstimator
+from .extractsurfaces import PipelineExtractSurfaces
+from .surfacerefinement import PipelineSurfaceRefinement
+from .mergesurfaces import PipelineMergeSurfaces
+from .roomsolver import PipelineRoomSolver
 
 class PipelineNoOp(PipelineStep):
 
@@ -116,6 +116,7 @@ class Pipeline():
         all_steps[PipelineStepIndex.DeterminePrimaryAngles] = PipelineDeterminePrimaryAngles
         all_steps[PipelineStepIndex.ExtractSurfaces] = PipelineExtractSurfaces
         all_steps[PipelineStepIndex.FindLines] = PipelineLineFinder
+        all_steps[PipelineStepIndex.SolveRoom] = PipelineRoomSolver
         all_steps[PipelineStepIndex.Geometry] = PipelinePlaneGeometry
         all_steps[PipelineStepIndex.EstimatePose] = PipelinePoseEstimator
         all_steps[PipelineStepIndex.SurfaceRefinement] = PipelineSurfaceRefinement

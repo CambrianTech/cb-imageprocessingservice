@@ -36,65 +36,12 @@ class SurfaceRefinement():
         markers[markers == 2] = (ndimage.label(markers == 2)[0])[markers == 2] + np.amax(markers)
         return markers
 
-    def extract_surfaces(self, data, confidence=0.95):
-        
-        plane_masks = data["plane_masks"]
-        #plane_clusters = data["plane_clusters"]
-        #dimensions = data["dimensions"]
-        #normals_c = data["normals_c"]
-
-        #cluster_masks = [.05 * np.ones_like(plane_masks[0])]
-
-        #vert_indices = dimensions[Dimension.Vertical].indices
-        cluster_contours = []
-
-        for i in range(0, len(plane_masks)):
-            #clust = np.intersect1d(clust, vert_indices)
-
-            if len(plane_masks[i]) > 50:
-                mask = plane_masks[i] * 255
-                #cluster_sum = np.sum(plane_masks[clust], 0)
-                #cluster_masks.append(mask)
-
-                #mask = cluster_sum * 255
-                #mask[mask < 127 * confidence] = 0
-                
-
-                log_image(data, "mask_%d" % i, mask)
-                cluster_contours.append(cv2.findContours(np.uint8(mask), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE))
-
-
-        items = self.probs.copy()
-        items.insert(0, (confidence * np.ones_like(self.probs[Groupings.Other])))
-
-        ade_seg_c = np.dstack(tuple(items))
-        ade_seg = np.argmax(ade_seg_c, -1)
-        lines = data["lines"]
-
-        sx = self.image.shape[0] / data["image"].shape[0]
-        sy = self.image.shape[1] / data["image"].shape[1]
-        
-        if im_logging_enabled(data):
-            debug = log_segmentation_image(data, "probs", np.int32(ade_seg), self.image, get_image=True)
-
-            for contours, hierarchy in cluster_contours:
-                cv2.drawContours(debug, contours, -1, random_color(), 2)
-
-            Line.draw_all(debug, lines, color=(255,80,200), thickness=2, sx=sx, sy=sy)
-
-            log_image(data, "surfaces", debug)
-            
-            
-
-        #contours, hierarchy = cv2.findContours(np.uint8(final_labels == d + 2), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
 
     def refine(self, data):
         #get labeled lines image
-        sx = self.image.shape[0] / data["image"].shape[0]
-        sy = self.image.shape[1] / data["image"].shape[1]
+        sx = self.image.shape[1] / data["image"].shape[1]
+        sy = self.image.shape[0] / data["image"].shape[0]
         
-        self.extract_surfaces(data)
 
         #draw lines in BW
         merged_lines = np.int32(np.zeros((self.image.shape[0], self.image.shape[1])))

@@ -5,9 +5,9 @@ import random
 from .ade20k import ADE20K
 
 def random_color():
-    rgbl=[255,0,0]
-    random.shuffle(rgbl)
-    return tuple(rgbl)
+    haystack = np.arange(80, 255, 30)
+    random.shuffle(haystack)
+    return (int(haystack[0]), int(haystack[1]), int(haystack[2]))
 
 def resize_array(array, shape):
     length = len(array)
