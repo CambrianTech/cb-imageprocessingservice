@@ -5,31 +5,17 @@ from time import time
 import cv2
 
 from .core import PipelineStep, PipelineStepIndex
-
-
-def _camera_fov_res_to_intrinsics(fov: float, res: np.ndarray):
-    # https://stackoverflow.com/a/41137160
-    # fov = 2 * arctan(r / (2 * f)) <=> f_y = r / (2 * tan(fov / 2))
-    c = res / 2
-
-    # Assume the fov corresponds to the longest side and use that for focal
-    i = 0 if c[0] >= c[1] else 1
-    f = c[i] / np.tan(np.radians(fov) / 2)
-    K = np.array([f, f, c[0], c[1], res[0], res[1]], dtype=np.float32)
-
-    return K
-
+from .utils import camera_fov_res_to_intrinsics
 
 def _remote_plane_detect(address, data):
     input_dicts = [{
         "image": datum["image"],
-        "camera": _camera_fov_res_to_intrinsics(datum["fov"], np.array([datum["image"].shape[1], datum["image"].shape[0]], dtype=np.float32))
+        "camera": camera_fov_res_to_intrinsics(datum["fov"], np.array([datum["image"].shape[1], datum["image"].shape[0]], dtype=np.float32))[0]
     } for datum in data]
 
     response_bytes = requests.post(
         address, data=pickle.dumps(input_dicts)).content
     return pickle.loads(response_bytes)
-
 
 def _remote_networks(address, data):
     images = [datum["image"] for datum in data]

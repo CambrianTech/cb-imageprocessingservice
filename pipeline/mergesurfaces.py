@@ -12,8 +12,9 @@ from .core import PipelineStep, PipelineStepIndex
 from .logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 from .ade20k import ADE20K
 from .extractsurfaces import Groupings
-from .poseestimator import calcPlaneXYZ, fan_surfaces
+from .poseestimator import fan_surfaces
 from .planegeometry import Dimension
+from .utils import calculate_plane_xyz
 
 def random_color():
     rgbl=[255,0,0]
@@ -183,7 +184,7 @@ class PipelineMergeSurfaces(PipelineStep):
                         print("if no good match just take the closest by angle", all_vertical,
                               plane_parameters[all_vertical[wall_index]], all_vertical[wall_index])
 
-        plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=w, height=h, camera=camera, max_depth=10)
+        plane_XYZ, plane_depth = calculate_plane_xyz(plane_parameters, width=w, height=h, camera=camera, max_depth=10)
         log_segmentation_image(data, 'labels_arg', labels_arg, img_lr, show_legend=False)
 
 

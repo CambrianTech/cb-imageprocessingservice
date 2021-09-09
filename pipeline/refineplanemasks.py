@@ -23,9 +23,9 @@ from .surfacerefinement import SurfaceRefinement
 
 from .ade20k import ADE20K
 from .extractsurfaces import Groupings
-from .utils import get_segmentation_image
+from .utils import get_segmentation_image, calculate_plane_xyz
 from .logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
-from .poseestimator import calcPlaneXYZ, PoseEstimator, fan_surfaces
+from .poseestimator import PoseEstimator, fan_surfaces
 
 def rough_dilate_erode(is_dilate, mask, size=5, iterations=1, scale=0.5, maintain_size=True, interpolation=cv2.INTER_NEAREST):
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(size,size))
@@ -406,7 +406,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                         print("if no good match just take the closest by angle", all_vertical,
                               plane_geometry.plane_parameters[all_vertical[wall_index]], all_vertical[wall_index])
 
-        plane_XYZ, plane_depth = calcPlaneXYZ(plane_geometry.plane_parameters, width=w, height=h, camera=pose_estimator.camera, max_depth=10)
+        plane_XYZ, plane_depth = calculate_plane_xyz(plane_geometry.plane_parameters, width=w, height=h, camera=pose_estimator.camera, max_depth=10)
         log_segmentation_image(data, 'labels_arg', labels_arg, img_lr)
 
 

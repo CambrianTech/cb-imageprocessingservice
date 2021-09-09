@@ -42,3 +42,60 @@ def get_segmentation_image(labels, image, avg=False, resize=True, get_legend=Fal
     if get_legend:
         return img_seg, legend
     return img_seg
+
+def fov_to_focal(fov, length):
+    return length / (2 * np.tan(np.radians(fov) / 2))
+
+def focal_to_fov(focal_length, length):
+    return 2 * np.arctan2(length,(2 * focal_length))
+
+def camera_fov_res_to_intrinsics(fov: float, res: np.ndarray):
+
+    c = res / 2
+    f = c[0] / np.tan(np.radians(fov) / 2)
+    K = np.array([f, f, c[0], c[1], res[0], res[1]], dtype=np.float32)
+
+    return K, f
+
+def camera_fov_to_intrinsic_matrix(fov,w,h):
+    K = np.eye(3)
+
+    K[0, :] = [fov_to_focal(fov, w),  w/2,0]
+    K[1, :] = [0, h/2, -fov_to_focal(fov, w)]
+    K[2, :] = [0, 1, 0]
+    return K
+
+def camera_focal_length_to_intrinsic_matrix(focal_length, w, h):
+    K = np.eye(3)
+
+    K[0, :] = [focal_length,  w/2,0]
+    K[1, :] = [0, h/2, -focal_length]
+    K[2, :] = [0, 1, 0]
+    return K
+
+def calculate_plane_xyz(planes, width, height, camera, max_depth=10):
+    urange = (np.arange(width, dtype=np.float32) / (width) * (camera[4]) - camera[2]) / camera[0]
+    urange = urange.reshape(1, -1).repeat(height, 0)
+
+    vrange = (np.arange(height, dtype=np.float32) / (height) * (camera[5]) - camera[3]) / camera[1]
+    vrange = vrange.reshape(-1, 1).repeat(width, 1)
+
+    ranges = np.stack([urange, np.ones(urange.shape), -vrange], axis=-1)
+
+    planeOffsets = np.linalg.norm(planes, axis=-1, keepdims=True)
+    planeNormals = planes / np.maximum(planeOffsets, 1e-4)
+
+    normalXYZ = np.dot(ranges, planeNormals.transpose())
+    # normalXYZ = np.round(normalXYZ,2)
+
+
+    normalXYZ[normalXYZ == 0] = 1e-4
+
+    planeDepths = planeOffsets.squeeze(-1) / normalXYZ
+    if max_depth > 0:
+        planeDepths = np.clip(planeDepths, 0, max_depth)
+        pass
+    XYZ = (np.expand_dims(planeDepths, -1) * np.expand_dims(ranges, 2))
+    
+    return XYZ.transpose(2, 0, 1, 3), planeDepths.transpose(2, 0, 1)
+
