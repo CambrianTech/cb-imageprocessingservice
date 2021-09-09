@@ -24,6 +24,7 @@ def make_log_path(data:dict, name:str, extension=".jpg"):
     global _logging_index
     directory = get_logging_dir(data)
     if not os.path.exists(directory):
+        #print("Creating directory" + directory)
         os.makedirs(directory)
 
     filename = "%d - %s%s" % (_logging_index, name, extension)
@@ -73,8 +74,12 @@ def log_image(data:dict, name:str, image, extension=".jpg"):
 def _log_image(data:dict, name:str, image, extension=".jpg", quality=95):
     global _logging_index
     path = make_log_path(data, name, extension)
-    cv2.imwrite(path, cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB) if len(image.shape) == 3 else image.astype(np.uint8), [int(cv2.IMWRITE_JPEG_QUALITY), quality])
-    _logging_index += 1
+    #print("Save image %s" % path)
+    success = cv2.imwrite(path, cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB) if len(image.shape) == 3 else image.astype(np.uint8), [int(cv2.IMWRITE_JPEG_QUALITY), quality])
+    if success:
+        _logging_index += 1
+    else:
+        print("Could not save image", path)
 
 
 def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", show_legend=True, labelset=ADE20K,  opacity=0.5, get_image=False):
