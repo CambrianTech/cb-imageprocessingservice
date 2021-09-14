@@ -1,13 +1,15 @@
 import numpy as np
 from scipy import ndimage
 import cv2
+from skimage.morphology import skeletonize, remove_small_objects
 
 from .core import PipelineStep, PipelineStepIndex
-from .utils import resize_array, random_color
+from .utils import resize_array, random_color, overlay_mask
 from .planegeometry import Dimension
 from .logging import log_image, log_segmentation_image, im_logging_enabled
 from .Line import Line
 from .extractsurfaces import Groupings
+from .room import Room, Ceiling, Floor, Wall
 
 class RoomSolver():
 
@@ -15,6 +17,7 @@ class RoomSolver():
         super().__init__()
         self.data = data
         self.image = self.data["downscaled"]
+        self.room = Room(data)
 
         planes_data = self.data["planes"]
         shape = (self.image.shape[1], self.image.shape[0])
@@ -24,16 +27,24 @@ class RoomSolver():
         self.plane_masks = resize_array(planes_data["masks"], shape)
         self.vert_indices = self.data["dimensions"][Dimension.Vertical].indices
 
-
     def solve(self, confidence=0.95):
         
         wall_contours = []
 
+        debug = self.image
+
         for i in self.vert_indices:
             mask = self.plane_masks[i] * 255
             mask[mask < 127] = 0
-            log_image(self.data, "mask_%d" % i, mask)
-            wall_contours.append(cv2.findContours(np.uint8(mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
+            mask = np.uint8(mask)
+            wall_contours.append(cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
+            
+            #mask_skel = skeletonize(mask)
+            debug = overlay_mask(debug, mask, 0, saturation=0)
+
+            #ip.refine_mask_watershed
+        
+        log_image(self.data, "masks", debug)
 
 
         items = self.probs.copy()
@@ -49,9 +60,9 @@ class RoomSolver():
         if im_logging_enabled(self.data):
             debug = log_segmentation_image(self.data, "probs", np.int32(ade_seg), self.image, get_image=True)
 
-            for contours, hierarchy in wall_contours:
-                color = random_color()
-                cv2.drawContours(debug, contours, -1, color, 2)
+            # for contours, hierarchy in wall_contours:
+            #     color = random_color()
+            #     cv2.drawContours(debug, contours, -1, color, 2)
 
             Line.draw_all(debug, self.lines, color=(255,80,200), thickness=2, sx=sx, sy=sy)
 

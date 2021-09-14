@@ -132,6 +132,7 @@ class Pipeline():
             all_steps[PipelineStepIndex.Geometry] = None
             all_steps[PipelineStepIndex.EstimatePose] = None
             all_steps[PipelineStepIndex.MergeSurfaces] = None
+            all_steps[PipelineStepIndex.SolveRoom] = None
             all_steps[PipelineStepIndex.Refine] = PipelineRefinePlaneMasks
         
 

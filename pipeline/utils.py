@@ -4,6 +4,11 @@ import random
 
 from .ade20k import ADE20K
 
+def multi_filter(fs, l):
+    if not fs:
+        return l
+    return multi_filter(fs[1:], (x for x in l if fs[0](x)))
+
 def random_color():
     haystack = np.arange(80, 255, 30)
     random.shuffle(haystack)
@@ -98,4 +103,23 @@ def calculate_plane_xyz(planes, width, height, camera, max_depth=10):
     XYZ = (np.expand_dims(planeDepths, -1) * np.expand_dims(ranges, 2))
     
     return XYZ.transpose(2, 0, 1, 3), planeDepths.transpose(2, 0, 1)
+
+def overlay_mask(img, mask, hue=random_color(), saturation=255, darkest_value=80):
+    
+    overlay = cv2.resize(mask, (img.shape[1], img.shape[0]))
+    img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) #range 0-180
+
+    grey = img_hsv[:, :, 2].copy()
+    grey[grey<darkest_value] = darkest_value
+
+    if hue is None:
+        hue = random.randint(0,360)
+
+    img_hsv[:, :, 0][overlay>0] = int(hue) / 2.0
+    img_hsv[:, :, 1][overlay>0] = saturation
+    img_hsv[:, :, 2][overlay>0] = grey[overlay>0] 
+
+    out = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR)
+
+    return out
 
