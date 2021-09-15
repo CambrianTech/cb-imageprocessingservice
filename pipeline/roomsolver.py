@@ -16,36 +16,35 @@ class RoomSolver():
     def __init__(self, data):
         super().__init__()
         self.data = data
-        self.image = self.data["downscaled"]
-        self.room = Room(data)
-
-        planes_data = self.data["planes"]
-        shape = (self.image.shape[1], self.image.shape[0])
-
         self.probs = self.data["isolated"]
         self.lines = self.data["lines"]
-        self.plane_masks = resize_array(planes_data["masks"], shape)
-        self.vert_indices = self.data["dimensions"][Dimension.Vertical].indices
+
+        self.room = Room(data)
 
     def solve(self, confidence=0.95):
         
         wall_contours = []
 
-        debug = self.image
+        self.image = self.data["downscaled"]
+        
+        #add the walls:
+        for i in self.data["dimensions"][Dimension.Vertical].wall_indices:
+            self.room.add_surface(Wall(self.data, i))
 
-        for i in self.vert_indices:
-            mask = self.plane_masks[i] * 255
-            mask[mask < 127] = 0
-            mask = np.uint8(mask)
-            wall_contours.append(cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
+        #add the floors:
+        for i in self.data["dimensions"][Dimension.Horizontal].floor_indices:
+            self.room.add_surface(Floor(self.data, i))
+
+        #add the ceilings:
+        for i in self.data["dimensions"][Dimension.Horizontal].ceiling_indices:
+            self.room.add_surface(Ceiling(self.data, i))
             
             #mask_skel = skeletonize(mask)
-            debug = overlay_mask(debug, mask, 0, saturation=0)
+            #debug = overlay_mask(debug, mask, 0, saturation=0)
 
             #ip.refine_mask_watershed
         
-        log_image(self.data, "masks", debug)
-
+        self.room.analyze()
 
         items = self.probs.copy()
         items.insert(0, (confidence * np.ones_like(self.probs[Groupings.Other])))
@@ -58,6 +57,10 @@ class RoomSolver():
         sy = self.image.shape[0] / self.data["image"].shape[0]
         
         if im_logging_enabled(self.data):
+
+            #for i, surface in enumerate(self.room.surfaces): log_image(self.data, "surface_%d" % i, surface.mask)
+            log_image(self.data, "room", self.room.get_debug_image())
+
             debug = log_segmentation_image(self.data, "probs", np.int32(ade_seg), self.image, get_image=True)
 
             # for contours, hierarchy in wall_contours:
