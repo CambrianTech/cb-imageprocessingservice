@@ -156,7 +156,7 @@ class Room(Geometry):
         for surface in self.surfaces:
             surface.analyze()
 
-    def get_debug_image(self, confidence=0.07):
+    def get_debug_image(self, confidence=0.05):
 
         img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV) #range 0-180
         for surface in self.surfaces:

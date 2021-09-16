@@ -9,7 +9,7 @@ from .planegeometry import Dimension
 from .logging import log_image, log_segmentation_image, im_logging_enabled
 from .Line import Line
 from .extractsurfaces import Groupings
-from .room import Room, Ceiling, Floor, Wall
+from .room import Room, Ceiling, Floor, Wall, Surface
 
 class RoomSolver():
 
@@ -28,16 +28,16 @@ class RoomSolver():
         self.image = self.data["downscaled"]
         
         #add the walls:
-        for i in self.data["dimensions"][Dimension.Vertical].wall_indices:
-            self.room.add_surface(Wall(self.data, i))
+        for i in range(len(self.room.masks)):
+            self.room.add_surface(Surface(self.data, i))
 
-        #add the floors:
-        for i in self.data["dimensions"][Dimension.Horizontal].floor_indices:
-            self.room.add_surface(Floor(self.data, i))
+        # #add the floors:
+        # for i in self.data["dimensions"][Dimension.Horizontal].indices:
+        #     self.room.add_surface(Floor(self.data, i))
 
-        #add the ceilings:
-        for i in self.data["dimensions"][Dimension.Horizontal].ceiling_indices:
-            self.room.add_surface(Ceiling(self.data, i))
+        # #add the ceilings:
+        # for i in self.data["dimensions"][Dimension.Horizontal].ceiling_indices:
+        #     self.room.add_surface(Ceiling(self.data, i))
             
             #mask_skel = skeletonize(mask)
             #debug = overlay_mask(debug, mask, 0, saturation=0)
