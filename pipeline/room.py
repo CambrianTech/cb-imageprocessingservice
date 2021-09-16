@@ -162,7 +162,7 @@ class Room(Geometry):
         for surface in self.surfaces:
             hue = random.randint(0,180)
             img_hsv[:, :, 0][surface.probs >= confidence] = hue 
-            img_hsv[:, :, 1][surface.probs >= confidence] = 255 * surface.probs[surface.probs > confidence]
+            img_hsv[:, :, 1][surface.probs >= confidence] = 255 * np.power(surface.probs[surface.probs > confidence], 0.5)
 
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB)
 
