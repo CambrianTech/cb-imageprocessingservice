@@ -77,10 +77,10 @@ class Surface():
         return self.geometry.masks[self.index]
 
     @property
-    def mask(self):
+    def mask(self, confidence=0.05):
         if self._mask is None:
             mask = self.probs.copy()
-            mask[mask < 0.4] = 0
+            mask[mask < confidence] = 0
             mask[mask > 0] = 255
             self._mask = np.uint8(mask)
         return self._mask
@@ -156,14 +156,13 @@ class Room(Geometry):
         for surface in self.surfaces:
             surface.analyze()
 
-    def get_debug_image(self):
+    def get_debug_image(self, confidence=0.07):
 
         img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV) #range 0-180
         for surface in self.surfaces:
             hue = random.randint(0,180)
-            overlay = cv2.resize(surface.mask, (self.image.shape[1], self.image.shape[0]))
-            img_hsv[:, :, 0][surface.mask>0] = hue 
-            img_hsv[:, :, 1][surface.mask>0] = 255
+            img_hsv[:, :, 0][surface.probs >= confidence] = hue 
+            img_hsv[:, :, 1][surface.probs >= confidence] = 255 * surface.probs[surface.probs > confidence]
 
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB)
 
