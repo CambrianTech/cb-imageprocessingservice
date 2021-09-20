@@ -58,7 +58,7 @@ class RoomSolver():
         
         if im_logging_enabled(self.data):
 
-            for i, surface in enumerate(self.room.surfaces): log_image(self.data, "surface_%d" % i, surface.probs * 255)
+            #for i, surface in enumerate(self.room.surfaces): log_image(self.data, "surface_%d" % i, surface.probs * 255)
             log_image(self.data, "room", self.room.get_debug_image())
 
             debug = log_segmentation_image(self.data, "probs", np.int32(ade_seg), self.image, get_image=True)

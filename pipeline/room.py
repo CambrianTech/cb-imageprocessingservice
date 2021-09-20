@@ -6,7 +6,7 @@ from enum import Enum
 import uuid
 import random
 
-from .utils import multi_filter, resize_array, overlay_mask
+from .utils import multi_filter, resize_array, overlay_mask, convert_color
 from .planegeometry import PlanarDimension
 
 #python info on object oriented methods and properties
@@ -92,7 +92,7 @@ class Surface():
 
     def analyze(self):
         print("Analyzing surface")
-        self.contours = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        self.contours, self.hierarchy = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
 class HorizontalSurface(Surface):
 
@@ -159,12 +159,18 @@ class Room(Geometry):
     def get_debug_image(self, confidence=0.05):
 
         img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV) #range 0-180
+        colors = []
         for surface in self.surfaces:
             hue = random.randint(0,180)
             img_hsv[:, :, 0][surface.probs >= confidence] = hue 
             img_hsv[:, :, 1][surface.probs >= confidence] = 255 * np.power(surface.probs[surface.probs > confidence], 0.5)
 
+            colors.append(convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB))
+
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB)
+
+        for i in range(len(self.surfaces)):
+            cv2.drawContours(img, self.surfaces[i].contours, -1, colors[i])
 
         return img
 

@@ -123,3 +123,6 @@ def overlay_mask(img, mask, hue=random_color(), saturation=255, darkest_value=80
 
     return out
 
+def convert_color(hsv, conversion):
+    return tuple(int(i) for i in cv2.cvtColor(np.uint8([[hsv]]), conversion).flatten())
+
