@@ -5,21 +5,14 @@ import cv2
 from enum import Enum
 import uuid
 import random
+from skimage.morphology import skeletonize, thin
 
 from .utils import multi_filter, resize_array, overlay_mask, convert_color
 from .planegeometry import PlanarDimension
+from .extractsurfaces import Groupings
 
 #python info on object oriented methods and properties
 #https://stackoverflow.com/questions/2736255/abstract-attributes-in-python
-
-class SurfaceType(Enum):
-    Unknown = "unknown"
-    Horizontal = "horizontal"
-    Vertical = "vertical"
-    Floor = "floor"
-    Wall = "wall"
-    Ceiling = "ceiling"
-
 class Geometry():
 
     def __init__(self, data):
@@ -52,8 +45,8 @@ class Geometry():
 
 class Surface():
 
-    def __init__(self, data, index, surfaceType=SurfaceType.Unknown):
-        self._data = data
+    def __init__(self, data, index, surfaceType=None):
+        self.data = data
         self.index = index
         self._uniqueId = uuid.uuid4()
         self._surfaceType = surfaceType
@@ -61,7 +54,7 @@ class Surface():
         self._mask = None
 
     @property
-    def surfaceType(self) -> SurfaceType:
+    def surfaceType(self) -> Groupings:
         return self._surfaceType
 
     @property
@@ -77,13 +70,23 @@ class Surface():
         return self.geometry.masks[self.index]
 
     @property
-    def mask(self, confidence=0.05):
+    def mask(self, confidence=0.3):
         if self._mask is None:
             mask = self.probs.copy()
             mask[mask < confidence] = 0
-            mask[mask > 0] = 255
+            mask[mask > 0] = 1
             self._mask = np.uint8(mask)
+
         return self._mask
+
+    @property
+    def center(self) -> tuple:
+        if self.moments is None or self.moments["m00"] == 0:
+            return None
+
+        cX = int(self.moments["m10"] / self.moments["m00"])
+        cY = int(self.moments["m01"] / self.moments["m00"])
+        return cX, cY
 
     @property
     @abstractmethod
@@ -91,46 +94,47 @@ class Surface():
         pass
 
     def analyze(self):
-        print("Analyzing surface")
         self.contours, self.hierarchy = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-class HorizontalSurface(Surface):
+        isolated = self.data["isolated"]
 
-    def __init__(self, data, index, surfaceType=SurfaceType.Horizontal):
-        super().__init__(data, index, surfaceType)
+        self.sums = np.zeros(Groupings.max_index() + 1)
+        for group in Groupings:
+             self.sums[group] = np.sum(isolated[group] * self.mask)
 
-    @property
-    @abstractmethod
-    def dimension() -> PlanarDimension:
-        return PlanarDimension.Horizontal
+        self.total = sum(self.sums)
+        
+        self.category_probs = self.sums / self.total
 
-class VerticalSurface(Surface):
-
-    def __init__(self, data, index, surfaceType=SurfaceType.Horizontal):
-        super().__init__(data, index, surfaceType)
-
-    @property
-    @abstractmethod
-    def dimension() -> PlanarDimension:
-        return PlanarDimension.Vertical
-
-class Ceiling(HorizontalSurface):
-
-    def __init__(self, data, index, surfaceType=SurfaceType.Ceiling):
-        super().__init__(data, index, surfaceType)
+        self.moments = cv2.moments(self.contours[0])
+        if self.moments["m00"] == 0:
+            self.moments = cv2.moments(self.mask)
 
 
-class Floor(HorizontalSurface):
+        self._surfaceType = Groupings(np.argmax(self.category_probs))
 
-    def __init__(self, data, index, surfaceType=SurfaceType.Floor):
-        super().__init__(data, index, surfaceType)
+        ceiling_prob = self.category_probs[Groupings.Ceiling]
+        wall_prob = self.category_probs[Groupings.Wall]
+        
+        
+        self._alteredType = False
 
-class Wall(VerticalSurface):
-
-    def __init__(self, data, index, surfaceType=SurfaceType.Wall):
-        super().__init__(data, index, surfaceType)
+        if self._surfaceType == Groupings.Wall and ceiling_prob > 0.05:
+            #todo: more analysis for false positives (angle)
 
 
+            ceiling_like_prob = self.category_probs[Groupings.CeilingLike]
+            self._surfaceType = Groupings.Ceiling if ceiling_prob > ceiling_like_prob else Groupings.CeilingLike
+
+            self._alteredType = True
+
+
+        #print("Category", self.category)
+
+        # best_match = Groupings.Unknown
+        # floor_probs = np.sum(isolated[Groupings.Floor] * self.mask)
+        # wall_probs = np.sum(isolated[Groupings.Wall] * self.mask)
+        # ceiling_probs = np.sum(isolated[Groupings.Ceiling] * self.mask)
 
 class Room(Geometry):
 
@@ -142,35 +146,64 @@ class Room(Geometry):
 
     @property
     def ceilings(self):
-        return self.get_surfaces(surfaceType=SurfaceType.Ceiling)
+        return self.get_surfaces(surfaceType=Groupings.Ceiling)
 
     @property
     def walls(self):
-        return self.get_surfaces(surfaceType=SurfaceType.Wall)
+        return self.get_surfaces(surfaceType=Groupings.Wall)
 
     @property
     def floors(self):
-        return self.get_surfaces(surfaceType=SurfaceType.Floor)
+        return self.get_surfaces(surfaceType=Groupings.Floor)
 
     def analyze(self):
+        
+
         for surface in self.surfaces:
             surface.analyze()
+
+        # isolated[Groupings.Floor]
+        # isolated[Groupings.Wall]
+        # isolated[Groupings.Ceiling]
 
     def get_debug_image(self, confidence=0.05):
 
         img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV) #range 0-180
-        colors = []
-        for surface in self.surfaces:
-            hue = random.randint(0,180)
-            img_hsv[:, :, 0][surface.probs >= confidence] = hue 
-            img_hsv[:, :, 1][surface.probs >= confidence] = 255 * np.power(surface.probs[surface.probs > confidence], 0.5)
+        hues = random.sample(range(0, 180), len(self.surfaces))
 
-            colors.append(convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB))
+        for i in range(len(self.surfaces)):
+            surface = self.surfaces[i]
 
+            if surface.surfaceType != Groupings.Other:
+                img_hsv[:, :, 0][surface.probs >= confidence] = hues[i]
+                img_hsv[:, :, 1][surface.probs >= confidence] = 255 * np.power(surface.probs[surface.probs > confidence], 0.5)
+
+    
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB)
 
         for i in range(len(self.surfaces)):
-            cv2.drawContours(img, self.surfaces[i].contours, -1, colors[i])
+            surface = self.surfaces[i]
+            hue = hues[i]
+
+            if surface.surfaceType != Groupings.Other:
+                color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB)
+                cv2.drawContours(img, surface.contours, -1, color)
+
+                bg = convert_color((hue, 100, 100), cv2.COLOR_HSV2RGB)
+                loc = min(max(surface.center[0] - 50, 10), img.shape[1] - 80), min(max(surface.center[1] - 20, 50), img.shape[0] - 50)
+                cv2.putText(img, surface.surfaceType.name, (loc[0] + 1, loc[1] + 1), cv2.FONT_HERSHEY_SIMPLEX, 0.5, bg, 2, cv2.LINE_AA)
+                cv2.putText(img, surface.surfaceType.name, loc, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+
+                if surface._alteredType:
+                    ceiling_prob = surface.category_probs[Groupings.Ceiling]
+                    ceiling_like_prob = surface.category_probs[Groupings.CeilingLike]
+                    wall_prob = surface.category_probs[Groupings.Wall]
+
+                    factor = wall_prob / ceiling_prob
+
+                    cv2.putText(img, "%.2f" % (factor), (loc[0], loc[1] + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 50), 1, cv2.LINE_AA)
+                
+                
 
         return img
 
