@@ -7,7 +7,7 @@ import uuid
 import random
 from skimage.morphology import skeletonize, thin
 
-from .utils import multi_filter, resize_array, overlay_mask, convert_color
+from .utils import multi_filter, resize_array, overlay_mask, convert_color, put_text
 from .planegeometry import PlanarDimension
 from .extractsurfaces import Groupings
 
@@ -101,7 +101,8 @@ class Surface():
         
         self.category_probs = self.sums / self.total
 
-        self._surfaceType = Groupings(np.argmax(self.category_probs))
+        best_2 = self.category_probs.argsort()[-2:][::-1]
+        self._surfaceType = Groupings(best_2[0])
 
         #current_prob = self.category_probs[self.surfaceType]
         ceiling_prob = self.category_probs[Groupings.Ceiling]
@@ -119,7 +120,7 @@ class Surface():
             self._alteredType = True
 
 
-        #todo: as of right now, just for visualization, so protect inside debug section:
+        #todo: as of right now, this is just used for visualization, so protect inside debug section:
         mask = np.zeros(self.probs.shape, dtype="uint8")
         mask[self.probs > bounds_confidence] = 1
         self.contours, self.hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -168,8 +169,8 @@ class Room(Geometry):
 
     def get_debug_image(self, confidence=0.05):
 
-        img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV) #range 0-180
-        hues = random.sample(range(0, 180), len(self.surfaces))
+        img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV_FULL)
+        hues = random.sample(range(0, 360), len(self.surfaces))
 
         for i in range(len(self.surfaces)):
             surface = self.surfaces[i]
@@ -179,23 +180,20 @@ class Room(Geometry):
                 img_hsv[:, :, 1][surface.probs >= confidence] = 255 * np.power(surface.probs[surface.probs > confidence], 0.5)
 
     
-        img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB)
+        img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
         for i in range(len(self.surfaces)):
             surface = self.surfaces[i]
             hue = hues[i]
 
             if surface.surfaceType != Groupings.Other:
-                color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB)
+                color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
                 cv2.drawContours(img, surface.contours, -1, color)
 
                 if surface.center is None:
                     continue
 
-                bg = convert_color((hue, 100, 100), cv2.COLOR_HSV2RGB)
-                loc = min(max(surface.center[0] - 50, 10), img.shape[1] - 80), min(max(surface.center[1] - 20, 30), img.shape[0] - 50)
-                cv2.putText(img, surface.surfaceType.name, (loc[0] + 1, loc[1] + 1), cv2.FONT_HERSHEY_SIMPLEX, 0.5, bg, 2, cv2.LINE_AA)
-                cv2.putText(img, surface.surfaceType.name, loc, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                put_text(img, surface.surfaceType.name, surface.center, color)
 
                 if surface._alteredType:
                     ceiling_prob = surface.category_probs[Groupings.Ceiling]
@@ -204,7 +202,7 @@ class Room(Geometry):
 
                     factor = wall_prob / ceiling_prob
 
-                    cv2.putText(img, "%.2f" % (factor), (loc[0], loc[1] + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 50), 1, cv2.LINE_AA)
+                    cv2.putText(img, "%.2f" % (factor), (surface.center[0], surface.center[1] + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 50), 1, cv2.LINE_AA)
                 
                 
 
