@@ -192,7 +192,7 @@ class Room(Geometry):
                     continue
 
                 bg = convert_color((hue, 100, 100), cv2.COLOR_HSV2RGB)
-                loc = min(max(surface.center[0] - 50, 10), img.shape[1] - 80), min(max(surface.center[1] - 20, 50), img.shape[0] - 50)
+                loc = min(max(surface.center[0] - 50, 10), img.shape[1] - 80), min(max(surface.center[1] - 20, 30), img.shape[0] - 50)
                 cv2.putText(img, surface.surfaceType.name, (loc[0] + 1, loc[1] + 1), cv2.FONT_HERSHEY_SIMPLEX, 0.5, bg, 2, cv2.LINE_AA)
                 cv2.putText(img, surface.surfaceType.name, loc, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
