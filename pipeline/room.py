@@ -70,16 +70,6 @@ class Surface():
         return self.geometry.masks[self.index]
 
     @property
-    def mask(self, confidence=0.3):
-        if self._mask is None:
-            mask = self.probs.copy()
-            mask[mask < confidence] = 0
-            mask[mask > 0] = 1
-            self._mask = np.uint8(mask)
-
-        return self._mask
-
-    @property
     def center(self) -> tuple:
         if self.moments is None or self.moments["m00"] == 0:
             return None
@@ -93,26 +83,27 @@ class Surface():
     def dimension() -> PlanarDimension:
         pass
 
-    def analyze(self):
-        self.contours, self.hierarchy = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    def analyze(self, confidence, bounds_confidence=0.1):
 
         isolated = self.data["isolated"]
 
+        mask = np.zeros(self.probs.shape, dtype="uint8")
+        mask[mask < confidence] = 0
+        if np.sum(mask) < 10:
+            mask = self.probs
+
         self.sums = np.zeros(Groupings.max_index() + 1)
+
         for group in Groupings:
-             self.sums[group] = np.sum(isolated[group] * self.mask)
+             self.sums[group] = np.sum(isolated[group] * mask)
 
         self.total = sum(self.sums)
         
         self.category_probs = self.sums / self.total
 
-        self.moments = cv2.moments(self.contours[0]) if len(self.contours) > 0 else None
-
-        if self.moments is None or self.moments["m00"] == 0:
-            self.moments = cv2.moments(self.mask)
-
         self._surfaceType = Groupings(np.argmax(self.category_probs))
 
+        #current_prob = self.category_probs[self.surfaceType]
         ceiling_prob = self.category_probs[Groupings.Ceiling]
         wall_prob = self.category_probs[Groupings.Wall]
         
@@ -127,6 +118,16 @@ class Surface():
 
             self._alteredType = True
 
+
+        #todo: as of right now, just for visualization, so protect inside debug section:
+        mask = np.zeros(self.probs.shape, dtype="uint8")
+        mask[self.probs > bounds_confidence] = 1
+        self.contours, self.hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        self.moments = cv2.moments(self.contours[0]) if len(self.contours) > 0 else None
+
+        if self.moments is None or self.moments["m00"] == 0:
+            self.moments = cv2.moments(mask)
 
         #print("Category", self.category)
 
@@ -155,11 +156,11 @@ class Room(Geometry):
     def floors(self):
         return self.get_surfaces(surfaceType=Groupings.Floor)
 
-    def analyze(self):
+    def analyze(self, confidence=0.3):
         
 
         for surface in self.surfaces:
-            surface.analyze()
+            surface.analyze(confidence)
 
         # isolated[Groupings.Floor]
         # isolated[Groupings.Wall]

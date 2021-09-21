@@ -35,7 +35,7 @@ class RoomSolver():
         
         self.room.analyze()
 
-
+        
 
         items = self.probs.copy()
         items.insert(0, (confidence * np.ones_like(self.probs[Groupings.Other])))
@@ -43,8 +43,6 @@ class RoomSolver():
         #take intersection
         ade_seg_c = np.dstack(tuple(items))
         ade_seg = np.argmax(ade_seg_c, -1)
-        
-        
         
         if im_logging_enabled(self.data):
 
