@@ -106,16 +106,15 @@ class Surface():
         
         self.category_probs = self.sums / self.total
 
-        self.moments = cv2.moments(self.contours[0])
-        if self.moments["m00"] == 0:
-            self.moments = cv2.moments(self.mask)
+        self.moments = cv2.moments(self.contours[0]) if len(self.contours) > 0 else None
 
+        if self.moments is None or self.moments["m00"] == 0:
+            self.moments = cv2.moments(self.mask)
 
         self._surfaceType = Groupings(np.argmax(self.category_probs))
 
         ceiling_prob = self.category_probs[Groupings.Ceiling]
         wall_prob = self.category_probs[Groupings.Wall]
-        
         
         self._alteredType = False
 
@@ -188,6 +187,9 @@ class Room(Geometry):
             if surface.surfaceType != Groupings.Other:
                 color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB)
                 cv2.drawContours(img, surface.contours, -1, color)
+
+                if surface.center is None:
+                    continue
 
                 bg = convert_color((hue, 100, 100), cv2.COLOR_HSV2RGB)
                 loc = min(max(surface.center[0] - 50, 10), img.shape[1] - 80), min(max(surface.center[1] - 20, 50), img.shape[0] - 50)
