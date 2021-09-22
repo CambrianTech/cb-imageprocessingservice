@@ -97,17 +97,18 @@ class Surface():
         if np.sum(mask) < 10:
             mask = self.probs
 
-        self.sums = np.zeros(Groupings.max_index() + 1)
-
-        for group in Groupings:
-             self.sums[group] = np.sum(isolated[group] * mask)
+        isolated_masked = list(map(lambda group: isolated[group] * mask, Groupings))
+        self.sums = np.asarray(list(map(lambda prob: np.sum(prob), isolated_masked))) #something simpler like vectorize?
 
         self.total = sum(self.sums)
         
         self.category_probs = self.sums / self.total
 
-        best_2 = self.category_probs.argsort()[-2:][::-1]
-        self._surfaceType = Groupings(best_2[0])
+        indices = self.category_probs.argsort()[-2:][::-1]
+        surface_types = list(map(lambda i: Groupings(i), indices))
+        self._surfaceType = surface_types[0]
+
+        
 
         #current_prob = self.category_probs[self.surfaceType]
         ceiling_prob = self.category_probs[Groupings.Ceiling]
