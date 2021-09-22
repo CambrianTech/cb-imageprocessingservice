@@ -111,21 +111,15 @@ class Surface():
 
         self._surfaceType = self.best_surface_types[0]
 
-
-        #current_prob = self.category_probs[self.surfaceType]
+        #pick secondary type if within threshold:
+        #todo: more analysis for false positives (angle)
         ceiling_prob = self.category_probs[Groupings.Ceiling]
-        wall_prob = self.category_probs[Groupings.Wall]
         
-        self._alteredType = False
-
         if self._surfaceType == Groupings.Wall and ceiling_prob > 0.05:
-            #todo: more analysis for false positives (angle)
-
             ceiling_like_prob = self.category_probs[Groupings.CeilingLike]
             self._surfaceType = Groupings.Ceiling if ceiling_prob > ceiling_like_prob else Groupings.CeilingLike
-            self._alteredType = True
 
-        if self._alteredType:
+        if self.best_surface_types[0] != self.surfaceType:
             print("\nAltered type from %s to %s" % (self.best_surface_types[0].name, self.surfaceType.name))
             for i in range(len(self.best_surface_types)):
                 print("%s: %.2f" % (self.best_surface_types[i].name, self.best_surface_sums[i]))
@@ -206,7 +200,7 @@ class Room(Geometry):
 
                 text_size, position = put_text(img, surface.surfaceType.name, surface.center, color, size=0.5, shadow=True, highlights=True)
 
-                if surface._alteredType:
+                if surface.surfaceType != surface.best_surface_types[0]:
                     best_prob = surface.category_probs[surface.best_surface_types[0]]
                     chosen_prob = surface.category_probs[surface.surfaceType]
                     text = "%s %.2f to %s %.2f" % (surface.best_surface_types[0].name, best_prob, surface.surfaceType.name, chosen_prob)
