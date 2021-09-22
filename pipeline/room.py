@@ -204,14 +204,14 @@ class Room(Geometry):
                 if surface.center is None:
                     continue
 
-                text_size, position = put_text(img, surface.surfaceType.name, surface.center, color, size=0.5, embossed=True)
+                text_size, position = put_text(img, surface.surfaceType.name, surface.center, color, size=0.5, shadow=True, highlights=True)
 
                 if surface._alteredType:
                     best_prob = surface.category_probs[surface.best_surface_types[0]]
                     chosen_prob = surface.category_probs[surface.surfaceType]
                     text = "%s %.2f to %s %.2f" % (surface.best_surface_types[0].name, best_prob, surface.surfaceType.name, chosen_prob)
 
-                    put_text(img, text, (position[0], position[1] + 3 * text_size[1] // 2), (255, 50, 50), size=0.33)                
+                    put_text(img, text, (position[0], position[1] + text_size[1]), (255, 255, 255), size=0.33, shadow=True)                
                 
 
         return img

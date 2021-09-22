@@ -126,20 +126,22 @@ def overlay_mask(img, mask, hue=random_color(), saturation=255, darkest_value=80
 def convert_color(hsv, conversion):
     return tuple(int(i) for i in cv2.cvtColor(np.uint8([[hsv]]), conversion).flatten())
 
-def put_text(img, text, origin, color, shadow_offset=(1,1), font=cv2.FONT_HERSHEY_SIMPLEX, size=1, thickness=1, line_type=cv2.LINE_AA, embossed=False):
+def put_text(img, text, origin, color, shadow_offset=(1,1), font=cv2.FONT_HERSHEY_SIMPLEX, size=1, thickness=1, line_type=cv2.LINE_AA, shadow=False, highlights=False):
 
-    hsv_color = convert_color(color, cv2.COLOR_RGB2HSV_FULL)
-
-    glow_color = convert_color((hsv_color[0], hsv_color[1] // 3, 255), cv2.COLOR_HSV2RGB_FULL)
-    shadow_color = convert_color((hsv_color[0], hsv_color[1] // 3, 50), cv2.COLOR_HSV2RGB_FULL)
-
-    dimensions = cv2.getTextSize( text, font, size, thickness)[0]
+    dimensions = cv2.getTextSize(text, font, size, thickness)[0]
 
     loc = min(max(origin[0], 10), img.shape[1] - dimensions[0] - 10), min(max(origin[1], 10 + dimensions[1] // 2), img.shape[0] - dimensions[1] // 2 - 10)
 
-    if embossed:
-        cv2.putText(img, text, (loc[0] - shadow_offset[0], loc[1] - shadow_offset[1]), font, size, glow_color, thickness, line_type)
-        cv2.putText(img, text, (loc[0] + shadow_offset[0], loc[1] + shadow_offset[1]), font, size, shadow_color, thickness, line_type)
+    if highlights or shadow:
+        hsv_color = convert_color(color, cv2.COLOR_RGB2HSV_FULL)
+
+        if highlights:
+            glow_color = convert_color((hsv_color[0], hsv_color[1] // 3, 255), cv2.COLOR_HSV2RGB_FULL)
+            cv2.putText(img, text, (loc[0] - shadow_offset[0], loc[1] - shadow_offset[1]), font, size, glow_color, thickness, line_type)
+            
+        if shadow:
+            shadow_color = convert_color((hsv_color[0], hsv_color[1] // 3, 50), cv2.COLOR_HSV2RGB_FULL)
+            cv2.putText(img, text, (loc[0] + shadow_offset[0], loc[1] + shadow_offset[1]), font, size, shadow_color, thickness, line_type)
 
     cv2.putText(img, text, loc, font, size, color, thickness, line_type)
 
