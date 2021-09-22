@@ -83,9 +83,14 @@ class Surface():
     def dimension() -> PlanarDimension:
         pass
 
-    def analyze(self, confidence, bounds_confidence=0.1):
+    def analyze(self, confidence, bounds_confidence=0.05):
 
         isolated = self.data["isolated"]
+
+        highest = np.max(self.probs)
+        confidence = max(min(highest * 0.95, confidence), 0.1)
+
+        bounds_confidence = max(min(highest * 0.95, bounds_confidence), 0.05)
 
         mask = np.zeros(self.probs.shape, dtype="uint8")
         mask[mask < confidence] = 0
@@ -193,7 +198,7 @@ class Room(Geometry):
                 if surface.center is None:
                     continue
 
-                put_text(img, surface.surfaceType.name, surface.center, color)
+                text_size, position = put_text(img, surface.surfaceType.name, surface.center, color, size=0.5, embossed=True)
 
                 if surface._alteredType:
                     ceiling_prob = surface.category_probs[Groupings.Ceiling]
@@ -202,8 +207,7 @@ class Room(Geometry):
 
                     factor = wall_prob / ceiling_prob
 
-                    cv2.putText(img, "%.2f" % (factor), (surface.center[0], surface.center[1] + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 50), 1, cv2.LINE_AA)
-                
+                    put_text(img, "%.2f" % (factor), (position[0], position[1] + 3 * text_size[1] // 2), (255, 0, 50), size=0.333)                
                 
 
         return img
