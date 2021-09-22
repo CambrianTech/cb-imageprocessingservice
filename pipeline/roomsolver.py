@@ -29,20 +29,21 @@ class RoomSolver():
         sx = self.image.shape[1] / self.data["image"].shape[1]
         sy = self.image.shape[0] / self.data["image"].shape[0]
         
+        
+        #Get argmax:
+
+        #take intersection
+        #self.probs.insert(0, (confidence * np.ones_like(self.probs[Groupings.Other])))
+        ade_seg_c = np.dstack(tuple(self.probs))
+        ade_seg = np.argmax(ade_seg_c, -1)
+
+        labels = np.int32(ade_seg)
+
         #add the walls:
         for i in range(len(self.room.masks)):
             self.room.add_surface(Surface(self.data, i))
-        
-        self.room.analyze()
 
-        
-
-        items = self.probs.copy()
-        items.insert(0, (confidence * np.ones_like(self.probs[Groupings.Other])))
-
-        #take intersection
-        ade_seg_c = np.dstack(tuple(items))
-        ade_seg = np.argmax(ade_seg_c, -1)
+        self.room.analyze(labels)
         
         if im_logging_enabled(self.data):
 
@@ -55,7 +56,7 @@ class RoomSolver():
             #     log_image(self.data, "skeleton_%d" % index, surface.skeleton * 255)
                 
 
-            debug = log_segmentation_image(self.data, "probs", np.int32(ade_seg), self.image, get_image=True)
+            debug = log_segmentation_image(self.data, "probs", np.int32(ade_seg), self.image, get_image=True, labelset=Groupings)
 
             Line.draw_all(debug, self.lines, color=(255,80,200), thickness=2, sx=sx, sy=sy)
 

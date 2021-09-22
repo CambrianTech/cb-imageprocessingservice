@@ -83,7 +83,7 @@ class Surface():
     def dimension() -> PlanarDimension:
         pass
 
-    def analyze(self, confidence, bounds_confidence=0.1, K=3):
+    def analyze(self, labels, confidence, bounds_confidence=0.05, K=3):
 
         isolated = self.data["isolated"]
 
@@ -97,33 +97,24 @@ class Surface():
         if np.sum(mask) < 10:
             mask = self.probs
 
+
         #something simpler like vectorize?
-        isolated_masked = np.asarray(list(map(lambda group: isolated[group] * mask, Groupings)))
-        self.sums = np.asarray([np.sum(i) for i in isolated_masked]) 
+        self.isolated_probs = []
+        for group in Groupings:
+            submask = isolated[group] * mask
+            submask[labels != group.index] = np.nan
+            self.isolated_probs.append(submask)
 
-        self.total = np.sum(self.sums)
-        
-        self.category_probs = self.sums / self.total
-
+        self.category_probs = np.asarray([np.nanmean(i) for i in self.isolated_probs])
+        self.category_probs = np.nan_to_num(self.category_probs)
         self.best_indices = self.category_probs.argsort()[-K:][::-1]
+
         self.best_surface_types = list(map(lambda i: Groupings(i), self.best_indices))
-        self.best_surface_sums = list(map(lambda i: self.sums[i], self.best_indices))
 
         self._surfaceType = self.best_surface_types[0]
 
-        #pick secondary type if within threshold:
-        #todo: more analysis for false positives (angle)
-        ceiling_prob = self.category_probs[Groupings.Ceiling]
-        
-        if self._surfaceType == Groupings.Wall and ceiling_prob > 0.05:
-            ceiling_like_prob = self.category_probs[Groupings.CeilingLike]
-            self._surfaceType = Groupings.Ceiling if ceiling_prob > ceiling_like_prob else Groupings.CeilingLike
-
-        if self.best_surface_types[0] != self.surfaceType:
-            print("\nAltered type from %s to %s" % (self.best_surface_types[0].name, self.surfaceType.name))
-            for i in range(len(self.best_surface_types)):
-                print("%s: %.2f" % (self.best_surface_types[i].name, self.best_surface_sums[i]))
-
+        #todo: check angles and other things to verify that ceilings are the right angle to be that 
+        # and walls are vertical, floors horizontal but opposite ceilings:
 
         #todo: as of right now, this is just used for visualization, so protect inside debug section:
         mask = np.zeros(self.probs.shape, dtype="uint8")
@@ -162,11 +153,10 @@ class Room(Geometry):
     def floors(self):
         return self.get_surfaces(surfaceType=Groupings.Floor)
 
-    def analyze(self, confidence=0.3):
+    def analyze(self, labels, confidence=0.3):
         
-
         for surface in self.surfaces:
-            surface.analyze(confidence)
+            surface.analyze(labels, confidence)
 
         # isolated[Groupings.Floor]
         # isolated[Groupings.Wall]
