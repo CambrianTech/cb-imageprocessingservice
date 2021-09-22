@@ -83,12 +83,12 @@ class Surface():
     def dimension() -> PlanarDimension:
         pass
 
-    def analyze(self, confidence, bounds_confidence=0.05):
+    def analyze(self, confidence, bounds_confidence=0.1):
 
         isolated = self.data["isolated"]
 
         highest = np.max(self.probs)
-        confidence = max(min(highest * 0.95, confidence), 0.1)
+        confidence = max(min(highest * 0.95, confidence), 0.05)
 
         bounds_confidence = max(min(highest * 0.95, bounds_confidence), 0.05)
 
@@ -97,10 +97,11 @@ class Surface():
         if np.sum(mask) < 10:
             mask = self.probs
 
-        isolated_masked = list(map(lambda group: isolated[group] * mask, Groupings))
-        self.sums = np.asarray(list(map(lambda prob: np.sum(prob), isolated_masked))) #something simpler like vectorize?
+        #something simpler like vectorize?
+        isolated_masked = np.asarray(list(map(lambda group: isolated[group] * mask, Groupings)))
+        self.sums = np.asarray([np.sum(i) for i in isolated_masked]) 
 
-        self.total = sum(self.sums)
+        self.total = np.sum(self.sums)
         
         self.category_probs = self.sums / self.total
 
