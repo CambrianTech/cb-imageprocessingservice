@@ -13,6 +13,7 @@ from .extractsurfaces import Groupings
 
 #python info on object oriented methods and properties
 #https://stackoverflow.com/questions/2736255/abstract-attributes-in-python
+
 class Geometry():
 
     def __init__(self, data):
@@ -155,10 +156,6 @@ class Room(Geometry):
         
         for surface in self.surfaces:
             surface.analyze(labels, confidence)
-
-        # isolated[Groupings.Floor]
-        # isolated[Groupings.Wall]
-        # isolated[Groupings.Ceiling]
 
     def get_debug_image(self, confidence=0.05):
 

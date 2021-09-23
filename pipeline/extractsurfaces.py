@@ -25,6 +25,12 @@ class Groupings(SemanticLabel):
 
     Other=6
 
+class SurfaceTypes(SemanticLabel):
+    Floor=0
+    Wall=1
+    Ceiling=2
+    Other=3
+
 def isolate_masks(data, output):
 
     isolated = list([None] * (Groupings.max_index() + 1))
@@ -46,7 +52,14 @@ def isolate_masks(data, output):
     #label everything else as other
     isolated[Groupings.Other] = 1.0 - sum(isolated[:-1])
 
-    return isolated
+    surface_types = list([None] * (SurfaceTypes.max_index() + 1))
+
+    surface_types[SurfaceTypes.Floor] = isolated[Groupings.Floor] + isolated[Groupings.FloorLike]
+    surface_types[SurfaceTypes.Wall] = isolated[Groupings.Wall] + isolated[Groupings.WallLike]
+    surface_types[SurfaceTypes.Ceiling] = isolated[Groupings.Ceiling] + isolated[Groupings.CeilingLike]
+    surface_types[SurfaceTypes.Other] = isolated[Groupings.Other]
+
+    return isolated, surface_types
 
 class PipelineExtractSurfaces(PipelineStep):
 
@@ -83,14 +96,13 @@ class PipelineExtractSurfaces(PipelineStep):
             log_segmentation_image(data, "segmentation", np.argmax(probs, -1), data["downscaled"])
 
         #combine_floor_masks(output)
-        isolated_masks = isolate_masks(data, output) #break masks into major groups: Floor, Wall, Ceiling, etc
+        data["isolated"], data["surface_types"] = isolate_masks(data, output) #break masks into major groups: Floor, Wall, Ceiling, etc
 
         if im_logging_enabled(data, LogLevel.Segmentation):
-            isolated_probs = np.dstack(isolated_masks)
+            isolated_probs = np.dstack(data["isolated"])
             log_segmentation_image(data, "isolated", np.argmax(isolated_probs, -1), data["downscaled"], labelset=Groupings)
 
-        data["isolated"] = isolated_masks
-
-        
+            surface_probs = np.dstack(data["surface_types"])
+            log_segmentation_image(data, "surface_probs", np.argmax(surface_probs, -1), data["downscaled"], labelset=SurfaceTypes)
 
         
