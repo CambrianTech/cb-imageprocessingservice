@@ -16,21 +16,18 @@ class RoomSolver():
     def __init__(self, data):
         super().__init__()
         self.data = data
-        self.probs = self.data["isolated"]
-        self.lines = self.data["lines"]
-
         self.room = Room(data)
 
     def solve(self, confidence=0.95):
         
         wall_contours = []
 
+        self.probs = self.data["isolated"]
+        self.lines = self.data["lines"]
+
         self.image = self.data["downscaled"]
         sx = self.image.shape[1] / self.data["image"].shape[1]
         sy = self.image.shape[0] / self.data["image"].shape[0]
-        
-        
-        #Get argmax:
 
         #take intersection
         #self.probs.insert(0, (confidence * np.ones_like(self.probs[Groupings.Other])))
