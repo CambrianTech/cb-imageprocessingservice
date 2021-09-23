@@ -34,3 +34,7 @@ class Geometry():
     @property
     def surfaces(self):
         return self.get_surfaces()
+
+    @abstractmethod
+    def get_debug_image(self, confidence=0.05):
+        pass

@@ -7,6 +7,7 @@ import uuid
 from .core import SurfaceType
 from .geometry import Geometry
 from .planegeometry import PlanarDimension
+from .utils import convert_color, put_text
 
 class Surface():
 
@@ -66,8 +67,11 @@ class Surface():
             submask[labels != group.index] = np.nan
             self.isolated_probs.append(submask)
 
-        self.category_probs = np.asarray([np.nanmean(i) for i in self.isolated_probs])
+        self.category_probs = np.asarray([np.nanmean(prob) for prob in self.isolated_probs])
         self.category_probs = np.nan_to_num(self.category_probs)
+
+        self.category_counts = [np.count_nonzero(prob[prob >= confidence]) for prob in self.isolated_probs]
+
         self.best_indices = self.category_probs.argsort()[-K:][::-1]
 
         self.best_surface_types = list(map(lambda i: SurfaceType(i), self.best_indices))
@@ -95,3 +99,17 @@ class Surface():
 
         if self.moments is None or self.moments["m00"] == 0:
             self.moments = cv2.moments(self.mask)
+
+    def debug(self, img, color):
+        cv2.drawContours(img, self.contours, -1, color)
+    
+        if self.center is not None:
+            text_size, position = put_text(img, self.surfaceType.name, self.center, color, size=0.5, shadow=True, highlights=True)
+
+
+        # if surface.surfaceType != surface.best_surface_types[0]:
+                #     best_prob = surface.category_probs[surface.best_surface_types[0]]
+                #     chosen_prob = surface.category_probs[surface.surfaceType]
+                #     text = "%s %.2f to %s %.2f" % (surface.best_surface_types[0].name, best_prob, surface.surfaceType.name, chosen_prob)
+
+                #     put_text(img, text, (position[0], position[1] + text_size[1]), (255, 255, 255), size=0.33, shadow=True) 
