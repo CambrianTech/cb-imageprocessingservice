@@ -70,13 +70,25 @@ class Surface():
         self.category_probs = np.asarray([np.nanmean(prob) for prob in self.isolated_probs])
         self.category_probs = np.nan_to_num(self.category_probs)
 
-        self.category_counts = [np.count_nonzero(prob[prob >= confidence]) for prob in self.isolated_probs]
+        self.category_counts = [np.count_nonzero(prob[prob >= 0.1]) for prob in self.isolated_probs]
 
         self.best_indices = self.category_probs.argsort()[-K:][::-1]
-
         self.best_surface_types = list(map(lambda i: SurfaceType(i), self.best_indices))
 
         self._surfaceType = self.best_surface_types[0]
+        self._altered = False
+
+        if self._surfaceType % 2 == 1: #is minor type, aka walllike, floorlike, ceilinglike
+            original_type = self._surfaceType
+            original_counts = self.category_counts[original_type.index]
+
+            major_type = SurfaceType(self._surfaceType - 1)
+            major_counts = self.category_counts[major_type.index]
+
+            if major_counts > original_counts and major_type in self.best_surface_types:
+                print("Switchin type from %s to %s: %d->%d" % (original_type.name, major_type.name, original_counts, major_counts))
+                self._surfaceType = major_type
+                self._altered = True
 
         #todo: check angles and other things to verify that ceilings are the right angle to be that 
         # and walls are vertical, floors horizontal but opposite ceilings:
@@ -103,13 +115,17 @@ class Surface():
     def debug(self, img, color):
         cv2.drawContours(img, self.contours, -1, color)
     
-        if self.center is not None:
-            text_size, position = put_text(img, self.surfaceType.name, self.center, color, size=0.5, shadow=True, highlights=True)
+        if self.center is None: return
 
+        text_size, position = put_text(img, self.surfaceType.name, self.center, color, size=0.5, shadow=True, highlights=True)
+
+        if self._altered:
+            text = "%d" % (self.category_counts[self.surfaceType.index])
+            put_text(img, text, (position[0], position[1] + text_size[1]), (255, 255, 255), size=0.33, shadow=True)
 
         # if surface.surfaceType != surface.best_surface_types[0]:
-                #     best_prob = surface.category_probs[surface.best_surface_types[0]]
-                #     chosen_prob = surface.category_probs[surface.surfaceType]
-                #     text = "%s %.2f to %s %.2f" % (surface.best_surface_types[0].name, best_prob, surface.surfaceType.name, chosen_prob)
+        #     best_prob = surface.category_probs[surface.best_surface_types[0]]
+        #     chosen_prob = surface.category_probs[surface.surfaceType]
+        #     text = "%s %.2f to %s %.2f" % (surface.best_surface_types[0].name, best_prob, surface.surfaceType.name, chosen_prob)
 
-                #     put_text(img, text, (position[0], position[1] + text_size[1]), (255, 255, 255), size=0.33, shadow=True) 
+        #     put_text(img, text, (position[0], position[1] + text_size[1]), (255, 255, 255), size=0.33, shadow=True) 
