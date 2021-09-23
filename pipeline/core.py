@@ -5,6 +5,8 @@ import typing
 from multiprocessing import cpu_count
 from enum import IntEnum
 
+from .semanticlabel import SemanticLabel
+
 class PipelineStepIndex(IntEnum):
     Input = 0
     RemoteNetworks = 1
@@ -23,6 +25,20 @@ class PipelineStepIndex(IntEnum):
     Superpixels = 14
     CombinePlaneMasks = 15
     Output = 16
+
+#Keep major (floor, wall, ceiling) even, "Like" versions odd. 
+#Perhaps write class method
+class SurfaceType(SemanticLabel):
+    Floor=0
+    FloorLike=1
+
+    Wall=2
+    WallLike=3
+
+    Ceiling=4
+    CeilingLike=5
+
+    Other=6
 
 class PipelineStep(metaclass=ABCMeta):
     def __init__(self, pipeline, batch_max_wait_time=1.0, batch_debounce_time=0.2, batch_max_size=4):

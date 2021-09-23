@@ -3,8 +3,7 @@ from time import time
 import cv2
 from cambrian import geometry
 
-from .core import PipelineStep, PipelineStepIndex
-from .extractsurfaces import Groupings
+from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .logging import log_segmentation_image
 from .utils import camera_fov_to_intrinsic_matrix, camera_fov_res_to_intrinsics, focal_to_fov, calculate_plane_xyz
 
@@ -674,7 +673,7 @@ class PipelinePoseEstimator(PipelineStep):
 
     def run(self, data):
 
-        pose_estimator = PoseEstimator(data, data["image"], data["lines"], data["fov"], data["isolated"][Groupings.Floor], data["floor_normal"], data["floor_offset"])
+        pose_estimator = PoseEstimator(data, data["image"], data["lines"], data["fov"], data["isolated"][SurfaceType.Floor], data["floor_normal"], data["floor_offset"])
         pose_estimator.estimate()
 
         data["fov"] = pose_estimator.fov

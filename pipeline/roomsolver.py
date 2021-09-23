@@ -3,12 +3,11 @@ from scipy import ndimage
 import cv2
 from skimage.morphology import remove_small_objects
 
-from .core import PipelineStep, PipelineStepIndex
+from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .utils import resize_array, random_color, overlay_mask
 from .planegeometry import Dimension
 from .logging import log_image, log_segmentation_image, im_logging_enabled
 from .Line import Line
-from .extractsurfaces import Groupings
 from .room import Room, Surface
 
 class RoomSolver():
@@ -30,7 +29,7 @@ class RoomSolver():
         sy = self.image.shape[0] / self.data["image"].shape[0]
 
         #take intersection
-        #self.probs.insert(0, (confidence * np.ones_like(self.probs[Groupings.Other])))
+        #self.probs.insert(0, (confidence * np.ones_like(self.probs[SurfaceType.Other])))
         ade_seg_c = np.dstack(tuple(self.probs))
         ade_seg = np.argmax(ade_seg_c, -1)
 
@@ -53,7 +52,7 @@ class RoomSolver():
             #     log_image(self.data, "skeleton_%d" % index, surface.skeleton * 255)
                 
 
-            debug = log_segmentation_image(self.data, "probs", np.int32(ade_seg), self.image, get_image=True, labelset=Groupings)
+            debug = log_segmentation_image(self.data, "probs", np.int32(ade_seg), self.image, get_image=True, labelset=SurfaceType)
 
             Line.draw_all(debug, self.lines, color=(255,80,200), thickness=2, sx=sx, sy=sy)
 

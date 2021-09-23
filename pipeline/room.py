@@ -7,9 +7,9 @@ import uuid
 import random
 from skimage.morphology import skeletonize, thin
 
+from .core import SurfaceType
 from .utils import multi_filter, resize_array, overlay_mask, convert_color, put_text
 from .planegeometry import PlanarDimension
-from .extractsurfaces import Groupings
 
 #python info on object oriented methods and properties
 #https://stackoverflow.com/questions/2736255/abstract-attributes-in-python
@@ -55,7 +55,7 @@ class Surface():
         self._mask = None
 
     @property
-    def surfaceType(self) -> Groupings:
+    def surfaceType(self) -> SurfaceType:
         return self._surfaceType
 
     @property
@@ -97,7 +97,7 @@ class Surface():
             mask = self.probs
 
         self.isolated_probs = []
-        for group in Groupings:
+        for group in SurfaceType:
             submask = isolated[group] * mask
             submask[labels != group.index] = np.nan
             self.isolated_probs.append(submask)
@@ -106,7 +106,7 @@ class Surface():
         self.category_probs = np.nan_to_num(self.category_probs)
         self.best_indices = self.category_probs.argsort()[-K:][::-1]
 
-        self.best_surface_types = list(map(lambda i: Groupings(i), self.best_indices))
+        self.best_surface_types = list(map(lambda i: SurfaceType(i), self.best_indices))
 
         self._surfaceType = self.best_surface_types[0]
 
@@ -142,15 +142,15 @@ class Room(Geometry):
 
     @property
     def ceilings(self):
-        return self.get_surfaces(surfaceType=Groupings.Ceiling)
+        return self.get_surfaces(surfaceType=SurfaceType.Ceiling)
 
     @property
     def walls(self):
-        return self.get_surfaces(surfaceType=Groupings.Wall)
+        return self.get_surfaces(surfaceType=SurfaceType.Wall)
 
     @property
     def floors(self):
-        return self.get_surfaces(surfaceType=Groupings.Floor)
+        return self.get_surfaces(surfaceType=SurfaceType.Floor)
 
     def analyze(self, labels, confidence=0.3):
         
@@ -165,7 +165,7 @@ class Room(Geometry):
         for i in range(len(self.surfaces)):
             surface = self.surfaces[i]
 
-            if surface.surfaceType != Groupings.Other:
+            if surface.surfaceType != SurfaceType.Other:
                 img_hsv[:, :, 0][surface.probs >= confidence] = hues[i]
                 img_hsv[:, :, 1][surface.probs >= confidence] = 255 * np.power(surface.probs[surface.probs > confidence], 0.5)
 
@@ -176,7 +176,7 @@ class Room(Geometry):
             surface = self.surfaces[i]
             hue = hues[i]
 
-            if surface.surfaceType != Groupings.Other:
+            if surface.surfaceType != SurfaceType.Other:
                 color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
                 cv2.drawContours(img, surface.contours, -1, color)
 

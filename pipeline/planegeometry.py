@@ -6,8 +6,7 @@ from scipy import ndimage
 from scipy.stats import mode
 from enum import Enum, IntEnum
 
-from .core import PipelineStep, PipelineStepIndex
-from .extractsurfaces import Groupings
+from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .utils import resize_array
 from .logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 
@@ -90,8 +89,8 @@ class PlaneGeometry():
         self.basis_indices = np.int32(np.concatenate([floor_indices, ceiling_indices, wall_indices]))
 
     def find_floor_indices(self):
-        floor_mask = cv2.resize(self.isolated_masks[Groupings.Floor] + self.isolated_masks[Groupings.FloorLike], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
-        ceiling_mask = cv2.resize(self.isolated_masks[Groupings.Ceiling] + self.isolated_masks[Groupings.CeilingLike], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
+        floor_mask = cv2.resize(self.isolated_masks[SurfaceType.Floor] + self.isolated_masks[SurfaceType.FloorLike], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
+        ceiling_mask = cv2.resize(self.isolated_masks[SurfaceType.Ceiling] + self.isolated_masks[SurfaceType.CeilingLike], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
 
         floor_intersections = []
         ceiling_intersections = []
@@ -138,7 +137,7 @@ class PlaneGeometry():
 
     def find_wall_indices(self, angle_threshold=math.radians(15)):
 
-        wall_mask = cv2.resize(self.isolated_masks[Groupings.Wall] + self.isolated_masks[Groupings.WallLike], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
+        wall_mask = cv2.resize(self.isolated_masks[SurfaceType.Wall] + self.isolated_masks[SurfaceType.WallLike], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
 
         wall_intersections = []
         dots = []

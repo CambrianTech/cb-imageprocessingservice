@@ -7,10 +7,9 @@ from skimage.segmentation import join_segmentations, watershed
 
 import cambrian.image_processing as ip
 
-from .core import PipelineStep, PipelineStepIndex
+from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .Line import Line
 from .planegeometry import Dimension
-from .extractsurfaces import Groupings
 from .utils import get_segmentation_image, random_color
 from .logging import log_segmentation_image, im_logging_enabled, log_image, LogLevel
 
@@ -50,34 +49,34 @@ class SurfaceRefinement():
         watershed_mask = (merged_lines == 0)
 
         other_markers = np.int32(
-            self.refine_surface(self.probs[Groupings.Other], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.03, gradient=False))
+            self.refine_surface(self.probs[SurfaceType.Other], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.03, gradient=False))
 
         wall_markers = np.int32(
-            self.refine_surface(self.probs[Groupings.Wall], self.hed, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=watershed_mask))
+            self.refine_surface(self.probs[SurfaceType.Wall], self.hed, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=watershed_mask))
 
         floor_markers = np.int32(
-            self.refine_surface(self.probs[Groupings.Floor], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
+            self.refine_surface(self.probs[SurfaceType.Floor], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
 
         wall_like_markers = np.int32(
-            self.refine_surface(self.probs[Groupings.WallLike], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
+            self.refine_surface(self.probs[SurfaceType.WallLike], self.image, big_thresh=.001, small_thresh=.95, watershed_dist=.05, gradient=False))
 
         ceiling_markers = np.int32(
-            self.refine_surface(self.probs[Groupings.Ceiling], self.hed, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=watershed_mask))
+            self.refine_surface(self.probs[SurfaceType.Ceiling], self.hed, big_thresh=.05, small_thresh=.95, watershed_dist=.05, gradient=True, watershed_mask=watershed_mask))
 
-        ceiling_prob = get_segmentation_image(ceiling_markers + 1, self.probs[Groupings.Ceiling], avg=True)
-        wall_like_prob = get_segmentation_image(wall_like_markers + 1, self.probs[Groupings.WallLike], avg=True)
+        ceiling_prob = get_segmentation_image(ceiling_markers + 1, self.probs[SurfaceType.Ceiling], avg=True)
+        wall_like_prob = get_segmentation_image(wall_like_markers + 1, self.probs[SurfaceType.WallLike], avg=True)
         wall_like_prob[wall_like_prob < .25] = 0
-        wall_prob = get_segmentation_image(wall_markers + 1, self.probs[Groupings.Wall], avg=True)
+        wall_prob = get_segmentation_image(wall_markers + 1, self.probs[SurfaceType.Wall], avg=True)
 
-        ade_skel = skeletonize(self.probs[Groupings.Other] > .5)
-        self.probs[Groupings.Floor][ade_skel > 0] = 0
-        floor_prob = get_segmentation_image(floor_markers + 1, self.probs[Groupings.Floor], avg=True)
+        ade_skel = skeletonize(self.probs[SurfaceType.Other] > .5)
+        self.probs[SurfaceType.Floor][ade_skel > 0] = 0
+        floor_prob = get_segmentation_image(floor_markers + 1, self.probs[SurfaceType.Floor], avg=True)
         floor_prob[floor_prob < .25] = 0
         floor_markers[floor_prob < .25] = 100
         other_markers = join_segmentations(floor_markers, other_markers)
 
-        self.probs[Groupings.Other][ade_skel > 0] = 1
-        other_prob = get_segmentation_image(other_markers + 1, self.probs[Groupings.Other], avg=True)
+        self.probs[SurfaceType.Other][ade_skel > 0] = 1
+        other_prob = get_segmentation_image(other_markers + 1, self.probs[SurfaceType.Other], avg=True)
 
         if im_logging_enabled(data, LogLevel.Images):
             log_image(data, "floor_markers", 255. * floor_prob)
@@ -87,7 +86,7 @@ class SurfaceRefinement():
             log_image(data, "wall_markers", 255. * wall_prob)
 
         segmentation = np.int32(np.argmax(np.dstack(
-            (.05 * np.ones_like(self.probs[Groupings.Other]), other_prob, floor_prob, wall_prob, ceiling_prob, wall_like_prob)), -1))
+            (.05 * np.ones_like(self.probs[SurfaceType.Other]), other_prob, floor_prob, wall_prob, ceiling_prob, wall_like_prob)), -1))
 
         segmentation[np.logical_and(segmentation == 3, wall_prob < .5)] = 6
         m = np.logical_and(segmentation == 2, other_prob > .5)

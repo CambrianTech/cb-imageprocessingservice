@@ -16,13 +16,11 @@ import math
 from skimage.segmentation import watershed
 from scipy.stats import mode
 
-from .core import PipelineStep, PipelineStepIndex
+from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .utils import resize_array
 from .planegeometry import PlaneGeometry, Dimension
 from .surfacerefinement import SurfaceRefinement
-
 from .ade20k import ADE20K
-from .extractsurfaces import Groupings
 from .utils import get_segmentation_image, calculate_plane_xyz
 from .logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
 from .poseestimator import PoseEstimator, fan_surfaces
@@ -278,7 +276,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         segmentation_initial = refiner.refine(data)
         sure_walls = (segmentation_initial == ADE20K.floor.index) #shouldn't this be == ADE20K.wall.index
 
-        pose_estimator = PoseEstimator(data, img, lines, data["fov"], isolated[Groupings.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
+        pose_estimator = PoseEstimator(data, img, lines, data["fov"], isolated[SurfaceType.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
         pose_estimator.estimate()
 
         data["fov"] = pose_estimator.fov
@@ -287,13 +285,13 @@ class PipelineRefinePlaneMasks(PipelineStep):
         if plane_geometry.floor_index > -1:
             plane_geometry.plane_parameters[plane_geometry.floor_index] = pose_estimator.floor_normal * pose_estimator.floor_offset
 
-        labels_fan, fan_normals_reduced, normals_wall = fan_surfaces(data, img_lr, pose_estimator.edgelets[0], pose_estimator.vp0, sure_walls, isolated[Groupings.Wall], plane_geometry.normals_c)
+        labels_fan, fan_normals_reduced, normals_wall = fan_surfaces(data, img_lr, pose_estimator.edgelets[0], pose_estimator.vp0, sure_walls, isolated[SurfaceType.Wall], plane_geometry.normals_c)
 
         vl_image = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
         vl_image[sure_walls == 0] = 0
 
         ade_seg_c = np.dstack(
-            (.95 * np.ones_like(isolated[Groupings.Other]), isolated[Groupings.Other], isolated[Groupings.Floor], isolated[Groupings.Wall], isolated[Groupings.Ceiling], isolated[Groupings.WallLike]))
+            (.95 * np.ones_like(isolated[SurfaceType.Other]), isolated[SurfaceType.Other], isolated[SurfaceType.Floor], isolated[SurfaceType.Wall], isolated[SurfaceType.Ceiling], isolated[SurfaceType.WallLike]))
         ade_seg = np.argmax(ade_seg_c, -1)
 
         if im_logging_enabled(data, LogLevel.Segmentation):
@@ -487,9 +485,9 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         # add floor
         if len(floor_indices) > 0:
-            isolated[Groupings.Floor] = np.uint8(segmentation_initial == 2)
+            isolated[SurfaceType.Floor] = np.uint8(segmentation_initial == 2)
             # floor_mask = cv2.dilate(floor_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
-            final_masks.append(255 * isolated[Groupings.Floor])
+            final_masks.append(255 * isolated[SurfaceType.Floor])
 
             plane_parameter = np.zeros((11))
             plane_parameter[:9] = data["planes"]["detection"][floor_indices[0]][:9]
@@ -503,8 +501,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         # add ceiling
         if len(ceiling_indices) > 0:
-            isolated[Groupings.Ceiling] = 255 * np.uint8(segmentation_initial == 4)
-            final_masks.append(isolated[Groupings.Ceiling])
+            isolated[SurfaceType.Ceiling] = 255 * np.uint8(segmentation_initial == 4)
+            final_masks.append(isolated[SurfaceType.Ceiling])
             plane_parameter = np.zeros((11))
             plane_parameter[:9] = data["planes"]["detection"][ceiling_indices[0]][:9]
             plane_parameter[6:9] = plane_geometry.plane_parameters[ceiling_indices[0]]
