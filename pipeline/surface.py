@@ -119,16 +119,16 @@ class Surface():
                 self._alteration = "%d deg from floor" % int(math.degrees(angle_with_floor))
 
         #If it is minor type, e.g. walllike or floorlike, it may need to become a major type such as wall or floor:
-        # if not self.surfaceType.is_major:
-        #     original_counts = self.category_counts[self.surfaceType.index]
+        if not self.surfaceType.is_major:
+            original_counts = self.category_counts[self.surfaceType.index]
 
-        #     major_type = SurfaceType(self._surfaceType - 1)
-        #     major_counts = self.category_counts[major_type.index]
+            major_type = SurfaceType(self._surfaceType - 1)
+            major_counts = self.category_counts[major_type.index]
 
-        #     #compare the total pixels. If it's a minor type it will be smaller
-        #     if major_counts > original_counts and major_type in self.best_surface_types:
-        #         self._surfaceType = major_type
-        #         self._alteration = "min %d->%d maj" % (original_counts, major_counts)
+            #compare the total pixels. If it's a minor type it will be smaller
+            if major_counts > original_counts and major_type in self.best_surface_types:
+                self._surfaceType = major_type
+                self._alteration = "min %d->%d maj" % (original_counts, major_counts)
                 
         if self._alteration is not None:
             print("Changed %d from %s to %s: %s" % (self.index, self.best_surface_types[0].name, self.surfaceType.name, self._alteration))
