@@ -32,9 +32,10 @@ class Room(Geometry):
         return self.get_surfaces(surfaceType=SurfaceType.Floor)
 
     def analyze(self, labels):
+        self.labels = labels
         
         for surface in self.surfaces:
-            surface.analyze(labels)
+            surface.analyze()
 
     def get_debug_image(self, masked=True):
 

@@ -63,6 +63,15 @@ class Surface():
 
     @property
     def mask(self) -> ndimage:
+        if self._mask is None:
+            self._mask = self.get_surface_mask(self.surfaceType, self.confidence)
+            
+            self.contours, self.hierarchy = cv2.findContours(self._mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            self.moments = cv2.moments(self.contours[0]) if len(self.contours) > 0 else None
+
+            if self.moments is None or self.moments["m00"] == 0:
+                self.moments = cv2.moments(self._mask)
+
         return self._mask
 
     @property
@@ -78,28 +87,28 @@ class Surface():
 
     @property
     @abstractmethod
-    def dimension() -> PlanarDimension:
+    def dimension(self) -> PlanarDimension:
         pass
 
-    def determine_surface_type(self, labels, confidence, K, angle_threshold=np.radians(20)):
+    def get_surface_mask(self, label:SurfaceType, confidence):
+        mask = np.zeros(self.probs.shape, dtype="uint8")
+        mask[self.probs >= confidence] = 1
+        mask[self.geometry.labels != label.index] = 0
+        return mask
 
-        def get_surface_mask(label:SurfaceType):
-            mask = np.zeros(self.probs.shape, dtype="uint8")
-            mask[self.probs >= confidence] = 1
-            mask[labels != label.index] = 0
-            return mask
+    def determine_surface_type(self, K, angle_threshold=np.radians(20)):
 
         isolated = self.data["isolated"]
 
-        mask = self.probs.copy()
-        mask[mask < confidence] = 0
-        if np.sum(mask) < 10:
-            mask = self.probs
+        prob_mask = self.probs.copy()
+        prob_mask[prob_mask < self.confidence] = 0
+        if np.sum(prob_mask) < 10:
+            prob_mask = self.probs
 
         self.isolated_probs = []
         for group in SurfaceType:
-            submask = isolated[group] * mask
-            submask[labels != group.index] = np.nan #exclude
+            submask = isolated[group] * prob_mask
+            submask[self.geometry.labels != group.index] = np.nan #exclude
             self.isolated_probs.append(submask)
 
         self.category_probs = np.asarray([np.nanmean(prob) for prob in self.isolated_probs])
@@ -140,58 +149,19 @@ class Surface():
             if major_counts > original_counts and major_type in self.best_surface_types:
                 self._surfaceType = major_type
                 self._alteration = "min %d->%d maj" % (original_counts, major_counts)
-                
+
         if self._alteration is not None:
             print("Changed %d from %s to %s: %s" % (self.index, self.best_surface_types[0].name, self.surfaceType.name, self._alteration))
-
-        primary_prob = self.category_probs[self.surfaceType]
-        secondary_prob = self.category_probs[self.secondaryType]
-
-        primary_mask = get_surface_mask(self.surfaceType)
-        primary_count = np.count_nonzero(primary_mask)
-
-        secondary_mask = get_surface_mask(self.secondaryType)
-        secondary_count = np.count_nonzero(secondary_mask)
-
-        diff = np.bitwise_and(primary_mask, secondary_mask)
-        diff_count = np.count_nonzero(diff)
-
-        ps_ratio = primary_prob / secondary_prob
-        ps_ratio = min(1./ps_ratio, ps_ratio)
-
-        if self.surfaceType.is_pair(self.secondaryType) and diff_count > 0:
-            print("%s - %s:%.2f, %s:%.2f %.2f" % (self.name, self.surfaceType.name, primary_prob, self.secondaryType.name, secondary_prob, ps_ratio))
-            print(primary_count, secondary_count, diff_count)
-            #self._surfaceType = self.secondaryType
-
-        # if self.surfaceType == SurfaceType.Other:
-        #     other_prob = self.category_probs[SurfaceType.Other]
-        # else:
-        #     other_prob = self.category_probs[SurfaceType.Other]
-
-        # other_to_current = current_prob
-        
-        # #deal with Other/Wall mixups or combinations
-        # if SurfaceType.Other in self.best_surface_types and other_prob:
     
 
-    def analyze(self, labels, confidence=0.05, K=3):
-
-        self.determine_surface_type(labels, confidence, K)
+    def analyze(self, confidence=0.05, K=3):
 
         highest = np.max(self.probs)
-        confidence = max(min(highest * 0.9, confidence), 0.05)
+        self.confidence = max(min(highest * 0.9, confidence), 0.05)
 
-        self._mask = np.zeros(self.probs.shape, dtype="uint8")
-        self._mask[self.probs >= confidence] = 1
-        self._mask[labels != self.surfaceType] = 0
+        self.determine_surface_type(K)
 
-        self.contours, self.hierarchy = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        self.moments = cv2.moments(self.contours[0]) if len(self.contours) > 0 else None
-
-        if self.moments is None or self.moments["m00"] == 0:
-            self.moments = cv2.moments(self.mask)
+        
 
     def debug(self, img, color):
         cv2.drawContours(img, self.contours, -1, color)
