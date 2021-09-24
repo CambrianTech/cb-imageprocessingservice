@@ -29,7 +29,6 @@ class RoomSolver():
         sy = self.image.shape[0] / self.data["image"].shape[0]
 
         #take intersection
-        #self.probs.insert(0, (confidence * np.ones_like(self.probs[SurfaceType.Other])))
         ade_seg_c = np.dstack(tuple(self.probs))
         ade_seg = np.argmax(ade_seg_c, -1)
 

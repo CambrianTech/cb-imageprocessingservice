@@ -31,12 +31,12 @@ class Room(Geometry):
     def floors(self):
         return self.get_surfaces(surfaceType=SurfaceType.Floor)
 
-    def analyze(self, labels, confidence=0.3):
+    def analyze(self, labels):
         
         for surface in self.surfaces:
-            surface.analyze(labels, confidence)
+            surface.analyze(labels)
 
-    def get_debug_image(self, confidence=0.05):
+    def get_debug_image(self):
 
         img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV_FULL)
         hues = random.sample(range(0, 360), len(self.surfaces))
@@ -45,8 +45,10 @@ class Room(Geometry):
         for i in range(len(self.surfaces)):
             surface = self.surfaces[i]
 
-            img_hsv[:, :, 0][surface.probs >= confidence] = hues[i]
-            img_hsv[:, :, 1][surface.probs >= confidence] = 255 * np.power(surface.probs[surface.probs > confidence], 0.5)
+            mask = surface.mask > 0
+
+            img_hsv[:, :, 0][mask] = hues[i]
+            img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.5)
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 

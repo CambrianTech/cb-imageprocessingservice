@@ -20,18 +20,23 @@ class Surface():
         self._surfaceType = surfaceType
         self._geometry = None
         self._mask = None
-
-    @property
-    def surfaceType(self) -> SurfaceType:
-        return self._surfaceType
+        self._alteration = None
 
     @property
     def uniqueId(self) -> str:
         return self._uniqueId
 
     @property
+    def surfaceType(self) -> SurfaceType:
+        return self._surfaceType
+
+    @property
+    def name(self) -> Geometry:
+        return "%s %d" % (self.surfaceType.name, self.index)
+
+    @property
     def geometry(self) -> Geometry:
-        return self._geometry
+        return self._geometry    
 
     @property
     def probs(self) -> Geometry:
@@ -58,11 +63,13 @@ class Surface():
 
     @property
     def center(self) -> tuple:
+        #todo: use 2D projection
         if self.moments is None or self.moments["m00"] == 0:
-            return None
-
-        cX = int(self.moments["m10"] / self.moments["m00"])
-        cY = int(self.moments["m01"] / self.moments["m00"])
+            cX = self.mask.shape[1] // 2
+            cY = self.mask.shape[0] // 2
+        else:
+            cX = int(self.moments["m10"] / self.moments["m00"])
+            cY = int(self.moments["m01"] / self.moments["m00"])
         return cX, cY
 
     @property
@@ -81,15 +88,14 @@ class Surface():
         self.isolated_probs = []
         for group in SurfaceType:
             submask = isolated[group] * mask
-            submask[labels != group.index] = np.nan
+            submask[labels != group.index] = np.nan #exclude
             self.isolated_probs.append(submask)
 
         self.category_probs = np.asarray([np.nanmean(prob) for prob in self.isolated_probs])
         self.category_probs = np.nan_to_num(self.category_probs)
+        self.category_counts = np.asarray([np.count_nonzero(prob[prob >= 0.1]) for prob in self.isolated_probs])
 
-        self.category_counts = [np.count_nonzero(prob[prob >= 0.1]) for prob in self.isolated_probs]
-
-        self.best_indices = self.category_probs.argsort()[-K:][::-1]
+        self.best_indices = self.category_counts.argsort()[-K:][::-1]
         self.best_surface_types = list(map(lambda i: SurfaceType(i), self.best_indices))
 
         self._surfaceType = self.best_surface_types[0]
@@ -98,10 +104,6 @@ class Surface():
         angle_with_wall = abs(0.5 * np.pi - self.angle)
         angle_with_ceiling = abs(np.pi - self.angle)
         angle_with_floor = abs(self.angle)
-
-
-
-        self._alteration = None
 
         #Maybe it is being classified as ceiling when it's really wall or vice versa:
         #check the angle versus the floor normal. Walls are generally orthagonal to the floor or ceiling    
@@ -117,32 +119,31 @@ class Surface():
                 self._alteration = "%d deg from floor" % int(math.degrees(angle_with_floor))
 
         #If it is minor type, e.g. walllike or floorlike, it may need to become a major type such as wall or floor:
-        if not self.surfaceType.is_major:
-            original_counts = self.category_counts[self.surfaceType.index]
+        # if not self.surfaceType.is_major:
+        #     original_counts = self.category_counts[self.surfaceType.index]
 
-            major_type = SurfaceType(self._surfaceType - 1)
-            major_counts = self.category_counts[major_type.index]
+        #     major_type = SurfaceType(self._surfaceType - 1)
+        #     major_counts = self.category_counts[major_type.index]
 
-            #compare the total pixels. If it's a minor type it will be smaller
-            if major_counts > original_counts and major_type in self.best_surface_types:
-                self._surfaceType = major_type
-                self._alteration = "min %d->%d maj" % (original_counts, major_counts)
+        #     #compare the total pixels. If it's a minor type it will be smaller
+        #     if major_counts > original_counts and major_type in self.best_surface_types:
+        #         self._surfaceType = major_type
+        #         self._alteration = "min %d->%d maj" % (original_counts, major_counts)
                 
         if self._alteration is not None:
             print("Changed %d from %s to %s: %s" % (self.index, self.best_surface_types[0].name, self.surfaceType.name, self._alteration))
         
 
 
-    def analyze(self, labels, confidence, bounds_confidence=0.05, K=3):
+    def analyze(self, labels, confidence=0.05, K=3):
 
         self.determine_surface_type(labels, confidence, K)
 
         highest = np.max(self.probs)
-        confidence = max(min(highest * 0.95, confidence), 0.05)
-        bounds_confidence = max(min(highest * 0.95, bounds_confidence), 0.05)
+        confidence = max(min(highest * 0.9, confidence), 0.05)
 
         self._mask = np.zeros(self.probs.shape, dtype="uint8")
-        self._mask[self.probs > bounds_confidence] = 1
+        self._mask[self.probs >= confidence] = 1
         self._mask[labels != self.surfaceType] = 0
 
         self.contours, self.hierarchy = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -155,10 +156,12 @@ class Surface():
     def debug(self, img, color):
         cv2.drawContours(img, self.contours, -1, color)
     
-        if self.center is None: return
+        if self.center is None: 
+            print("No center found for %s" % self.name)
+            return
 
         pos = self.center
-        pos = put_text(img, "%s %d" % (self.surfaceType.name, self.index), pos, color, size=0.5, shadow=True, highlights=True)
+        pos = put_text(img, self.name, pos, color, size=0.5, shadow=True, highlights=True)
 
         if self._alteration is not None:
             pos = put_text(img, self._alteration, pos, color, size=0.33, shadow=True)
