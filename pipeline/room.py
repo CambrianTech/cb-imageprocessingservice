@@ -35,19 +35,32 @@ class Room(Geometry):
     def analyze(self, labels):
         self.labels = labels
 
+        #perform initial analysis
         for surface in self.surfaces:
             surface.analyze()
 
-        #expand all surfaces as far as they can go within their segmentation:
-        
-
-        #find_missing_surfaces
+        #merge heavily intersecting surfaces:
         total_mask = np.sum(np.dstack([s.mask for s in self.surfaces]), axis=-1)
-        max_value = np.max(total_mask)
-        total_mask = total_mask * 255 / max_value
+        intersecting_areas = np.zeros_like(total_mask)
+        intersecting_areas[total_mask > 1] = 1
+
         
+        #expand all surfaces as far as they can go within their segmentation (watershed)
+        #and resolve disputes between planes as they intersect by probability (confidence):
+        markers = np.zeros(self.image.shape[:2], dtype=np.int32)
+        for surface in self.surfaces:
+            markers[surface.mask > 0] = (surface.index + 1)
+
+        markers[intersecting_areas > 0] = 0
+        #find_missing_surfaces
+
+
         if im_logging_enabled(self.data):
-            log_image(self.data, "total_mask", overlay_mask(self.image, total_mask))
+            log_image(self.data, "room_markers", markers * (255 / len(self.surfaces)))
+            log_image(self.data, "room_intersect", overlay_mask(self.image, intersecting_areas))
+            log_image(self.data, "room_total_mask", overlay_mask(self.image, total_mask * 255 / np.max(total_mask)))
+        
+        
 
 
     def get_debug_image(self, masked=True):
