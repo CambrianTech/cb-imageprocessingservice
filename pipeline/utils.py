@@ -104,10 +104,10 @@ def calculate_plane_xyz(planes, width, height, camera, max_depth=10):
     
     return XYZ.transpose(2, 0, 1, 3), planeDepths.transpose(2, 0, 1)
 
-def overlay_mask(img, mask, hue=random_color(), saturation=255, darkest_value=80):
+def overlay_mask(img, mask, hue=None, saturation=255, darkest_value=80):
     
     overlay = cv2.resize(mask, (img.shape[1], img.shape[0]))
-    img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) #range 0-180
+    img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV_FULL) #range 0-180
 
     grey = img_hsv[:, :, 2].copy()
     grey[grey<darkest_value] = darkest_value
@@ -119,7 +119,7 @@ def overlay_mask(img, mask, hue=random_color(), saturation=255, darkest_value=80
     img_hsv[:, :, 1][overlay>0] = saturation
     img_hsv[:, :, 2][overlay>0] = grey[overlay>0] 
 
-    out = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR)
+    out = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR_FULL)
 
     return out
 

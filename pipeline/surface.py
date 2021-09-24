@@ -152,7 +152,6 @@ class Surface():
 
         if self._alteration is not None:
             print("Changed %d from %s to %s: %s" % (self.index, self.best_surface_types[0].name, self.surfaceType.name, self._alteration))
-    
 
     def analyze(self, confidence=0.05, K=3):
 
@@ -161,7 +160,6 @@ class Surface():
 
         self.determine_surface_type(K)
 
-        
 
     def debug(self, img, color):
         cv2.drawContours(img, self.contours, -1, color)

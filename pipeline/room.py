@@ -7,7 +7,8 @@ import random
 from .geometry import Geometry
 from .core import SurfaceType
 from .surface import Surface
-from .utils import convert_color, put_text
+from .utils import convert_color, put_text, overlay_mask
+from .logging import im_logging_enabled, log_image
 
 #python info on object oriented methods and properties
 #https://stackoverflow.com/questions/2736255/abstract-attributes-in-python
@@ -33,9 +34,21 @@ class Room(Geometry):
 
     def analyze(self, labels):
         self.labels = labels
-        
+
         for surface in self.surfaces:
             surface.analyze()
+
+        #expand all surfaces as far as they can go within their segmentation:
+        
+
+        #find_missing_surfaces
+        total_mask = np.sum(np.dstack([s.mask for s in self.surfaces]), axis=-1)
+        max_value = np.max(total_mask)
+        total_mask = total_mask * 255 / max_value
+        
+        if im_logging_enabled(self.data):
+            log_image(self.data, "total_mask", overlay_mask(self.image, total_mask))
+
 
     def get_debug_image(self, masked=True):
 
