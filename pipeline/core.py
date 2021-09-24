@@ -40,6 +40,12 @@ class SurfaceType(SemanticLabel):
 
     Other=6
 
+    @property
+    def is_major(self):
+        return self.index % 2 == 0
+
+
+
 class PipelineStep(metaclass=ABCMeta):
     def __init__(self, pipeline, batch_max_wait_time=1.0, batch_debounce_time=0.2, batch_max_size=4):
         self.pipeline = pipeline

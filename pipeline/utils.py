@@ -145,5 +145,5 @@ def put_text(img, text, origin, color, shadow_offset=(1,1), font=cv2.FONT_HERSHE
 
     cv2.putText(img, text, loc, font, size, color, thickness, line_type)
 
-    return dimensions, loc
+    return (loc[0], loc[1] + 3 * dimensions[1] // 2)
 

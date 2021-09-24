@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
 import numpy as np
+import math
 from scipy import ndimage
 import cv2
 import uuid
@@ -8,6 +9,7 @@ from .core import SurfaceType
 from .geometry import Geometry
 from .planegeometry import PlanarDimension
 from .utils import convert_color, put_text
+from .Line import line_angle_difference
 
 class Surface():
 
@@ -36,6 +38,21 @@ class Surface():
         return self.geometry.masks[self.index]
 
     @property
+    def normal(self) -> float:
+        return self.data["plane_normals"][self.index]
+
+    @property
+    def offset(self) -> float:
+        return self.data["plane_offsets"][self.index]
+
+    @property
+    def angle(self): #from floor
+        floor_normal = (0,0,-1)
+        dot_product = np.dot(floor_normal, self.normal)
+        result = np.arccos(dot_product)
+        return 0 if np.isnan(result) else result
+
+    @property
     def mask(self) -> ndimage:
         return self._mask
 
@@ -53,7 +70,7 @@ class Surface():
     def dimension() -> PlanarDimension:
         pass
 
-    def determine_surface_type(self, labels, confidence, K):
+    def determine_surface_type(self, labels, confidence, K, angle_threshold=np.radians(20)):
         isolated = self.data["isolated"]
 
         mask = np.zeros(self.probs.shape, dtype="uint8")
@@ -76,22 +93,45 @@ class Surface():
         self.best_surface_types = list(map(lambda i: SurfaceType(i), self.best_indices))
 
         self._surfaceType = self.best_surface_types[0]
-        self._altered = False
 
-        if self._surfaceType % 2 == 1: #is minor type, aka walllike, floorlike, ceilinglike
-            original_type = self._surfaceType
-            original_counts = self.category_counts[original_type.index]
+        #now fix incorrect classifications:
+        angle_with_wall = abs(0.5 * np.pi - self.angle)
+        angle_with_ceiling = abs(np.pi - self.angle)
+        angle_with_floor = abs(self.angle)
+
+
+
+        self._alteration = None
+
+        #Maybe it is being classified as ceiling when it's really wall or vice versa:
+        #check the angle versus the floor normal. Walls are generally orthagonal to the floor or ceiling    
+        if self.surfaceType != SurfaceType.Other:
+            if angle_with_wall < angle_threshold and self.surfaceType != SurfaceType.Wall and self.surfaceType != SurfaceType.WallLike:
+                self._surfaceType = SurfaceType.Wall if self.surfaceType.is_major else SurfaceType.WallLike
+                self._alteration = "%d deg from wall" % int(math.degrees(angle_with_wall))
+            elif angle_with_ceiling < angle_threshold and self.surfaceType != SurfaceType.Ceiling and self.surfaceType != SurfaceType.CeilingLike:
+                self._surfaceType = SurfaceType.Ceiling if self.surfaceType.is_major else SurfaceType.CeilingLike
+                self._alteration = "%d deg from ceil" % int(math.degrees(angle_with_ceiling))
+            elif angle_with_floor < angle_threshold and self.surfaceType != SurfaceType.Floor and self.surfaceType != SurfaceType.FloorLike:
+                self._surfaceType = SurfaceType.Floor if self.surfaceType.is_major else SurfaceType.FloorLike
+                self._alteration = "%d deg from floor" % int(math.degrees(angle_with_floor))
+
+        #If it is minor type, e.g. walllike or floorlike, it may need to become a major type such as wall or floor:
+        if not self.surfaceType.is_major:
+            original_counts = self.category_counts[self.surfaceType.index]
 
             major_type = SurfaceType(self._surfaceType - 1)
             major_counts = self.category_counts[major_type.index]
 
+            #compare the total pixels. If it's a minor type it will be smaller
             if major_counts > original_counts and major_type in self.best_surface_types:
-                print("Switchin type from %s to %s: %d->%d" % (original_type.name, major_type.name, original_counts, major_counts))
                 self._surfaceType = major_type
-                self._altered = True
+                self._alteration = "min %d->%d maj" % (original_counts, major_counts)
+                
+        if self._alteration is not None:
+            print("Changed %d from %s to %s: %s" % (self.index, self.best_surface_types[0].name, self.surfaceType.name, self._alteration))
+        
 
-        #todo: check angles and other things to verify that ceilings are the right angle to be that 
-        # and walls are vertical, floors horizontal but opposite ceilings:
 
     def analyze(self, labels, confidence, bounds_confidence=0.05, K=3):
 
@@ -117,11 +157,13 @@ class Surface():
     
         if self.center is None: return
 
-        text_size, position = put_text(img, self.surfaceType.name, self.center, color, size=0.5, shadow=True, highlights=True)
+        pos = self.center
+        pos = put_text(img, "%s %d" % (self.surfaceType.name, self.index), pos, color, size=0.5, shadow=True, highlights=True)
 
-        if self._altered:
-            text = "%d" % (self.category_counts[self.surfaceType.index])
-            put_text(img, text, (position[0], position[1] + text_size[1]), (255, 255, 255), size=0.33, shadow=True)
+        if self._alteration is not None:
+            pos = put_text(img, self._alteration, pos, color, size=0.33, shadow=True)
+
+        pos = put_text(img, "%.0f deg" % np.degrees(self.angle), pos, (255, 255, 255), size=0.33, shadow=True)
 
         # if surface.surfaceType != surface.best_surface_types[0]:
         #     best_prob = surface.category_probs[surface.best_surface_types[0]]
