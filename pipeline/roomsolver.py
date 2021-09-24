@@ -44,6 +44,7 @@ class RoomSolver():
 
             #for i, surface in enumerate(self.room.surfaces): log_image(self.data, "surface_%d" % i, surface.probs * 255)
             log_image(self.data, "room", self.room.get_debug_image())
+            log_image(self.data, "room-unmasked", self.room.get_debug_image(False))
 
             
             # for index in range(len(self.room.surfaces)):

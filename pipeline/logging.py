@@ -15,19 +15,16 @@ class LogLevel(IntFlag):
 
     All = 0xff
 
-_logging_index = 0
-
 def get_unique_id(data:dict):
     return data["unique_id"]
 
 def make_log_path(data:dict, name:str, extension=".jpg"):
-    global _logging_index
     directory = get_logging_dir(data)
     if not os.path.exists(directory):
         #print("Creating directory" + directory)
         os.makedirs(directory)
 
-    filename = "%d - %s%s" % (_logging_index, name, extension)
+    filename = "%s%s" % (name, extension)
     return os.path.join(directory, filename)
 
 def im_logging_enabled(data:dict, level=LogLevel.All):
@@ -47,8 +44,6 @@ def get_logging_step(data:dict):
     return data["logging_step"] if "logging_step" in data else LogLevel.Nothing
 
 def set_logging_step(data:dict, step:int, current_step:int):
-    global _logging_index
-    _logging_index = 0
     data["logging_step"] = step
     data["step"] = current_step
 
@@ -72,15 +67,39 @@ def log_image(data:dict, name:str, image, extension=".jpg"):
         _log_image(data, name, image, extension)
 
 def _log_image(data:dict, name:str, image, extension=".jpg", quality=95):
-    global _logging_index
     path = make_log_path(data, name, extension)
     #print("Save image %s" % path)
     success = cv2.imwrite(path, cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB) if len(image.shape) == 3 else image.astype(np.uint8), [int(cv2.IMWRITE_JPEG_QUALITY), quality])
-    if success:
-        _logging_index += 1
-    else:
+    if not success:
         print("Could not save image", path)
 
+def draw_legend(data:dict, debug:np.ndarray, legend:tuple):
+    #draw legend
+    font_scale = min(max(0.5, debug.shape[0] / 1000), 2)
+    thickness = max(int(font_scale * 2), 1)
+    radius = int(12 * font_scale)
+    padding = int(12 * font_scale)
+    line_height = int(40 * font_scale)
+    text_color = (50,50,50)
+    
+    font = cv2.FONT_HERSHEY_SIMPLEX
+
+    text_height = cv2.getTextSize(text=str("Just Some Text"), fontFace=font, fontScale=font_scale, thickness=thickness)[0][1]
+
+    start_location = (padding * 2 + radius, padding * 2 + line_height // 2)
+    
+    x = start_location[0]
+    y = start_location[1]
+    
+    for label, color in legend:
+        cv2.circle(debug, (x+radius, y+radius), radius, color, cv2.FILLED) 
+        cv2.circle(debug, (x+radius, y+radius), radius, text_color, min(thickness, 2))
+        x += 2 * radius + padding
+        text_y = y + text_height + int(2 * font_scale)
+        cv2.putText(debug, label.name, (x, text_y), font, font_scale, text_color, thickness, cv2.LINE_AA)
+
+        x = start_location[0]
+        y += line_height
 
 def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", show_legend=True, labelset=ADE20K,  opacity=0.5, get_image=False):
     
@@ -97,32 +116,7 @@ def log_segmentation_image(data:dict, name, segmentation, image, avg=False, exte
         debug = cv2.addWeighted(debug, opacity, image, 1.0 - opacity, 0)
 
         if show_legend:
-            #draw legend
-            font_scale = min(max(0.5, debug.shape[0] / 1000), 2)
-            thickness = max(int(font_scale * 2), 1)
-            radius = int(12 * font_scale)
-            padding = int(12 * font_scale)
-            line_height = int(40 * font_scale)
-            text_color = (50,50,50)
-            
-            font = cv2.FONT_HERSHEY_SIMPLEX
-
-            text_height = cv2.getTextSize(text=str("Just Some Text"), fontFace=font, fontScale=font_scale, thickness=thickness)[0][1]
-
-            start_location = (padding * 2 + radius, padding * 2 + line_height // 2)
-            
-            x = start_location[0]
-            y = start_location[1]
-            
-            for label, color in legend:
-                cv2.circle(debug, (x+radius, y+radius), radius, color, cv2.FILLED) 
-                cv2.circle(debug, (x+radius, y+radius), radius, text_color, min(thickness, 2))
-                x += 2 * radius + padding
-                text_y = y + text_height + int(2 * font_scale)
-                cv2.putText(debug, label.name, (x, text_y), font, font_scale, text_color, thickness, cv2.LINE_AA)
-
-                x = start_location[0]
-                y += line_height
+            draw_legend(data, debug, legend)
 
         if get_image:
             return debug
@@ -130,11 +124,9 @@ def log_segmentation_image(data:dict, name, segmentation, image, avg=False, exte
         _log_image(data, name, debug, extension)
 
 def log_ply(data:dict, name, image, masks, plane_XYZ, write_occlusion=False, mult=1.0):
-    global _logging_index
     if im_logging_enabled(data, LogLevel.Models):
         file_path = make_log_path(data, name, ".ply")
         print("Saving model", file_path)
-        _logging_index += 1
 
         image = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB)
         image = cv2.resize(image, (int(mult * 160), int(mult * 120)))

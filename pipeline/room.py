@@ -36,7 +36,7 @@ class Room(Geometry):
         for surface in self.surfaces:
             surface.analyze(labels)
 
-    def get_debug_image(self):
+    def get_debug_image(self, masked=True):
 
         img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV_FULL)
         hues = random.sample(range(0, 360), len(self.surfaces))
@@ -45,7 +45,7 @@ class Room(Geometry):
         for i in range(len(self.surfaces)):
             surface = self.surfaces[i]
 
-            mask = surface.mask > 0
+            mask = surface.mask > 0 if masked else surface.probs >= 0.05
 
             img_hsv[:, :, 0][mask] = hues[i]
             img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.5)
