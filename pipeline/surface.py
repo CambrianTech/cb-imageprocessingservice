@@ -31,6 +31,10 @@ class Surface():
         return self._surfaceType
 
     @property
+    def secondaryType(self) -> SurfaceType:
+        return next(filter(lambda t: t != self.surfaceType, self.best_surface_types))
+
+    @property
     def name(self) -> Geometry:
         return "%s %d" % (self.surfaceType.name, self.index)
 
@@ -78,9 +82,16 @@ class Surface():
         pass
 
     def determine_surface_type(self, labels, confidence, K, angle_threshold=np.radians(20)):
+
+        def get_surface_mask(label:SurfaceType):
+            mask = np.zeros(self.probs.shape, dtype="uint8")
+            mask[self.probs >= confidence] = 1
+            mask[labels != label.index] = 0
+            return mask
+
         isolated = self.data["isolated"]
 
-        mask = np.zeros(self.probs.shape, dtype="uint8")
+        mask = self.probs.copy()
         mask[mask < confidence] = 0
         if np.sum(mask) < 10:
             mask = self.probs
@@ -134,11 +145,24 @@ class Surface():
             print("Changed %d from %s to %s: %s" % (self.index, self.best_surface_types[0].name, self.surfaceType.name, self._alteration))
 
         primary_prob = self.category_probs[self.surfaceType]
-        self.secondarySurfaceType = next(filter(lambda t: t != self.surfaceType, self.best_surface_types))
-        secondary_prob = self.category_probs[self.secondarySurfaceType]
+        secondary_prob = self.category_probs[self.secondaryType]
 
-        print("%s Primary %s:%.2f, secondary %s:%.2f" % (self.name, self.surfaceType.name, primary_prob, self.secondarySurfaceType.name, secondary_prob))
+        primary_mask = get_surface_mask(self.surfaceType)
+        primary_count = np.count_nonzero(primary_mask)
 
+        secondary_mask = get_surface_mask(self.secondaryType)
+        secondary_count = np.count_nonzero(secondary_mask)
+
+        diff = np.bitwise_and(primary_mask, secondary_mask)
+        diff_count = np.count_nonzero(diff)
+
+        ps_ratio = primary_prob / secondary_prob
+        ps_ratio = min(1./ps_ratio, ps_ratio)
+
+        if self.surfaceType.is_pair(self.secondaryType) and diff_count > 0:
+            print("%s - %s:%.2f, %s:%.2f %.2f" % (self.name, self.surfaceType.name, primary_prob, self.secondaryType.name, secondary_prob, ps_ratio))
+            print(primary_count, secondary_count, diff_count)
+            #self._surfaceType = self.secondaryType
 
         # if self.surfaceType == SurfaceType.Other:
         #     other_prob = self.category_probs[SurfaceType.Other]
@@ -149,8 +173,7 @@ class Surface():
         
         # #deal with Other/Wall mixups or combinations
         # if SurfaceType.Other in self.best_surface_types and other_prob:
-            
-
+    
 
     def analyze(self, labels, confidence=0.05, K=3):
 
