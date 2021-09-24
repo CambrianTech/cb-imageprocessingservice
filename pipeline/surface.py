@@ -132,7 +132,24 @@ class Surface():
                 
         if self._alteration is not None:
             print("Changed %d from %s to %s: %s" % (self.index, self.best_surface_types[0].name, self.surfaceType.name, self._alteration))
+
+        primary_prob = self.category_probs[self.surfaceType]
+        self.secondarySurfaceType = next(filter(lambda t: t != self.surfaceType, self.best_surface_types))
+        secondary_prob = self.category_probs[self.secondarySurfaceType]
+
+        print("%s Primary %s:%.2f, secondary %s:%.2f" % (self.name, self.surfaceType.name, primary_prob, self.secondarySurfaceType.name, secondary_prob))
+
+
+        # if self.surfaceType == SurfaceType.Other:
+        #     other_prob = self.category_probs[SurfaceType.Other]
+        # else:
+        #     other_prob = self.category_probs[SurfaceType.Other]
+
+        # other_to_current = current_prob
         
+        # #deal with Other/Wall mixups or combinations
+        # if SurfaceType.Other in self.best_surface_types and other_prob:
+            
 
 
     def analyze(self, labels, confidence=0.05, K=3):
