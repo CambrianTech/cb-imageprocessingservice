@@ -57,11 +57,10 @@ class Room(Geometry):
                 markers[surface.mask > 0] = (surface.index + 1)
 
             markers[intersecting_areas > 0] = 0 #freedom!
-            markers[self.labels != surfaceType] = -1 #masked off
+            markers[self.labels != surfaceType] = 255 #masked off
 
-            visual_gain = (255 / SurfaceType.max_index())
-
-            log_image(self.data, "room_markers_before", markers * visual_gain)
+            if im_logging_enabled(self.data):
+                markers_before = markers.copy()
 
             markers = cv2.watershed(self.image, markers)
             markers[markers < 0] = 0
@@ -69,7 +68,10 @@ class Room(Geometry):
             # for surface in surfaces:
             #     surface.mask[markers == surface.index + 1] = 1
 
-            log_image(self.data, "room_markers_after", markers * visual_gain)
+            if im_logging_enabled(self.data):
+                visual_gain = (255 / SurfaceType.max_index())
+                log_image(self.data, "room_markers_before", markers_before * visual_gain)
+                log_image(self.data, "room_markers_after", markers * visual_gain)
 
             return markers
 
