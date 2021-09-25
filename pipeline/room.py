@@ -8,7 +8,7 @@ from .geometry import Geometry
 from .core import SurfaceType
 from .surface import Surface
 from .utils import convert_color, put_text, overlay_mask
-from .logging import im_logging_enabled, log_image
+from .logging import im_logging_enabled, log_image, log_segmentation_image
 
 #python info on object oriented methods and properties
 #https://stackoverflow.com/questions/2736255/abstract-attributes-in-python
@@ -34,6 +34,10 @@ class Room(Geometry):
 
     def analyze(self, labels):
         self.labels = labels
+
+        plane_masks = np.dstack(tuple(self.masks))
+        plane_masks = np.int32(np.argmax(plane_masks, -1))
+        log_segmentation_image(self.data, "plane_masks", plane_masks, self.image)
 
         #perform initial analysis
         for surface in self.surfaces:

@@ -21,6 +21,7 @@ class Surface():
         self._geometry = None
         self._mask = None
         self._alteration = None
+        self.invalidated = False
 
     @property
     def uniqueId(self) -> str:
@@ -127,7 +128,8 @@ class Surface():
 
         #Maybe it is being classified as ceiling when it's really wall or vice versa:
         #check the angle versus the floor normal. Walls are generally orthagonal to the floor or ceiling    
-        if self.surfaceType != SurfaceType.Other and self.surfaceType != SurfaceType.Ceiling:
+        if self.surfaceType != SurfaceType.Other:
+            was_ceiling = self.surfaceType == SurfaceType.Ceiling
             if angle_with_wall < angle_threshold and self.surfaceType != SurfaceType.Wall and self.surfaceType != SurfaceType.WallLike:
                 self._surfaceType = SurfaceType.Wall if self.surfaceType.is_major else SurfaceType.WallLike
                 self._alteration = "%d deg from wall" % int(math.degrees(angle_with_wall))
@@ -137,6 +139,9 @@ class Surface():
             elif angle_with_floor < angle_threshold and self.surfaceType != SurfaceType.Floor and self.surfaceType != SurfaceType.FloorLike:
                 self._surfaceType = SurfaceType.Floor if self.surfaceType.is_major else SurfaceType.FloorLike
                 self._alteration = "%d deg from floor" % int(math.degrees(angle_with_floor))
+
+            if was_ceiling and self.surfaceType != SurfaceType.Ceiling:
+                self.invalidated = True
 
         #If it is minor type, e.g. walllike or floorlike, it may need to become a major type such as wall or floor:
         if not self.surfaceType.is_major:
@@ -153,7 +158,7 @@ class Surface():
             if major_counts > minor_counts and major_type in self.best_surface_types:
                 self._surfaceType = major_type
                 self._alteration = "min %d->%d maj" % (minor_counts, major_counts)
-            elif self.surfaceType.is_pair(self.secondaryType) and sp_ratio > 0.5:
+            elif self.surfaceType.is_pair(self.secondaryType) and sp_ratio > 0.8:
                 self._alteration = "expanded %.2f" % (sp_ratio)
                 self._surfaceType = major_type
                 #print(sp_ratio)

@@ -20,8 +20,7 @@ class RoomSolver():
     def solve(self, confidence=0.95):
         
         wall_contours = []
-
-        self.probs = self.data["isolated"]
+ 
         self.lines = self.data["lines"]
 
         self.image = self.data["downscaled"]
@@ -29,10 +28,8 @@ class RoomSolver():
         sy = self.image.shape[0] / self.data["image"].shape[0]
 
         #take intersection
-        ade_seg_c = np.dstack(tuple(self.probs))
-        ade_seg = np.argmax(ade_seg_c, -1)
-
-        labels = np.int32(ade_seg)
+        ade_seg_c = np.dstack(tuple(self.data["isolated"]))
+        labels = np.int32(np.argmax(ade_seg_c, -1))
 
         #add the walls:
         for i in range(len(self.room.masks)):
@@ -52,7 +49,7 @@ class RoomSolver():
             #     log_image(self.data, "skeleton_%d" % index, surface.skeleton * 255)
                 
 
-            debug = log_segmentation_image(self.data, "probs", np.int32(ade_seg), self.image, get_image=True, labelset=SurfaceType)
+            debug = log_segmentation_image(self.data, "probs", labels, self.image, get_image=True, labelset=SurfaceType)
 
             Line.draw_all(debug, self.lines, color=(255,80,200), thickness=2, sx=sx, sy=sy)
 

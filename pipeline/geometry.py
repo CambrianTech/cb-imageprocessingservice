@@ -21,7 +21,7 @@ class Geometry():
         self._surfaces[surface.uniqueId] = surface
 
     def get_surfaces(self, surfaceType=None, dimension=None):
-        filters = []
+        filters = [lambda surface: not surface.invalidated]
         
         if surfaceType is not None:
             filters.append(lambda surface: surface.surfaceType == surfaceType)
