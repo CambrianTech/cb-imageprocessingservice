@@ -48,32 +48,24 @@ class Room(Geometry):
                 return
 
             total_mask = np.sum(np.dstack([s.mask for s in surfaces]), axis=-1)
-            intersecting_areas = np.zeros_like(total_mask)
-            intersecting_areas[total_mask > 1] = 1
+            disputed_areas = np.zeros_like(total_mask)
+            disputed_areas[total_mask > 1] = 1
 
-            markers = np.zeros(self.image.shape[:2], dtype=np.int32)
+            unfilled_areas = np.zeros_like(total_mask)
+            where = np.where(np.logical_and(self.labels == surfaceType.index, total_mask == 0))
+            unfilled_areas[where] = 1
+
             
-            for surface in surfaces:
-                markers[surface.mask > 0] = (surface.index + 1)
+            #intersecting_areas[total_mask > 1] = 1
 
-            markers[intersecting_areas > 0] = 0 #freedom!
-            markers[self.labels != surfaceType] = 255 #masked off
-
-            if im_logging_enabled(self.data):
-                markers_before = markers.copy()
-
-            markers = cv2.watershed(self.image, markers)
-            markers[markers < 0] = 0
 
             # for surface in surfaces:
             #     surface.mask[markers == surface.index + 1] = 1
 
             if im_logging_enabled(self.data):
-                visual_gain = (255 / SurfaceType.max_index())
-                log_image(self.data, "room_markers_before", markers_before * visual_gain)
-                log_image(self.data, "room_markers_after", markers * visual_gain)
+                log_image(self.data, "room_unfilled", overlay_mask(self.image, unfilled_areas))
 
-            return markers
+            
 
 
         #expand all surfaces as far as they can go within their segmentation (watershed)
