@@ -40,25 +40,46 @@ class Room(Geometry):
             surface.analyze()
 
         #merge heavily intersecting surfaces:
-        total_mask = np.sum(np.dstack([s.mask for s in self.surfaces]), axis=-1)
-        intersecting_areas = np.zeros_like(total_mask)
-        intersecting_areas[total_mask > 1] = 1
-
         
+        def expand_into_type(surfaceType:SurfaceType):
+            surfaces = self.get_surfaces(surfaceType)
+
+            if len(surfaces) == 0:
+                return
+
+            total_mask = np.sum(np.dstack([s.mask for s in surfaces]), axis=-1)
+            intersecting_areas = np.zeros_like(total_mask)
+            intersecting_areas[total_mask > 1] = 1
+
+            markers = np.zeros(self.image.shape[:2], dtype=np.int32)
+            
+            for surface in surfaces:
+                markers[surface.mask > 0] = (surface.index + 1)
+
+            markers[intersecting_areas > 0] = 0 #freedom!
+            markers[self.labels != surfaceType] = -1 #masked off
+
+            visual_gain = (255 / SurfaceType.max_index())
+
+            log_image(self.data, "room_markers_before", markers * visual_gain)
+
+            markers = cv2.watershed(self.image, markers)
+            markers[markers < 0] = 0
+
+            # for surface in surfaces:
+            #     surface.mask[markers == surface.index + 1] = 1
+
+            log_image(self.data, "room_markers_after", markers * visual_gain)
+
+            return markers
+
+
         #expand all surfaces as far as they can go within their segmentation (watershed)
         #and resolve disputes between planes as they intersect by probability (confidence):
-        markers = np.zeros(self.image.shape[:2], dtype=np.int32)
-        for surface in self.surfaces:
-            markers[surface.mask > 0] = (surface.index + 1)
+        expand_into_type(SurfaceType.Wall)
 
-        markers[intersecting_areas > 0] = 0
+
         #find_missing_surfaces
-
-
-        if im_logging_enabled(self.data):
-            log_image(self.data, "room_markers", markers * (255 / len(self.surfaces)))
-            log_image(self.data, "room_intersect", overlay_mask(self.image, intersecting_areas))
-            log_image(self.data, "room_total_mask", overlay_mask(self.image, total_mask * 255 / np.max(total_mask)))
         
         
 
