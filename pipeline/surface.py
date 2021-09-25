@@ -113,7 +113,7 @@ class Surface():
 
         self.category_probs = np.asarray([np.nanmean(prob) for prob in self.isolated_probs])
         self.category_probs = np.nan_to_num(self.category_probs)
-        self.category_counts = np.asarray([np.count_nonzero(prob[prob >= 0.1]) for prob in self.isolated_probs])
+        self.category_counts = np.asarray([np.count_nonzero(prob[prob >= self.confidence]) for prob in self.isolated_probs])
 
         self.best_indices = self.category_counts.argsort()[-K:][::-1]
         self.best_surface_types = list(map(lambda i: SurfaceType(i), self.best_indices))
@@ -127,7 +127,7 @@ class Surface():
 
         #Maybe it is being classified as ceiling when it's really wall or vice versa:
         #check the angle versus the floor normal. Walls are generally orthagonal to the floor or ceiling    
-        if self.surfaceType != SurfaceType.Other:
+        if self.surfaceType != SurfaceType.Other and self.surfaceType != SurfaceType.Ceiling:
             if angle_with_wall < angle_threshold and self.surfaceType != SurfaceType.Wall and self.surfaceType != SurfaceType.WallLike:
                 self._surfaceType = SurfaceType.Wall if self.surfaceType.is_major else SurfaceType.WallLike
                 self._alteration = "%d deg from wall" % int(math.degrees(angle_with_wall))
