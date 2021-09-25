@@ -14,12 +14,6 @@ from .logging import im_logging_enabled, log_image, log_segmentation_image
 #https://stackoverflow.com/questions/2736255/abstract-attributes-in-python
 class Room(Geometry):
 
-    def __init__(self, data):
-        super().__init__(data)
-        
-        # self.vert_indices = self.data["dimensions"][Dimension.Vertical].indices
-        # self.horiz_indices = self.data["dimensions"][Dimension.Vertical].indices
-
     @property
     def ceilings(self):
         return self.get_surfaces(surfaceType=SurfaceType.Ceiling)
@@ -32,12 +26,8 @@ class Room(Geometry):
     def floors(self):
         return self.get_surfaces(surfaceType=SurfaceType.Floor)
 
-    def analyze(self, labels):
-        self.labels = labels
-
-        plane_masks = np.dstack(tuple(self.masks))
-        plane_masks = np.int32(np.argmax(plane_masks, -1))
-        log_segmentation_image(self.data, "plane_masks", plane_masks, self.image)
+    def analyze(self):
+        
 
         #perform initial analysis
         for surface in self.surfaces:

@@ -4,6 +4,8 @@ import cv2
 import uuid
 
 from .utils import resize_array, multi_filter
+from .Line import Line
+from .logging import log_segmentation_image
 
 class Geometry():
 
@@ -14,7 +16,15 @@ class Geometry():
         self.image = self.data["downscaled"]
         planes_data = self.data["planes"]
         shape = (self.image.shape[1], self.image.shape[0])
-        self.masks = resize_array(planes_data["masks"], shape)
+        self.probs = resize_array(planes_data["masks"], shape)
+
+        self.masks = np.dstack(tuple(self.probs))
+        self.masks = np.int32(np.argmax(self.masks, -1))
+
+        ade_seg_c = np.dstack(tuple(self.data["isolated"]))
+        self.labels = np.int32(np.argmax(ade_seg_c, -1))
+
+        self.lines = self.data["lines"]
 
     def add_surface(self, surface):
         surface._geometry = self

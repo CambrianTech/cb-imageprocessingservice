@@ -45,6 +45,10 @@ class Surface():
 
     @property
     def probs(self) -> Geometry:
+        return self.geometry.probs[self.index]
+
+    @property
+    def plane_mask(self) -> Geometry:
         return self.geometry.masks[self.index]
 
     @property

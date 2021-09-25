@@ -20,22 +20,13 @@ class RoomSolver():
     def solve(self, confidence=0.95):
         
         wall_contours = []
- 
-        self.lines = self.data["lines"]
-
-        self.image = self.data["downscaled"]
-        sx = self.image.shape[1] / self.data["image"].shape[1]
-        sy = self.image.shape[0] / self.data["image"].shape[0]
-
-        #take intersection
-        ade_seg_c = np.dstack(tuple(self.data["isolated"]))
-        labels = np.int32(np.argmax(ade_seg_c, -1))
 
         #add the walls:
-        for i in range(len(self.room.masks)):
+        for i in range(len(self.room.probs)):
             self.room.add_surface(Surface(self.data, i))
 
-        self.room.analyze(labels)
+        self.room.analyze()
+
         
         if im_logging_enabled(self.data):
 
@@ -43,17 +34,21 @@ class RoomSolver():
             log_image(self.data, "room", self.room.get_debug_image())
             log_image(self.data, "room-unmasked", self.room.get_debug_image(False))
 
+
+            log_segmentation_image(self.data, "room_masks", self.room.masks, self.room.image, show_legend=False)
             
+            sx = self.room.image.shape[1] / self.room.data["image"].shape[1]
+            sy = self.room.image.shape[0] / self.room.data["image"].shape[0]
+            debug = log_segmentation_image(self.data, "probs", self.room.labels, self.room.image, get_image=True, labelset=SurfaceType)
+            Line.draw_all(debug, self.room.lines, color=(255,80,200), thickness=2, sx=sx, sy=sy)
+            log_image(self.data, "surfaces", debug)
+
             # for index in range(len(self.room.surfaces)):
             #     surface = self.room.surfaces[index]
             #     log_image(self.data, "skeleton_%d" % index, surface.skeleton * 255)
                 
 
-            debug = log_segmentation_image(self.data, "probs", labels, self.image, get_image=True, labelset=SurfaceType)
-
-            Line.draw_all(debug, self.lines, color=(255,80,200), thickness=2, sx=sx, sy=sy)
-
-            log_image(self.data, "surfaces", debug)
+            
 
 
 class PipelineRoomSolver(PipelineStep):
