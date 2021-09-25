@@ -140,15 +140,31 @@ class Surface():
 
         #If it is minor type, e.g. walllike or floorlike, it may need to become a major type such as wall or floor:
         if not self.surfaceType.is_major:
-            original_counts = self.category_counts[self.surfaceType.index]
+            minor_counts = self.category_counts[self.surfaceType.index]
 
             major_type = SurfaceType(self._surfaceType - 1)
             major_counts = self.category_counts[major_type.index]
 
+            primary_prob = self.category_probs[self.surfaceType]
+            secondary_prob = self.category_probs[self.secondaryType]
+            sp_ratio = (secondary_prob / primary_prob)
+
             #compare the total pixels. If it's a minor type it will be smaller
-            if major_counts > original_counts and major_type in self.best_surface_types:
+            if major_counts > minor_counts and major_type in self.best_surface_types:
                 self._surfaceType = major_type
-                self._alteration = "min %d->%d maj" % (original_counts, major_counts)
+                self._alteration = "min %d->%d maj" % (minor_counts, major_counts)
+            elif self.surfaceType.is_pair(self.secondaryType) and sp_ratio > 0.5:
+                self._alteration = "expanded %.2f" % (sp_ratio)
+                self._surfaceType = major_type
+                #print(sp_ratio)
+
+                # ratio = union_count / (primary_count + secondary_count)
+                # ratio = min(ratio, 1./ratio)
+
+                # if ratio > 0.5:
+                #     self._alteration = "expanded %.2f, %.2f" % (ratio, sp_ratio)
+                #     self._surfaceType = major_type
+
 
         if self._alteration is not None:
             print("Changed %d from %s to %s: %s" % (self.index, self.best_surface_types[0].name, self.surfaceType.name, self._alteration))

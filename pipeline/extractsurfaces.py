@@ -9,7 +9,7 @@ from .semanticlabel import SemanticLabel
 
 floor_like = [ADE20K.earth, ADE20K.grass, ADE20K.rug]
 wall_like = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.mirror, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen]
-ceiling_like = [ADE20K.fan, ADE20K.chandelier, ADE20K.light]
+ceiling_like = [ADE20K.light]
 
 def isolate_masks(data, output):
 
