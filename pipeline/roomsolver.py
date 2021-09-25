@@ -35,7 +35,7 @@ class RoomSolver():
             log_image(self.data, "room-unmasked", self.room.get_debug_image(False))
 
 
-            log_segmentation_image(self.data, "room_masks", self.room.masks, self.room.image, show_legend=False)
+            log_segmentation_image(self.data, "room_masks", self.room.index_mask, self.room.image, show_legend=False)
             
             sx = self.room.image.shape[1] / self.room.data["image"].shape[1]
             sy = self.room.image.shape[0] / self.room.data["image"].shape[0]

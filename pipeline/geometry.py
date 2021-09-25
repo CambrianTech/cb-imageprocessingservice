@@ -18,8 +18,8 @@ class Geometry():
         shape = (self.image.shape[1], self.image.shape[0])
         self.probs = resize_array(planes_data["masks"], shape)
 
-        self.masks = np.dstack(tuple(self.probs))
-        self.masks = np.int32(np.argmax(self.masks, -1))
+        self.index_mask = np.dstack(tuple(self.probs))
+        self.index_mask = np.int32(np.argmax(self.index_mask, -1))
 
         ade_seg_c = np.dstack(tuple(self.data["isolated"]))
         self.labels = np.int32(np.argmax(ade_seg_c, -1))

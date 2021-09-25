@@ -29,6 +29,7 @@ class Room(Geometry):
     def analyze(self):
         
 
+
         #perform initial analysis
         for surface in self.surfaces:
             surface.analyze()
@@ -57,6 +58,7 @@ class Room(Geometry):
             #     surface.mask[markers == surface.index + 1] = 1
 
             if im_logging_enabled(self.data):
+                
                 log_image(self.data, "room_unfilled", overlay_mask(self.image, unfilled_areas))
 
             

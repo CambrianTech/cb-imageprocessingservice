@@ -22,6 +22,7 @@ class Surface():
         self._mask = None
         self._alteration = None
         self.invalidated = False
+        self._plane_mask = None
 
     @property
     def uniqueId(self) -> str:
@@ -49,7 +50,10 @@ class Surface():
 
     @property
     def plane_mask(self) -> Geometry:
-        return self.geometry.masks[self.index]
+        if self._plane_mask is None:
+            self._plane_mask = np.zeros_like(self.geometry.index_mask)
+            self._plane_mask[self.geometry.index_mask == self.index] = 1
+        return self._plane_mask
 
     @property
     def normal(self) -> float:
@@ -106,7 +110,7 @@ class Surface():
         isolated = self.data["isolated"]
 
         prob_mask = self.probs.copy()
-        prob_mask[prob_mask < self.confidence] = 0
+        prob_mask[self.plane_mask == 0] = 0
         if np.sum(prob_mask) < 10:
             prob_mask = self.probs
 
@@ -178,7 +182,7 @@ class Surface():
         if self._alteration is not None:
             print("Changed %d from %s to %s: %s" % (self.index, self.best_surface_types[0].name, self.surfaceType.name, self._alteration))
 
-    def analyze(self, confidence=0.05, K=3):
+    def analyze(self, confidence=0.0, K=3):
 
         highest = np.max(self.probs)
         self.confidence = max(min(highest * 0.9, confidence), 0.05)
