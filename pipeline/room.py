@@ -10,7 +10,7 @@ from .geometry import Geometry
 from .core import SurfaceType
 from .surface import Surface
 from .utils import convert_color, put_text, overlay_mask
-from .logging import im_logging_enabled, log_image, log_segmentation_image
+from .logging import im_logging_enabled, log_image, log_segmentation_image, log_markers
 from .Line import Line
 
 from termcolor import colored
@@ -33,6 +33,21 @@ class Room(Geometry):
 
     def analyze(self):
         
+        self.analyze_surfaces()
+
+        log_image(self.data, "room_initial", self.get_debug_image())
+
+        self.add_missing_surfaces()
+
+        log_image(self.data, "room_adjusted", self.get_debug_image())
+
+        self.refine_surfaces()
+
+        self.ransac_fit()
+
+        log_image(self.data, "room", self.get_debug_image())
+
+    def analyze_surfaces(self):
         #perform initial analysis
         num_before = len(self.surfaces)
         for surface in self.surfaces:
@@ -42,16 +57,24 @@ class Room(Geometry):
         if num_after != num_before:
             print(colored("Surfaces reduced from %d to %d" % (num_before, num_after), 'red'))
 
+
+    def add_missing_surfaces(self):
+        pass
+
+    def refine_surfaces(self):
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
         lines_mask = np.zeros(watershed_image.shape, dtype=np.uint8)
         sx = self.image.shape[1] / self.data["image"].shape[1]
         sy = self.image.shape[0] / self.data["image"].shape[0]
         Line.draw_all(lines_mask, self.data["lines"], color=(255,255,255), thickness=1, sx=sx, sy=sy, lineType=cv2.LINE_4)
+
         
         def expand_into_type(surfaceType:SurfaceType):
             surfaces = self.get_surfaces(surfaceType)
 
-            if len(surfaces) == 0:
+            num_surfaces = len(surfaces)
+
+            if num_surfaces == 0:
                 return
 
             total_mask = np.sum(np.dstack([s.mask for s in surfaces]), axis=-1)
@@ -60,7 +83,7 @@ class Room(Geometry):
 
             markers = np.zeros(total_mask.shape, dtype=np.int32)
             
-            for index in range(len(surfaces)):
+            for index in range(num_surfaces):
                 surface = surfaces[index]
                 dist_transform = cv2.distanceTransform(surface.mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
                 markers[dist_transform > 0.15 * dist_transform.max()] = index + 1
@@ -71,16 +94,16 @@ class Room(Geometry):
             watershed_mask[self.labels == surfaceType.index] = 1
             watershed_mask[lines_mask > 0] = 0
 
-            # if im_logging_enabled(self.data):
-            #     log_image(self.data, "room_%s_markers" % surfaceType.name, markers * 20)
+            log_markers(self.data, "room_%s_markers" % surfaceType.name, markers, mask=watershed_mask)
 
             #perform watershed:
             markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
             markers[markers<0] = 0
 
-            if im_logging_enabled(self.data): log_image(self.data, "room_%s_watershed" % surfaceType.name, markers * 20)
+            log_markers(self.data, "room_%s_watershed" % surfaceType.name, markers, mask=watershed_mask)
 
-            for index in range(len(surfaces)):
+            #commit to mask
+            for index in range(num_surfaces):
                 surface = surfaces[index]
                 mask = np.zeros_like(surface.mask)
                 mask[markers == (index + 1)] = 1
@@ -90,9 +113,12 @@ class Room(Geometry):
 
         #expand all surfaces as far as they can go within their segmentation (watershed)
         #and resolve disputes between planes as they intersect by probability (confidence):
-        for surfaceType in SurfaceType: expand_into_type(surfaceType)
+        for surfaceType in SurfaceType: 
+            expand_into_type(surfaceType)
 
-        #find_missing_surfaces
+    def ransac_fit(self):
+        pass
+
         
     def get_debug_image(self):
 
@@ -119,6 +145,9 @@ class Room(Geometry):
 
             surface.debug(img, color)
                 
+        sx = self.image.shape[1] / self.data["image"].shape[1]
+        sy = self.image.shape[0] / self.data["image"].shape[0]
+        Line.draw_all(img, self.data["lines"], color=(0,0,255), thickness=1, sx=sx, sy=sy)
 
         return img
 
