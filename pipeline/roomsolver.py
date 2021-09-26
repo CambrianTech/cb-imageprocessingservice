@@ -37,10 +37,12 @@ class RoomSolver():
 
             log_segmentation_image(self.data, "room_masks", self.room.index_mask, self.room.image, show_legend=False)
             
+            debug = log_segmentation_image(self.data, "probs", self.room.labels, self.room.image, get_image=True, labelset=SurfaceType)
+
             sx = self.room.image.shape[1] / self.room.data["image"].shape[1]
             sy = self.room.image.shape[0] / self.room.data["image"].shape[0]
-            debug = log_segmentation_image(self.data, "probs", self.room.labels, self.room.image, get_image=True, labelset=SurfaceType)
-            Line.draw_all(debug, self.room.lines, color=(255,80,200), thickness=2, sx=sx, sy=sy)
+            Line.draw_all(debug, self.data["lines"], color=(255,80,200), thickness=2, sx=sx, sy=sy)
+            
             log_image(self.data, "surfaces", debug)
 
             # for index in range(len(self.room.surfaces)):

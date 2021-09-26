@@ -7,7 +7,6 @@ import uuid
 
 from .core import SurfaceType
 from .geometry import Geometry
-from .planegeometry import PlanarDimension
 from .utils import convert_color, put_text
 from .Line import line_angle_difference
 
@@ -93,11 +92,6 @@ class Surface():
             cX = int(self.moments["m10"] / self.moments["m00"])
             cY = int(self.moments["m01"] / self.moments["m00"])
         return cX, cY
-
-    @property
-    @abstractmethod
-    def dimension(self) -> PlanarDimension:
-        pass
 
     def get_surface_mask(self, label:SurfaceType, confidence):
         mask = np.zeros(self.probs.shape, dtype="uint8")

@@ -4,8 +4,6 @@ import cv2
 import uuid
 
 from .utils import resize_array, multi_filter
-from .Line import Line
-from .logging import log_segmentation_image
 
 class Geometry():
 
@@ -23,8 +21,6 @@ class Geometry():
 
         ade_seg_c = np.dstack(tuple(self.data["isolated"]))
         self.labels = np.int32(np.argmax(ade_seg_c, -1))
-
-        self.lines = self.data["lines"]
 
     def add_surface(self, surface):
         surface._geometry = self
