@@ -26,8 +26,14 @@ class Geometry():
         surface._geometry = self
         self._surfaces[surface.uniqueId] = surface
 
+    def refresh_surfaces(self):        
+        self._surfaces = dict(filter(lambda kv:not kv[1].invalidated, self._surfaces.items()))
+
     def get_surfaces(self, surfaceType=None, dimension=None):
-        filters = [lambda surface: not surface.invalidated]
+
+        self.refresh_surfaces()
+
+        filters = []
         
         if surfaceType is not None:
             filters.append(lambda surface: surface.surfaceType == surfaceType)

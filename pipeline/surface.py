@@ -22,6 +22,7 @@ class Surface():
         self._alteration = None
         self.invalidated = False
         self._plane_mask = None
+        self._contours = None
 
     @property
     def uniqueId(self) -> str:
@@ -73,14 +74,18 @@ class Surface():
     def mask(self) -> ndimage:
         if self._mask is None:
             self._mask = self.get_surface_mask(self.surfaceType, self.confidence)
-            
-            self.contours, self.hierarchy = cv2.findContours(self._mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            self.moments = cv2.moments(self.contours[0]) if len(self.contours) > 0 else None
+        return self._mask
+
+    @property
+    def contours(self) -> ndimage:
+        if self._contours is None:
+            self._contours, self.hierarchy = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            self.moments = cv2.moments(self._contours[0]) if len(self._contours) > 0 else None
 
             if self.moments is None or self.moments["m00"] == 0:
-                self.moments = cv2.moments(self._mask)
+                self.moments = cv2.moments(self.mask)
 
-        return self._mask
+        return self._contours
 
     @property
     def center(self) -> tuple:

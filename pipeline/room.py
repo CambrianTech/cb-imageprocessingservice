@@ -10,6 +10,8 @@ from .surface import Surface
 from .utils import convert_color, put_text, overlay_mask
 from .logging import im_logging_enabled, log_image, log_segmentation_image
 
+from termcolor import colored
+
 #python info on object oriented methods and properties
 #https://stackoverflow.com/questions/2736255/abstract-attributes-in-python
 class Room(Geometry):
@@ -28,13 +30,16 @@ class Room(Geometry):
 
     def analyze(self):
         
-
-
         #perform initial analysis
+        num_before = len(self.surfaces)
         for surface in self.surfaces:
             surface.analyze()
 
-        #merge heavily intersecting surfaces:
+        num_after = len(self.surfaces)
+
+        if num_after != num_before:
+
+            print(colored("Surfaces reduced from %d to %d" % (num_before, num_after), 'red'))
         
         def expand_into_type(surfaceType:SurfaceType):
             surfaces = self.get_surfaces(surfaceType)

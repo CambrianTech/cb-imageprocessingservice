@@ -3,6 +3,8 @@ import os.path
 import numpy as np
 import pickle
 from enum import IntFlag
+from termcolor import colored
+
 from .ade20k import ADE20K
 from .utils import get_segmentation_image
 

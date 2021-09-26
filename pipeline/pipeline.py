@@ -2,6 +2,7 @@ import os
 import time
 import subprocess
 from enum import IntEnum
+from termcolor import colored
 
 from .core import schedule_and_wait, PipelineStep, PipelineStepIndex
 from .logging import get_unique_id, set_logging_dir, set_logging_step, log_data, LogLevel, set_logging_level
@@ -184,7 +185,7 @@ class Pipeline():
 
         start_time = time.time()
 
-        print("\n##### Running stages %s through %s #####" % (self.steps[1].description, self.steps[len(self.steps)-1].description))
+        print(colored("Running stages %s through %s" % (self.steps[1].description, self.steps[len(self.steps)-1].description), attrs=['bold']))
 
         for step in self.steps:
 
@@ -206,6 +207,6 @@ class Pipeline():
             if step.index == self.export_step and logging_dir is not None:
                 log_data(data)
 
-        print("##### All stages time: %.2f seconds #####\n" % (time.time() - start_time))
+        print(colored("\nAll stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
 
         return data
