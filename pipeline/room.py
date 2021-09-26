@@ -4,6 +4,7 @@ import cv2
 import uuid
 import random
 from skimage.segmentation import watershed
+from skimage.color import rgb2gray
 
 from .geometry import Geometry
 from .core import SurfaceType
@@ -39,6 +40,10 @@ class Room(Geometry):
         num_after = len(self.surfaces)
         if num_after != num_before:
             print(colored("Surfaces reduced from %d to %d" % (num_before, num_after), 'red'))
+
+        #watershed_image = rgb2gray(self.image)
+
+        watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
         
         def expand_into_type(surfaceType:SurfaceType):
             surfaces = self.get_surfaces(surfaceType)
@@ -47,7 +52,7 @@ class Room(Geometry):
                 return
 
             total_mask = np.sum(np.dstack([s.mask for s in surfaces]), axis=-1)
-            disputed_areas = np.zeros_like(total_mask)
+            disputed_areas = np.zeros(total_mask.shape, dtype=np.uint8)
             disputed_areas[total_mask > 1] = 1
 
             markers = np.zeros(total_mask.shape, dtype=np.int32)
@@ -56,23 +61,34 @@ class Room(Geometry):
                 surface = surfaces[index]
                 markers[surface.mask > 0] = index + 1
 
+            #disputed_areas = cv2.dilate(disputed_areas, np.ones((5,5),np.uint8), iterations=5)
+
             markers[disputed_areas > 0] = 0
-            markers[self.labels != surfaceType.index] = 255
+
+            watershed_mask = np.zeros(total_mask.shape, dtype=np.int32)
+            watershed_mask[self.labels == surfaceType.index] = 1
 
             if im_logging_enabled(self.data):
                 log_image(self.data, "room_%s_markers" % surfaceType.name, markers * 20)
 
-            #perform watershed:            
-            markers = watershed(self.image, markers)
+            #perform watershed:
+            markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
             markers[markers<0] = 0
 
             if im_logging_enabled(self.data):
                 log_image(self.data, "room_%s_watershed" % surfaceType.name, markers * 20)
 
+            for index in range(len(surfaces)):
+                surface = surfaces[index]
+                mask = np.zeros_like(surface.mask)
+                mask[markers == (index + 1)] = 1
+                surface._mask = mask
+
 
         #expand all surfaces as far as they can go within their segmentation (watershed)
         #and resolve disputes between planes as they intersect by probability (confidence):
         expand_into_type(SurfaceType.Wall)
+
         #expand_into_type(SurfaceType.Floor)
 
         #find_missing_surfaces
