@@ -36,9 +36,7 @@ class Room(Geometry):
             surface.analyze()
 
         num_after = len(self.surfaces)
-
         if num_after != num_before:
-
             print(colored("Surfaces reduced from %d to %d" % (num_before, num_after), 'red'))
         
         def expand_into_type(surfaceType:SurfaceType):
@@ -57,10 +55,6 @@ class Room(Geometry):
 
             
             #intersecting_areas[total_mask > 1] = 1
-
-
-            # for surface in surfaces:
-            #     surface.mask[markers == surface.index + 1] = 1
 
             if im_logging_enabled(self.data):
                 
