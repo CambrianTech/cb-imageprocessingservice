@@ -11,6 +11,7 @@ from .core import SurfaceType
 from .surface import Surface
 from .utils import convert_color, put_text, overlay_mask
 from .logging import im_logging_enabled, log_image, log_segmentation_image
+from .Line import Line
 
 from termcolor import colored
 
@@ -44,6 +45,11 @@ class Room(Geometry):
         #watershed_image = rgb2gray(self.image)
 
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
+
+        lines_mask = np.zeros(watershed_image.shape, dtype=np.uint8)
+        sx = self.image.shape[1] / self.data["image"].shape[1]
+        sy = self.image.shape[0] / self.data["image"].shape[0]
+        Line.draw_all(lines_mask, self.data["lines"], color=(0,0,0), thickness=5, sx=sx, sy=sy)
         
         def expand_into_type(surfaceType:SurfaceType):
             surfaces = self.get_surfaces(surfaceType)
@@ -59,14 +65,14 @@ class Room(Geometry):
             
             for index in range(len(surfaces)):
                 surface = surfaces[index]
-                markers[surface.mask > 0] = index + 1
-
-            #disputed_areas = cv2.dilate(disputed_areas, np.ones((5,5),np.uint8), iterations=5)
+                dist_transform = cv2.distanceTransform(surface.mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
+                markers[dist_transform > 0.15 * dist_transform.max()] = index + 1
 
             markers[disputed_areas > 0] = 0
 
             watershed_mask = np.zeros(total_mask.shape, dtype=np.int32)
             watershed_mask[self.labels == surfaceType.index] = 1
+            watershed_mask[lines_mask > 0] = 1
 
             if im_logging_enabled(self.data):
                 log_image(self.data, "room_%s_markers" % surfaceType.name, markers * 20)
@@ -82,14 +88,14 @@ class Room(Geometry):
                 surface = surfaces[index]
                 mask = np.zeros_like(surface.mask)
                 mask[markers == (index + 1)] = 1
+                mask[surface.probs < 0.01] = 0
                 surface._mask = mask
 
 
         #expand all surfaces as far as they can go within their segmentation (watershed)
         #and resolve disputes between planes as they intersect by probability (confidence):
-        expand_into_type(SurfaceType.Wall)
-
-        #expand_into_type(SurfaceType.Floor)
+        for surfaceType in SurfaceType:
+            expand_into_type(surfaceType)
 
         #find_missing_surfaces
         
