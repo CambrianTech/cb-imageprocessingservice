@@ -49,8 +49,8 @@ class Line(Sequence):
     def point_b(self):
         return (self.data[2], self.data[3])
 
-    def draw(self, img, color=(255,50,255,255), thickness=2, sx=1.0, sy=1.0):
-        cv2.line(img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness)
+    def draw(self, img, color=(255,50,255,255), thickness=2, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
+        cv2.line(img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
 
     def reshape(self, *args):
         return self.data.reshape(*args)
@@ -72,8 +72,8 @@ class Line(Sequence):
                                         and line != self, lines)) 
 
     @classmethod
-    def draw_all(cls, img, lines, color=(255,50,255,255), thickness=2, sx=1.0, sy=1.0):
-        [line.draw(img, color=color, thickness=thickness, sx=sx, sy=sy) for line in lines]
+    def draw_all(cls, img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
+        [line.draw(img, color=color, thickness=thickness, sx=sx, sy=sy, lineType=lineType) for line in lines]
 
     @classmethod
     def merge(cls, lines, search_width, search_length=1.01, angle_threshold=math.radians(3), max_iterations=1e5):
