@@ -42,10 +42,7 @@ class Room(Geometry):
         if num_after != num_before:
             print(colored("Surfaces reduced from %d to %d" % (num_before, num_after), 'red'))
 
-        #watershed_image = rgb2gray(self.image)
-
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
-
         lines_mask = np.zeros(watershed_image.shape, dtype=np.uint8)
         sx = self.image.shape[1] / self.data["image"].shape[1]
         sy = self.image.shape[0] / self.data["image"].shape[0]
@@ -66,7 +63,7 @@ class Room(Geometry):
             for index in range(len(surfaces)):
                 surface = surfaces[index]
                 dist_transform = cv2.distanceTransform(surface.mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
-                markers[dist_transform > 0.2 * dist_transform.max()] = index + 1
+                markers[dist_transform > 0.15 * dist_transform.max()] = index + 1
 
             markers[disputed_areas > 0] = 0
 
@@ -81,8 +78,7 @@ class Room(Geometry):
             markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
             markers[markers<0] = 0
 
-            # if im_logging_enabled(self.data):
-            #     log_image(self.data, "room_%s_watershed" % surfaceType.name, markers * 20)
+            if im_logging_enabled(self.data): log_image(self.data, "room_%s_watershed" % surfaceType.name, markers * 20)
 
             for index in range(len(surfaces)):
                 surface = surfaces[index]
@@ -94,8 +90,7 @@ class Room(Geometry):
 
         #expand all surfaces as far as they can go within their segmentation (watershed)
         #and resolve disputes between planes as they intersect by probability (confidence):
-        # for surfaceType in filter(lambda surfaceType: surfaceType.is_major, SurfaceType):
-        #     expand_into_type(surfaceType)
+        for surfaceType in SurfaceType: expand_into_type(surfaceType)
 
         #find_missing_surfaces
         
@@ -109,8 +104,10 @@ class Room(Geometry):
             surface = self.surfaces[i]
             mask = surface.mask > 0
 
-            img_hsv[:, :, 0][mask] = hues[i]
-            img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.5)
+            max_value = 0.9
+            if max_value > 0:
+                img_hsv[:, :, 0][mask] = hues[i]
+                img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.25)
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
