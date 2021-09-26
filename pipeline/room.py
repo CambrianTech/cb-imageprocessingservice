@@ -49,7 +49,7 @@ class Room(Geometry):
         lines_mask = np.zeros(watershed_image.shape, dtype=np.uint8)
         sx = self.image.shape[1] / self.data["image"].shape[1]
         sy = self.image.shape[0] / self.data["image"].shape[0]
-        Line.draw_all(lines_mask, self.data["lines"], color=(0,0,0), thickness=5, sx=sx, sy=sy)
+        Line.draw_all(lines_mask, self.data["lines"], color=(255,255,255), thickness=1, sx=sx, sy=sy, lineType=cv2.LINE_4)
         
         def expand_into_type(surfaceType:SurfaceType):
             surfaces = self.get_surfaces(surfaceType)
@@ -66,23 +66,23 @@ class Room(Geometry):
             for index in range(len(surfaces)):
                 surface = surfaces[index]
                 dist_transform = cv2.distanceTransform(surface.mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
-                markers[dist_transform > 0.15 * dist_transform.max()] = index + 1
+                markers[dist_transform > 0.2 * dist_transform.max()] = index + 1
 
             markers[disputed_areas > 0] = 0
 
             watershed_mask = np.zeros(total_mask.shape, dtype=np.int32)
             watershed_mask[self.labels == surfaceType.index] = 1
-            watershed_mask[lines_mask > 0] = 1
+            watershed_mask[lines_mask > 0] = 0
 
-            if im_logging_enabled(self.data):
-                log_image(self.data, "room_%s_markers" % surfaceType.name, markers * 20)
+            # if im_logging_enabled(self.data):
+            #     log_image(self.data, "room_%s_markers" % surfaceType.name, markers * 20)
 
             #perform watershed:
             markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
             markers[markers<0] = 0
 
-            if im_logging_enabled(self.data):
-                log_image(self.data, "room_%s_watershed" % surfaceType.name, markers * 20)
+            # if im_logging_enabled(self.data):
+            #     log_image(self.data, "room_%s_watershed" % surfaceType.name, markers * 20)
 
             for index in range(len(surfaces)):
                 surface = surfaces[index]
@@ -94,8 +94,8 @@ class Room(Geometry):
 
         #expand all surfaces as far as they can go within their segmentation (watershed)
         #and resolve disputes between planes as they intersect by probability (confidence):
-        for surfaceType in SurfaceType:
-            expand_into_type(surfaceType)
+        # for surfaceType in filter(lambda surfaceType: surfaceType.is_major, SurfaceType):
+        #     expand_into_type(surfaceType)
 
         #find_missing_surfaces
         
