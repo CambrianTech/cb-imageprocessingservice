@@ -181,7 +181,7 @@ class Surface():
         if self._alteration is not None:
             print("Changed %d from %s to %s: %s" % (self.index, self.best_surface_types[0].name, self.surfaceType.name, self._alteration))
 
-    def analyze(self, confidence=0.0, K=3):
+    def analyze(self, confidence=0.05, K=3):
 
         highest = np.max(self.probs)
         self.confidence = max(min(highest * 0.9, confidence), 0.05)
