@@ -27,13 +27,10 @@ class RoomSolver():
 
         self.room.analyze()
 
-        
         if im_logging_enabled(self.data):
 
             #for i, surface in enumerate(self.room.surfaces): log_image(self.data, "surface_%d" % i, surface.probs * 255)
             log_image(self.data, "room", self.room.get_debug_image())
-            log_image(self.data, "room-unmasked", self.room.get_debug_image(False))
-
 
             log_segmentation_image(self.data, "room_masks", self.room.index_mask, self.room.image, show_legend=False)
             
@@ -42,13 +39,8 @@ class RoomSolver():
             sx = self.room.image.shape[1] / self.room.data["image"].shape[1]
             sy = self.room.image.shape[0] / self.room.data["image"].shape[0]
             Line.draw_all(debug, self.data["lines"], color=(255,80,200), thickness=2, sx=sx, sy=sy)
-            
-            log_image(self.data, "surfaces", debug)
 
-            # for index in range(len(self.room.surfaces)):
-            #     surface = self.room.surfaces[index]
-            #     log_image(self.data, "skeleton_%d" % index, surface.skeleton * 255)
-                
+            log_image(self.data, "surfaces", debug)
 
             
 

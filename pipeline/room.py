@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import uuid
 import random
+from skimage.segmentation import watershed
 
 from .geometry import Geometry
 from .core import SurfaceType
@@ -49,31 +50,34 @@ class Room(Geometry):
             disputed_areas = np.zeros_like(total_mask)
             disputed_areas[total_mask > 1] = 1
 
-            unfilled_areas = np.zeros_like(total_mask)
-            where = np.where(np.logical_and(self.labels == surfaceType.index, total_mask == 0))
-            unfilled_areas[where] = 1
-
+            markers = np.zeros(total_mask.shape, dtype=np.int32)
             
-            #intersecting_areas[total_mask > 1] = 1
+            for index in range(len(surfaces)):
+                surface = surfaces[index]
+                markers[surface.mask > 0] = index + 1
+
+            markers[disputed_areas > 0] = 0
+            markers[self.labels != surfaceType.index] = 255
 
             if im_logging_enabled(self.data):
-                
-                log_image(self.data, "room_unfilled", overlay_mask(self.image, unfilled_areas))
+                log_image(self.data, "room_%s_markers" % surfaceType.name, markers * 20)
 
-            
+            #perform watershed:            
+            markers = watershed(self.image, markers)
+            markers[markers<0] = 0
+
+            if im_logging_enabled(self.data):
+                log_image(self.data, "room_%s_watershed" % surfaceType.name, markers * 20)
 
 
         #expand all surfaces as far as they can go within their segmentation (watershed)
         #and resolve disputes between planes as they intersect by probability (confidence):
         expand_into_type(SurfaceType.Wall)
-
+        #expand_into_type(SurfaceType.Floor)
 
         #find_missing_surfaces
         
-        
-
-
-    def get_debug_image(self, masked=True):
+    def get_debug_image(self):
 
         img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV_FULL)
         hues = random.sample(range(0, 360), len(self.surfaces))
@@ -81,8 +85,7 @@ class Room(Geometry):
         #overlay probs
         for i in range(len(self.surfaces)):
             surface = self.surfaces[i]
-
-            mask = surface.mask > 0 if masked else surface.probs >= 0.05
+            mask = surface.mask > 0
 
             img_hsv[:, :, 0][mask] = hues[i]
             img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.5)
