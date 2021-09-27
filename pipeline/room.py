@@ -62,6 +62,14 @@ class Room(Geometry):
 
         missing = []
 
+        total_area = self.image.shape[0] * self.image.shape[1]
+        area_threshold = total_area / 50
+
+        if len(self.surfaces) > 0:
+            total_mask = np.sum(np.dstack([s.mask for s in self.surfaces]), axis=-1)
+        else:
+            total_mask = None
+
         debug = self.image.copy()
         
         for surfaceType in SurfaceType:
@@ -71,15 +79,19 @@ class Room(Geometry):
             remaining_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
             remaining_mask[self.labels == surfaceType] = 1
 
-            surfaces = self.get_surfaces(surfaceType)
-            if len(surfaces) > 0:
-                total_mask = np.sum(np.dstack([s.mask for s in surfaces]), axis=-1)
+            if total_mask is not None:
                 remaining_mask[total_mask > 0] = 0
 
             contours, hierarchy = cv2.findContours(remaining_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+            valid_contours = []
             if contours is not None:
-                cv2.drawContours(debug, contours, -1, color, -1)
+                for contour in contours:
+                    if cv2.contourArea(contour) > area_threshold:
+                        valid_contours.append(contour)
+
+            if len(valid_contours):
+                cv2.drawContours(debug, np.array(valid_contours), -1, color, -1)
 
             
 
