@@ -9,7 +9,7 @@ from skimage.color import rgb2gray
 from .geometry import Geometry
 from .core import SurfaceType
 from .surface import Surface
-from .utils import convert_color, put_text, overlay_mask
+from .utils import convert_color, put_text, overlay_mask, random_color
 from .logging import im_logging_enabled, log_image, log_segmentation_image, log_markers
 from .Line import Line
 
@@ -59,7 +59,33 @@ class Room(Geometry):
 
 
     def add_missing_surfaces(self):
-        pass
+
+        missing = []
+
+        debug = self.image.copy()
+        
+        for surfaceType in SurfaceType:
+            
+            color = random_color()
+
+            remaining_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+            remaining_mask[self.labels == surfaceType] = 1
+
+            surfaces = self.get_surfaces(surfaceType)
+            if len(surfaces) > 0:
+                total_mask = np.sum(np.dstack([s.mask for s in surfaces]), axis=-1)
+                remaining_mask[total_mask > 0] = 0
+
+            contours, hierarchy = cv2.findContours(remaining_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            if contours is not None:
+                cv2.drawContours(debug, contours, -1, color, -1)
+
+            
+
+        log_image(self.data, "room_missing", debug)
+
+        
 
     def refine_surfaces(self):
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
