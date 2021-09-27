@@ -63,7 +63,7 @@ class Room(Geometry):
         missing = []
 
         total_area = self.image.shape[0] * self.image.shape[1]
-        area_threshold = total_area / 50
+        area_threshold = total_area / 100
 
         if len(self.surfaces) > 0:
             total_mask = np.sum(np.dstack([s.mask for s in self.surfaces]), axis=-1)
@@ -145,8 +145,8 @@ class Room(Geometry):
                 surface = surfaces[index]
                 mask = np.zeros_like(surface.mask)
                 mask[markers == (index + 1)] = 1
-                mask[surface.probs < 0.01] = 0
-                surface._mask = mask
+                #mask[surface.probs < 0.01] = 0
+                surface.set_mask(mask)
 
 
         #expand all surfaces as far as they can go within their segmentation (watershed)

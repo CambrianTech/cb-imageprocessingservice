@@ -73,8 +73,12 @@ class Surface():
     @property
     def mask(self) -> ndimage:
         if self._mask is None:
-            self._mask = self.get_surface_mask(self.surfaceType, self.confidence)
+            self.set_mask(self.get_surface_mask(self.surfaceType, self.confidence))
         return self._mask
+
+    def set_mask(self, mask):
+         self._mask = mask
+         self._contours = None
 
     @property
     def contours(self) -> ndimage:
