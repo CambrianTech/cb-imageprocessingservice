@@ -37,11 +37,11 @@ class Room(Geometry):
 
         log_image(self.data, "room_initial", self.get_debug_image())
 
-        self.add_missing_surfaces()
-
-        log_image(self.data, "room_adjusted", self.get_debug_image())
+        #log_image(self.data, "room_adjusted", self.get_debug_image())
 
         self.refine_surfaces()
+
+        self.add_missing_surfaces()
 
         self.ransac_fit()
 
