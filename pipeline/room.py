@@ -52,6 +52,8 @@ class Room(Geometry):
         #log_image(self.data, "room_refined_again", self.get_debug_image())
         #self.ransac_fit()
 
+        self.merge_like_surfaces()
+
         log_image(self.data, "room", self.get_debug_image())
 
     def analyze_surfaces(self):
@@ -84,7 +86,8 @@ class Room(Geometry):
         else:
             total_mask = None
 
-        debug = self.image.copy()
+        if im_logging_enabled(self.data):
+            debug = self.image.copy()
         
         for surfaceType in SurfaceType:
             
@@ -104,11 +107,8 @@ class Room(Geometry):
                     if cv2.contourArea(contour) > area_threshold:
                         valid_contours.append(contour)
 
-            if len(valid_contours):
+            if im_logging_enabled(self.data) and len(valid_contours):
                 cv2.drawContours(debug, np.array(valid_contours), -1, color, cv2.FILLED)
-
-            
-            #matches = self.index_mask[]
 
             for contour in valid_contours:
                 contour_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
@@ -141,12 +141,11 @@ class Room(Geometry):
                     log_image(self.data, surface.name, new_surface.mask)
                     self.add_surface(new_surface)
 
+        if im_logging_enabled(self.data):
+            log_image(self.data, "room_missing", debug)
 
-                
-
-            
-
-        log_image(self.data, "room_missing", debug)
+    def merge_like_surfaces(self):
+        pass
 
         
     def refine_surfaces(self, min_confidence=None):
