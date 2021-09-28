@@ -18,6 +18,7 @@ from .surface import Surface
 from .utils import convert_color, put_text, overlay_mask, random_color
 from .logging import im_logging_enabled, log_image, log_segmentation_image, log_markers
 from .Line import Line
+from .ade20k import ADE20K
 
 from termcolor import colored
 
@@ -55,6 +56,12 @@ class Room(Geometry):
         self.merge_like_surfaces()
 
         log_image(self.data, "room", self.get_debug_image())
+
+    @property
+    def semantic_type() -> ADE20K:
+        #todo: get value
+        return ADE20K.shelf
+
 
     def analyze_surfaces(self):
         #perform initial analysis
@@ -137,7 +144,7 @@ class Room(Geometry):
         if im_logging_enabled(self.data):
             log_image(self.data, "room_missing", debug)
 
-    def merge_like_surfaces(self):
+    def merge_like_surfaces(self, angle_threshold=np.radians(30)):
 
         if im_logging_enabled(self.data):
             debug = self.image.copy()
@@ -167,13 +174,15 @@ class Room(Geometry):
 
                     distance_between = abs(distance_i - distance_j)
                     distance_mean = 0.5 * (distance_i + distance_j)
-                    distance_threshold = distance_mean * 0.25 #accuracy degrades by range (maybe use error here, error square?)
+                    distance_error = 0.35 * distance_mean #accuracy degrades by range (maybe use error here, error square?)
 
-                    if surfaceType == SurfaceType.Floor or (angle < np.radians(20) and distance_between < distance_threshold):
+                    if surfaceType == SurfaceType.Floor or (angle < angle_threshold and distance_between < distance_error):
                         if surfaceType != SurfaceType.Other:
                             surfaces[i].merge(surfaces[j])
+                            surfaces[i]._alteration = "%.2fm %.2fd" % (distance_between, angle_threshold)
                         else:
-                            print("Check semantic type")
+                            print("todo: Check semantic type")
+
 
 
 
