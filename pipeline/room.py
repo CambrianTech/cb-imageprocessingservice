@@ -119,15 +119,26 @@ class Room(Geometry):
                 valid_clusters = indexes[counts > area_threshold]
 
                 max_clusters = len(valid_clusters)
+                new_surface = None
 
-                if max_clusters > 0:
-                    print(colored("Create %d surfaces" % max_clusters, 'yellow'))
-                    for i in range(max_clusters):
-                        index = valid_clusters[i]
-                        surface = self.surfaces[index]
-                        print(colored("Creating new %s using %s as reference" % (surfaceType.name, surface.name), 'green'))
-                        new_surface = surface.clone()
-                        
+                for i in range(max_clusters):
+                    index = valid_clusters[i]
+                    surface = self.surfaces[index]
+                    if surface.surfaceType == surfaceType or surface.surfaceType.is_pair(surfaceType):
+
+                        mask = contour_mask.copy()
+                        mask[self.index_mask != index] = 0
+
+                        if cv2.countNonZero(mask) >= area_threshold:
+                            new_surface = surface.clone()
+                            new_surface.surfaceType = surfaceType
+                            new_surface.set_mask(mask)
+                            break
+
+                if new_surface is not None:
+                    print(colored("Creating new %s using %s as reference" % (surfaceType.name, surface.name), 'green'))
+                    log_image(self.data, surface.name, new_surface.mask)
+                    self.add_surface(new_surface)
 
 
                 

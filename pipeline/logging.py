@@ -9,13 +9,15 @@ from .ade20k import ADE20K
 from .utils import get_segmentation_image
 
 class LogLevel(IntFlag):
-    Nothing = 0
-    Images = 0x1 << 0
-    Segmentation = 0x1 << 1
-    Lines = 0x1 << 2
-    Models = 0x1 << 3
+    Nothing =       0
+    Images =        0x1 << 0
+    Segmentation =  0x1 << 1
+    Markers =       0x1 << 2
+    Lines =         0x1 << 3
+    Models =        0x1 << 4
 
-    All = 0xff
+    Default =       Images 
+    All =           0xff
 
 def get_unique_id(data:dict):
     return data["unique_id"]
@@ -117,7 +119,7 @@ def log_markers(data:dict, name, markers, mask=None, num_labels=None):
 
 def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", show_legend=True, labelset=ADE20K,  opacity=0.5, get_image=False):
     
-    if im_logging_enabled(data, LogLevel.Segmentation):
+    if get_image or im_logging_enabled(data, LogLevel.Segmentation):
         
         debug = get_segmentation_image(segmentation, image, avg, get_legend=show_legend, labelset=labelset)
 

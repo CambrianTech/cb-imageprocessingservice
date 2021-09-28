@@ -17,11 +17,12 @@ class Surface():
         self.data = data
         self.index = index
         self._uniqueId = uuid.uuid4()
-        self._surfaceType = surfaceType
+        self.surfaceType = surfaceType
         self._geometry = None
         self._mask = None
         self._alteration = None
         self.invalidated = False
+        self._is_clone = False
         self._plane_mask = None
         self._contours = None
 
@@ -30,12 +31,16 @@ class Surface():
         return self._uniqueId
 
     @property
-    def surfaceType(self) -> SurfaceType:
-        return self._surfaceType
+    def is_clone(self) -> bool:
+        return self._is_clone
 
     @property
     def secondaryType(self) -> SurfaceType:
         return next(filter(lambda t: t != self.surfaceType, self.best_surface_types))
+
+    @property
+    def uniqueId(self) -> str:
+        return self._uniqueId
 
     @property
     def name(self) -> str:
@@ -94,6 +99,9 @@ class Surface():
 
     def clone(self):
         new_surface = deepcopy(self)
+        new_surface.index = -1 #nothing till added to room/geometry
+        new_surface._is_clone = True
+        new_surface._uniqueId = uuid.uuid4()
         return new_surface
 
     @property
@@ -135,7 +143,7 @@ class Surface():
         self.best_indices = self.category_counts.argsort()[-K:][::-1]
         self.best_surface_types = list(map(lambda i: SurfaceType(i), self.best_indices))
 
-        self._surfaceType = self.best_surface_types[0]
+        self.surfaceType = self.best_surface_types[0]
 
         #now fix incorrect classifications:
         angle_with_wall = abs(0.5 * np.pi - self.angle)
@@ -147,13 +155,13 @@ class Surface():
         if self.surfaceType != SurfaceType.Other:
             was_ceiling = self.surfaceType == SurfaceType.Ceiling
             if angle_with_wall < angle_threshold and self.surfaceType != SurfaceType.Wall and self.surfaceType != SurfaceType.WallLike:
-                self._surfaceType = SurfaceType.Wall if self.surfaceType.is_major else SurfaceType.WallLike
+                self.surfaceType = SurfaceType.Wall if self.surfaceType.is_major else SurfaceType.WallLike
                 self._alteration = "%d deg from wall" % int(math.degrees(angle_with_wall))
             elif angle_with_ceiling < angle_threshold and self.surfaceType != SurfaceType.Ceiling and self.surfaceType != SurfaceType.CeilingLike:
-                self._surfaceType = SurfaceType.Ceiling if self.surfaceType.is_major else SurfaceType.CeilingLike
+                self.surfaceType = SurfaceType.Ceiling if self.surfaceType.is_major else SurfaceType.CeilingLike
                 self._alteration = "%d deg from ceil" % int(math.degrees(angle_with_ceiling))
             elif angle_with_floor < angle_threshold and self.surfaceType != SurfaceType.Floor and self.surfaceType != SurfaceType.FloorLike:
-                self._surfaceType = SurfaceType.Floor if self.surfaceType.is_major else SurfaceType.FloorLike
+                self.surfaceType = SurfaceType.Floor if self.surfaceType.is_major else SurfaceType.FloorLike
                 self._alteration = "%d deg from floor" % int(math.degrees(angle_with_floor))
 
             if was_ceiling and self.surfaceType != SurfaceType.Ceiling:
@@ -163,7 +171,7 @@ class Surface():
         if not self.surfaceType.is_major:
             minor_counts = self.category_counts[self.surfaceType.index]
 
-            major_type = SurfaceType(self._surfaceType - 1)
+            major_type = SurfaceType(self.surfaceType - 1)
             major_counts = self.category_counts[major_type.index]
 
             primary_prob = self.category_probs[self.surfaceType]
@@ -172,20 +180,11 @@ class Surface():
 
             #compare the total pixels. If it's a minor type it will be smaller
             if major_counts > minor_counts and major_type in self.best_surface_types:
-                self._surfaceType = major_type
+                self.surfaceType = major_type
                 self._alteration = "min %d->%d maj" % (minor_counts, major_counts)
             elif self.surfaceType.is_pair(self.secondaryType) and sp_ratio > 0.8:
                 self._alteration = "expanded %.2f" % (sp_ratio)
-                self._surfaceType = major_type
-                #print(sp_ratio)
-
-                # ratio = union_count / (primary_count + secondary_count)
-                # ratio = min(ratio, 1./ratio)
-
-                # if ratio > 0.5:
-                #     self._alteration = "expanded %.2f, %.2f" % (ratio, sp_ratio)
-                #     self._surfaceType = major_type
-
+                self.surfaceType = major_type
 
         if self._alteration is not None:
             print("Changed %d from %s to %s: %s" % (self.index, self.best_surface_types[0].name, self.surfaceType.name, self._alteration))

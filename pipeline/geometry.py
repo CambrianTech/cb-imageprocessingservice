@@ -14,8 +14,8 @@ class Geometry():
         self.image = self.data["downscaled"]
         planes_data = self.data["planes"]
         shape = (self.image.shape[1], self.image.shape[0])
-        self.probs = resize_array(planes_data["masks"], shape)
 
+        self.probs = resize_array(planes_data["masks"], shape)
         self.index_mask = np.dstack(tuple(self.probs))
         self.index_mask = np.int32(np.argmax(self.index_mask, -1))
 
@@ -23,6 +23,12 @@ class Geometry():
         self.labels = np.int32(np.argmax(ade_seg_c, -1))
 
     def add_surface(self, surface):
+        if surface.is_clone:
+            #get next index, expand everything
+            surface.index = len(self.data["planes"])
+            #self.probs.add_row
+
+
         surface._geometry = self
         self._surfaces[surface.index] = surface
 
