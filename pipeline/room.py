@@ -143,7 +143,31 @@ class Room(Geometry):
             log_image(self.data, "room_missing", debug)
 
     def merge_like_surfaces(self):
-        pass
+
+        if im_logging_enabled(self.data):
+            debug = self.image.copy()
+
+
+        for surfaceType in SurfaceType:
+            
+            color = random_color()
+            surfaces = self.get_surfaces(surfaceType)
+
+            for i in range(len(surfaces)):
+
+                if surfaces[i].invalidated: continue
+
+                for j in range(i+1, len(surfaces)):
+
+                    if surfaces[j].invalidated: continue
+
+                    if surfaceType == SurfaceType.Floor:
+                        print(colored("Merge %s with %s" % (surfaces[i].name, surfaces[j].name), 'magenta'))
+
+
+
+        if im_logging_enabled(self.data):
+            log_image(self.data, "room_merged", debug)
 
         
     def refine_surfaces(self, min_confidence=None):

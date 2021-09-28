@@ -16,7 +16,7 @@ class Surface():
     def __init__(self, data, index, surfaceType=None):
         self.data = data
         self.index = index
-        self._uniqueId = uuid.uuid4()
+        self.uniqueId = uuid.uuid4()
         self.surfaceType = surfaceType
         self._geometry = None
         self._mask = None
@@ -27,16 +27,8 @@ class Surface():
         self._contours = None
 
     @property
-    def uniqueId(self) -> str:
-        return self._uniqueId
-
-    @property
     def secondaryType(self) -> SurfaceType:
         return next(filter(lambda t: t != self.surfaceType, self.best_surface_types))
-
-    @property
-    def uniqueId(self) -> str:
-        return self._uniqueId
 
     @property
     def name(self) -> str:
@@ -95,9 +87,10 @@ class Surface():
 
     def clone(self):
         new_surface = copy(self)
+        new_surface.uniqueId = uuid.uuid4()
         new_surface.index = -1 #nothing till added to room/geometry
         new_surface._cloned_from = self.index
-        new_surface._uniqueId = uuid.uuid4()
+        
         return new_surface
 
     @property

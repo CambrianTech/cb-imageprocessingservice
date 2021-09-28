@@ -207,6 +207,6 @@ class Pipeline():
             if step.index == self.export_step and logging_dir is not None:
                 log_data(data)
 
-        print(colored("\nAll stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
+        print(colored("All stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
 
         return data

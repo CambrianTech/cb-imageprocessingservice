@@ -12,6 +12,7 @@ import time
 import asyncio
 import signal
 from concurrent.futures import ThreadPoolExecutor
+from termcolor import colored
 
 from pipeline.core import ask_exit
 from pipeline.pipeline import Pipeline, PipelineMode
@@ -72,10 +73,14 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     files = get_file_paths(input_dir, file_pattern)
 
+    def print_title(text):
+        print(colored("\n%s\n" % text, 'blue', 'on_white', attrs=['bold']))
+        print("\n")
+
     if file_pattern is None:
-        print("\nProcessing %d images from \"%s\"" % (len(files), input_dir))
+        print_title("Processing %d images from \"%s\"" % (len(files), input_dir))
     else:
-        print("\nProcessing %d files from \"%s/**/%s\"" % (len(files), input_dir, file_pattern))
+        print_title("Processing %d files from \"%s/**/%s\"" % (len(files), input_dir, file_pattern))
 
     if len(files) == 0:
         raise Exception('No files found at path {}'.format(input_dir)) 
@@ -101,7 +106,7 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     elapsed = (time.time() - start_time)
     avg = elapsed / len(files)
     
-    print("\n[Total processing time: %.2fs, average: %.2fs] \n" % (elapsed, avg))
+    print_title("Total processing time: %.2fs, average: %.2fs" % (elapsed, avg))
 
 if __name__ == "__main__":
     main()

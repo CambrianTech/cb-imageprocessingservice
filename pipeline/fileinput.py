@@ -9,6 +9,8 @@ except:
 import pickle
 from pathlib import Path
 
+from termcolor import colored
+
 class PipelineFileInput(PipelineInput):
 
     def run(self, data):
@@ -16,7 +18,7 @@ class PipelineFileInput(PipelineInput):
         path = Path(data["path"])
 
         if path.suffix == ".pickle":
-            print("Reading data from", path)
+            print("Reading data from", colored(path, 'cyan', attrs=['bold']))
             with open(path, 'rb') as handle:
                 loaded = pickle.load(handle)
                 #todo: maybe there's a deep copy that works instead? 
