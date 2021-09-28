@@ -40,21 +40,17 @@ class Room(Geometry):
     def analyze(self):
         
         self.analyze_surfaces()
-
         log_image(self.data, "room_initial", self.get_debug_image())
 
-        #log_image(self.data, "room_adjusted", self.get_debug_image())
-
-        self.refine_surfaces()
-
+        self.refine_surfaces(min_confidence=0.1) #preserve plane context information i.e. probs < 0.1 are ignored
         log_image(self.data, "room_refined", self.get_debug_image())
 
         self.add_missing_surfaces()
         log_image(self.data, "room_modified", self.get_debug_image())
 
         self.refine_surfaces()
-
-        self.ransac_fit()
+        #log_image(self.data, "room_refined_again", self.get_debug_image())
+        #self.ransac_fit()
 
         log_image(self.data, "room", self.get_debug_image())
 
@@ -153,8 +149,7 @@ class Room(Geometry):
         log_image(self.data, "room_missing", debug)
 
         
-
-    def refine_surfaces(self):
+    def refine_surfaces(self, min_confidence=None):
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
         lines_mask = np.zeros(watershed_image.shape, dtype=np.uint8)
         sx = self.image.shape[1] / self.data["image"].shape[1]
@@ -199,7 +194,9 @@ class Room(Geometry):
                 surface = surfaces[index]
                 mask = np.zeros_like(surface.mask)
                 mask[markers == (index + 1)] = 1
-                #mask[surface.probs < 0.01] = 0
+                if min_confidence is not None: 
+                    mask[surface.probs < 0.01] = 0
+
                 surface.set_mask(mask)
 
 
