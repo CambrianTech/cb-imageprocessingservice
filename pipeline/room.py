@@ -47,7 +47,7 @@ class Room(Geometry):
 
         self.refine_surfaces()
 
-        self.add_missing_surfaces()
+        #self.add_missing_surfaces()
 
         self.ransac_fit()
 

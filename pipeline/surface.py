@@ -22,17 +22,13 @@ class Surface():
         self._mask = None
         self._alteration = None
         self.invalidated = False
-        self._is_clone = False
+        self._cloned_from = False
         self._plane_mask = None
         self._contours = None
 
     @property
     def uniqueId(self) -> str:
         return self._uniqueId
-
-    @property
-    def is_clone(self) -> bool:
-        return self._is_clone
 
     @property
     def secondaryType(self) -> SurfaceType:
@@ -100,7 +96,7 @@ class Surface():
     def clone(self):
         new_surface = deepcopy(self)
         new_surface.index = -1 #nothing till added to room/geometry
-        new_surface._is_clone = True
+        new_surface._cloned_from = self.index
         new_surface._uniqueId = uuid.uuid4()
         return new_surface
 
@@ -206,6 +202,9 @@ class Surface():
 
         pos = self.center
         pos = put_text(img, self.name, pos, color, size=0.5, shadow=True, highlights=True)
+
+        if self._cloned_from:
+            pos = put_text(img, "cloned %d" % self._cloned_from, pos, (255, 0, 0), size=0.33, shadow=True)
 
         if self._alteration is not None:
             pos = put_text(img, self._alteration, pos, color, size=0.33, shadow=True)

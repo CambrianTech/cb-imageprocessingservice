@@ -23,11 +23,10 @@ class Geometry():
         self.labels = np.int32(np.argmax(ade_seg_c, -1))
 
     def add_surface(self, surface):
-        if surface.is_clone:
+        if surface.index < 0:
             #get next index, expand everything
             surface.index = len(self.data["planes"])
             #self.probs.add_row
-
 
         surface._geometry = self
         self._surfaces[surface.index] = surface
