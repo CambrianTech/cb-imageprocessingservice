@@ -12,12 +12,9 @@ class Geometry():
         self.data = data
         self._surfaces = {}
         self.image = self.data["downscaled"]
-        planes_data = self.data["planes"]
-        shape = (self.image.shape[1], self.image.shape[0])
-
-        self.probs = resize_array(planes_data["masks"], shape)
-        self.index_mask = np.dstack(tuple(self.probs))
-        self.index_mask = np.int32(np.argmax(self.index_mask, -1))
+        
+        self._probs = None
+        self._index_mask = None
 
         ade_seg_c = np.dstack(tuple(self.data["isolated"]))
         self.labels = np.int32(np.argmax(ade_seg_c, -1))
@@ -51,6 +48,21 @@ class Geometry():
     @property
     def surfaces(self):
         return self.get_surfaces()
+
+    @property
+    def probs(self):
+        if self._probs is None:
+            shape = (self.image.shape[1], self.image.shape[0])
+            self._probs = resize_array(self.data["planes"]["masks"], shape)
+
+        return self._probs
+
+    @property
+    def index_mask(self):
+        if self._index_mask is None:
+            self._index_mask = np.dstack(tuple(self.probs))
+            self._index_mask = np.int32(np.argmax(self._index_mask, -1))
+        return self._index_mask
 
     @abstractmethod
     def get_debug_image(self, confidence=0.05):
