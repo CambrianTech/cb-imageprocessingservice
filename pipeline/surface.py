@@ -4,6 +4,7 @@ import math
 from scipy import ndimage
 import cv2
 import uuid
+from copy import deepcopy
 
 from .core import SurfaceType
 from .geometry import Geometry
@@ -37,7 +38,7 @@ class Surface():
         return next(filter(lambda t: t != self.surfaceType, self.best_surface_types))
 
     @property
-    def name(self) -> Geometry:
+    def name(self) -> str:
         return "%s %d" % (self.surfaceType.name, self.index)
 
     @property
@@ -90,6 +91,10 @@ class Surface():
                 self.moments = cv2.moments(self.mask)
 
         return self._contours
+
+    def clone(self):
+        new_surface = deepcopy(self)
+        return new_surface
 
     @property
     def center(self) -> tuple:

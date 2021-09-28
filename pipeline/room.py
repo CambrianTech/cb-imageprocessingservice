@@ -76,7 +76,7 @@ class Room(Geometry):
         missing = []
 
         total_area = self.image.shape[0] * self.image.shape[1]
-        area_threshold = total_area / 100
+        area_threshold = total_area / 200
 
         if len(self.surfaces) > 0:
             total_mask = np.sum(np.dstack([s.mask for s in self.surfaces]), axis=-1)
@@ -123,9 +123,12 @@ class Room(Geometry):
                 if max_clusters > 0:
                     print(colored("Create %d surfaces" % max_clusters, 'yellow'))
                     for i in range(max_clusters):
-                        print(colored("Creating new %s" % surfaceType.name, 'green'))
-    
-                
+                        index = valid_clusters[i]
+                        surface = self.surfaces[index]
+                        print(colored("Creating new %s using %s as reference" % (surfaceType.name, surface.name), 'green'))
+                        new_surface = surface.clone()
+                        
+
 
                 
 

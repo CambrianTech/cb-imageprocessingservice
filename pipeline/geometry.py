@@ -24,7 +24,7 @@ class Geometry():
 
     def add_surface(self, surface):
         surface._geometry = self
-        self._surfaces[surface.uniqueId] = surface
+        self._surfaces[surface.index] = surface
 
     def refresh_surfaces(self):        
         self._surfaces = dict(filter(lambda kv:not kv[1].invalidated, self._surfaces.items()))
