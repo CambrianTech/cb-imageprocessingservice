@@ -3,6 +3,10 @@ import numpy as np
 from pathlib import Path
 import pickle
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
 import click
 import time
 import asyncio

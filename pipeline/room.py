@@ -3,8 +3,14 @@ import numpy as np
 import cv2
 import uuid
 import random
+
+import warnings #skimage warnings excessive:
+warnings.filterwarnings("ignore")
+
 from skimage.segmentation import watershed
 from skimage.color import rgb2gray
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 
 from .geometry import Geometry
 from .core import SurfaceType
@@ -57,6 +63,13 @@ class Room(Geometry):
         if num_after != num_before:
             print(colored("Surfaces reduced from %d to %d" % (num_before, num_after), 'red'))
 
+    def get_clusters(self, x, kmin=2, kmax=5):
+        sil = []
+        for k in range(kmin, kmax+1):
+          kmeans = KMeans(n_clusters = k).fit(x)
+          labels = kmeans.labels_
+          sil.append(silhouette_score(x, labels, metric = 'euclidean'))
+
 
     def add_missing_surfaces(self):
 
@@ -91,7 +104,30 @@ class Room(Geometry):
                         valid_contours.append(contour)
 
             if len(valid_contours):
-                cv2.drawContours(debug, np.array(valid_contours), -1, color, -1)
+                cv2.drawContours(debug, np.array(valid_contours), -1, color, cv2.FILLED)
+
+            
+            #matches = self.index_mask[]
+
+            for contour in valid_contours:
+                contour_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+                cv2.drawContours(contour_mask, [contour], 0, (1,1,1), cv2.FILLED)
+
+                matches = self.index_mask[contour_mask > 0]
+                indexes, counts = np.unique(matches, return_counts=True)
+                
+                valid_clusters = indexes[counts > area_threshold]
+
+                max_clusters = len(valid_clusters)
+
+                if max_clusters > 0:
+                    print(colored("Create %d surfaces" % max_clusters, 'yellow'))
+                    for i in range(max_clusters):
+                        print(colored("Creating new %s" % surfaceType.name, 'green'))
+    
+                
+
+                
 
             
 
@@ -106,7 +142,6 @@ class Room(Geometry):
         sy = self.image.shape[0] / self.data["image"].shape[0]
         Line.draw_all(lines_mask, self.data["lines"], color=(255,255,255), thickness=1, sx=sx, sy=sy, lineType=cv2.LINE_4)
 
-        
         def expand_into_type(surfaceType:SurfaceType):
             surfaces = self.get_surfaces(surfaceType)
 
