@@ -18,12 +18,25 @@ class Geometry():
         ade_seg_c = np.dstack(tuple(self.data["isolated"]))
         self.labels = np.int32(np.argmax(ade_seg_c, -1))
 
+
     def add_surface(self, surface):
         if surface.index < 0:
-            #get next index, expand everything
-            surface.index = len(self.data["planes"])
-            surface_mask = self.data["planes"]["masks"][surface.cloned_from].copy()
+            #get next index, expand everything, 
+            #todo: store inside surface
+            surface.index = self.data["planes"]["masks"].shape[0]
+
+            #append a copy of the index mask
+            surface_mask = self.data["planes"]["masks"][surface.cloned_from].copy() #check for intersect?
             self.data["planes"]["masks"] = np.append(self.data["planes"]["masks"], [surface_mask], axis=0)
+
+            def data_append(key):
+                self.data[key] = np.append(self.data[key], [self.data[key][surface.cloned_from].copy()], axis=0)
+
+            data_append("plane_parameters")
+            data_append("plane_normals")
+            data_append("plane_offsets")
+            data_append("plane_clusters")
+
             self.invalidate()
 
         surface._geometry = self
