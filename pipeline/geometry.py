@@ -2,8 +2,11 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 import numpy as np
 import cv2
 import uuid
+from termcolor import colored
 
 from .utils import resize_array, multi_filter
+
+indexed_fields = ["plane_parameters", "plane_normals", "plane_offsets", "plane_clusters"]
 
 class Geometry():
 
@@ -29,18 +32,17 @@ class Geometry():
             surface_mask = self.data["planes"]["masks"][surface.cloned_from].copy() #check for intersect?
             self.data["planes"]["masks"] = np.append(self.data["planes"]["masks"], [surface_mask], axis=0)
 
-            def data_append(key):
-                self.data[key] = np.append(self.data[key], [self.data[key][surface.cloned_from].copy()], axis=0)
-
-            data_append("plane_parameters")
-            data_append("plane_normals")
-            data_append("plane_offsets")
-            data_append("plane_clusters")
+            for field in indexed_fields:
+                self.data[field] = np.append(self.data[field], [self.data[field][surface.cloned_from].copy()], axis=0)
 
             self.invalidate()
 
         surface._geometry = self
         self._surfaces[surface.index] = surface
+
+    def remove_surface(self, surface):
+        surface.destroyed = True
+        #remove other stuff?
 
     @property
     def image(self):
@@ -74,8 +76,13 @@ class Geometry():
         self._index_mask = None
 
     def refresh_surfaces(self):
+        num_before = len(self._surfaces)
+        self._surfaces = dict(filter(lambda kv:not kv[1].destroyed, self._surfaces.items()))
 
-        self._surfaces = dict(filter(lambda kv:not kv[1].invalidated, self._surfaces.items()))
+        num_after = len(self._surfaces)
+        if num_after < num_before:
+            print(colored("Surfaces reduced from %d to %d" % (num_before, num_after), 'red'))
+            #cleanup:
 
     def get_surfaces(self, surfaceType=None, dimension=None):
 

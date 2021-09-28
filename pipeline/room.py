@@ -58,13 +58,8 @@ class Room(Geometry):
 
     def analyze_surfaces(self):
         #perform initial analysis
-        num_before = len(self.surfaces)
         for surface in self.surfaces:
             surface.analyze()
-
-        num_after = len(self.surfaces)
-        if num_after != num_before:
-            print(colored("Surfaces reduced from %d to %d" % (num_before, num_after), 'red'))
 
     def get_clusters(self, x, kmin=2, kmax=5):
         sil = []
@@ -77,7 +72,7 @@ class Room(Geometry):
     def add_missing_surfaces(self):
 
         total_area = self.image.shape[0] * self.image.shape[1]
-        area_threshold = total_area / 200
+        area_threshold = total_area / 300
 
         if len(self.surfaces) > 0:
             total_mask = np.sum(np.dstack([s.mask for s in self.surfaces]), axis=-1)
@@ -153,16 +148,32 @@ class Room(Geometry):
             color = random_color()
             surfaces = self.get_surfaces(surfaceType)
 
+
             for i in range(len(surfaces)):
 
-                if surfaces[i].invalidated: continue
+                if surfaces[i].destroyed: continue
+
+                distance_i = abs(surfaces[i].offset) #todo: calculate this?
 
                 for j in range(i+1, len(surfaces)):
 
-                    if surfaces[j].invalidated: continue
+                    if surfaces[j].destroyed: continue
 
-                    if surfaceType == SurfaceType.Floor:
-                        print(colored("Merge %s with %s" % (surfaces[i].name, surfaces[j].name), 'magenta'))
+                    dot_product = np.dot(surfaces[i].normal, surfaces[j].normal)
+                    angle = np.arccos(dot_product)
+
+                    #do some planar geometry comparisons, maybe color/texture
+                    distance_j = abs(surfaces[j].offset)
+
+                    distance_between = abs(distance_i - distance_j)
+                    distance_mean = 0.5 * (distance_i + distance_j)
+                    distance_threshold = distance_mean * 0.25 #accuracy degrades by range (maybe use error here, error square?)
+
+                    if surfaceType == SurfaceType.Floor or (angle < np.radians(20) and distance_between < distance_threshold):
+                        if surfaceType != SurfaceType.Other:
+                            surfaces[i].merge(surfaces[j])
+                        else:
+                            print("Check semantic type")
 
 
 

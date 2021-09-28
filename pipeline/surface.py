@@ -5,6 +5,7 @@ from scipy import ndimage
 import cv2
 import uuid
 from copy import copy, deepcopy
+from termcolor import colored
 
 from .core import SurfaceType
 from .geometry import Geometry
@@ -21,7 +22,7 @@ class Surface():
         self._geometry = None
         self._mask = None
         self._alteration = None
-        self.invalidated = False
+        self.destroyed = False
         self._cloned_from = -1
         self._plane_mask = None
         self._contours = None
@@ -71,8 +72,12 @@ class Surface():
         return self._mask
 
     def set_mask(self, mask):
-         self._mask = mask
-         self._contours = None
+        self._mask = mask
+        self.mask_changed()
+
+    def mask_changed(self):
+        self._contours = None
+        self.geometry.invalidate()
 
     @property
     def contours(self) -> ndimage:
@@ -96,6 +101,20 @@ class Surface():
     @property
     def cloned_from(self) -> int:
         return self._cloned_from
+
+    def merge(self, surface):
+        print(colored("Merge %s with %s" % (self.name, surface.name), 'magenta'))
+        self._mask[surface.mask > 0] = 1
+
+        #average the normals? Take one over the other by area? Do what where?
+
+        self.mask_changed()
+
+        surface.destroy()
+
+    def destroy(self):
+        self.geometry.remove_surface(self) 
+        #Important! do not add code here, add inside remove_surface, and call public methods on this object
 
     @property
     def center(self) -> tuple:
@@ -158,7 +177,7 @@ class Surface():
                 self._alteration = "%d deg from floor" % int(math.degrees(angle_with_floor))
 
             if was_ceiling and self.surfaceType != SurfaceType.Ceiling:
-                self.invalidated = True
+                self.destroy() #too problematic
 
         #If it is minor type, e.g. walllike or floorlike, it may need to become a major type such as wall or floor:
         if not self.surfaceType.is_major:
