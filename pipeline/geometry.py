@@ -10,9 +10,8 @@ class Geometry():
     def __init__(self, data):
         super().__init__()
         self.data = data
+
         self._surfaces = {}
-        self.image = self.data["downscaled"]
-        
         self._probs = None
         self._index_mask = None
 
@@ -23,27 +22,16 @@ class Geometry():
         if surface.index < 0:
             #get next index, expand everything
             surface.index = len(self.data["planes"])
-            #self.probs.add_row
+            surface_mask = self.data["planes"]["masks"][surface.cloned_from].copy()
+            self.data["planes"]["masks"] = np.append(self.data["planes"]["masks"], [surface_mask], axis=0)
+            self.invalidate()
 
         surface._geometry = self
         self._surfaces[surface.index] = surface
 
-    def refresh_surfaces(self):        
-        self._surfaces = dict(filter(lambda kv:not kv[1].invalidated, self._surfaces.items()))
-
-    def get_surfaces(self, surfaceType=None, dimension=None):
-
-        self.refresh_surfaces()
-
-        filters = []
-        
-        if surfaceType is not None:
-            filters.append(lambda surface: surface.surfaceType == surfaceType)
-
-        if dimension is not None:
-            filters.append(lambda surface: surface.dimension == dimension)
-
-        return self._surfaces.values() if len(filters) is None else list(multi_filter(filters, self._surfaces.values()))
+    @property
+    def image(self):
+        return self.data["downscaled"]
 
     @property
     def surfaces(self):
@@ -67,3 +55,25 @@ class Geometry():
     @abstractmethod
     def get_debug_image(self, confidence=0.05):
         pass
+
+    def invalidate(self):
+        self._probs = None
+        self._index_mask = None
+
+    def refresh_surfaces(self):
+
+        self._surfaces = dict(filter(lambda kv:not kv[1].invalidated, self._surfaces.items()))
+
+    def get_surfaces(self, surfaceType=None, dimension=None):
+
+        self.refresh_surfaces()
+
+        filters = []
+        
+        if surfaceType is not None:
+            filters.append(lambda surface: surface.surfaceType == surfaceType)
+
+        if dimension is not None:
+            filters.append(lambda surface: surface.dimension == dimension)
+
+        return self._surfaces.values() if len(filters) is None else list(multi_filter(filters, self._surfaces.values()))

@@ -47,7 +47,12 @@ class Room(Geometry):
 
         self.refine_surfaces()
 
+        log_image(self.data, "room_refined", self.get_debug_image())
+
         #self.add_missing_surfaces()
+        #log_image(self.data, "room_modified", self.get_debug_image())
+
+        self.refine_surfaces()
 
         self.ransac_fit()
 

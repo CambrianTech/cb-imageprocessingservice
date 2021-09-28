@@ -4,7 +4,7 @@ import math
 from scipy import ndimage
 import cv2
 import uuid
-from copy import deepcopy
+from copy import copy, deepcopy
 
 from .core import SurfaceType
 from .geometry import Geometry
@@ -22,7 +22,7 @@ class Surface():
         self._mask = None
         self._alteration = None
         self.invalidated = False
-        self._cloned_from = False
+        self._cloned_from = -1
         self._plane_mask = None
         self._contours = None
 
@@ -94,11 +94,15 @@ class Surface():
         return self._contours
 
     def clone(self):
-        new_surface = deepcopy(self)
+        new_surface = copy(self)
         new_surface.index = -1 #nothing till added to room/geometry
         new_surface._cloned_from = self.index
         new_surface._uniqueId = uuid.uuid4()
         return new_surface
+
+    @property
+    def cloned_from(self) -> int:
+        return self._cloned_from
 
     @property
     def center(self) -> tuple:
@@ -203,8 +207,8 @@ class Surface():
         pos = self.center
         pos = put_text(img, self.name, pos, color, size=0.5, shadow=True, highlights=True)
 
-        if self._cloned_from:
-            pos = put_text(img, "cloned %d" % self._cloned_from, pos, (255, 0, 0), size=0.33, shadow=True)
+        if self.cloned_from >= 0:
+            pos = put_text(img, "cloned %d" % self.cloned_from, pos, (255, 0, 0), size=0.33, shadow=True)
 
         if self._alteration is not None:
             pos = put_text(img, self._alteration, pos, color, size=0.33, shadow=True)

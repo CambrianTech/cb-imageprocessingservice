@@ -106,16 +106,17 @@ def draw_legend(data:dict, debug:np.ndarray, legend:tuple):
         y += line_height
 
 def log_markers(data:dict, name, markers, mask=None, num_labels=None):
-    if num_labels is None:
-        num_labels = markers.max()
+    if im_logging_enabled(data, LogLevel.Markers):
+        if num_labels is None:
+            num_labels = markers.max()
 
-    alpha = 255 * (num_labels + 1) / (num_labels + 2)
-    debug = markers * alpha
+        alpha = 255 * (num_labels + 1) / (num_labels + 2)
+        debug = markers * alpha
 
-    if mask is not None:
-        debug[mask == 0] = 255
+        if mask is not None:
+            debug[mask == 0] = 255
 
-    log_image(data, name, debug)
+        _log_image(data, name, debug)
 
 def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", show_legend=True, labelset=ADE20K,  opacity=0.5, get_image=False):
     
