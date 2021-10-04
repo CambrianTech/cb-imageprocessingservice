@@ -77,6 +77,7 @@ class Geometry():
     def invalidate(self):
         self._probs = None
         self._index_mask = None
+        
 
     def refresh_surfaces(self):
         num_before = len(self._surfaces)

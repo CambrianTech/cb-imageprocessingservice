@@ -11,6 +11,7 @@ from .core import SurfaceType
 from .geometry import Geometry
 from .utils import convert_color, put_text
 from .Line import line_angle_difference
+from .ade20k import ADE20K
 
 class Surface():
 
@@ -27,13 +28,15 @@ class Surface():
         self._plane_mask = None
         self._contours = None
 
+        self._semantic_labels = None
+
     @property
     def secondaryType(self) -> SurfaceType:
         return next(filter(lambda t: t != self.surfaceType, self.best_surface_types))
 
     @property
     def name(self) -> str:
-        return "%s %d" % (self.surfaceType.name, self.index)
+        return "%s %d" % ("?" if self.bestLabel is None else self.bestLabel.name, self.index)
 
     @property
     def geometry(self) -> Geometry:
@@ -77,6 +80,8 @@ class Surface():
 
     def mask_changed(self):
         self._contours = None
+        self._semantic_labels = None
+
         self.geometry.invalidate()
 
     @property
@@ -90,11 +95,28 @@ class Surface():
 
         return self._contours
 
+
+    @property
+    def semantic_labels(self) -> ndimage:
+        if self._semantic_labels is None:
+            segments, counts = np.unique(self.geometry.semantic_labels[self.mask > 0], return_counts=True)
+            segmentList = zip(segments.tolist(), counts.tolist())
+            self._semantic_labels = sorted(segmentList, key=lambda x:-x[1])
+
+        return self._semantic_labels
+
+    @property
+    def bestLabel(self) -> tuple:
+        if len(self.semantic_labels):
+            return ADE20K(self.semantic_labels[0][0] + 1)
+        return None
+
     def clone(self):
         new_surface = copy(self)
         new_surface.uniqueId = uuid.uuid4()
         new_surface.index = -1 #nothing till added to room/geometry
         new_surface._cloned_from = self.index
+        new_surface.mask_changed()
         
         return new_surface
 
