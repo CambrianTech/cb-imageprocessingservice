@@ -21,6 +21,9 @@ class Geometry():
         ade_seg_c = np.dstack(tuple(self.data["isolated"]))
         self.isolated_labels = np.int32(np.argmax(ade_seg_c, -1))
 
+        ade_seg_c = np.dstack((tuple(self.data["output"])))
+        self.semantic_labels = np.int32(np.argmax(ade_seg_c, -1))
+
 
     def add_surface(self, surface):
         if surface.index < 0:
