@@ -130,7 +130,7 @@ class Surface():
     def get_surface_mask(self, label:SurfaceType, confidence):
         mask = np.zeros(self.probs.shape, dtype="uint8")
         mask[self.probs >= confidence] = 1
-        mask[self.geometry.labels != label.index] = 0
+        mask[self.geometry.isolated_labels != label.index] = 0
         return mask
 
     def determine_surface_type(self, K, angle_threshold=np.radians(20)):
@@ -145,7 +145,7 @@ class Surface():
         self.isolated_probs = []
         for group in SurfaceType:
             submask = isolated[group] * prob_mask
-            submask[self.geometry.labels != group.index] = np.nan #exclude
+            submask[self.geometry.isolated_labels != group.index] = np.nan #exclude
             self.isolated_probs.append(submask)
 
         self.category_probs = np.asarray([np.nanmean(prob) for prob in self.isolated_probs])

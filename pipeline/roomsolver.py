@@ -31,7 +31,7 @@ class RoomSolver():
 
             log_segmentation_image(self.data, "room_masks", self.room.index_mask, self.room.image, show_legend=False)
             
-            debug = log_segmentation_image(self.data, "probs", self.room.labels, self.room.image, get_image=True, labelset=SurfaceType)
+            debug = log_segmentation_image(self.data, "isolated_labels", self.room.isolated_labels, self.room.image, get_image=True, labelset=SurfaceType)
 
             log_image(self.data, "surfaces", debug)
 

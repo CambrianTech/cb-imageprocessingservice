@@ -19,7 +19,7 @@ class Geometry():
         self._index_mask = None
 
         ade_seg_c = np.dstack(tuple(self.data["isolated"]))
-        self.labels = np.int32(np.argmax(ade_seg_c, -1))
+        self.isolated_labels = np.int32(np.argmax(ade_seg_c, -1))
 
 
     def add_surface(self, surface):

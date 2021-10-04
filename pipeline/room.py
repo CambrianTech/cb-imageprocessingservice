@@ -94,7 +94,7 @@ class Room(Geometry):
             color = random_color()
 
             remaining_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
-            remaining_mask[self.labels == surfaceType] = 1
+            remaining_mask[self.isolated_labels == surfaceType] = 1
 
             if total_mask is not None:
                 remaining_mask[total_mask > 0] = 0
@@ -219,7 +219,7 @@ class Room(Geometry):
             markers[disputed_areas > 0] = 0
 
             watershed_mask = np.zeros(total_mask.shape, dtype=np.int32)
-            watershed_mask[self.labels == surfaceType.index] = 1
+            watershed_mask[self.isolated_labels == surfaceType.index] = 1
             watershed_mask[lines_mask > 0] = 0
 
             log_markers(self.data, "room_%s_markers" % surfaceType.name, markers, mask=watershed_mask)
