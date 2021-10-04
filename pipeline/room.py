@@ -16,7 +16,7 @@ from .geometry import Geometry
 from .core import SurfaceType
 from .surface import Surface
 from .utils import convert_color, put_text, overlay_mask, random_color
-from .logging import im_logging_enabled, log_image, log_segmentation_image, log_markers, LogLevel
+from .logging import im_logging_enabled, log_image, log_segmentation_image, log_markers
 from .Line import Line
 from .ade20k import ADE20K
 
@@ -40,8 +40,7 @@ class Room(Geometry):
 
     def analyze(self):
 
-        if im_logging_enabled(self.data, LogLevel.Segmentation):
-            log_segmentation_image(data, "segmentation", np.argmax(probs, -1), data["downscaled"])
+        log_segmentation_image(self.data, "semantic_labels", self.semantic_labels, self.image)
         
         self.analyze_surfaces()
         log_image(self.data, "room_initial", self.get_debug_image())

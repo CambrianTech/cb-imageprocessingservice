@@ -64,10 +64,6 @@ class PipelineExtractSurfaces(PipelineStep):
         else:
             data["downscaled"] = data["image"]
 
-        if im_logging_enabled(data, LogLevel.Segmentation):
-            probs = np.dstack((tuple(output)))
-            log_segmentation_image(data, "segmentation", np.argmax(probs, -1), data["downscaled"])
-
         #combine_floor_masks(output)
         data["isolated"] = isolate_masks(data, output) #break masks into surface types
 
