@@ -127,6 +127,7 @@ class Room(Geometry):
                 for i in range(max_clusters):
                     index = valid_clusters[i]
                     surface = self.surfaces[index]
+
                     if surface.surfaceType == surfaceType or surface.surfaceType.is_pair(surfaceType):
 
                         mask = contour_mask.copy()
@@ -137,6 +138,9 @@ class Room(Geometry):
                             new_surface.surfaceType = surfaceType
                             new_surface.set_mask(mask)
                             break
+                    elif not surface.bestLabel:
+                        surface.destroyed = True
+                        break
 
                 if new_surface is not None:
                     print(colored("Creating new %s using %s as reference" % (surfaceType.name, surface.name), 'green'))
@@ -182,8 +186,6 @@ class Room(Geometry):
                         if surfaceType != SurfaceType.Other or surfaces[i].bestLabel == surfaces[j].bestLabel:
                             surfaces[i].merge(surfaces[j])
                             surfaces[i]._alteration = "%.2fm %.2fd" % (distance_between, angle_threshold)
-
-
 
 
         if im_logging_enabled(self.data):
