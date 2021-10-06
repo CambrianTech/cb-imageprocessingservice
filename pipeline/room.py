@@ -59,12 +59,6 @@ class Room(Geometry):
 
         log_image(self.data, "room", self.get_debug_image())
 
-    @property
-    def semantic_type() -> ADE20K:
-        #todo: get value
-        return ADE20K.shelf
-
-
     def analyze_surfaces(self):
         #perform initial analysis
         for surface in self.surfaces:
@@ -250,7 +244,6 @@ class Room(Geometry):
 
     def ransac_fit(self):
         pass
-
         
     def get_debug_image(self):
 
