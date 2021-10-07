@@ -85,7 +85,7 @@ class Room(Geometry):
 
         return candidates[0]
 
-    def add_missing_surfaces(self, min_area=1/300):
+    def add_missing_surfaces(self, min_area=1/400):
 
         total_area = self.image.shape[0] * self.image.shape[1]
         area_threshold = int(total_area * min_area)
