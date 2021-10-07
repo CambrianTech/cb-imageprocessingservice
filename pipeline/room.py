@@ -71,24 +71,36 @@ class Room(Geometry):
           labels = kmeans.labels_
           sil.append(silhouette_score(x, labels, metric = 'euclidean'))
 
+    def find_best_candidate(self, surfaceType, mask):
+        candidates = self.get_surfaces(surfaceType=surfaceType)
+        if len(candidates) == 0:
+            return None
 
-    def add_missing_surfaces(self):
+        if len(candidates) > 1:
+            #todo: sort if more than one, for walls, above and below the wall is the best match
+            print("Find match for missing %s amongst %d candidates" % (surfaceType.name, len(candidates)))
+
+        return candidates[0]
+
+    def add_missing_surfaces(self, min_area=1/300):
 
         total_area = self.image.shape[0] * self.image.shape[1]
-        area_threshold = total_area / 300
+        area_threshold = int(total_area * min_area)
+
+        print("Size threshold: square greater than %d pixels on one side" % np.sqrt(area_threshold))
 
         if len(self.surfaces) > 0:
             total_mask = np.sum(np.dstack([s.mask for s in self.surfaces]), axis=-1)
         else:
             total_mask = None
 
-        if im_logging_enabled(self.data):
-            debug = self.image.copy()
+        room_missing = self.image.copy() if im_logging_enabled(self.data) else None
         
         for surfaceType in SurfaceType:
             
             color = random_color()
 
+            #find missing
             remaining_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
             remaining_mask[self.isolated_labels == surfaceType] = 1
 
@@ -103,10 +115,13 @@ class Room(Geometry):
                     if cv2.contourArea(contour) > area_threshold:
                         valid_contours.append(contour)
 
-            if im_logging_enabled(self.data) and len(valid_contours):
-                cv2.drawContours(debug, np.array(valid_contours), -1, color, cv2.FILLED)
+            #draw
+            if room_missing is not None:
+                cv2.drawContours(room_missing, np.array(valid_contours), -1, color, cv2.FILLED)
 
+            #add missing
             for contour in valid_contours:
+
                 contour_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
                 cv2.drawContours(contour_mask, [contour], 0, (1,1,1), cv2.FILLED)
 
@@ -117,6 +132,7 @@ class Room(Geometry):
 
                 max_clusters = len(valid_clusters)
                 new_surface = None
+                reference_surface = None
 
                 for i in range(max_clusters):
                     index = valid_clusters[i]
@@ -128,27 +144,38 @@ class Room(Geometry):
                         mask[self.index_mask != index] = 0
 
                         if cv2.countNonZero(mask) >= area_threshold:
-                            new_surface = surface.clone()
+                            reference_surface = surface
+                            new_surface = reference_surface.clone()
                             new_surface.surfaceType = surfaceType
                             new_surface.set_mask(mask)
                             break
+
                     elif not surface.bestLabel:
                         surface.destroyed = True
                         break
 
+                if new_surface is None and surfaceType.is_major:
+                    reference_surface = self.find_best_candidate(surfaceType, contour_mask)
+                    if reference_surface is not None:
+                        new_surface = reference_surface.clone()
+                        new_surface.surfaceType = surfaceType
+                        new_surface.set_mask(contour_mask)
+
+
                 if new_surface is not None:
-                    print(colored("Creating new %s using %s as reference" % (surfaceType.name, surface.name), 'green'))
-                    log_image(self.data, surface.name, new_surface.mask)
+                    print(colored("Creating new %s using %s as reference" % (surfaceType.name, reference_surface.name), 'green'))
+                    log_image(self.data, new_surface.name, new_surface.mask)
                     self.add_surface(new_surface)
 
-        if im_logging_enabled(self.data):
-            log_image(self.data, "room_missing", debug)
+            #logging
+            if room_missing is not None:
+                log_image(self.data, "room_missing", room_missing)
+            
 
     def merge_like_surfaces(self, angle_threshold=np.radians(30)):
 
         if im_logging_enabled(self.data):
             debug = self.image.copy()
-
 
         for surfaceType in SurfaceType:
             

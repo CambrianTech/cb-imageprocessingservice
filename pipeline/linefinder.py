@@ -57,7 +57,7 @@ class PipelineLineFinder(PipelineStep):
 
         #print("0. elapsed %.2f" % (time() - start)); start = time()
 
-        fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)
+        fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 80.0), 1.41, 200, 240, 3, False)
         lines = []
 
         #find lines in BW image
