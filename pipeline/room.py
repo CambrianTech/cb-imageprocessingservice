@@ -11,6 +11,7 @@ from skimage.segmentation import watershed
 from skimage.color import rgb2gray
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+from scipy.spatial import distance
 
 from .geometry import Geometry
 from .core import SurfaceType
@@ -79,6 +80,8 @@ class Room(Geometry):
         if len(candidates) > 1:
             #todo: sort if more than one, for walls, above and below the wall is the best match
             print("Find match for missing %s amongst %d candidates" % (surfaceType.name, len(candidates)))
+            normal = np.mean(self.data["normals"], axis=(0, 1)) #todo: use 3d vector normal angle difference instead.
+            candidates.sort(key=lambda x: distance.sqeuclidean(normal, x.normals_color))
 
         return candidates[0]
 

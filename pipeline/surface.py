@@ -27,6 +27,7 @@ class Surface():
         self._cloned_from = -1
         self._plane_mask = None
         self._contours = None
+        self._normals_color = None
 
         self._semantic_labels = None
 
@@ -62,6 +63,12 @@ class Surface():
         return self.data["plane_offsets"][self.index]
 
     @property
+    def normals_color(self) -> tuple:
+        if self._normals_color is None:
+            self._normals_color = np.mean(self.data["normals"], axis=(0, 1))
+        return self._normals_color
+
+    @property
     def angle(self): #from floor
         floor_normal = (0,0,-1)
         dot_product = np.dot(floor_normal, self.normal)
@@ -81,6 +88,7 @@ class Surface():
     def mask_changed(self):
         self._contours = None
         self._semantic_labels = None
+        self._normals_color = None
 
         self.geometry.invalidate()
 
