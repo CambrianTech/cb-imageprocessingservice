@@ -219,9 +219,7 @@ class Room(Geometry):
     def refine_surfaces(self, min_confidence=None):
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
         lines_mask = np.zeros(watershed_image.shape, dtype=np.uint8)
-        sx = self.image.shape[1] / self.data["image"].shape[1]
-        sy = self.image.shape[0] / self.data["image"].shape[0]
-        Line.draw_all(lines_mask, self.data["lines"], color=(255,255,255), thickness=1, sx=sx, sy=sy, lineType=cv2.LINE_4)
+        Line.draw_all(lines_mask, self.data["lines"], color=(255,255,255), thickness=1, lineType=cv2.LINE_4)
 
         def expand_into_type(surfaceType:SurfaceType):
             surfaces = self.get_surfaces(surfaceType)
@@ -292,17 +290,16 @@ class Room(Geometry):
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
+        Line.draw_all(img, self.data["lines"], color=(0,0,255), thickness=1)
+
         #let surface do its debug
         for i in range(len(self.surfaces)):
             surface = self.surfaces[i]
             hue = hues[i]
             color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
-
             surface.debug(img, color)
                 
-        sx = self.image.shape[1] / self.data["image"].shape[1]
-        sy = self.image.shape[0] / self.data["image"].shape[0]
-        Line.draw_all(img, self.data["lines"], color=(0,0,255), thickness=1, sx=sx, sy=sy)
+        
 
         return img
 

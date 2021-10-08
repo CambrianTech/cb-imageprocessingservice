@@ -61,16 +61,16 @@ class PipelineLineFinder(PipelineStep):
         lines = []
 
         #find lines in BW image
-        sx = data["image"].shape[1] / bw.shape[1]
-        sy = data["image"].shape[0] / bw.shape[0]
+        sx = data["downscaled"].shape[1] / bw.shape[1]
+        sy = data["downscaled"].shape[0] / bw.shape[0]
         result = fld.detect(bw)
         if result is not None and len(result) > 0: 
             lines.extend(transform_result(result))
         #log_lines(lines, "bw_lines")
 
         #find lines in hed hed edges
-        sx = data["image"].shape[1] / data["hed"].shape[1]
-        sy = data["image"].shape[0] / data["hed"].shape[0]
+        sx = data["downscaled"].shape[1] / data["hed"].shape[1]
+        sy = data["downscaled"].shape[0] / data["hed"].shape[0]
 
         result = fld.detect(data["hed"])
         if result is not None and len(result) > 0: 
@@ -83,8 +83,8 @@ class PipelineLineFinder(PipelineStep):
         fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 20.0), 1.41, 200, 240, 3, False)
         normals = np.uint8(data["normals"])
         #log_image(data, "normals", normals)
-        sx = data["image"].shape[1] / normals.shape[1]
-        sy = data["image"].shape[0] / normals.shape[0]
+        sx = data["downscaled"].shape[1] / normals.shape[1]
+        sy = data["downscaled"].shape[0] / normals.shape[0]
         normals = cv2.split(normals)
         normals_lines = []
         for i in range(0, 3):
@@ -107,8 +107,8 @@ class PipelineLineFinder(PipelineStep):
         edges = cv2.resize(edges, (self.width, self.height), interpolation = cv2.INTER_CUBIC)
 
 
-        sx = data["image"].shape[1] / edges.shape[1]
-        sy = data["image"].shape[0] / edges.shape[0]
+        sx = data["downscaled"].shape[1] / edges.shape[1]
+        sy = data["downscaled"].shape[0] / edges.shape[0]
         result = fld.detect(edges)
         if result is not None and len(result) > 0: 
             gabor_lines = Line.merge(transform_result(result), search_length=1.1, search_width=diagonal/100, angle_threshold=math.radians(7))
@@ -118,8 +118,8 @@ class PipelineLineFinder(PipelineStep):
         #frei chen edges:
         clean_edges = (frei_chen(bw) * 255.0 * 5.0).astype(np.float32)
         clean_edges = cv2.bilateralFilter(clean_edges, 5, 5, 5).astype(np.uint8)
-        sx = data["image"].shape[1] / clean_edges.shape[1]
-        sy = data["image"].shape[0] / clean_edges.shape[0]
+        sx = data["downscaled"].shape[1] / clean_edges.shape[1]
+        sy = data["downscaled"].shape[0] / clean_edges.shape[0]
         #log_image(data, "frei_chen", clean_edges)
         result = fld.detect(clean_edges)
         if result is not None and len(result) > 0: 

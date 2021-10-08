@@ -10,7 +10,7 @@ from termcolor import colored
 from .core import SurfaceType
 from .geometry import Geometry
 from .utils import convert_color, put_text
-from .Line import line_angle_difference
+from .Line import line_angle_difference, Line
 from .ade20k import ADE20K
 
 class Surface():
@@ -28,6 +28,7 @@ class Surface():
         self._plane_mask = None
         self._contours = None
         self._normals_color = None
+        self._lines = None
 
         self._semantic_labels = None
 
@@ -67,6 +68,25 @@ class Surface():
         if self._normals_color is None:
             self._normals_color = np.mean(self.data["normals"], axis=(0, 1))
         return self._normals_color
+
+    @property
+    def lines(self) -> list:
+        if self._lines is None:
+            padding = self.geometry.image.shape[1] / 30
+
+            self._lines = []
+            for i in range(len(self.data["lines"])):
+                line = self.data["lines"][i]
+                for contour in self.contours:
+                    dist_midpoint = cv2.pointPolygonTest(contour, line.midpoint, True)
+                    dist_a = cv2.pointPolygonTest(contour, line.point_a, True)
+                    dist_b = cv2.pointPolygonTest(contour, line.point_b, True)
+                    
+                    if (dist_midpoint >= 0 or abs(dist_midpoint) <= padding) and (dist_a <= 0 or dist_b <= 0):
+                        self._lines.append(line)
+                        break
+                            
+        return self._lines
 
     @property
     def angle(self): #from floor
@@ -241,6 +261,8 @@ class Surface():
 
     def debug(self, img, color):
         cv2.drawContours(img, self.contours, -1, color)
+
+        Line.draw_all(img, self.lines, color=color, thickness=2)
     
         if self.center is None: 
             print("No center found for %s" % self.name)
@@ -256,6 +278,8 @@ class Surface():
             pos = put_text(img, self._alteration, pos, color, size=0.33, shadow=True)
 
         pos = put_text(img, "%.0f deg" % np.degrees(self.angle), pos, (255, 255, 255), size=0.33, shadow=True)
+
+        #print("%s has %d lines" % (self.name, len(self.lines)))
 
         # if surface.surfaceType != surface.best_surface_types[0]:
         #     best_prob = surface.category_probs[surface.best_surface_types[0]]

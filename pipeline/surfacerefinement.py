@@ -41,10 +41,9 @@ class SurfaceRefinement():
         sx = self.image.shape[1] / data["image"].shape[1]
         sy = self.image.shape[0] / data["image"].shape[0]
         
-
         #draw lines in BW
         merged_lines = np.int32(np.zeros((self.image.shape[0], self.image.shape[1])))
-        Line.draw_all(merged_lines, self.lines, color=255, thickness=2, sx=sx, sy=sy)
+        Line.draw_all(merged_lines, self.lines, color=255, thickness=2)
 
         watershed_mask = (merged_lines == 0)
 
