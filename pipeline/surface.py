@@ -78,7 +78,7 @@ class Surface():
                 line = self.data["lines"][i]
                 for contour in self.contours:
                     area = cv2.contourArea(contour)
-                    padding = math.sqrt(area) / 20
+                    padding = math.sqrt(area) / 10
 
                     def is_inside(point):
                         #positive (inside), negative (outside), or zero (on an edge)
