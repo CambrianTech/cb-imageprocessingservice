@@ -284,7 +284,7 @@ class Room(Geometry):
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
-        Line.draw_all(img, self.data["lines"], color=(127,127,127), thickness=1)
+        Line.draw_all(img, self.data["lines"], color=(255,255,255), thickness=1)
 
         #let surface do its debug
         for i in range(len(self.surfaces)):
