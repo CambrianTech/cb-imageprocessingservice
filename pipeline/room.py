@@ -280,7 +280,7 @@ class Room(Geometry):
             max_value = 0.9
             if max_value > 0:
                 img_hsv[:, :, 0][mask] = hues[i]
-                img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.75)
+                img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.15)
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 

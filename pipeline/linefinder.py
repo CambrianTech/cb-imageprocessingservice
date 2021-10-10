@@ -69,15 +69,17 @@ class PipelineLineFinder(PipelineStep):
         log_lines(lines, "bw_lines")
 
         #find lines in hed hed edges
-        # sx = data["downscaled"].shape[1] / data["hed"].shape[1]
-        # sy = data["downscaled"].shape[0] / data["hed"].shape[0]
+        sx = data["downscaled"].shape[1] / data["hed"].shape[1]
+        sy = data["downscaled"].shape[0] / data["hed"].shape[0]
 
-        # result = fld.detect(data["hed"])
-        # if result is not None and len(result) > 0: 
-        #     #lines are made parallel by thickness of source image edges
-        #     hed_lines = Line.merge(transform_result(result), search_width=diagonal/100)
-        #     log_lines(hed_lines, "hed_lines")
-        #     lines.extend(hed_lines)
+        hed = data["hed"].copy()
+        hed = cv2.bilateralFilter(hed, 13, 40, 9)
+        result = fld.detect(hed)
+        if result is not None and len(result) > 0: 
+            #lines are made parallel by thickness of source image edges
+            hed_lines = Line.merge(transform_result(result), search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(7))
+            log_lines(hed_lines, "hed_lines")
+            lines.extend(hed_lines)
 
         #find lines in normals
         fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 20.0), 1.41, 200, 240, 3, False)
@@ -101,7 +103,7 @@ class PipelineLineFinder(PipelineStep):
         #find lines in gabor edges:
         v_gabor = gabor(bw, 0, 7)
         h_gabor = gabor(bw, np.pi/2.0, 9)
-        edges = cv2.addWeighted(v_gabor, 1.0, h_gabor, 1.0, -100)
+        edges = cv2.addWeighted(v_gabor, 1.0, h_gabor, 1.0, -40)
         edges = cv2.bilateralFilter(edges, 13, 60, 9)
         log_image(data, "gabor", edges)
         edges = cv2.resize(edges, (self.width, self.height), interpolation = cv2.INTER_CUBIC)
