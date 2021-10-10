@@ -71,18 +71,24 @@ class Surface():
 
     @property
     def lines(self) -> list:
+
         if self._lines is None:
             self._lines = []
             for i in range(len(self.data["lines"])):
                 line = self.data["lines"][i]
                 for contour in self.contours:
                     area = cv2.contourArea(contour)
-                    padding = math.sqrt(area) / 10
-                    dist_midpoint = cv2.pointPolygonTest(contour, line.midpoint, True)
-                    dist_a = cv2.pointPolygonTest(contour, line.point_a, True)
-                    dist_b = cv2.pointPolygonTest(contour, line.point_b, True)
-                    
-                    if (dist_midpoint >= 0 or abs(dist_midpoint) <= padding) and (dist_a <= 0 or dist_b <= 0):
+                    padding = math.sqrt(area) / 20
+
+                    def is_inside(point):
+                        #positive (inside), negative (outside), or zero (on an edge)
+                        dist = cv2.pointPolygonTest(contour, point, True)
+                        return dist >= 0 or abs(dist) <= padding
+
+                    midpoint_a = ((line.point_a[0] + line.midpoint[0]) / 2, (line.point_a[1] + line.midpoint[1]) / 2)
+                    midpoint_b = ((line.point_b[0] + line.midpoint[0]) / 2, (line.point_b[1] + line.midpoint[1]) / 2)
+
+                    if is_inside(line.midpoint) and (is_inside(midpoint_a) or is_inside(midpoint_b)):
                         self._lines.append(line)
                         break
                             

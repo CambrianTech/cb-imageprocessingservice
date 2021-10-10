@@ -203,7 +203,8 @@ class Room(Geometry):
                     distance_mean = 0.5 * (distance_i + distance_j)
                     distance_error = 0.35 * distance_mean #accuracy degrades by range (maybe use error here, error square?)
 
-                    if surfaceType == SurfaceType.Floor or (angle < angle_threshold and distance_between < distance_error):
+                    #todo: check for intersection. In elevator image, wall sitting out front is being incorrectly merged. if it's fairly parallel, don't
+                    if surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling or (angle < angle_threshold and distance_between < distance_error):
                         if surfaceType != SurfaceType.Other or surfaces[i].bestLabel == surfaces[j].bestLabel:
                             surfaces[i].merge(surfaces[j])
                             surfaces[i]._alteration = "%.2fm %.2fd" % (distance_between, angle_threshold)
@@ -283,7 +284,7 @@ class Room(Geometry):
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
-        Line.draw_all(img, self.data["lines"], color=(0,0,255), thickness=1)
+        Line.draw_all(img, self.data["lines"], color=(127,127,127), thickness=1)
 
         #let surface do its debug
         for i in range(len(self.surfaces)):
