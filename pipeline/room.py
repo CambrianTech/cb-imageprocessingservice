@@ -167,7 +167,7 @@ class Room(Geometry):
 
                 if new_surface is not None:
                     print(colored("Creating new %s using %s as reference" % (surfaceType.name, reference_surface.name), 'green'))
-                    log_image(self.data, new_surface.name, new_surface.mask)
+                    #log_image(self.data, new_surface.name, new_surface.mask * 255)
                     self.add_surface(new_surface)
 
             #logging
@@ -280,7 +280,7 @@ class Room(Geometry):
             max_value = 0.9
             if max_value > 0:
                 img_hsv[:, :, 0][mask] = hues[i]
-                img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.25)
+                img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.75)
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
@@ -292,8 +292,6 @@ class Room(Geometry):
             hue = hues[i]
             color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
             surface.debug(img, color)
-                
-        
 
         return img
 

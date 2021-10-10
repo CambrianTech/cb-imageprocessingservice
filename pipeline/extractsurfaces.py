@@ -57,7 +57,7 @@ class PipelineExtractSurfaces(PipelineStep):
         h, w = output[0].shape
         shape = (w, h)
 
-        log_image(data, "image", data["image"])
+        log_image(data, "hed", data["hed"])
 
         if data["image"].shape[0] > shape[0] or data["image"].shape[1] > shape[1]:
             data["downscaled"] = cv2.resize(data["image"], shape)
