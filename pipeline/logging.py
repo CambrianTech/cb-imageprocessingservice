@@ -16,7 +16,7 @@ class LogLevel(IntFlag):
     Lines =         0x1 << 3
     Models =        0x1 << 4
 
-    Default =       Images | Segmentation
+    Default =       Images | Segmentation | Lines
     All =           0xff
 
 def get_unique_id(data:dict):

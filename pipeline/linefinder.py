@@ -48,7 +48,7 @@ class PipelineLineFinder(PipelineStep):
 
         def log_lines(lines, name):
             if im_logging_enabled(data, LogLevel.Lines):
-                debug = data["image"].copy()
+                debug = data["downscaled"].copy()
                 thickness = max(int(math.hypot(debug.shape[0], debug.shape[1]) / 600), 1)
                 Line.draw_all(debug, lines, thickness=thickness)
                 log_image(data, name, debug)
@@ -112,7 +112,7 @@ class PipelineLineFinder(PipelineStep):
         result = fld.detect(edges)
         if result is not None and len(result) > 0: 
             gabor_lines = Line.merge(transform_result(result), search_length=1.1, search_width=diagonal/100, angle_threshold=math.radians(7))
-            #log_lines(gabor_lines, "gabor_lines")
+            log_lines(gabor_lines, "gabor_lines")
             lines.extend(gabor_lines)
 
         #frei chen edges:
