@@ -175,7 +175,7 @@ class Room(Geometry):
                 log_image(self.data, "room_missing", room_missing)
             
 
-    def merge_like_surfaces(self, angle_threshold=np.radians(30)):
+    def merge_like_surfaces(self, angle_threshold=np.radians(20)):
 
         for surfaceType in SurfaceType:
             
