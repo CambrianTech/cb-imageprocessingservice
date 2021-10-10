@@ -177,9 +177,6 @@ class Room(Geometry):
 
     def merge_like_surfaces(self, angle_threshold=np.radians(30)):
 
-        if im_logging_enabled(self.data):
-            debug = self.image.copy()
-
         for surfaceType in SurfaceType:
             
             color = random_color()
@@ -210,10 +207,6 @@ class Room(Geometry):
                         if surfaceType != SurfaceType.Other or surfaces[i].bestLabel == surfaces[j].bestLabel:
                             surfaces[i].merge(surfaces[j])
                             surfaces[i]._alteration = "%.2fm %.2fd" % (distance_between, angle_threshold)
-
-
-        if im_logging_enabled(self.data):
-            log_image(self.data, "room_merged", debug)
 
         
     def refine_surfaces(self, min_confidence=None):
