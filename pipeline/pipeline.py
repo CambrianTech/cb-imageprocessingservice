@@ -19,13 +19,11 @@ from .superpixels import PipelineSuperpixels
 from .planegeometry import PipelinePlaneGeometry
 from .refineplanemasks import PipelineRefinePlaneMasks
 from .linefinder import PipelineLineFinder
-from .refine import PipelineRefineResults
 from .combineplanemasks import PipelineCombinePlaneMasks
 from .remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 from .poseestimator import PipelinePoseEstimator
 from .extractsurfaces import PipelineExtractSurfaces
 from .surfacerefinement import PipelineSurfaceRefinement
-from .mergesurfaces import PipelineMergeSurfaces
 from .roomsolver import PipelineRoomSolver
 
 class PipelineNoOp(PipelineStep):
@@ -120,19 +118,15 @@ class Pipeline():
         all_steps[PipelineStepIndex.SolveRoom] = PipelineRoomSolver
         all_steps[PipelineStepIndex.Geometry] = PipelinePlaneGeometry
         all_steps[PipelineStepIndex.EstimatePose] = PipelinePoseEstimator
-        all_steps[PipelineStepIndex.SurfaceRefinement] = PipelineSurfaceRefinement
-        all_steps[PipelineStepIndex.MergeSurfaces] = PipelineMergeSurfaces
-        all_steps[PipelineStepIndex.Refine] = PipelineRefineResults
+        all_steps[PipelineStepIndex.Refine] = PipelineSurfaceRefinement
         all_steps[PipelineStepIndex.Superpixels] = PipelineSuperpixels if self.api_level < 3 else None
         all_steps[PipelineStepIndex.CombinePlaneMasks] = PipelineCombinePlaneMasks
         all_steps[PipelineStepIndex.Output] = output_step
         
         if self.api_level < 3.5:
-            all_steps[PipelineStepIndex.SurfaceRefinement] = None
             all_steps[PipelineStepIndex.FindLines] = None
             all_steps[PipelineStepIndex.Geometry] = None
             all_steps[PipelineStepIndex.EstimatePose] = None
-            all_steps[PipelineStepIndex.MergeSurfaces] = None
             all_steps[PipelineStepIndex.SolveRoom] = None
             all_steps[PipelineStepIndex.Refine] = PipelineRefinePlaneMasks
         
