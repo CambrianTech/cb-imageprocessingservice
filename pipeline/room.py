@@ -201,7 +201,7 @@ class Room(Geometry):
 
                     distance_between = abs(distance_i - distance_j)
                     distance_mean = 0.5 * (distance_i + distance_j)
-                    distance_error = 0.35 * distance_mean #accuracy degrades by range (maybe use error here, error square?)
+                    distance_error = 0.25 * distance_mean #accuracy degrades by range (maybe use error here, error square?)
 
                     #todo: check for intersection. In elevator image, wall sitting out front is being incorrectly merged. if it's fairly parallel, don't
                     if surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling or (angle < angle_threshold and distance_between < distance_error):
