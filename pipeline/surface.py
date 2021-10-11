@@ -164,7 +164,6 @@ class Surface():
 
         return self._contours
 
-
     @property
     def semantic_labels(self) -> ndimage:
         if self._semantic_labels is None:
