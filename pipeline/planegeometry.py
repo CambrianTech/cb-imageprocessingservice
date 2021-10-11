@@ -8,7 +8,7 @@ from enum import Enum, IntEnum
 
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .utils import resize_array
-from .logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
+from .logging import log_image, log_segmentation_image, log_model, im_logging_enabled, LogLevel
 
 class Dimension(IntEnum):
     Horizontal = 0
@@ -70,7 +70,7 @@ class PlaneGeometry():
         if im_logging_enabled(self.data, LogLevel.Models):
             plane_XYZ = planes_data["plane_XYZ"][:, :, 80:-80, :].transpose(0, 2, 3, 1)
             plane_XYZ = resize_array(plane_XYZ, shape)
-            log_ply(self.data, "3D", self.image, self.plane_masks, np.float32(plane_XYZ), mult=1)
+            log_model(self.data, "model_initial", self.image, self.plane_masks, np.float32(plane_XYZ), mult=1)
 
         self.normals = (normals - 127.5) / 127.5
         

@@ -140,7 +140,7 @@ def log_segmentation_image(data:dict, name, segmentation, image, avg=False, exte
 
         _log_image(data, name, debug, extension)
 
-def log_ply(data:dict, name, image, masks, plane_XYZ, write_occlusion=False, mult=1.0):
+def log_model(data:dict, name, image, masks, plane_XYZ, write_occlusion=False, mult=1.0):
     if im_logging_enabled(data, LogLevel.Models):
         file_path = make_log_path(data, name, ".ply")
         print("Saving model", file_path)

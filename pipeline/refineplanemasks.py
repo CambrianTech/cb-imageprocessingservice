@@ -22,7 +22,7 @@ from .planegeometry import PlaneGeometry, Dimension
 from .surfacerefinement import SurfaceRefinement
 from .ade20k import ADE20K
 from .utils import get_segmentation_image, calculate_plane_xyz
-from .logging import log_image, log_segmentation_image, log_ply, im_logging_enabled, LogLevel
+from .logging import log_image, log_segmentation_image, im_logging_enabled, LogLevel
 from .poseestimator import PoseEstimator, fan_surfaces
 
 def rough_dilate_erode(is_dilate, mask, size=5, iterations=1, scale=0.5, maintain_size=True, interpolation=cv2.INTER_NEAREST):

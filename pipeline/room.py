@@ -121,6 +121,7 @@ class Room(Geometry):
             #draw
             if room_missing is not None:
                 cv2.drawContours(room_missing, np.array(valid_contours), -1, color, cv2.FILLED)
+                log_image(self.data, "room_missing", room_missing)
 
             #add missing
             for contour in valid_contours:
@@ -168,11 +169,7 @@ class Room(Geometry):
                 if new_surface is not None:
                     print(colored("Creating new %s using %s as reference" % (surfaceType.name, reference_surface.name), 'green'))
                     #log_image(self.data, new_surface.name, new_surface.mask * 255)
-                    self.add_surface(new_surface)
-
-            #logging
-            if room_missing is not None:
-                log_image(self.data, "room_missing", room_missing)
+                    self.add_surface(new_surface)                
             
 
     def merge_like_surfaces(self, angle_threshold=np.radians(20)):
