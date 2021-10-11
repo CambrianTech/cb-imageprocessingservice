@@ -222,10 +222,12 @@ class Room(Geometry):
                             surfaces[i]._alteration = "%.2fm %.2fd" % (distance_between, angle_threshold)
 
         
-    def refine_surfaces(self, min_confidence=None):
+    def refine_surfaces(self, min_confidence=None, use_lines=True):
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
-        lines_mask = np.zeros(watershed_image.shape, dtype=np.uint8)
-        Line.draw_all(lines_mask, self.data["lines"], color=(255,255,255), thickness=1, lineType=cv2.LINE_4)
+        
+        if use_lines:
+            lines_mask = np.zeros(watershed_image.shape, dtype=np.uint8)
+            Line.draw_all(lines_mask, self.data["lines"], color=(255,255,255), thickness=1, lineType=cv2.LINE_4)
 
         def expand_into_type(surfaceType:SurfaceType):
             surfaces = self.get_surfaces(surfaceType)
@@ -250,7 +252,8 @@ class Room(Geometry):
 
             watershed_mask = np.zeros(total_mask.shape, dtype=np.int32)
             watershed_mask[self.isolated_labels == surfaceType.index] = 1
-            watershed_mask[lines_mask > 0] = 0
+            if use_lines:
+                watershed_mask[lines_mask > 0] = 0
 
             log_markers(self.data, "room_%s_markers" % surfaceType.name, markers, mask=watershed_mask)
 
@@ -281,8 +284,9 @@ class Room(Geometry):
         #ceilings do not have as many things on them (it'd fall!) so iterate across contours, looking for points downward
         #images may lack floors, ceilings, or both
 
-    
-        epsilon = self.image.shape[0] / 80
+        epsilon = self.image.shape[0] / 200
+        distance_check = self.image.shape[0] / 30
+        min_length = self.image.shape[0] / 50
 
         self.barrier_contours = []
         self.barrier_candidates = []
@@ -297,6 +301,9 @@ class Room(Geometry):
 
                 line_a = Line(np.array([(point_a[0], point_a[1], point_b[0], point_b[1])], dtype=np.int).reshape(4))
                 line_b = Line(np.array([(point_b[0], point_b[1], point_c[0], point_c[1])], dtype=np.int).reshape(4))
+
+                if line_a.length < min_length or line_b.length < min_length:
+                    continue
 
                 angle = line_angle_difference(line_a.angle, line_b.angle)
                 if angle > min_angle_threshold:
