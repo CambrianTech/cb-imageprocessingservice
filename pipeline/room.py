@@ -85,7 +85,7 @@ class Room(Geometry):
 
         return candidates[0]
 
-    def add_missing_surfaces(self, min_area=1/400):
+    def add_missing_surfaces(self, min_area=1/1200):
 
         total_area = self.image.shape[0] * self.image.shape[1]
         area_threshold = int(total_area * min_area)
@@ -98,6 +98,8 @@ class Room(Geometry):
             total_mask = None
 
         room_missing = self.image.copy() if im_logging_enabled(self.data) else None
+
+        total_elevation = 3 #todo: get total elevation from highest and lowest objects. Floor or ceiling could be missing
         
         for surfaceType in SurfaceType:
             
@@ -158,23 +160,38 @@ class Room(Geometry):
                         surface.destroyed = True
                         break
 
+                new_normal = None
+                new_offset = None
+
                 if new_surface is None and surfaceType.is_major:
                     reference_surface = self.find_best_candidate(surfaceType, contour_mask)
-                    if reference_surface is None and surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling:
-                        print("Generate %s" % surfaceType.name)
-
+                    
                     if reference_surface is not None:
                         new_surface = reference_surface.clone()
                         new_surface.surfaceType = surfaceType
                         new_surface.set_mask(contour_mask)
-                    else:
+                    elif surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling:
+                        complimentary_type = SurfaceType.Floor if surfaceType == SurfaceType.Ceiling else SurfaceType.Ceiling
+                        reference_surface = self.find_best_candidate(complimentary_type, contour_mask)
+
+                        if reference_surface is not None:
+                            print("Generate %s using %s as opposing surface" % (surfaceType.name, reference_surface.name))
+                            
+                            new_surface = reference_surface.clone()
+                            new_surface.surfaceType = surfaceType
+                            new_surface.set_mask(contour_mask)
+                            new_surface.normal = -reference_surface.normal
+                            new_surface.offset = total_elevation - reference_surface.offset
+
+
+                    if reference_surface is None:
                         print(colored("No match for %s" % surfaceType.name, 'yellow'))
                         
 
                 if new_surface is not None:
                     print(colored("Creating new %s using %s as reference" % (surfaceType.name, reference_surface.name), 'green'))
                     #log_image(self.data, new_surface.name, new_surface.mask * 255)
-                    self.add_surface(new_surface)                
+                    self.add_surface(new_surface)
             
 
     def merge_like_surfaces(self, angle_threshold=np.radians(20)):
@@ -203,7 +220,7 @@ class Room(Geometry):
 
                     distance_between = abs(distance_i - distance_j)
                     distance_mean = 0.5 * (distance_i + distance_j)
-                    distance_error = 0.25 * distance_mean #accuracy degrades by range (maybe use error here, error square?)
+                    distance_error = 0.35 * distance_mean #accuracy degrades by range (maybe use error here, error square?)
 
                     #todo: check for intersection. In elevator image, wall sitting out front is being incorrectly merged. if it's fairly parallel, don't
                     if surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling or (angle < angle_threshold and distance_between < distance_error):

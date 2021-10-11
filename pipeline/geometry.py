@@ -26,7 +26,10 @@ class Geometry():
 
 
     def add_surface(self, surface):
-        if surface.index < 0:
+
+        surface.geometry = self
+        
+        if not surface.was_added:
             #get next index, expand everything, 
             #todo: store inside surface
             surface.index = self.data["planes"]["masks"].shape[0]
@@ -40,8 +43,9 @@ class Geometry():
 
             self.invalidate()
 
-        surface._geometry = self
         self._surfaces[surface.index] = surface
+
+        surface.on_added()
 
     def remove_surface(self, surface):
         surface.destroyed = True

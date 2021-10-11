@@ -1,3 +1,4 @@
+import abc
 from abc import ABCMeta, abstractmethod, abstractproperty
 import numpy as np
 import math
@@ -15,12 +16,12 @@ from .ade20k import ADE20K
 
 class Surface():
 
-    def __init__(self, data, index, surfaceType=None):
+    def __init__(self, data, index=None, surfaceType=None):
         self.data = data
-        self.index = index
+        self._index = index
         self.uniqueId = uuid.uuid4()
         self.surfaceType = surfaceType
-        self._geometry = None
+        self.geometry = None
         self._mask = None
         self._alteration = None
         self.destroyed = False
@@ -32,6 +33,9 @@ class Surface():
 
         self._semantic_labels = None
 
+        self._normal = None
+        self._offset = None
+
     @property
     def secondaryType(self) -> SurfaceType:
         return next(filter(lambda t: t != self.surfaceType, self.best_surface_types))
@@ -40,9 +44,26 @@ class Surface():
     def name(self) -> str:
         return "%s %d" % ("?" if self.bestLabel is None else self.bestLabel.name, self.index)
 
+    @property #protected or private
+    def index(self) -> int:
+        return self._index if self.was_added else self._cloned_from
+
+    @index.setter
+    def index(self, value:int):
+        self._index = value
+
     @property
-    def geometry(self) -> Geometry:
-        return self._geometry    
+    def was_added(self) -> bool:
+        return self._index is not None
+
+    def on_added(self):
+        if self._normal is not None:
+            self.normal = self._normal
+            self._normal = None
+
+        if self._offset is not None:
+            self.offset = self._offset
+            self._offset = None
 
     @property
     def probs(self) -> Geometry:
@@ -56,12 +77,26 @@ class Surface():
         return self._plane_mask
 
     @property
-    def normal(self) -> float:
+    def normal(self) -> tuple:
         return self.data["plane_normals"][self.index]
+
+    @normal.setter
+    def normal(self, value:tuple):
+        if self.was_added:
+            self.data["plane_normals"][self.index] = value
+        else:
+            self._normal = value
 
     @property
     def offset(self) -> float:
         return self.data["plane_offsets"][self.index]
+
+    @offset.setter
+    def offset(self, value:float):
+        if self.was_added:
+            self.data["plane_offsets"][self.index] = value
+        else:
+            self._offset = value
 
     @property
     def normals_color(self) -> tuple:
@@ -148,7 +183,7 @@ class Surface():
     def clone(self):
         new_surface = copy(self)
         new_surface.uniqueId = uuid.uuid4()
-        new_surface.index = -1 #nothing till added to room/geometry
+        new_surface._index = None #nothing till added to room/geometry
         new_surface._cloned_from = self.index
         new_surface.mask_changed()
         
