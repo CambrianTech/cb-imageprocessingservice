@@ -160,11 +160,16 @@ class Room(Geometry):
 
                 if new_surface is None and surfaceType.is_major:
                     reference_surface = self.find_best_candidate(surfaceType, contour_mask)
+                    if reference_surface is None and surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling:
+                        print("Generate %s" % surfaceType.name)
+
                     if reference_surface is not None:
                         new_surface = reference_surface.clone()
                         new_surface.surfaceType = surfaceType
                         new_surface.set_mask(contour_mask)
-
+                    else:
+                        print(colored("No match for %s" % surfaceType.name, 'yellow'))
+                        
 
                 if new_surface is not None:
                     print(colored("Creating new %s using %s as reference" % (surfaceType.name, reference_surface.name), 'green'))
