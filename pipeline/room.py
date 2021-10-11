@@ -18,7 +18,7 @@ from .core import SurfaceType
 from .surface import Surface
 from .utils import convert_color, put_text, overlay_mask, random_color
 from .logging import im_logging_enabled, log_image, log_segmentation_image, log_markers
-from .Line import line_angle_difference, Line
+from .Line import line_angle_difference, Line, on_image_edge
 from .ade20k import ADE20K
 
 from termcolor import colored
@@ -279,14 +279,13 @@ class Room(Geometry):
         for surfaceType in SurfaceType: 
             expand_into_type(surfaceType)
 
-    def find_vertical_barriers(self, min_angle_threshold=np.radians(5)):
+    def find_vertical_barriers(self, min_angle_threshold=np.radians(7)):
         
-        #ceilings do not have as many things on them (it'd fall!) so iterate across contours, looking for points downward
+        #ceilings do not have as many things on them, so iterate across contours, looking for points downward
         #images may lack floors, ceilings, or both
 
-        epsilon = self.image.shape[0] / 200
         distance_check = self.image.shape[0] / 30
-        min_length = self.image.shape[0] / 50
+        min_length = self.image.shape[0] / 100
 
         self.barrier_contours = []
         self.barrier_candidates = []
@@ -299,6 +298,9 @@ class Room(Geometry):
                 point_b = poly[(i+1) % num_pts][0]
                 point_c = poly[(i+2) % num_pts][0]
 
+                if on_image_edge(point_b, self.image):
+                    continue
+
                 line_a = Line(np.array([(point_a[0], point_a[1], point_b[0], point_b[1])], dtype=np.int).reshape(4))
                 line_b = Line(np.array([(point_b[0], point_b[1], point_c[0], point_c[1])], dtype=np.int).reshape(4))
 
@@ -310,19 +312,19 @@ class Room(Geometry):
                     candidates.append(tuple(point_b))
             return candidates
 
-
+        ceiling_epsilon = self.image.shape[0] / 60
         for ceiling in self.get_surfaces(surfaceType=SurfaceType.Ceiling):
             for contour in ceiling.contours:
-                poly = cv2.approxPolyDP(contour, epsilon, True)
+                poly = cv2.approxPolyDP(contour, ceiling_epsilon, True)
                 self.barrier_contours.append(poly)
 
                 candidates = find_candidates(poly)
                 self.barrier_candidates.extend(candidates)
                 
-
-        for ceiling in self.get_surfaces(surfaceType=SurfaceType.Floor):
-            for contour in ceiling.contours:
-                poly = cv2.approxPolyDP(contour, epsilon, True)
+        wall_epsilon = self.image.shape[0] / 100
+        for floor in self.get_surfaces(surfaceType=SurfaceType.Floor):
+            for contour in floor.contours:
+                poly = cv2.approxPolyDP(contour, wall_epsilon, True)
                 self.barrier_contours.append(poly)
 
                 candidates = find_candidates(poly)
@@ -362,7 +364,6 @@ class Room(Geometry):
 
         for point in self.barrier_candidates:
             cv2.drawMarker(img, point, color=(255,0,0))
-
 
         return img
 

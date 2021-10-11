@@ -144,6 +144,17 @@ def sqeuclidean(point_a, point_b):
     return dx * dx + dy * dy
 
 @nb.jit(nopython=True)
+def on_image_edge(point, image, min_distance=5):
+    if point[0] <= min_distance:
+        return 1
+    elif point[0] >= image.shape[1] - min_distance - 1:
+        return 3
+    elif point[1] <= min_distance:
+        return 2
+    elif point[1] >= image.shape[0] - min_distance - 1:
+        return 4
+
+@nb.jit(nopython=True)
 def merge_line_pair(line_a, line_b):
 
     ax = line_a[0][0]
