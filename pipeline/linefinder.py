@@ -53,11 +53,22 @@ class PipelineLineFinder(PipelineStep):
                 Line.draw_all(debug, lines, thickness=thickness)
                 log_image(data, name, debug)
 
+        def find_lines(img, min_length, use_lsd=False):
+            min_length = int(min_length)
+            if use_lsd:
+                lsd = cv2.createLineSegmentDetector(scale=1.0)
+                lines = lsd.detect(img)[0]
+                lines = list(filter(lambda line: distance.euclidean((line[0][0], line[0][1]), (line[0][2], line[0][3])) >= min_length, lines))
+            else:
+                fld = cv2.ximgproc.createFastLineDetector(min_length, 1.41, 200, 240, 3, False)
+                return fld.detect(img)
+
         transform_result = lambda x: list(map(lambda x: Line(x.reshape(4), sx, sy), result))
 
         #print("0. elapsed %.2f" % (time() - start)); start = time()
+        min_length = int(diagonal / 80)
 
-        fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 80.0), 1.41, 200, 240, 3, False)
+        fld = cv2.ximgproc.createFastLineDetector(min_length, 1.41, 200, 240, 3, False)
         lines = []
 
         #find lines in BW image
@@ -82,7 +93,8 @@ class PipelineLineFinder(PipelineStep):
             lines.extend(hed_lines)
 
         #find lines in normals
-        fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 20.0), 1.41, 200, 240, 3, False)
+        min_length = int(diagonal / 20)
+        fld = cv2.ximgproc.createFastLineDetector(min_length, 1.41, 200, 240, 3, False)
         normals = np.uint8(data["normals"])
         #log_image(data, "normals", normals)
         sx = data["downscaled"].shape[1] / normals.shape[1]
