@@ -75,10 +75,13 @@ class PipelineLineFinder(PipelineStep):
         lines = []
 
         #find lines in BW image
-        lines.extend(find_lines(bw, min_length))
-        lines.extend(find_lines(bw, min_length, True))
+        bw_lines_a = find_lines(bw, min_length)
+        lines.extend(bw_lines_a)
+        log_lines(bw_lines_a, "bw_lines_a")
 
-        log_lines(lines, "bw_lines")
+        bw_lines_b = find_lines(bw, min_length, True)
+        lines.extend(bw_lines_b)
+        log_lines(bw_lines_b, "bw_lines_b")
 
         lines = Line.merge(lines, search_length=0.5, search_width=diagonal/800, angle_threshold=math.radians(3))
 
