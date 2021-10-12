@@ -92,7 +92,7 @@ class PipelineLineFinder(PipelineStep):
         sy = data["downscaled"].shape[0] / data["hed"].shape[0]
 
         hed = data["hed"].copy()
-        hed = cv2.bilateralFilter(hed, 13, 40, 9)
+        hed = cv2.bilateralFilter(hed, 13, 40, 9) #todo: apply non-maxima-suppression (NMS) to image instead
         hed_lines = find_lines(hed, min_length, use_lsd=True, ang_th=12) #ang_th=22.5 was getting false positives
         log_lines(hed_lines, "hed_lines_initial")
 
