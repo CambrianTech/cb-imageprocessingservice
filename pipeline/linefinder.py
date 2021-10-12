@@ -54,10 +54,10 @@ class PipelineLineFinder(PipelineStep):
                 Line.draw_all(debug, lines, thickness=thickness)
                 log_image(data, name, debug)
 
-        def find_lines(image, min_length, use_lsd=False, refine=cv2.LSD_REFINE_NONE, scale=1.0, sigma_scale=1.0, quant=2.0, ang_th=22.5, density_th=0.7, n_bins=1024):
+        def find_lines(image, min_length, use_lsd=False, refine=cv2.LSD_REFINE_NONE, scale=1.0, sigma_scale=0.7, quant=2.0, ang_th=22.5, log_eps=0.1, density_th=0.7, n_bins=1024):
             min_length = int(min_length)
             if use_lsd:
-                lsd = cv2.createLineSegmentDetector(refine=refine, scale=scale, sigma_scale=sigma_scale, quant=quant, ang_th=ang_th, density_th=density_th, n_bins=n_bins)
+                lsd = cv2.createLineSegmentDetector(refine=refine, scale=scale, sigma_scale=sigma_scale, quant=quant, ang_th=ang_th, log_eps=log_eps, density_th=density_th, n_bins=n_bins)
                 lines = lsd.detect(image)[0]
                 lines = list(filter(lambda line: distance.euclidean((line[0][0], line[0][1]), (line[0][2], line[0][3])) >= min_length, lines))
             else:
