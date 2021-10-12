@@ -54,17 +54,20 @@ class PipelineLineFinder(PipelineStep):
                 Line.draw_all(debug, lines, thickness=thickness)
                 log_image(data, name, debug)
 
-        def find_lines(image, min_length, use_lsd=False, refine=cv2.LSD_REFINE_NONE, scale=1.0, sigma_scale=0.7, quant=2.0, ang_th=22.5, log_eps=0.1, density_th=0.7, n_bins=1024):
+        def find_lines(image, min_length, use_lsd=False, refine=cv2.LSD_REFINE_NONE, scale=1.0, sigma_scale=1.0, quant=2.0, ang_th=22.5, log_eps=0.1, density_th=0.7, n_bins=1024):
             min_length = int(min_length)
             if use_lsd:
                 lsd = cv2.createLineSegmentDetector(refine=refine, scale=scale, sigma_scale=sigma_scale, quant=quant, ang_th=ang_th, log_eps=log_eps, density_th=density_th, n_bins=n_bins)
                 lines = lsd.detect(image)[0]
-                lines = list(filter(lambda line: distance.euclidean((line[0][0], line[0][1]), (line[0][2], line[0][3])) >= min_length, lines))
+                if lines is not None:
+                    lines = list(filter(lambda line: distance.euclidean((line[0][0], line[0][1]), (line[0][2], line[0][3])) >= min_length, lines))
             else:
                 fld = cv2.ximgproc.createFastLineDetector(min_length, 1.41, 200, 240, 3, False)
-                return fld.detect(image)
+                lines = fld.detect(image)
 
-        transform_result = lambda x: list(map(lambda x: Line(x.reshape(4), sx, sy), result))
+            sx = data["downscaled"].shape[1] / image.shape[1]
+            sy = data["downscaled"].shape[0] / image.shape[0]
+            return list(map(lambda x: Line(x.reshape(4), sx, sy), lines)) if lines is not None else list()
 
         #print("0. elapsed %.2f" % (time() - start)); start = time()
         min_length = int(diagonal / 80)
@@ -72,18 +75,14 @@ class PipelineLineFinder(PipelineStep):
         lines = []
 
         #find lines in BW image
-        sx = data["downscaled"].shape[1] / bw.shape[1]
-        sy = data["downscaled"].shape[0] / bw.shape[0]
+        lines.extend(find_lines(bw, min_length))
+        lines.extend(find_lines(bw, min_length, True))
 
-        # result = find_lines(bw, min_length)
-        # if result is not None and len(result) > 0: 
-        #     lines.extend(transform_result(result))
+        log_lines(lines, "bw_lines")
 
-        result = find_lines(bw, min_length, True)
-        if result is not None and len(result) > 0: 
-            lines.extend(transform_result(result))
+        lines = Line.merge(lines, search_length=0.5, search_width=diagonal/800, angle_threshold=math.radians(3))
 
-        lines = Line.merge(lines, search_length=1.05, search_width=diagonal/200, angle_threshold=math.radians(5))
+        log_lines(lines, "bw_lines_merged")
 
         #find lines in hed hed edges
         sx = data["downscaled"].shape[1] / data["hed"].shape[1]
@@ -91,10 +90,10 @@ class PipelineLineFinder(PipelineStep):
 
         hed = data["hed"].copy()
         hed = cv2.bilateralFilter(hed, 13, 40, 9)
-        result = find_lines(hed, min_length)
-        if result is not None and len(result) > 0: 
-            #lines are made parallel by thickness of source image edges
-            hed_lines = Line.merge(transform_result(result), search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(7))
+        hed_lines = find_lines(hed, min_length, use_lsd=True)
+        hed_lines = Line.merge(hed_lines, search_length=0.5, search_width=diagonal/400, angle_threshold=math.radians(3))
+
+        if len(hed_lines) > 0: 
             log_lines(hed_lines, "hed_lines")
             lines.extend(hed_lines)
 
@@ -102,14 +101,10 @@ class PipelineLineFinder(PipelineStep):
         min_length = int(diagonal / 20)
         normals = np.uint8(data["normals"])
         #log_image(data, "normals", normals)
-        sx = data["downscaled"].shape[1] / normals.shape[1]
-        sy = data["downscaled"].shape[0] / normals.shape[0]
         normals = cv2.split(normals)
         normals_lines = []
         for i in range(0, 3):
-            result = find_lines(normals[i], min_length)
-            if result is not None and len(result) > 0:
-                normals_lines.extend(transform_result(result))
+            normals_lines.extend(find_lines(normals[i], min_length))
         
         if len(normals_lines) > 0:
             #cleanup normals
@@ -117,40 +112,37 @@ class PipelineLineFinder(PipelineStep):
             log_lines(normals_lines, "normals_lines")
             lines.extend(normals_lines)
 
-        #find lines in gabor edges:
-        v_gabor = gabor(bw, 0, 7)
-        h_gabor = gabor(bw, np.pi/2.0, 9)
-        edges = cv2.addWeighted(v_gabor, 1.0, h_gabor, 1.0, -40)
-        edges = cv2.bilateralFilter(edges, 13, 60, 9)
-        log_image(data, "gabor", edges)
-        edges = cv2.resize(edges, (self.width, self.height), interpolation = cv2.INTER_CUBIC)
+        # #find lines in gabor edges:
+        # v_gabor = gabor(bw, 0, 7)
+        # h_gabor = gabor(bw, np.pi/2.0, 9)
+        # edges = cv2.addWeighted(v_gabor, 1.0, h_gabor, 1.0, -60)
+        # edges = cv2.bilateralFilter(edges, 5, 60, 9)
+        # log_image(data, "gabor", edges)
+        # edges = cv2.resize(edges, (self.width, self.height), interpolation = cv2.INTER_CUBIC)
 
-        sx = data["downscaled"].shape[1] / edges.shape[1]
-        sy = data["downscaled"].shape[0] / edges.shape[0]
-        result = find_lines(edges, min_length, use_lsd=True)
-        if result is not None and len(result) > 0: 
-            gabor_lines = Line.merge(transform_result(result), search_length=0.5, search_width=diagonal/100, angle_threshold=math.radians(5))
-            log_lines(gabor_lines, "gabor_lines")
-            lines.extend(gabor_lines)
+        # gabor_lines = find_lines(edges, min_length, use_lsd=True)
+        # if len(gabor_lines) > 0: 
+        #     gabor_lines = Line.merge(gabor_lines, search_length=0.5, search_width=diagonal/100, angle_threshold=math.radians(5))
+        #     log_lines(gabor_lines, "gabor_lines")
+        #     lines.extend(gabor_lines)
 
-        #frei chen edges:
-        clean_edges = (frei_chen(bw) * 255.0 * 3.0).astype(np.float32)
-        clean_edges[clean_edges > 255] = 255
-        clean_edges = cv2.bilateralFilter(clean_edges, 5, 5, 5).astype(np.uint8)
-        #clean_edges = bw - clean_edges
-        #clean_edges[clean_edges < 0] = 0
-        sx = data["downscaled"].shape[1] / clean_edges.shape[1]
-        sy = data["downscaled"].shape[0] / clean_edges.shape[0]
-        log_image(data, "frei_chen", clean_edges)
-        result = find_lines(clean_edges, min_length, use_lsd=True)
-        if result is not None and len(result) > 0: 
-            frei_lines = transform_result(result)
-            frei_lines = Line.merge(frei_lines, search_width=diagonal/200, search_length=1.1, angle_threshold=math.radians(7))
-            log_lines(frei_lines, "frei_lines")
-            lines.extend(frei_lines)
+        # #frei chen edges:
+        # clean_edges = frei_chen(bw) * 5 * 255 - 127
+        # clean_edges[clean_edges > 255] = 255
+        # clean_edges[clean_edges < 0] = 0
+        # clean_edges = cv2.bilateralFilter(clean_edges.astype(np.float32), 5, 5, 5)
+        # #clean_edges = bw - clean_edges
+        # #clean_edges[clean_edges < 0] = 0
+
+        # log_image(data, "frei_chen", clean_edges)
+        # frei_lines = find_lines(clean_edges.astype(np.uint8), min_length, use_lsd=True)
+        # if len(frei_lines) > 0: 
+        #     frei_lines = Line.merge(frei_lines, search_width=diagonal/200, search_length=1.1, angle_threshold=math.radians(7))
+        #     log_lines(frei_lines, "frei_lines")
+        #     lines.extend(frei_lines)
 
         #merge all
-        lines = Line.merge(lines, search_width=diagonal/200)
+        lines = Line.merge(lines, search_width=diagonal/300)
 
         # print("8. elapsed %.2f" % (time() - start)); start = time()
 
