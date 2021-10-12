@@ -144,7 +144,7 @@ def sqeuclidean(point_a, point_b):
     return dx * dx + dy * dy
 
 @nb.jit(nopython=True)
-def on_image_edge(point, image, min_distance=5):
+def on_image_edge(point, image, min_distance=3):
     if point[0] <= min_distance:
         return 1
     elif point[0] >= image.shape[1] - min_distance - 1:

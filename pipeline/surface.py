@@ -302,8 +302,8 @@ class Surface():
     def debug(self, img, color):
         cv2.drawContours(img, self.contours, -1, color)
 
-        if self.surfaceType.is_major and self.surfaceType != SurfaceType.Other:
-            Line.draw_all(img, self.lines, color=color, thickness=2)
+        # if self.surfaceType.is_major and self.surfaceType != SurfaceType.Other:
+        #     Line.draw_all(img, self.lines, color=color)
     
         if self.center is None: 
             print("No center found for %s" % self.name)
