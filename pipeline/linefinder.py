@@ -54,7 +54,7 @@ class PipelineLineFinder(PipelineStep):
                 Line.draw_all(debug, lines, thickness=thickness)
                 log_image(data, name, debug)
 
-        def find_lines(image, min_length, use_lsd=False, refine=cv2.LSD_REFINE_NONE, scale=1.0, sigma_scale=1.0, quant=2.0, ang_th=22.5, log_eps=0.1, density_th=0.7, n_bins=1024):
+        def find_lines(image, min_length, use_lsd=False, refine=cv2.LSD_REFINE_NONE, scale=1.0, sigma_scale=1.0, quant=2.0, ang_th=22.5, log_eps=0, density_th=0.7, n_bins=1024):
             min_length = int(min_length)
             if use_lsd:
                 lsd = cv2.createLineSegmentDetector(refine=refine, scale=scale, sigma_scale=sigma_scale, quant=quant, ang_th=ang_th, log_eps=log_eps, density_th=density_th, n_bins=n_bins)
@@ -77,15 +77,15 @@ class PipelineLineFinder(PipelineStep):
         #find lines in BW image
         bw_lines_a = find_lines(bw, min_length)
         lines.extend(bw_lines_a)
-        log_lines(bw_lines_a, "bw_lines_a")
+        log_lines(bw_lines_a, "bw_lines_fld")
 
-        bw_lines_b = find_lines(bw, min_length, True)
+        bw_lines_b = find_lines(bw, min_length, True, ang_th=20) #ang_th=22.5 was getting false positives
         lines.extend(bw_lines_b)
-        log_lines(bw_lines_b, "bw_lines_b")
+        log_lines(bw_lines_b, "bw_lines_lsd")
 
-        lines = Line.merge(lines, search_length=0.5, search_width=diagonal/800, angle_threshold=math.radians(3))
+        lines = Line.merge(lines, search_length=1.0, search_width=diagonal/800, angle_threshold=math.radians(3))
 
-        log_lines(lines, "bw_lines_merged")
+        log_lines(lines, "bw_lines")
 
         #find lines in hed hed edges
         sx = data["downscaled"].shape[1] / data["hed"].shape[1]
@@ -93,7 +93,9 @@ class PipelineLineFinder(PipelineStep):
 
         hed = data["hed"].copy()
         hed = cv2.bilateralFilter(hed, 13, 40, 9)
-        hed_lines = find_lines(hed, min_length, use_lsd=True)
+        hed_lines = find_lines(hed, min_length, use_lsd=True, ang_th=17) #ang_th=22.5 was getting false positives
+        log_lines(lines, "hed_lines_initial")
+
         hed_lines = Line.merge(hed_lines, search_length=0.5, search_width=diagonal/400, angle_threshold=math.radians(3))
 
         if len(hed_lines) > 0: 
