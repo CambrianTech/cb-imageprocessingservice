@@ -123,8 +123,15 @@ def overlay_mask(img, mask, hue=None, saturation=255, darkest_value=80):
 
     return out
 
-def convert_color(hsv, conversion):
-    return tuple(int(i) for i in cv2.cvtColor(np.uint8([[hsv]]), conversion).flatten())
+def convert_color(color, conversion):
+    #return tuple(int(i) for i in cv2.cvtColor(img, conversion).flatten())
+    
+    #bug in opencv 4.5.4 incorrectly asserting on width or height parameter instead of channels
+    #return tuple(int(i) for i in cv2.cvtColor(img, conversion).flatten())
+    img = np.zeros([3,3,3],dtype=np.uint8)
+    img[0,0] = color
+    converted = cv2.cvtColor(img, conversion)[0,0]
+    return (int(converted[0]), int(converted[1]), int(converted[2]))
 
 def put_text(img, text, origin, color, shadow_offset=(1,1), font=cv2.FONT_HERSHEY_SIMPLEX, size=1, thickness=1, line_type=cv2.LINE_AA, shadow=False, highlights=False):
 
