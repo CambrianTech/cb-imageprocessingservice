@@ -79,7 +79,7 @@ class PipelineLineFinder(PipelineStep):
         lines.extend(bw_lines_a)
         log_lines(bw_lines_a, "bw_lines_fld")
 
-        bw_lines_b = find_lines(bw, min_length, True, ang_th=20) #ang_th=22.5 was getting false positives
+        bw_lines_b = find_lines(bw, min_length, True, ang_th=17) #ang_th=22.5 was getting false positives
         lines.extend(bw_lines_b)
         log_lines(bw_lines_b, "bw_lines_lsd")
 
@@ -93,10 +93,10 @@ class PipelineLineFinder(PipelineStep):
 
         hed = data["hed"].copy()
         hed = cv2.bilateralFilter(hed, 13, 40, 9)
-        hed_lines = find_lines(hed, min_length, use_lsd=True, ang_th=17) #ang_th=22.5 was getting false positives
-        log_lines(lines, "hed_lines_initial")
+        hed_lines = find_lines(hed, min_length, use_lsd=True, ang_th=12) #ang_th=22.5 was getting false positives
+        log_lines(hed_lines, "hed_lines_initial")
 
-        hed_lines = Line.merge(hed_lines, search_length=0.5, search_width=diagonal/400, angle_threshold=math.radians(3))
+        hed_lines = Line.merge(hed_lines, search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(3))
 
         if len(hed_lines) > 0: 
             log_lines(hed_lines, "hed_lines")
