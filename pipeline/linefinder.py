@@ -147,7 +147,7 @@ class PipelineLineFinder(PipelineStep):
         #     lines.extend(frei_lines)
 
         #merge all
-        lines = Line.merge(lines, search_width=diagonal/300)
+        lines = Line.merge(lines, search_width=min(diagonal/400, 8))
 
         # print("8. elapsed %.2f" % (time() - start)); start = time()
 
