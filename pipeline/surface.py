@@ -28,6 +28,7 @@ class Surface():
         self._cloned_from = -1
         self._plane_mask = None
         self._contours = None
+        self._polygons = None
         self._normals_color = None
         self._lines = None
 
@@ -154,7 +155,7 @@ class Surface():
         self.geometry.invalidate()
 
     @property
-    def contours(self) -> ndimage:
+    def contours(self):
         if self._contours is None:
             self._contours, self.hierarchy = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             self.moments = cv2.moments(self._contours[0]) if len(self._contours) > 0 else None
@@ -163,6 +164,13 @@ class Surface():
                 self.moments = cv2.moments(self.mask)
 
         return self._contours
+
+    @property
+    def polygons(self):
+        if self._polygons is None:
+            self._polygons = list(map(lambda contour: cv2.approxPolyDP(contour, max(cv2.arcLength(contour, True) / 100, 1.0), True), self.contours))
+
+        return self._polygons
 
     @property
     def semantic_labels(self) -> ndimage:

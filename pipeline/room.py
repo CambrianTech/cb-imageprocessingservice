@@ -23,6 +23,12 @@ from .ade20k import ADE20K
 
 from termcolor import colored
 
+class Barrier():
+    def __init__(self, data, midpoint, angle=0):
+        self.data = data
+        self.midpoint = midpoint
+        self.angle = angle
+
 #python info on object oriented methods and properties
 #https://stackoverflow.com/questions/2736255/abstract-attributes-in-python
 class Room(Geometry):
@@ -49,7 +55,7 @@ class Room(Geometry):
 
         self.merge_like_surfaces()
 
-        self.find_vertical_barriers()
+        self.find_barriers()
 
         log_image(self.data, "room", self.get_debug_image())
 
@@ -279,18 +285,18 @@ class Room(Geometry):
         for surfaceType in SurfaceType: 
             expand_into_type(surfaceType)
 
-    def find_vertical_barriers(self, min_angle_threshold=np.radians(5)):
+    def find_barriers(self):
         
         #ceilings do not have as many things on them, so iterate across contours, looking for points downward
         #images may lack floors, ceilings, or both
 
         distance_check = self.image.shape[0] / 30
-        min_length = self.image.shape[0] / 100
+        min_length = self.image.shape[0] / 50
 
         self.barrier_contours = []
         self.barrier_candidates = []
 
-        def find_candidates(poly):
+        def find_candidates(poly, min_angle_threshold):
             num_pts = len(poly)
             candidates = []
             for i in range(num_pts):
@@ -298,8 +304,8 @@ class Room(Geometry):
                 point_b = poly[(i+1) % num_pts][0]
                 point_c = poly[(i+2) % num_pts][0]
 
-                # if on_image_edge(point_b, self.image):
-                #     continue
+                if on_image_edge(point_b, self.image):
+                    continue
 
                 line_a = Line(np.array([(point_a[0], point_a[1], point_b[0], point_b[1])], dtype=np.int).reshape(4))
                 line_b = Line(np.array([(point_b[0], point_b[1], point_c[0], point_c[1])], dtype=np.int).reshape(4))
@@ -312,23 +318,19 @@ class Room(Geometry):
                     candidates.append(tuple(point_b))
             return candidates
 
-        ceiling_epsilon = self.image.shape[0] / 50
-        for ceiling in self.get_surfaces(surfaceType=SurfaceType.Ceiling):
-            for contour in ceiling.contours:
-                poly = cv2.approxPolyDP(contour, ceiling_epsilon, True)
-                self.barrier_contours.append(poly)
-
-                candidates = find_candidates(poly)
-                self.barrier_candidates.extend(candidates)
+        
+        def build_barriers(surfaceType, min_angle_threshold):
+            for surface in self.get_surfaces(surfaceType):
+                for poly in surface.polygons:
+                    self.barrier_contours.append(poly)
+                    self.barrier_candidates.extend(find_candidates(poly, min_angle_threshold))
                 
-        floor_epsilon = self.image.shape[0] / 100
-        for floor in self.get_surfaces(surfaceType=SurfaceType.Floor):
-            for contour in floor.contours:
-                poly = cv2.approxPolyDP(contour, floor_epsilon, True)
-                self.barrier_contours.append(poly)
+        
+        #build_barriers(SurfaceType.Ceiling)
+        #build_barriers(SurfaceType.Floor)
+        build_barriers(SurfaceType.Wall, np.radians(45))
+        #build_barriers(SurfaceType.WallLike)
 
-                candidates = find_candidates(poly)
-                self.barrier_candidates.extend(candidates)
 
             #contours = ceilings.concatenate
 
@@ -357,12 +359,12 @@ class Room(Geometry):
             color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
             surface.debug(img, color)
 
-        #cv2.drawContours(img, self.barrier_contours, -1, color=(255,255,0), thickness=2) 
+        cv2.drawContours(img, self.barrier_contours, -1, color=(255,255,0), thickness=2) 
 
         Line.draw_all(img, self.data["lines"], color=(50,50,50), thickness=2)
 
         for point in self.barrier_candidates:
-            cv2.drawMarker(img, point, color=(0,255,0))
+            cv2.drawMarker(img, point, color=(255,0,0))
 
 
         return img
