@@ -296,9 +296,10 @@ class Room(Geometry):
         self.barrier_contours = []
         self.barrier_candidates = []
 
-        def find_candidates(poly, min_angle_threshold):
+        def find_candidates(poly, min_angle_threshold, max_angle_threshold):
             num_pts = len(poly)
             candidates = []
+
             for i in range(num_pts):
                 point_a = poly[i][0]
                 point_b = poly[(i+1) % num_pts][0]
@@ -307,30 +308,31 @@ class Room(Geometry):
                 if on_image_edge(point_b, self.image):
                     continue
 
-                line_a = Line(np.array([(point_a[0], point_a[1], point_b[0], point_b[1])], dtype=np.int).reshape(4))
+                line_a = Line(np.array([(point_b[0], point_b[1], point_a[0], point_a[1])], dtype=np.int).reshape(4))
                 line_b = Line(np.array([(point_b[0], point_b[1], point_c[0], point_c[1])], dtype=np.int).reshape(4))
 
                 if line_a.length < min_length or line_b.length < min_length:
                     continue
 
                 angle = line_angle_difference(line_a.angle, line_b.angle)
-                if angle > min_angle_threshold:
+                if angle > min_angle_threshold and angle < max_angle_threshold:
+                    #check for type differential:
+
                     candidates.append((point_a, point_b, point_c))
             return candidates
 
         
-        def build_barriers(surfaceType, min_angle_threshold):
+        def build_barriers(surfaceType, min_angle_threshold=np.radians(30), max_angle_threshold=np.radians(170)):
             for surface in self.get_surfaces(surfaceType):
                 for poly in surface.polygons:
                     self.barrier_contours.append(poly)
-                    self.barrier_candidates.extend(find_candidates(poly, min_angle_threshold))
+                    self.barrier_candidates.extend(find_candidates(poly, min_angle_threshold, max_angle_threshold))
                 
         
-        #build_barriers(SurfaceType.Ceiling)
-        #build_barriers(SurfaceType.Floor)
-        build_barriers(SurfaceType.Wall, np.radians(30))
-        build_barriers(SurfaceType.WallLike, np.radians(30))
-        #build_barriers(SurfaceType.WallLike)
+        build_barriers(SurfaceType.Ceiling)
+        build_barriers(SurfaceType.Floor)
+        build_barriers(SurfaceType.Wall)
+        build_barriers(SurfaceType.WallLike)
 
 
             #contours = ceilings.concatenate
