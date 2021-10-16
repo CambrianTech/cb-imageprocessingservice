@@ -315,7 +315,7 @@ class Room(Geometry):
                     continue
 
                 angle = line_angle_difference(line_a.angle, line_b.angle)
-                if angle > min_angle_threshold and angle < max_angle_threshold:
+                if angle > min_angle_threshold:
                     #check for type differential:
 
                     candidates.append((point_a, point_b, point_c))

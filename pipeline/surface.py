@@ -168,7 +168,8 @@ class Surface():
     @property
     def polygons(self):
         if self._polygons is None:
-            self._polygons = list(map(lambda contour: cv2.approxPolyDP(contour, max(cv2.arcLength(contour, True) / 400, 1.0), True), self.contours))
+            epsilon = math.hypot(self.data["downscaled"].shape[0], self.data["downscaled"].shape[1]) / 200
+            self._polygons = list(map(lambda contour: cv2.approxPolyDP(contour, epsilon, True), self.contours))
 
         return self._polygons
 
