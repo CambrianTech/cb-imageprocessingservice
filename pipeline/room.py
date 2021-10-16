@@ -315,7 +315,7 @@ class Room(Geometry):
 
                 angle = line_angle_difference(line_a.angle, line_b.angle)
                 if angle > min_angle_threshold:
-                    candidates.append(tuple(point_b))
+                    candidates.append((point_a, point_b, point_c))
             return candidates
 
         
@@ -328,7 +328,8 @@ class Room(Geometry):
         
         #build_barriers(SurfaceType.Ceiling)
         #build_barriers(SurfaceType.Floor)
-        build_barriers(SurfaceType.Wall, np.radians(45))
+        build_barriers(SurfaceType.Wall, np.radians(30))
+        build_barriers(SurfaceType.WallLike, np.radians(30))
         #build_barriers(SurfaceType.WallLike)
 
 
@@ -359,12 +360,16 @@ class Room(Geometry):
             color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
             surface.debug(img, color)
 
-        cv2.drawContours(img, self.barrier_contours, -1, color=(255,255,0), thickness=2) 
+        #cv2.drawContours(img, self.barrier_contours, -1, color=(255,255,0), thickness=1) 
 
-        Line.draw_all(img, self.data["lines"], color=(50,50,50), thickness=2)
+        Line.draw_all(img, self.data["lines"], color=(80,80,80), thickness=2)
 
-        for point in self.barrier_candidates:
-            cv2.drawMarker(img, point, color=(255,0,0))
+        for triad in self.barrier_candidates:
+            cv2.line(img, triad[1], triad[0], [0, 0, 255], thickness=2)
+            cv2.line(img, triad[1], triad[2], [255, 255, 0], thickness=2)
+
+        for triad in self.barrier_candidates:
+            cv2.drawMarker(img, triad[1], color=(255,0,0))
 
 
         return img
