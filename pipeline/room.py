@@ -29,6 +29,13 @@ class Barrier():
         self.midpoint = midpoint
         self.angle = angle
 
+class Vertex():
+    def __init__(self, center, line_a, line_b):
+        self.center = center
+        self.line_a = line_a
+        self.line_b = line_b
+        self.radius = int(min(min(self.line_a.length, self.line_b.length), 30))
+
 #python info on object oriented methods and properties
 #https://stackoverflow.com/questions/2736255/abstract-attributes-in-python
 class Room(Geometry):
@@ -296,7 +303,7 @@ class Room(Geometry):
         self.barrier_contours = []
         self.barrier_candidates = []
 
-        def find_candidates(poly, min_angle_threshold, max_angle_threshold):
+        def find_candidates(surface, poly, min_angle_threshold, max_angle_threshold):
             num_pts = len(poly)
             candidates = []
 
@@ -315,10 +322,47 @@ class Room(Geometry):
                     continue
 
                 angle = line_angle_difference(line_a.angle, line_b.angle)
-                if angle > min_angle_threshold:
-                    #check for type differential:
+                if angle >= min_angle_threshold and angle <= max_angle_threshold:
+                    #check for type differential of the labels inside an arc (see debug arc):
+                    vertex = Vertex(point_b, line_a, line_b)
+                    x_min, x_max = vertex.center[0] - vertex.radius, vertex.center[0] + vertex.radius
+                    y_min, y_max = vertex.center[1] - vertex.radius, vertex.center[1] + vertex.radius
 
-                    candidates.append((point_a, point_b, point_c))
+                    #keep track of clipping outside of image
+                    x_offset = 0
+                    if x_min < 0: 
+                        x_offset = x_min
+                        x_min = 0
+                    elif x_max >= self.isolated_labels.shape[1]: 
+                        x_offset = self.isolated_labels.shape[1] - x_max + 1
+                        x_max = self.isolated_labels.shape[1] - 1
+
+                    y_offset = 0
+                    if y_min < 0: 
+                        y_offset = y_min
+                        y_min = 0
+                    elif y_max >= self.isolated_labels.shape[0]: 
+                        y_offset = self.isolated_labels.shape[0] - y_max + 1
+                        y_max = self.isolated_labels.shape[0] - 1
+
+                    mask = np.zeros((y_max - y_min, x_max - x_min), dtype=np.uint8)
+                    cv2.ellipse(mask, (vertex.radius + x_offset, vertex.radius + y_offset), (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_a.angle), np.degrees(vertex.line_b.angle), [255, 255, 255], thickness=cv2.FILLED)
+
+                    labels_arc = self.isolated_labels[y_min:y_max, x_min:x_max].copy()
+                    labels_arc = labels_arc[mask > 0]
+                    
+                    if len(labels_arc) > 0:
+                        segments, counts = np.unique(labels_arc, return_counts=True)
+                        sorted_labels = sorted(zip(segments.tolist(), counts.tolist()), key=lambda x:-x[1])
+                        best_label, best_count = sorted_labels[0]
+                        if len(sorted_labels) < 3 and best_label == surface.surfaceType.index:
+                            if len(sorted_labels) > 1:
+                                second_best_label, second_best_count = sorted_labels[1]
+                                if best_count / second_best_count > 3:
+                                    candidates.append(vertex)   
+                            else:
+                                candidates.append(vertex)
+
             return candidates
 
         
@@ -326,7 +370,7 @@ class Room(Geometry):
             for surface in self.get_surfaces(surfaceType):
                 for poly in surface.polygons:
                     self.barrier_contours.append(poly)
-                    self.barrier_candidates.extend(find_candidates(poly, min_angle_threshold, max_angle_threshold))
+                    self.barrier_candidates.extend(find_candidates(surface, poly, min_angle_threshold, max_angle_threshold))
                 
         
         build_barriers(SurfaceType.Ceiling)
@@ -366,12 +410,14 @@ class Room(Geometry):
 
         Line.draw_all(img, self.data["lines"], color=(80,80,80), thickness=2)
 
-        for triad in self.barrier_candidates:
-            cv2.line(img, triad[1], triad[0], [0, 0, 255], thickness=2)
-            cv2.line(img, triad[1], triad[2], [255, 255, 0], thickness=2)
+        for vertex in self.barrier_candidates:
 
-        for triad in self.barrier_candidates:
-            cv2.drawMarker(img, triad[1], color=(255,0,0))
+            cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_a.angle), np.degrees(vertex.line_b.angle), [0, 255, 0], thickness=1) 
+            cv2.line(img, vertex.line_a.point_a, vertex.line_a.point_b, [0, 0, 255], thickness=2)
+            cv2.line(img, vertex.line_b.point_a, vertex.line_b.point_b, [255, 255, 0], thickness=2)
+
+        for vertex in self.barrier_candidates:
+            cv2.drawMarker(img, vertex.center, color=(255,0,0), thickness=2)
 
 
         return img
