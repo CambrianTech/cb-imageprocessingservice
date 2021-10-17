@@ -23,67 +23,11 @@ from .ade20k import ADE20K
 
 from termcolor import colored
 
-class Barrier():
-    def __init__(self, data, midpoint, angle=0):
-        self.data = data
-        self.midpoint = midpoint
-        self.angle = angle
-
-class Vertex():
-    def __init__(self, center, line_a, line_b):
-        self.center = center
-        self.line_a = line_a
-        self.line_b = line_b
-        self.radius = int(min(min(self.line_a.length, self.line_b.length), 30))
-
-    def get_samples(self, image, outside=False):
-
-        x_min, x_max = self.center[0] - self.radius, self.center[0] + self.radius
-        y_min, y_max = self.center[1] - self.radius, self.center[1] + self.radius
-
-        x_offset = 0
-        if x_min < 0: 
-            x_offset = x_min
-            x_min = 0
-        elif x_max >= image.shape[1]: 
-            x_offset = image.shape[1] - x_max + 1
-            x_max = image.shape[1] - 1
-
-        y_offset = 0
-        if y_min < 0: 
-            y_offset = y_min
-            y_min = 0
-        elif y_max >= image.shape[0]: 
-            y_offset = image.shape[0] - y_max + 1
-            y_max = image.shape[0] - 1
-
-        mask = np.zeros((y_max - y_min, x_max - x_min), dtype=np.uint8)
-
-        if outside:
-            start_angle = self.line_b.angle
-            stop_angle = self.line_a.angle + 2 * np.pi
-        else:
-            start_angle = self.line_a.angle
-            stop_angle = self.line_b.angle
-
-        cv2.ellipse(mask, (self.radius + x_offset, self.radius + y_offset), (self.radius, self.radius), 0, np.degrees(start_angle), np.degrees(stop_angle), [255, 255, 255], thickness=cv2.FILLED)
-
-        image_arc = image[y_min:y_max, x_min:x_max][mask > 0]
-
-        segments, counts = np.unique(image_arc, return_counts=True)
-        sorted_labels = sorted(zip(segments.tolist(), counts.tolist()), key=lambda x:-x[1])
-        
-        return sorted_labels
-
-
 #python info on object oriented methods and properties
 #https://stackoverflow.com/questions/2736255/abstract-attributes-in-python
 class Room(Geometry):
 
     def analyze(self):
-
-        self.barrier_contours = []
-        self.barrier_candidates = []
 
         log_segmentation_image(self.data, "semantic_labels", self.semantic_labels, self.image)
         
@@ -101,8 +45,6 @@ class Room(Geometry):
         #self.ransac_fit()
 
         self.merge_like_surfaces()
-
-        self.find_barriers()
 
         log_image(self.data, "room", self.get_debug_image())
 
@@ -332,84 +274,6 @@ class Room(Geometry):
         for surfaceType in SurfaceType: 
             expand_into_type(surfaceType)
 
-    def find_barriers(self):
-        
-        #ceilings do not have as many things on them, so iterate across contours, looking for points downward
-        #images may lack floors, ceilings, or both
-
-        distance_check = self.image.shape[0] / 30
-        min_length = self.image.shape[0] / 50
-
-        self.barrier_contours = []
-        self.barrier_candidates = []
-
-        def find_candidates(surface, poly, min_angle_threshold, max_angle_threshold):
-            num_pts = len(poly)
-            candidates = []
-
-            for i in range(num_pts):
-                point_a = poly[i][0]
-                point_b = poly[(i+1) % num_pts][0]
-                point_c = poly[(i+2) % num_pts][0]
-
-                if on_image_edge(point_b, self.image):
-                    continue
-
-                line_a = Line(np.array([(point_b[0], point_b[1], point_a[0], point_a[1])], dtype=np.int).reshape(4))
-                line_b = Line(np.array([(point_b[0], point_b[1], point_c[0], point_c[1])], dtype=np.int).reshape(4))
-
-                if line_a.length < min_length or line_b.length < min_length:
-                    continue
-
-                angle = line_angle_difference(line_a.angle, line_b.angle)
-                if angle >= min_angle_threshold and angle <= max_angle_threshold:
-                    #check for type differential of the labels inside an arc (see debug arc):
-                    vertex = Vertex(point_b, line_a, line_b)
-                    
-                    inner_labels = vertex.get_samples(self.isolated_labels)
-                    
-                    if len(inner_labels) > 0:
-                        best_label, best_count = inner_labels[0]
-                        if len(inner_labels) < 3 and best_label == surface.surfaceType.index:
-                            outer_labels = vertex.get_samples(self.isolated_labels, outside=True)
-                            best_outer, best_outer_count = outer_labels[0]
-
-                            #if nowhere near a wall, forget it (unless ceiling near cabinet)
-                            #also ignore wall-like not touching wall
-                            if best_label != SurfaceType.Wall.index and best_label != SurfaceType.WallLike.index \
-                                and best_outer != SurfaceType.Wall.index and best_outer != SurfaceType.WallLike.index \
-                                and not (best_label == SurfaceType.Ceiling.index and best_outer == SurfaceType.Other.index): 
-                                continue
-
-                            if (best_label == SurfaceType.WallLike.index and best_outer == SurfaceType.WallLike.index):
-                                continue
-
-                            if len(inner_labels) > 1:
-                                #remove clutter
-                                second_best_label, second_best_count = inner_labels[1]
-                                if best_count / second_best_count > 3:
-                                    candidates.append(vertex)   
-                            else:
-                                candidates.append(vertex)
-
-            return candidates
-
-        
-        def build_barriers(surfaceType, min_angle_threshold=np.radians(30), max_angle_threshold=np.radians(170)):
-            for surface in self.get_surfaces(surfaceType):
-                for poly in surface.polygons:
-                    self.barrier_contours.append(poly)
-                    self.barrier_candidates.extend(find_candidates(surface, poly, min_angle_threshold, max_angle_threshold))
-                
-        
-        build_barriers(SurfaceType.Ceiling, min_angle_threshold=np.radians(15))
-        build_barriers(SurfaceType.Floor)
-        build_barriers(SurfaceType.Wall)
-        build_barriers(SurfaceType.WallLike)
-
-
-            #contours = ceilings.concatenate
-
         
     def get_debug_image(self):
 
@@ -434,22 +298,6 @@ class Room(Geometry):
             hue = hues[i]
             color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
             surface.debug(img, color)
-
-        #cv2.drawContours(img, self.barrier_contours, -1, color=(255,255,0), thickness=1) 
-
-        Line.draw_all(img, self.data["lines"], color=(80,80,80), thickness=2)
-
-        for vertex in self.barrier_candidates:
-
-            cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_a.angle), np.degrees(vertex.line_b.angle), [0, 255, 0], thickness=1) 
-            #cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_b.angle), np.degrees(vertex.line_a.angle) + 360, [255, 0, 0], thickness=2) 
-
-            cv2.line(img, vertex.line_a.point_a, vertex.line_a.point_b, [0, 0, 255], thickness=2)
-            cv2.line(img, vertex.line_b.point_a, vertex.line_b.point_b, [255, 255, 0], thickness=2)
-
-        for vertex in self.barrier_candidates:
-            cv2.drawMarker(img, vertex.center, color=(255,0,0), thickness=2)
-
 
         return img
 

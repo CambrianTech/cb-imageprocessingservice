@@ -35,6 +35,8 @@ class RoomSolver():
 
             log_image(self.data, "surfaces", debug)
 
+
+        return self.room
             
 
 
@@ -54,8 +56,5 @@ class PipelineRoomSolver(PipelineStep):
     def run(self, data):
 
         solver = RoomSolver(data)
-        solver.solve()
-
-        # refiner = SurfaceRefinement(img_lr, hed_lr, data["isolated"], data["lines"])
-        # data["segmentation"] = refiner.refine(data)
+        data["room"] = solver.solve()
 

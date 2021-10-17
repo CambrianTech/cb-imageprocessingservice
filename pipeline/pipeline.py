@@ -25,6 +25,8 @@ from .poseestimator import PipelinePoseEstimator
 from .extractsurfaces import PipelineExtractSurfaces
 from .surfacerefinement import PipelineSurfaceRefinement
 from .roomsolver import PipelineRoomSolver
+from .vanishingpointfinder import PipelineVanishingPointFinder
+from .barrierfinder import PipelineBarrierFinder
 
 class PipelineNoOp(PipelineStep):
 
@@ -116,6 +118,8 @@ class Pipeline():
         all_steps[PipelineStepIndex.ExtractSurfaces] = PipelineExtractSurfaces
         all_steps[PipelineStepIndex.FindLines] = PipelineLineFinder
         all_steps[PipelineStepIndex.SolveRoom] = PipelineRoomSolver
+        all_steps[PipelineStepIndex.VanishingPoints] = PipelineVanishingPointFinder
+        all_steps[PipelineStepIndex.Barriers] = PipelineBarrierFinder
         all_steps[PipelineStepIndex.Geometry] = PipelinePlaneGeometry
         all_steps[PipelineStepIndex.EstimatePose] = PipelinePoseEstimator
         all_steps[PipelineStepIndex.Refine] = PipelineSurfaceRefinement
