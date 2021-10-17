@@ -61,7 +61,7 @@ class Vertex():
 
         if outside:
             start_angle = self.line_b.angle
-            stop_angle = self.line_a.angle
+            stop_angle = self.line_a.angle + 2 * np.pi
         else:
             start_angle = self.line_a.angle
             stop_angle = self.line_b.angle
@@ -70,7 +70,10 @@ class Vertex():
 
         image_arc = image[y_min:y_max, x_min:x_max][mask > 0]
 
-        return image_arc
+        segments, counts = np.unique(image_arc, return_counts=True)
+        sorted_labels = sorted(zip(segments.tolist(), counts.tolist()), key=lambda x:-x[1])
+        
+        return sorted_labels
 
 
 #python info on object oriented methods and properties
@@ -363,17 +366,22 @@ class Room(Geometry):
                     #check for type differential of the labels inside an arc (see debug arc):
                     vertex = Vertex(point_b, line_a, line_b)
                     
-                    labels_inside = vertex.get_samples(self.isolated_labels)
+                    inner_labels = vertex.get_samples(self.isolated_labels)
                     
-                    if len(labels_inside) > 0:
-                        segments, counts = np.unique(labels_inside, return_counts=True)
-                        sorted_labels = sorted(zip(segments.tolist(), counts.tolist()), key=lambda x:-x[1])
-                        best_label, best_count = sorted_labels[0]
-                        if len(sorted_labels) < 3 and best_label == surface.surfaceType.index:
-                            labels_outside = vertex.get_samples(self.isolated_labels, outside=True)
+                    if len(inner_labels) > 0:
+                        best_label, best_count = inner_labels[0]
+                        if len(inner_labels) < 3 and best_label == surface.surfaceType.index:
+                            outer_labels = vertex.get_samples(self.isolated_labels, outside=True)
+                            best_outer, best_outer_count = outer_labels[0]
 
-                            if len(sorted_labels) > 1:
-                                second_best_label, second_best_count = sorted_labels[1]
+                            #if nowhere near a wall, forget it
+                            if best_label != SurfaceType.Wall.index and best_label != SurfaceType.WallLike.index \
+                                and best_outer != SurfaceType.Wall.index and best_outer != SurfaceType.WallLike.index:
+                                continue
+
+                            if len(inner_labels) > 1:
+                                #remove clutter
+                                second_best_label, second_best_count = inner_labels[1]
                                 if best_count / second_best_count > 3:
                                     candidates.append(vertex)   
                             else:
@@ -429,6 +437,8 @@ class Room(Geometry):
         for vertex in self.barrier_candidates:
 
             cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_a.angle), np.degrees(vertex.line_b.angle), [0, 255, 0], thickness=1) 
+            #cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_b.angle), np.degrees(vertex.line_a.angle) + 360, [255, 0, 0], thickness=2) 
+
             cv2.line(img, vertex.line_a.point_a, vertex.line_a.point_b, [0, 0, 255], thickness=2)
             cv2.line(img, vertex.line_b.point_a, vertex.line_b.point_b, [255, 255, 0], thickness=2)
 
