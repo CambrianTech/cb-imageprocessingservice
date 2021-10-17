@@ -374,9 +374,14 @@ class Room(Geometry):
                             outer_labels = vertex.get_samples(self.isolated_labels, outside=True)
                             best_outer, best_outer_count = outer_labels[0]
 
-                            #if nowhere near a wall, forget it
+                            #if nowhere near a wall, forget it (unless ceiling near cabinet)
+                            #also ignore wall-like not touching wall
                             if best_label != SurfaceType.Wall.index and best_label != SurfaceType.WallLike.index \
-                                and best_outer != SurfaceType.Wall.index and best_outer != SurfaceType.WallLike.index:
+                                and best_outer != SurfaceType.Wall.index and best_outer != SurfaceType.WallLike.index \
+                                and not (best_label == SurfaceType.Ceiling.index and best_outer == SurfaceType.Other.index): 
+                                continue
+
+                            if (best_label == SurfaceType.WallLike.index and best_outer == SurfaceType.WallLike.index):
                                 continue
 
                             if len(inner_labels) > 1:
@@ -397,7 +402,7 @@ class Room(Geometry):
                     self.barrier_candidates.extend(find_candidates(surface, poly, min_angle_threshold, max_angle_threshold))
                 
         
-        build_barriers(SurfaceType.Ceiling)
+        build_barriers(SurfaceType.Ceiling, min_angle_threshold=np.radians(15))
         build_barriers(SurfaceType.Floor)
         build_barriers(SurfaceType.Wall)
         build_barriers(SurfaceType.WallLike)
