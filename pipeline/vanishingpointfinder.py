@@ -1,7 +1,8 @@
 import numpy as np
 from scipy import ndimage
 import cv2
-from skimage.morphology import remove_small_objects
+import math
+import time
 
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .utils import resize_array, random_color, overlay_mask
@@ -10,16 +11,140 @@ from .logging import log_image, log_segmentation_image, im_logging_enabled
 from .Line import Line
 from .room import Room, Surface
 
+class VanishingPoint:
+    def __init__(self, model, votes):
+
+        self.model = model
+        self.votes = votes
+        self._score = sum(self.votes)
+        
+
+    def __eq__(self, other):
+        return self.score() == other.score()
+
+    def __lt__(self, other):
+        return self.score() < other.score()
+
+    @property
+    def score(self):
+        return self._score
+
+class Edglets:
+    def __init__(self, locations, directions, strengths):
+        self.locations = locations
+        self.directions = directions
+        self.strengths = strengths
+
+        self.normals = np.zeros_like(self.directions)
+        self.normals[:, 0] = self.directions[:, 1]
+        self.normals[:, 1] = -self.directions[:, 0]
+        p = -np.sum(self.locations * self.normals, axis=1)
+
+        self.lines = np.concatenate((self.normals, p[:, np.newaxis]), axis=1)
+        
+
 class VanishingPointFinder():
 
-    def __init__(self, data):
+    def __init__(self, data, surface):
         super().__init__()
         self.data = data
-        self.room = data["room"]
+        self.surface = surface
 
-    def solve(self, confidence=0.95):
-        if self.room:
-            print("find vanishing points for each surface")
+    def compute_edgelets(self):
+
+        if len(self.surface.lines) < 3: return None
+
+        locations = []
+        directions = []
+        strengths = []
+
+        for line in self.surface.lines:
+            p0, p1 = np.array([line.point_a[0], line.point_a[1]]), np.array([line.point_b[0], line.point_b[1]])
+
+            locations.append(line.midpoint)
+            directions.append(p1 - p0)
+            strengths.append(line.length)
+
+
+        locations = np.array(locations)
+        directions = np.array(directions)
+        strengths = np.array(strengths)
+        directions = np.array(directions) / np.linalg.norm(directions, axis=1)[:, np.newaxis]
+
+        return Edglets(locations, directions, strengths)
+
+    def solve(self, num_ransac_iter=2000, threshold_inlier=math.radians(7), max_time=1.0, find_vert=False):
+
+        self.edgelets = self.compute_edgelets()
+
+        if self.edgelets is None:
+            return None
+
+        num_pts = self.edgelets.strengths.size
+
+        arg_sort = np.argsort(-self.edgelets.strengths)
+        first_index_space = arg_sort[:num_pts // min(5, len(self.edgelets.lines))]
+        second_index_space = arg_sort[:num_pts // 2]
+
+        self.best_model = None
+        self.vanishing_points = []
+        t = time.time()
+
+        for ransac_iter in range(num_ransac_iter):
+            if time.time() - t > max_time:
+                return self.best_model
+
+            ind1 = np.random.choice(first_index_space)
+
+            ind2 = np.random.choice(second_index_space)
+
+            l1 = self.edgelets.lines[ind1]
+            l2 = self.edgelets.lines[ind2]
+
+            current_model = np.cross(l1, l2)
+
+            if np.sum(current_model ** 2) < 1 or current_model[2] == 0:
+                # reject degenerate candidates
+                continue
+
+
+            if find_vert:
+                if current_model[1] / current_model[2] < 1000: continue
+
+                dt1 = abs(np.dot(self.edgelets.directions[ind1], [0, 1]))
+                dt2 = abs(np.dot(self.edgelets.directions[ind2], [0, 1]))
+
+                if dt1 < .95 or dt2 < .95:
+                    continue
+
+            current_model = current_model / current_model[2]
+
+            vp = VanishingPoint(current_model, self.compute_votes(current_model, threshold_inlier))
+            
+            self.vanishing_points.append(vp)
+
+        self.vanishing_points.sort(key=lambda x:x.score, reverse=True)
+
+        return self.vanishing_points
+
+
+    def compute_votes(self, model, threshold_inlier):
+
+        vp = model[:2] / model[2]
+
+        est_directions = self.edgelets.locations - vp
+
+        dot_prod = np.sum(est_directions * self.edgelets.directions, axis=1)
+        abs_prod = np.linalg.norm(self.edgelets.directions, axis=1) * \
+                   np.linalg.norm(est_directions, axis=1)
+        abs_prod[abs_prod == 0] = 1e-5
+
+        cosine_theta = np.abs(dot_prod / abs_prod)
+
+        theta_thresh = np.cos(threshold_inlier)
+
+        return (cosine_theta > theta_thresh) * self.edgelets.strengths
+
 
 
 class PipelineVanishingPointFinder(PipelineStep):
@@ -37,5 +162,40 @@ class PipelineVanishingPointFinder(PipelineStep):
 
     def run(self, data):
 
-        VanishingPointFinder(data).solve()
+        self.surfaces = []
+
+        self.surfaces.extend(data["room"].get_surfaces(SurfaceType.Wall))
+
+        for surface in self.surfaces:
+            surface.vanishing_points = VanishingPointFinder(data, surface).solve()
+
+        if im_logging_enabled(data):
+            log_image(data, "vanishing_points", self.get_debug_image(data))
+
+    def get_debug_image(self, data):
+           
+        img = data["downscaled"].copy()
+
+        for surface in self.surfaces:
+
+            if surface.vanishing_points:
+
+                #draw all lines
+                for line in surface.lines:
+                    line.draw(img, color=(80,80,80))
+
+                for i in range(len(surface.vanishing_points)):
+                    vp = surface.vanishing_points[i]
+
+                    inliers = np.array(surface.lines)[vp.votes > 0]
+                    color = random_color()
+
+                    for line_data in inliers:
+                        line = Line(line_data)
+                        line.draw(img, color=color)
+                
+
+                #cv2.line(img, vertex.line_a.point_a, vertex.line_a.point_b, [0, 0, 255], thickness=2)
+            
+        return img
 

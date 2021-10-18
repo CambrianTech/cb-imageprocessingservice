@@ -37,6 +37,8 @@ class Surface():
         self._normal = None
         self._offset = None
 
+        self.vanishing_points = []
+
     @property
     def secondaryType(self) -> SurfaceType:
         return next(filter(lambda t: t != self.surfaceType, self.best_surface_types))

@@ -146,7 +146,8 @@ class BarrierFinder():
         build_barriers(SurfaceType.Wall)
         build_barriers(SurfaceType.WallLike)
 
-        log_image(self.data, "barriers", self.get_debug_image())
+        if im_logging_enabled(self.data):
+            log_image(self.data, "barriers", self.get_debug_image())
 
     def get_debug_image(self):
 

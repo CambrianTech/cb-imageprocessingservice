@@ -10,6 +10,7 @@ def multi_filter(fs, l):
     return multi_filter(fs[1:], (x for x in l if fs[0](x)))
 
 def random_color():
+    random.seed()
     haystack = np.arange(80, 255, 30)
     random.shuffle(haystack)
     return (int(haystack[0]), int(haystack[1]), int(haystack[2]))
