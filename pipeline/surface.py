@@ -37,7 +37,8 @@ class Surface():
         self._normal = None
         self._offset = None
 
-        self.vanishing_points = []
+        self.horizontal_vp = []
+        self.vertical_vp = []
 
     @property
     def secondaryType(self) -> SurfaceType:
