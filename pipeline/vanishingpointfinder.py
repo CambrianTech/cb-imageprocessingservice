@@ -57,7 +57,7 @@ class VanishingPointFinder():
 
     def compute_edgelets(self):
 
-        if len(self.surface.lines) < 3: return None
+        if len(self.surface.lines) < 2: return None
 
         locations = []
         directions = []
