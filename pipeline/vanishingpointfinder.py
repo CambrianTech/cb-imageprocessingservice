@@ -78,7 +78,7 @@ class VanishingPointFinder():
 
         return Edglets(locations, directions, strengths)
 
-    def solve(self, num_ransac_iter=2000, threshold_inlier=math.radians(7), max_time=1.0):
+    def solve(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_time=1.0):
 
         if self.edgelets is None:
             self.edgelets = self.compute_edgelets()
@@ -96,7 +96,10 @@ class VanishingPointFinder():
         self.vanishing_points = []
         t = time.time()
 
-        threshold_horizontal = np.radians(75)
+        threshold_horizontal = np.radians(80)
+        threshold_vertical = np.radians(10)
+
+        num_ransac_iter = min(num_ransac_iter, len(self.surface.lines) * 20)
 
         for ransac_iter in range(num_ransac_iter):
             if time.time() - t > max_time:
@@ -121,18 +124,12 @@ class VanishingPointFinder():
 
             if self.direction is not None:
 
-                both_consistent = (current_model[1] / current_model[2] > 1000)
+                #both_consistent = (current_model[1] / current_model[2] > 1000)
 
                 if self.direction == Direction.Vertical:
-                    vdt1 = abs(np.dot(self.edgelets.directions[ind1], [0, 1]))
-                    vdt2 = abs(np.dot(self.edgelets.directions[ind2], [0, 1]))
-
-                    if vdt1 < .95 or vdt2 < .95 or not both_consistent:
+                    if line_angle_difference(line1.angle, np.pi/2) > threshold_vertical or line_angle_difference(line2.angle, np.pi/2) > threshold_vertical:
                         continue
                 else:
-                    # hdt1 = abs(np.dot(self.edgelets.directions[ind1], [1, 0]))
-                    # hdt2 = abs(np.dot(self.edgelets.directions[ind2], [1, 0]))
-
                     if line_angle_difference(line1.angle, 0) > threshold_horizontal or line_angle_difference(line2.angle, 0) > threshold_horizontal:
                         continue
 
