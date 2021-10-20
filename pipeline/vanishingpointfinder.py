@@ -13,11 +13,16 @@ from .Line import Line, line_angle_difference
 from .room import Room, Surface
 
 class VanishingPoint:
-    def __init__(self, model, votes):
+    def __init__(self, surface, model, votes):
 
+        self.surface = surface
         self.model = model
         self.votes = votes
-        self._score = sum(self.votes)
+
+        self._score = None
+        self._inliers = None
+
+        #cv2.minAreaRect(InputArray  points)
 
     def __eq__(self, other):
         return self.score() == other.score()
@@ -27,8 +32,23 @@ class VanishingPoint:
 
     @property
     def score(self):
+        if self._score is None:
+            self._score = sum(self.votes)
+
+            if len(self.inliers) > 1:
+                all_points = self.inliers.reshape((self.inliers.shape[0] * 2, 2)).astype(int)
+                rect = cv2.minAreaRect(all_points)
+                self._score = self._score * np.hypot(rect[1][0], rect[1][1])
+
         return self._score
 
+    @property
+    def inliers(self):
+        if self._inliers is None:
+            self._inliers = np.array(self.surface.lines)[self.votes > 0]
+
+        return self._inliers
+        
 class Edglets:
     def __init__(self, locations, directions, strengths):
         self.locations = locations
@@ -78,7 +98,7 @@ class VanishingPointFinder():
 
         return Edglets(locations, directions, strengths)
 
-    def solve(self, num_ransac_iter=2000, threshold_inlier=math.radians(5), max_time=1.0):
+    def solve(self, num_ransac_iter=2000, threshold_inlier=math.radians(7), max_time=1.0):
 
         if self.edgelets is None:
             self.edgelets = self.compute_edgelets()
@@ -136,7 +156,7 @@ class VanishingPointFinder():
 
             current_model = current_model / current_model[2]
 
-            vp = VanishingPoint(current_model, self.compute_votes(current_model, threshold_inlier))
+            vp = VanishingPoint(self.surface, current_model, self.compute_votes(current_model, threshold_inlier))
             
             self.vanishing_points.append(vp)
 
@@ -197,13 +217,16 @@ class PipelineVanishingPointFinder(PipelineStep):
     def get_debug_image(self, data):
            
         img = data["downscaled"].copy()
+    
+        #draw all lines
+        all_lines = []
+        for surface in self.surfaces:
+            all_lines.extend(surface.lines)
+
+        Line.draw_all(img, all_lines, color=(80,80,80))
 
         for surface in self.surfaces:
-
-            #draw all lines
-            for line in surface.lines:
-                line.draw(img, color=(80,80,80))
-
+        
             def draw_vp(vp):
                 inliers = np.array(surface.lines)[vp.votes > 0]
                 color = random_color()
