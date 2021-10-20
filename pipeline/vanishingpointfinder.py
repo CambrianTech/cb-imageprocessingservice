@@ -13,9 +13,9 @@ from .Line import Line, line_angle_difference
 from .room import Room, Surface
 
 class VanishingPoint:
-    def __init__(self, surface, model, votes):
+    def __init__(self, lines, model, votes):
 
-        self.surface = surface
+        self.lines = lines
         self.model = model
         self.votes = votes
 
@@ -45,7 +45,7 @@ class VanishingPoint:
     @property
     def inliers(self):
         if self._inliers is None:
-            self._inliers = np.array(self.surface.lines)[self.votes > 0]
+            self._inliers = np.array(self.lines)[self.votes > 0]
 
         return self._inliers
         
@@ -68,22 +68,23 @@ class Direction(IntEnum):
 
 class VanishingPointFinder():
 
-    def __init__(self, data, surface, direction:Direction=None, edgelets=None):
+    def __init__(self, lines, direction:Direction=None, edgelets=None, primary_vp=None):
         super().__init__()
-        self.data = data
-        self.surface = surface
+
+        self.lines = lines
         self.direction = direction
         self.edgelets = edgelets
+        self.primary_vp = primary_vp
 
     def compute_edgelets(self):
 
-        if len(self.surface.lines) < 2: return None
+        if len(self.lines) < 2: return None
 
         locations = []
         directions = []
         strengths = []
 
-        for line in self.surface.lines:
+        for line in self.lines:
             p0, p1 = np.array([line.point_a[0], line.point_a[1]]), np.array([line.point_b[0], line.point_b[1]])
 
             locations.append(line.midpoint)
@@ -119,7 +120,7 @@ class VanishingPointFinder():
         threshold_horizontal = np.radians(80)
         threshold_vertical = np.radians(10)
 
-        num_ransac_iter = min(num_ransac_iter, len(self.surface.lines) * 20)
+        num_ransac_iter = min(num_ransac_iter, len(self.lines) * 20)
 
         for ransac_iter in range(num_ransac_iter):
             if time.time() - t > max_time:
@@ -132,8 +133,8 @@ class VanishingPointFinder():
             l1 = self.edgelets.lines[ind1]
             l2 = self.edgelets.lines[ind2]
 
-            line1 = self.surface.lines[ind1]
-            line2 = self.surface.lines[ind2]
+            line1 = self.lines[ind1]
+            line2 = self.lines[ind2]
 
             current_model = np.cross(l1, l2)
 
@@ -156,7 +157,7 @@ class VanishingPointFinder():
 
             current_model = current_model / current_model[2]
 
-            vp = VanishingPoint(self.surface, current_model, self.compute_votes(current_model, threshold_inlier))
+            vp = VanishingPoint(self.lines, current_model, self.compute_votes(current_model, threshold_inlier))
             
             self.vanishing_points.append(vp)
 
@@ -205,10 +206,10 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         for surface in self.surfaces:
 
-            vpf = VanishingPointFinder(data, surface, direction=Direction.Horizontal)
+            vpf = VanishingPointFinder(surface.lines, direction=Direction.Horizontal)
             surface.horizontal_vp = vpf.solve()
 
-            vpf = VanishingPointFinder(data, surface, direction=Direction.Vertical, edgelets=vpf.edgelets)
+            vpf = VanishingPointFinder(surface.lines, direction=Direction.Vertical, edgelets=vpf.edgelets)
             surface.vertical_vp = vpf.solve()
 
         if im_logging_enabled(data):
