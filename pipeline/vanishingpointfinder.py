@@ -6,18 +6,20 @@ import time
 from enum import IntEnum
 
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
-from .utils import resize_array, random_color, overlay_mask
+from .utils import resize_array, random_color, overlay_mask, partition
 from .planegeometry import Dimension
 from .logging import log_image, log_segmentation_image, im_logging_enabled
 from .Line import Line, line_angle_difference
 from .room import Room, Surface
+from .ade20k import ADE20K
 
 class VanishingPoint:
-    def __init__(self, lines, model, votes):
+    def __init__(self, lines, model, votes, measure_area=False):
 
         self.lines = lines
         self.model = model
         self.votes = votes
+        self.measure_area = measure_area
 
         self._score = None
         self._inliers = None
@@ -35,7 +37,7 @@ class VanishingPoint:
         if self._score is None:
             self._score = sum(self.votes)
 
-            if len(self.inliers) > 1:
+            if self.measure_area and len(self.inliers) > 1:
                 all_points = self.inliers.reshape((self.inliers.shape[0] * 2, 2)).astype(int)
                 rect = cv2.minAreaRect(all_points)
                 self._score = self._score * np.hypot(rect[1][0], rect[1][1])
@@ -68,13 +70,12 @@ class Direction(IntEnum):
 
 class VanishingPointFinder():
 
-    def __init__(self, lines, direction:Direction=None, edgelets=None, primary_vp=None):
+    def __init__(self, lines, direction:Direction=None, angle_threshold=np.radians(80)):
         super().__init__()
 
         self.lines = lines
         self.direction = direction
-        self.edgelets = edgelets
-        self.primary_vp = primary_vp
+        self.angle_threshold = angle_threshold
 
     def compute_edgelets(self):
 
@@ -99,10 +100,9 @@ class VanishingPointFinder():
 
         return Edglets(locations, directions, strengths)
 
-    def solve(self, num_ransac_iter=2000, threshold_inlier=math.radians(7), max_time=1.0):
+    def solve(self, num_ransac_iter=1000, threshold_inlier=math.radians(7), max_time=1.0, measure_area=False):
 
-        if self.edgelets is None:
-            self.edgelets = self.compute_edgelets()
+        self.edgelets = self.compute_edgelets()
 
         if self.edgelets is None:
             return []
@@ -115,10 +115,8 @@ class VanishingPointFinder():
 
         self.best_model = None
         self.vanishing_points = []
-        t = time.time()
-
-        threshold_horizontal = np.radians(80)
-        threshold_vertical = np.radians(10)
+        t = time.time() 
+        pi_2 = np.pi/2       
 
         num_ransac_iter = min(num_ransac_iter, len(self.lines) * 20)
 
@@ -142,22 +140,21 @@ class VanishingPointFinder():
                 # reject degenerate candidates
                 continue
 
-
             if self.direction is not None:
 
                 #both_consistent = (current_model[1] / current_model[2] > 1000)
 
                 if self.direction == Direction.Vertical:
-                    if line_angle_difference(line1.angle, np.pi/2) > threshold_vertical or line_angle_difference(line2.angle, np.pi/2) > threshold_vertical:
+                    if line_angle_difference(line1.angle, pi_2) > self.angle_threshold or line_angle_difference(line2.angle, pi_2) > self.angle_threshold:
                         continue
                 else:
-                    if line_angle_difference(line1.angle, 0) > threshold_horizontal or line_angle_difference(line2.angle, 0) > threshold_horizontal:
+                    if line_angle_difference(line1.angle, 0) > self.angle_threshold or line_angle_difference(line2.angle, 0) > self.angle_threshold:
                         continue
 
 
             current_model = current_model / current_model[2]
 
-            vp = VanishingPoint(self.lines, current_model, self.compute_votes(current_model, threshold_inlier))
+            vp = VanishingPoint(self.lines, current_model, self.compute_votes(current_model, threshold_inlier), measure_area=measure_area)
             
             self.vanishing_points.append(vp)
 
@@ -202,15 +199,25 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         self.surfaces = []
 
-        self.surfaces.extend(data["room"].get_surfaces(SurfaceType.Wall))
+        self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Wall))
+        self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.WallLike))
+        self.surfaces.extend(data["room"].get_surfaces(label=ADE20K.cabinet))
+
+        pi_2 = np.pi/2
+        vertical_threshold = np.radians(15)
+        self.vertical_lines = []
+        for surface in self.surfaces:
+            self.vertical_lines.extend(list(filter(lambda x: line_angle_difference(x.angle, pi_2) < vertical_threshold, surface.lines)))
+
+        if len(self.vertical_lines) > 1:
+            vpf = VanishingPointFinder(self.vertical_lines)
+            self.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
+            if self.vertical_vp is None:
+                self.vertical_vp = vpf.solve(threshold_inlier=np.radians(20))
 
         for surface in self.surfaces:
-
             vpf = VanishingPointFinder(surface.lines, direction=Direction.Horizontal)
-            surface.horizontal_vp = vpf.solve()
-
-            vpf = VanishingPointFinder(surface.lines, direction=Direction.Vertical, edgelets=vpf.edgelets)
-            surface.vertical_vp = vpf.solve()
+            surface.horizontal_vp = vpf.solve(measure_area=True)
 
         if im_logging_enabled(data):
             log_image(data, "vanishing_points", self.get_debug_image(data))
@@ -218,29 +225,22 @@ class PipelineVanishingPointFinder(PipelineStep):
     def get_debug_image(self, data):
            
         img = data["downscaled"].copy()
+
+        def draw_vp(vp, color):
+            for line_data in vp.inliers:
+                line = Line(line_data)
+                line.draw(img, color=color)
     
         #draw all lines
-        all_lines = []
+        Line.draw_all(img, data["lines"], color=(80,80,80))
+
+        if self.vertical_vp is not None and len(self.vertical_vp) > 0:
+            draw_vp(self.vertical_vp[0], color=(0,0,255))
+
         for surface in self.surfaces:
-            all_lines.extend(surface.lines)
+            if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
+                draw_vp(surface.horizontal_vp[0], color=random_color())
 
-        Line.draw_all(img, all_lines, color=(80,80,80))
-
-        for surface in self.surfaces:
-        
-            def draw_vp(vp):
-                inliers = np.array(surface.lines)[vp.votes > 0]
-                color = random_color()
-
-                for line_data in inliers:
-                    line = Line(line_data)
-                    line.draw(img, color=color)
-                
-            if len(surface.horizontal_vp) > 0:
-                draw_vp(surface.horizontal_vp[0])
-
-            if len(surface.vertical_vp) > 0:
-                draw_vp(surface.vertical_vp[0])
             
         return img
 
