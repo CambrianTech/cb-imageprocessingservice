@@ -8,6 +8,25 @@ from .utils import resize_array, multi_filter
 
 indexed_fields = ["plane_parameters", "plane_normals", "plane_offsets", "plane_clusters"]
 
+class PlanarGroup():
+    def __init__(self, surface):
+        super().__init__()
+        self.uniqueId = uuid.uuid4()
+        self.add_surface(surface)
+
+    def add_surface(self, surface):
+        surface.planar_group = self
+
+    @property
+    def normal(self) -> tuple:
+        #todo: maybe composite such as mode or mean
+        return self.surfaces[0].normal
+
+    @property
+    def offset(self) -> float:
+        #todo: maybe composite such as mode, mean, max, or min
+        return self.surfaces[0].offset
+
 class Geometry():
 
     def __init__(self, data):
@@ -23,6 +42,7 @@ class Geometry():
 
         ade_seg_c = np.dstack((tuple(self.data["output"])))
         self.semantic_labels = np.int32(np.argmax(ade_seg_c, -1))
+        self.planar_groups = []
 
 
     def add_surface(self, surface):

@@ -9,8 +9,6 @@ warnings.filterwarnings("ignore")
 
 from skimage.segmentation import watershed
 from skimage.color import rgb2gray
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
 from scipy.spatial import distance
 
 from .geometry import Geometry
@@ -41,10 +39,10 @@ class Room(Geometry):
         log_image(self.data, "room_modified", self.get_debug_image())
 
         self.refine_surfaces()
-        #log_image(self.data, "room_refined_again", self.get_debug_image())
-        #self.ransac_fit()
 
         self.merge_like_surfaces()
+
+        self.assign_groups()
 
         log_image(self.data, "room", self.get_debug_image())
 
@@ -53,14 +51,7 @@ class Room(Geometry):
         for surface in self.surfaces:
             surface.analyze()
 
-    def get_clusters(self, x, kmin=2, kmax=5):
-        sil = []
-        for k in range(kmin, kmax+1):
-          kmeans = KMeans(n_clusters = k).fit(x)
-          labels = kmeans.labels_
-          sil.append(silhouette_score(x, labels, metric = 'euclidean'))
-
-    def find_best_candidate(self, surfaceType, mask):
+    def find_best_surface(self, surfaceType, mask):
         candidates = self.get_surfaces(surfaceType=surfaceType)
         if len(candidates) == 0:
             return None
@@ -68,7 +59,7 @@ class Room(Geometry):
         if len(candidates) > 1:
             #todo: sort if more than one, for walls, above and below the wall is the best match
             print("Find match for missing %s amongst %d candidates" % (surfaceType.name, len(candidates)))
-            normal = np.mean(self.data["normals"], axis=(0, 1)) #todo: use 3d vector normal angle difference instead.
+            normal = np.mean(self.data["normals"], axis=(0, 1)) #todo: use 3d vector normal angle difference instead (eg dot product/arcos).
             candidates.sort(key=lambda x: distance.sqeuclidean(normal, x.normals_color))
 
         return candidates[0]
@@ -152,7 +143,7 @@ class Room(Geometry):
                 new_offset = None
 
                 if new_surface is None and surfaceType.is_major:
-                    reference_surface = self.find_best_candidate(surfaceType, contour_mask)
+                    reference_surface = self.find_best_surface(surfaceType, contour_mask)
                     
                     if reference_surface is not None:
                         new_surface = reference_surface.clone()
@@ -160,7 +151,7 @@ class Room(Geometry):
                         new_surface.set_mask(contour_mask)
                     elif surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling:
                         complimentary_type = SurfaceType.Floor if surfaceType == SurfaceType.Ceiling else SurfaceType.Ceiling
-                        reference_surface = self.find_best_candidate(complimentary_type, contour_mask)
+                        reference_surface = self.find_best_surface(complimentary_type, contour_mask)
 
                         if reference_surface is not None:
                             print("Generate %s using %s as opposing surface" % (surfaceType.name, reference_surface.name))
@@ -273,6 +264,17 @@ class Room(Geometry):
         #and resolve disputes between planes as they intersect by probability (confidence):
         for surfaceType in SurfaceType: 
             expand_into_type(surfaceType)
+
+    def assign_groups(self):
+
+        self.planar_groups = []
+
+        # for surface in surfaces:
+
+        #     dot_product = np.dot(surface.normal, unit_vector_2)
+        #     surface.planar_group = Group(surface)
+
+        #     self.planar_groups.append(Group())
 
         
     def get_debug_image(self):

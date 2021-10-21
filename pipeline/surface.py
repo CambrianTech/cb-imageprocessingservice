@@ -39,6 +39,7 @@ class Surface():
 
         self.horizontal_vp = []
         self.vertical_vp = []
+        self.planar_group = None
 
     @property
     def secondaryType(self) -> SurfaceType:
