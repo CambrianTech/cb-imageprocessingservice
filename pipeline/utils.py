@@ -4,6 +4,16 @@ import random
 
 from .ade20k import ADE20K
 
+def partition(pred, iterable):
+    trues = []
+    falses = []
+    for item in iterable:
+        if pred(item):
+            trues.append(item)
+        else:
+            falses.append(item)
+    return trues, falses
+
 def multi_filter(fs, l):
     if not fs:
         return l
