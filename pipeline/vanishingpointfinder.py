@@ -240,12 +240,13 @@ class PipelineVanishingPointFinder(PipelineStep):
         for surface in self.surfaces:
             lines = surface.lines.copy()
             lines.extend(self.get_contour_lines(surface))
-            lines = Line.merge(lines, search_width=self.diagonal/100, search_length=1.2)
-
+            
             self.all_lines.extend(lines)
 
             vertical, horizontal = partition(lambda x: line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
             vertical_lines.extend(vertical)
+
+            horizontal = Line.merge(horizontal, search_width=self.diagonal/100, search_length=1.1)
 
             #find horizontal vanishing points for this surface
             vpf = VanishingPointFinder(horizontal)
@@ -253,10 +254,15 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         #find vertical vanishing point for entire room
         if len(vertical_lines) > 1:
+            vertical_lines = Line.merge(vertical_lines, search_width=self.diagonal/100, angle_threshold=math.radians(5))
             vpf = VanishingPointFinder(vertical_lines)
             self.vertical_vp = vpf.solve(threshold_inlier=np.radians(3))
             if self.vertical_vp is None:
                 self.vertical_vp = vpf.solve(threshold_inlier=np.radians(20))
+
+
+        for surface in self.surfaces:
+            surface.vertical_vp = self.vertical_vp
 
 
         if im_logging_enabled(data):
