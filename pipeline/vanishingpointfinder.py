@@ -100,7 +100,7 @@ class VanishingPointFinder():
 
         return Edglets(locations, directions, strengths)
 
-    def solve(self, num_ransac_iter=1000, threshold_inlier=math.radians(7), max_time=1.0, measure_area=False):
+    def solve(self, num_ransac_iter=1000, threshold_inlier=math.radians(7), max_time=0.5, measure_area=False):
 
         self.edgelets = self.compute_edgelets()
 
@@ -207,11 +207,11 @@ class PipelineVanishingPointFinder(PipelineStep):
                 point_a = poly[i][0]
                 point_b = poly[(i+1) % num_pts][0]
 
-                if on_image_edge(point_b, self.image):
+                if on_image_edge(point_a, self.image) and on_image_edge(point_b, self.image):
                     continue
 
                 line = Line(np.array([(point_b[0], point_b[1], point_a[0], point_a[1])], dtype=np.int).reshape(4))
-                if line.length < min_length:
+                if line.length > min_length:
                     lines.append(line)
         
         return lines
@@ -224,35 +224,37 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         self.surfaces = []
 
-        self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Floor))
-        self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.FloorLike))
+        # self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Floor))
+        # self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.FloorLike))
         self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Wall))
         self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.WallLike))
-        self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Ceiling))
         self.surfaces.extend(data["room"].get_surfaces(label=ADE20K.cabinet))
 
 
         #find single vertical vanishing point
         pi_2 = np.pi/2
         vertical_threshold = np.radians(15)
-        self.vertical_lines = []
+        vertical_lines = []
+        self.all_lines = []
 
         for surface in self.surfaces:
             lines = surface.lines.copy()
             lines.extend(self.get_contour_lines(surface))
+            lines = Line.merge(lines, search_width=self.diagonal/100, search_length=1.2)
+
+            self.all_lines.extend(lines)
+
             vertical, horizontal = partition(lambda x: line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
-            self.vertical_lines.extend(vertical)
+            vertical_lines.extend(vertical)
 
             #find horizontal vanishing points for this surface
             vpf = VanishingPointFinder(horizontal)
-            surface.horizontal_vp = vpf.solve(measure_area=True, max_time=0.25)
-
-            #self.vertical_lines.extend(list(filter(lambda x: line_angle_difference(x.angle, pi_2) < vertical_threshold, surface.lines)))
+            surface.horizontal_vp = vpf.solve(measure_area=True, threshold_inlier=np.radians(4), max_time=0.25)
 
         #find vertical vanishing point for entire room
-        if len(self.vertical_lines) > 1:
-            vpf = VanishingPointFinder(self.vertical_lines)
-            self.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
+        if len(vertical_lines) > 1:
+            vpf = VanishingPointFinder(vertical_lines)
+            self.vertical_vp = vpf.solve(threshold_inlier=np.radians(3))
             if self.vertical_vp is None:
                 self.vertical_vp = vpf.solve(threshold_inlier=np.radians(20))
 
@@ -270,10 +272,10 @@ class PipelineVanishingPointFinder(PipelineStep):
                 line.draw(img, color=color)
     
         #draw all lines
-        Line.draw_all(img, data["lines"], color=(80,80,80))
+        Line.draw_all(img, self.all_lines, color=(80,80,80))
 
         if self.vertical_vp is not None and len(self.vertical_vp) > 0:
-            draw_vp(self.vertical_vp[0], color=(0,0,255))
+            draw_vp(self.vertical_vp[0], color=(0,255,0))
 
         for surface in self.surfaces:
             if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
