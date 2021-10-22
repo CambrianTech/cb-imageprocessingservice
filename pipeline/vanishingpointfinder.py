@@ -246,7 +246,7 @@ class PipelineVanishingPointFinder(PipelineStep):
             vertical, horizontal = partition(lambda x: line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
             vertical_lines.extend(vertical)
 
-            horizontal = Line.merge(horizontal, search_width=self.diagonal/100, search_length=1.1)
+            horizontal = Line.merge(horizontal, search_width=self.diagonal/200, search_length=1.1)
 
             #find horizontal vanishing points for this surface
             vpf = VanishingPointFinder(horizontal)
@@ -254,9 +254,9 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         #find vertical vanishing point for entire room
         if len(vertical_lines) > 1:
-            vertical_lines = Line.merge(vertical_lines, search_width=self.diagonal/100, angle_threshold=math.radians(5))
+            vertical_lines = Line.merge(vertical_lines, search_width=self.diagonal/200, angle_threshold=math.radians(5))
             vpf = VanishingPointFinder(vertical_lines)
-            self.vertical_vp = vpf.solve(threshold_inlier=np.radians(3))
+            self.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
             if self.vertical_vp is None:
                 self.vertical_vp = vpf.solve(threshold_inlier=np.radians(20))
 
