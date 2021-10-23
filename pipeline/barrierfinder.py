@@ -101,42 +101,14 @@ class BarrierFinder():
                     continue
 
                 angle = line_angle_difference(line_a.angle, line_b.angle)
-                if angle >= min_angle_threshold and angle <= max_angle_threshold:
-                    #check for type differential of the labels inside an arc (see debug arc):
-                    vertex = Vertex(point_b, line_a, line_b)
-                    
-                    inner_isolated = vertex.get_samples(self.room.isolated_labels)
-                    inner_semantic = vertex.get_samples(self.room.semantic_labels)
-                    
-                    if len(inner_isolated) > 0:
-                        best_isolated, best_isolated_count = inner_isolated[0]
-                        best_semantic, best_semantic_count = inner_semantic[0]
 
-                        if len(inner_isolated) < 3 and best_isolated == surface.surfaceType.index:
-                            outer_isolated = vertex.get_samples(self.room.isolated_labels, outside=True)
-                            outer_semantic = vertex.get_samples(self.room.semantic_labels, outside=True)
+                if angle < min_angle_threshold or angle > max_angle_threshold:
+                    continue
 
-                            best_outer_isolated, best_outer_isolated_count = outer_isolated[0]
-                            best_outer_semantic, best_outer_semantic_count = outer_semantic[0]
-
-                            is_inner_vertical = (best_isolated == SurfaceType.Wall.index or best_isolated == SurfaceType.WallLike.index or best_semantic in box_like)
-                            is_outer_vertical = (best_outer_isolated == SurfaceType.Wall.index or best_outer_isolated == SurfaceType.WallLike.index or best_outer_semantic in box_like)
-
-                            #if nowhere near a wall, forget it (unless ceiling near box_like)
-                            #also ignore wall-like not touching wall
-                            if not is_inner_vertical and not is_outer_vertical: 
-                                continue
-
-                            # if (best_isolated == SurfaceType.WallLike.index and best_outer_isolated == SurfaceType.WallLike.index):
-                            #     continue
-
-                            if len(inner_isolated) > 1:
-                                #remove clutter
-                                second_best_label, second_best_count = inner_isolated[1]
-                                if best_isolated_count / second_best_count > 1.2:
-                                    candidates.append(vertex)   
-                            else:
-                                candidates.append(vertex)
+                #check for type differential of the labels inside an arc (see debug arc):
+                vertex = Vertex(point_b, line_a, line_b)
+                
+                candidates.append(vertex)
 
             return candidates
 
