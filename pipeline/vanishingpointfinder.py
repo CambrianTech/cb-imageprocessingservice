@@ -8,6 +8,7 @@ from enum import IntEnum
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .utils import resize_array, random_color, overlay_mask, partition
 from .planegeometry import Dimension
+from .extractsurfaces import box_like
 from .logging import log_image, log_segmentation_image, im_logging_enabled
 from .Line import Line, line_angle_difference, on_image_edge
 from .room import Room, Surface
@@ -225,12 +226,8 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         self.surfaces = []
 
-        self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Floor))
-        #self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Ceiling))
-
-        self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Wall))
-        self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.WallLike))
-        self.surfaces.extend(data["room"].get_surfaces(label=ADE20K.cabinet))
+        self.surfaces.extend(data["room"].get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.Wall, SurfaceType.WallLike]))
+        self.surfaces.extend(data["room"].get_surfaces(labels=box_like))
 
 
         #find single vertical vanishing point

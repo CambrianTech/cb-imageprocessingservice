@@ -32,7 +32,7 @@ class Room(Geometry):
         self.analyze_surfaces()
         log_image(self.data, "room_initial", self.get_debug_image())
 
-        self.refine_surfaces(min_confidence=0.1) #preserve plane context information i.e. probs < min_confidence are ignored
+        self.refine_surfaces(min_confidence=0.3) #preserve plane context information i.e. probs < min_confidence are ignored
         log_image(self.data, "room_refined", self.get_debug_image())
 
         self.add_missing_surfaces()
@@ -52,7 +52,7 @@ class Room(Geometry):
             surface.analyze()
 
     def find_best_surface(self, surfaceType, mask):
-        candidates = self.get_surfaces(surfaceType=surfaceType)
+        candidates = self.get_surfaces([surfaceType])
         if len(candidates) == 0:
             return None
 
@@ -178,7 +178,7 @@ class Room(Geometry):
         for surfaceType in SurfaceType:
             
             color = random_color()
-            surfaces = self.get_surfaces(surfaceType)
+            surfaces = self.get_surfaces([surfaceType])
 
 
             for i in range(len(surfaces)):
@@ -216,7 +216,7 @@ class Room(Geometry):
             Line.draw_all(lines_mask, self.data["lines"], color=(255,255,255), thickness=1, lineType=cv2.LINE_4)
 
         def expand_into_type(surfaceType:SurfaceType):
-            surfaces = self.get_surfaces(surfaceType)
+            surfaces = self.get_surfaces([surfaceType])
 
             num_surfaces = len(surfaces)
 

@@ -8,6 +8,7 @@ from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .utils import resize_array, random_color, overlay_mask
 from .planegeometry import Dimension
+from .extractsurfaces import box_like
 from .logging import log_image, log_segmentation_image, im_logging_enabled
 from .Line import line_angle_difference, Line, on_image_edge
 from .room import Room, Surface
@@ -113,9 +114,9 @@ class BarrierFinder():
                             outer_isolated = vertex.get_samples(self.room.isolated_labels, outside=True)
                             best_outer_isolated, best_outer_isolated_count = outer_isolated[0]
 
-                            is_vertical_surface = (best_isolated == SurfaceType.Wall.index or best_isolated == SurfaceType.WallLike.index or inner_semantic == ADE20K.cabinet)
+                            is_vertical_surface = (best_isolated == SurfaceType.Wall.index or best_isolated == SurfaceType.WallLike.index or inner_semantic in box_like)
 
-                            #if nowhere near a wall, forget it (unless ceiling near cabinet)
+                            #if nowhere near a wall, forget it (unless ceiling near box_like)
                             #also ignore wall-like not touching wall
                             if not is_vertical_surface \
                                 and best_outer_isolated != SurfaceType.Wall.index and best_outer_isolated != SurfaceType.WallLike.index \
@@ -136,8 +137,8 @@ class BarrierFinder():
             return candidates
 
         
-        def build_barriers(surfaceType=None, label=None, min_angle_threshold=np.radians(30), max_angle_threshold=np.radians(170)):
-            for surface in self.room.get_surfaces(surfaceType=surfaceType, label=label):
+        def build_barriers(surfaceTypes=None, labels=None, min_angle_threshold=np.radians(30), max_angle_threshold=np.radians(170)):
+            for surface in self.room.get_surfaces(surfaceTypes=surfaceTypes, labels=labels):
                 vertices = []
                 for poly in surface.polygons:
                     vertices.extend(find_vertices(surface, poly, min_angle_threshold, max_angle_threshold))
@@ -145,11 +146,9 @@ class BarrierFinder():
                 self.barrier_candidates.append(SurfaceVertices(surface, vertices))
                 
         
-        build_barriers(SurfaceType.Ceiling, min_angle_threshold=np.radians(15))
-        build_barriers(SurfaceType.Floor)
-        build_barriers(SurfaceType.Wall)
-        build_barriers(SurfaceType.WallLike)
-        build_barriers(label=ADE20K.cabinet)
+        build_barriers([SurfaceType.Ceiling], min_angle_threshold=np.radians(15))
+        build_barriers([SurfaceType.Floor, SurfaceType.Wall, SurfaceType.WallLike])
+        build_barriers(labels=box_like)
 
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers", self.get_debug_image())

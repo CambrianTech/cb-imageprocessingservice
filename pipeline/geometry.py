@@ -112,17 +112,17 @@ class Geometry():
             print(colored("Surfaces reduced from %d to %d" % (num_before, num_after), 'red'))
             #cleanup:
 
-    def get_surfaces(self, surfaceType=None, label=None, dimension=None):
+    def get_surfaces(self, surfaceTypes=None, labels=None, dimension=None):
 
         self.refresh_surfaces()
 
         filters = []
         
-        if surfaceType is not None:
-            filters.append(lambda surface: surface.surfaceType == surfaceType)
+        if surfaceTypes is not None:
+            filters.append(lambda surface: surface.surfaceType in surfaceTypes)
 
-        if label is not None:
-            filters.append(lambda surface: surface.bestLabel == label)
+        if labels is not None:
+            filters.append(lambda surface: surface.bestLabel in labels)
 
         if dimension is not None:
             filters.append(lambda surface: surface.dimension == dimension)
