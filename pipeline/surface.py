@@ -173,7 +173,7 @@ class Surface():
     @property
     def polygons(self):
         if self._polygons is None:
-            epsilon = math.hypot(self.data["downscaled"].shape[0], self.data["downscaled"].shape[1]) / 300
+            epsilon = math.hypot(self.data["downscaled"].shape[0], self.data["downscaled"].shape[1]) / 200
             self._polygons = list(map(lambda contour: cv2.approxPolyDP(contour, epsilon, True), self.contours))
 
         return self._polygons

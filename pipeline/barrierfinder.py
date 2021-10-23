@@ -91,7 +91,7 @@ class BarrierFinder():
                 point_b = poly[(i+1) % num_pts][0]
                 point_c = poly[(i+2) % num_pts][0]
 
-                if on_image_edge(point_b, self.image):
+                if on_image_edge(point_b, self.image) and (on_image_edge(point_a, self.image) or on_image_edge(point_c, self.image)):
                     continue
 
                 line_a = Line(np.array([(point_b[0], point_b[1], point_a[0], point_a[1])], dtype=np.int).reshape(4))
@@ -110,21 +110,25 @@ class BarrierFinder():
                     
                     if len(inner_isolated) > 0:
                         best_isolated, best_isolated_count = inner_isolated[0]
+                        best_semantic, best_semantic_count = inner_semantic[0]
+
                         if len(inner_isolated) < 3 and best_isolated == surface.surfaceType.index:
                             outer_isolated = vertex.get_samples(self.room.isolated_labels, outside=True)
-                            best_outer_isolated, best_outer_isolated_count = outer_isolated[0]
+                            outer_semantic = vertex.get_samples(self.room.semantic_labels, outside=True)
 
-                            is_vertical_surface = (best_isolated == SurfaceType.Wall.index or best_isolated == SurfaceType.WallLike.index or inner_semantic in box_like)
+                            best_outer_isolated, best_outer_isolated_count = outer_isolated[0]
+                            best_outer_semantic, best_outer_semantic_count = outer_semantic[0]
+
+                            is_inner_vertical = (best_isolated == SurfaceType.Wall.index or best_isolated == SurfaceType.WallLike.index or best_semantic in box_like)
+                            is_outer_vertical = (best_outer_isolated == SurfaceType.Wall.index or best_outer_isolated == SurfaceType.WallLike.index or best_outer_semantic in box_like)
 
                             #if nowhere near a wall, forget it (unless ceiling near box_like)
                             #also ignore wall-like not touching wall
-                            if not is_vertical_surface \
-                                and best_outer_isolated != SurfaceType.Wall.index and best_outer_isolated != SurfaceType.WallLike.index \
-                                and not (best_isolated == SurfaceType.Ceiling.index and best_outer_isolated == SurfaceType.Other.index): 
+                            if not is_inner_vertical and not is_outer_vertical: 
                                 continue
 
-                            if (best_isolated == SurfaceType.WallLike.index and best_outer_isolated == SurfaceType.WallLike.index):
-                                continue
+                            # if (best_isolated == SurfaceType.WallLike.index and best_outer_isolated == SurfaceType.WallLike.index):
+                            #     continue
 
                             if len(inner_isolated) > 1:
                                 #remove clutter
@@ -188,7 +192,7 @@ class BarrierFinder():
             color = (255, 0, 0) if candidate.surface.surfaceType.is_major else (255, 255, 255)
             thickness = 2 if candidate.surface.surfaceType.is_major else 1
             for vertex in candidate.vertices:
-                cv2.drawMarker(img, vertex.center, color=color, thickness=2)
+                cv2.drawMarker(img, vertex.center, color=color, thickness=thickness)
             
 
 
