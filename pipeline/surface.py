@@ -37,8 +37,9 @@ class Surface():
         self._normal = None
         self._offset = None
 
-        self.horizontal_vp = []
-        self.vertical_vp = []
+        self.horizontal_vp = None
+        self.vertical_vp = None
+        self.vp = None
         self.planar_group = None
 
     @property

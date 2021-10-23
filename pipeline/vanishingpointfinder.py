@@ -224,8 +224,8 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         self.surfaces = []
 
-        # self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Floor))
-        # self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.FloorLike))
+        self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Floor))
+        self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.FloorLike))
         self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Wall))
         self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.WallLike))
         self.surfaces.extend(data["room"].get_surfaces(label=ADE20K.cabinet))
@@ -243,14 +243,19 @@ class PipelineVanishingPointFinder(PipelineStep):
             
             self.all_lines.extend(lines)
 
-            vertical, horizontal = partition(lambda x: line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
-            vertical_lines.extend(vertical)
+            if surface.surfaceType == SurfaceType.Floor or surface.surfaceType == SurfaceType.Ceiling:
+                #used for legs and objects setting upon:
+                vpf = VanishingPointFinder(lines)
+                surface.vp = vpf.solve()
+            else:
+                vertical, horizontal = partition(lambda x: line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
+                horizontal = Line.merge(horizontal, search_width=self.diagonal/200, search_length=1.1)
 
-            horizontal = Line.merge(horizontal, search_width=self.diagonal/200, search_length=1.1)
+                #find horizontal vanishing points for this surface
+                vpf = VanishingPointFinder(horizontal)
+                surface.horizontal_vp = vpf.solve(measure_area=True, threshold_inlier=np.radians(4), max_time=0.25)
 
-            #find horizontal vanishing points for this surface
-            vpf = VanishingPointFinder(horizontal)
-            surface.horizontal_vp = vpf.solve(measure_area=True, threshold_inlier=np.radians(4), max_time=0.25)
+                vertical_lines.extend(vertical)
 
         #find vertical vanishing point for entire room
         if len(vertical_lines) > 1:
@@ -262,7 +267,8 @@ class PipelineVanishingPointFinder(PipelineStep):
 
 
         for surface in self.surfaces:
-            surface.vertical_vp = self.vertical_vp
+            if surface.vertical_vp is None:
+                surface.vertical_vp = self.vertical_vp
 
 
         if im_logging_enabled(data):
@@ -287,6 +293,8 @@ class PipelineVanishingPointFinder(PipelineStep):
             if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
                 draw_vp(surface.horizontal_vp[0], color=random_color())
 
+            if surface.vp and len(surface.vp):
+                draw_vp(surface.vp[0], color=random_color())
             
         return img
 
