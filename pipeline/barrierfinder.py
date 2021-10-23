@@ -117,7 +117,6 @@ class BarrierFinder():
 
                             #if nowhere near a wall, forget it (unless ceiling near cabinet)
                             #also ignore wall-like not touching wall
-
                             if not is_vertical_surface \
                                 and best_outer_isolated != SurfaceType.Wall.index and best_outer_isolated != SurfaceType.WallLike.index \
                                 and not (best_isolated == SurfaceType.Ceiling.index and best_outer_isolated == SurfaceType.Other.index): 
@@ -129,7 +128,7 @@ class BarrierFinder():
                             if len(inner_isolated) > 1:
                                 #remove clutter
                                 second_best_label, second_best_count = inner_isolated[1]
-                                if best_isolated_count / second_best_count > 3:
+                                if best_isolated_count / second_best_count > 1.2:
                                     candidates.append(vertex)   
                             else:
                                 candidates.append(vertex)
