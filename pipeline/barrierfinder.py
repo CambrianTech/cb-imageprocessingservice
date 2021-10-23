@@ -3,6 +3,7 @@ from scipy import ndimage
 import cv2
 from skimage.morphology import remove_small_objects
 import random
+from .ade20k import ADE20K
 
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .utils import resize_array, random_color, overlay_mask
@@ -103,28 +104,32 @@ class BarrierFinder():
                     #check for type differential of the labels inside an arc (see debug arc):
                     vertex = Vertex(point_b, line_a, line_b)
                     
-                    inner_labels = vertex.get_samples(self.room.isolated_labels)
+                    inner_isolated = vertex.get_samples(self.room.isolated_labels)
+                    inner_semantic = vertex.get_samples(self.room.semantic_labels)
                     
-                    if len(inner_labels) > 0:
-                        best_label, best_count = inner_labels[0]
-                        if len(inner_labels) < 3 and best_label == surface.surfaceType.index:
-                            outer_labels = vertex.get_samples(self.room.isolated_labels, outside=True)
-                            best_outer, best_outer_count = outer_labels[0]
+                    if len(inner_isolated) > 0:
+                        best_isolated, best_isolated_count = inner_isolated[0]
+                        if len(inner_isolated) < 3 and best_isolated == surface.surfaceType.index:
+                            outer_isolated = vertex.get_samples(self.room.isolated_labels, outside=True)
+                            best_outer_isolated, best_outer_isolated_count = outer_isolated[0]
+
+                            is_vertical_surface = (best_isolated == SurfaceType.Wall.index or best_isolated == SurfaceType.WallLike.index or inner_semantic == ADE20K.cabinet)
 
                             #if nowhere near a wall, forget it (unless ceiling near cabinet)
                             #also ignore wall-like not touching wall
-                            if best_label != SurfaceType.Wall.index and best_label != SurfaceType.WallLike.index \
-                                and best_outer != SurfaceType.Wall.index and best_outer != SurfaceType.WallLike.index \
-                                and not (best_label == SurfaceType.Ceiling.index and best_outer == SurfaceType.Other.index): 
+
+                            if not is_vertical_surface \
+                                and best_outer_isolated != SurfaceType.Wall.index and best_outer_isolated != SurfaceType.WallLike.index \
+                                and not (best_isolated == SurfaceType.Ceiling.index and best_outer_isolated == SurfaceType.Other.index): 
                                 continue
 
-                            if (best_label == SurfaceType.WallLike.index and best_outer == SurfaceType.WallLike.index):
+                            if (best_isolated == SurfaceType.WallLike.index and best_outer_isolated == SurfaceType.WallLike.index):
                                 continue
 
-                            if len(inner_labels) > 1:
+                            if len(inner_isolated) > 1:
                                 #remove clutter
-                                second_best_label, second_best_count = inner_labels[1]
-                                if best_count / second_best_count > 3:
+                                second_best_label, second_best_count = inner_isolated[1]
+                                if best_isolated_count / second_best_count > 3:
                                     candidates.append(vertex)   
                             else:
                                 candidates.append(vertex)
@@ -132,8 +137,8 @@ class BarrierFinder():
             return candidates
 
         
-        def build_barriers(surfaceType, min_angle_threshold=np.radians(30), max_angle_threshold=np.radians(170)):
-            for surface in self.room.get_surfaces(surfaceType):
+        def build_barriers(surfaceType=None, label=None, min_angle_threshold=np.radians(30), max_angle_threshold=np.radians(170)):
+            for surface in self.room.get_surfaces(surfaceType=surfaceType, label=label):
                 vertices = []
                 for poly in surface.polygons:
                     vertices.extend(find_vertices(surface, poly, min_angle_threshold, max_angle_threshold))
@@ -145,6 +150,7 @@ class BarrierFinder():
         build_barriers(SurfaceType.Floor)
         build_barriers(SurfaceType.Wall)
         build_barriers(SurfaceType.WallLike)
+        build_barriers(label=ADE20K.cabinet)
 
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers", self.get_debug_image())
@@ -166,18 +172,25 @@ class BarrierFinder():
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
-        Line.draw_all(img, self.data["lines"], color=(80,80,80), thickness=2)
+        #Line.draw_all(img, self.data["lines"], color=(80,80,80), thickness=2)
 
         for candidate in self.barrier_candidates:
+
+            color_a = (0, 0, 255) if candidate.surface.surfaceType.is_major else (0, 0, 180)
+            color_b = (255, 255, 0) if candidate.surface.surfaceType.is_major else (180, 180, 0)
+
             for vertex in candidate.vertices:
-                cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_a.angle), np.degrees(vertex.line_b.angle), [0, 255, 0], thickness=1) 
+                cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_a.angle), np.degrees(vertex.line_b.angle), (255, 0, 255), thickness=1) 
                 #cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_b.angle), np.degrees(vertex.line_a.angle) + 360, [255, 0, 0], thickness=2) 
 
-                cv2.line(img, vertex.line_a.point_a, vertex.line_a.point_b, [0, 0, 255], thickness=2)
-                cv2.line(img, vertex.line_b.point_a, vertex.line_b.point_b, [255, 255, 0], thickness=2)
-
-                
-                cv2.drawMarker(img, vertex.center, color=(255,0,0), thickness=2)
+                cv2.line(img, vertex.line_a.point_a, vertex.line_a.point_b, color_a, thickness=2)
+                cv2.line(img, vertex.line_b.point_a, vertex.line_b.point_b, color_b, thickness=2)
+        
+        for candidate in self.barrier_candidates:
+            color = (255, 0, 0) if candidate.surface.surfaceType.is_major else (255, 255, 255)
+            thickness = 2 if candidate.surface.surfaceType.is_major else 1
+            for vertex in candidate.vertices:
+                cv2.drawMarker(img, vertex.center, color=color, thickness=2)
             
 
 
