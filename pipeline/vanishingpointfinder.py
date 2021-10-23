@@ -100,7 +100,7 @@ class VanishingPointFinder():
 
         return Edglets(locations, directions, strengths)
 
-    def solve(self, num_ransac_iter=1000, threshold_inlier=math.radians(7), max_time=0.5, measure_area=False):
+    def solve(self, num_ransac_iter=500, threshold_inlier=math.radians(7), max_time=0.25, measure_area=False):
 
         self.edgelets = self.compute_edgelets()
 
@@ -137,11 +137,12 @@ class VanishingPointFinder():
                 # reject degenerate candidates
                 continue
 
+            # if current_model[1] / current_model[2] > 1000:
+            #     continue
+
             if self.direction is not None:
                 line1 = self.lines[ind1]
                 line2 = self.lines[ind2]
-
-                #both_consistent = (current_model[1] / current_model[2] > 1000)
 
                 if self.direction == Direction.Vertical:
                     if line_angle_difference(line1.angle, pi_2) > self.angle_threshold or line_angle_difference(line2.angle, pi_2) > self.angle_threshold:
@@ -225,7 +226,8 @@ class PipelineVanishingPointFinder(PipelineStep):
         self.surfaces = []
 
         self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Floor))
-        self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.FloorLike))
+        #self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Ceiling))
+
         self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.Wall))
         self.surfaces.extend(data["room"].get_surfaces(surfaceType=SurfaceType.WallLike))
         self.surfaces.extend(data["room"].get_surfaces(label=ADE20K.cabinet))
@@ -240,20 +242,19 @@ class PipelineVanishingPointFinder(PipelineStep):
         for surface in self.surfaces:
             lines = surface.lines.copy()
             lines.extend(self.get_contour_lines(surface))
-            
             self.all_lines.extend(lines)
 
             if surface.surfaceType == SurfaceType.Floor or surface.surfaceType == SurfaceType.Ceiling:
                 #used for legs and objects setting upon:
                 vpf = VanishingPointFinder(lines)
                 surface.vp = vpf.solve()
-            else:
+            else:                
                 vertical, horizontal = partition(lambda x: line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
                 horizontal = Line.merge(horizontal, search_width=self.diagonal/200, search_length=1.1)
 
                 #find horizontal vanishing points for this surface
                 vpf = VanishingPointFinder(horizontal)
-                surface.horizontal_vp = vpf.solve(measure_area=True, threshold_inlier=np.radians(4), max_time=0.25)
+                surface.horizontal_vp = vpf.solve(measure_area=True)
 
                 vertical_lines.extend(vertical)
 
@@ -261,7 +262,7 @@ class PipelineVanishingPointFinder(PipelineStep):
         if len(vertical_lines) > 1:
             vertical_lines = Line.merge(vertical_lines, search_width=self.diagonal/200, angle_threshold=math.radians(5))
             vpf = VanishingPointFinder(vertical_lines)
-            self.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
+            self.vertical_vp = vpf.solve(threshold_inlier=np.radians(5), max_time=0.5)
             if self.vertical_vp is None:
                 self.vertical_vp = vpf.solve(threshold_inlier=np.radians(20))
 

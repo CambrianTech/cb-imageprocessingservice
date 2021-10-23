@@ -40,9 +40,9 @@ class Room(Geometry):
 
         self.refine_surfaces()
 
-        self.merge_like_surfaces()
+        self.merge_like_surfaces()    
 
-        self.assign_groups()
+        #self.remove_invalid_surfaces()    
 
         log_image(self.data, "room", self.get_debug_image())
 
@@ -265,9 +265,9 @@ class Room(Geometry):
         for surfaceType in SurfaceType: 
             expand_into_type(surfaceType)
 
-    def assign_groups(self):
+    def remove_invalid_surfaces(self):
 
-        self.planar_groups = []
+        print("remove invalid")
 
         # for surface in surfaces:
 
