@@ -11,11 +11,10 @@ from .logging import log_image, log_segmentation_image, im_logging_enabled
 from .Line import line_angle_difference, Line, on_image_edge
 from .room import Room, Surface
 
-class Barrier():
-    def __init__(self, data, midpoint, angle=0):
-        self.data = data
-        self.midpoint = midpoint
-        self.angle = angle
+class SurfaceVertices():
+    def __init__(self, surface, vertices):
+        self.surface = surface
+        self.vertices = vertices
 
 class Vertex():
     def __init__(self, center, line_a, line_b):
@@ -79,10 +78,9 @@ class BarrierFinder():
         distance_check = self.image.shape[0] / 30
         min_length = self.image.shape[0] / 50
 
-        self.barrier_contours = []
         self.barrier_candidates = []
 
-        def find_candidates(surface, poly, min_angle_threshold, max_angle_threshold):
+        def find_vertices(surface, poly, min_angle_threshold, max_angle_threshold):
             num_pts = len(poly)
             candidates = []
 
@@ -136,9 +134,11 @@ class BarrierFinder():
         
         def build_barriers(surfaceType, min_angle_threshold=np.radians(30), max_angle_threshold=np.radians(170)):
             for surface in self.room.get_surfaces(surfaceType):
+                vertices = []
                 for poly in surface.polygons:
-                    self.barrier_contours.append(poly)
-                    self.barrier_candidates.extend(find_candidates(surface, poly, min_angle_threshold, max_angle_threshold))
+                    vertices.extend(find_vertices(surface, poly, min_angle_threshold, max_angle_threshold))
+                    
+                self.barrier_candidates.append(SurfaceVertices(surface, vertices))
                 
         
         build_barriers(SurfaceType.Ceiling, min_angle_threshold=np.radians(15))
@@ -168,16 +168,17 @@ class BarrierFinder():
 
         Line.draw_all(img, self.data["lines"], color=(80,80,80), thickness=2)
 
-        for vertex in self.barrier_candidates:
+        for candidate in self.barrier_candidates:
+            for vertex in candidate.vertices:
+                cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_a.angle), np.degrees(vertex.line_b.angle), [0, 255, 0], thickness=1) 
+                #cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_b.angle), np.degrees(vertex.line_a.angle) + 360, [255, 0, 0], thickness=2) 
 
-            cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_a.angle), np.degrees(vertex.line_b.angle), [0, 255, 0], thickness=1) 
-            #cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_b.angle), np.degrees(vertex.line_a.angle) + 360, [255, 0, 0], thickness=2) 
+                cv2.line(img, vertex.line_a.point_a, vertex.line_a.point_b, [0, 0, 255], thickness=2)
+                cv2.line(img, vertex.line_b.point_a, vertex.line_b.point_b, [255, 255, 0], thickness=2)
 
-            cv2.line(img, vertex.line_a.point_a, vertex.line_a.point_b, [0, 0, 255], thickness=2)
-            cv2.line(img, vertex.line_b.point_a, vertex.line_b.point_b, [255, 255, 0], thickness=2)
-
-        for vertex in self.barrier_candidates:
-            cv2.drawMarker(img, vertex.center, color=(255,0,0), thickness=2)
+                
+                cv2.drawMarker(img, vertex.center, color=(255,0,0), thickness=2)
+            
 
 
         return img
