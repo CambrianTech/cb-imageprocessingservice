@@ -254,6 +254,10 @@ class Room(Geometry):
                 surface = surfaces[index]
                 mask = np.zeros_like(surface.mask)
                 mask[markers == (index + 1)] = 1
+                mask[lines_mask > 0] = 0
+                kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(2,2))
+                mask = cv2.dilate(mask, kernel)
+
                 if min_confidence is not None: 
                     mask[surface.probs < 0.01] = 0
 
