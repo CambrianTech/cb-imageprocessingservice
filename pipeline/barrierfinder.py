@@ -140,7 +140,7 @@ class RectangleFinder():
         self.vertices = vertices
         self.hed = hed
 
-    def solve(self, max_iterations=3000, max_time=1.0, angle_threshold=np.radians(5), min_vp_mean=0.1, min_hed_mean=0.1):
+    def solve(self, max_iterations=3000, max_time=1.0, angle_threshold=np.radians(4), min_vp_mean=0.1, min_hed_mean=0.1):
         
         if len(self.vertices) < 2 or len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
             return []
@@ -193,8 +193,14 @@ class RectangleFinder():
             is_horizontal = horiz_theta > theta_thresh
 
             if is_vertical or is_horizontal:
-                num_samples = int(max(line.length / 5, 3))
+                vp = horizontal_vp if is_horizontal else vertical_vp
+                est_directions = locations - vp.direction
 
+                direction = normalize(est_directions[0]) * 0.5 * line.length
+
+                line = Line(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4))
+
+                num_samples = int(max(line.length / 5, 3))
                 samples = LineFunctions.get_line_samples(line.point_a, line.point_b, vp_mask, num_samples)
                 vp_mean = np.mean(samples)
 
@@ -207,16 +213,9 @@ class RectangleFinder():
                 if hed_mean < min_hed_mean:
                     continue
 
-                vp = horizontal_vp if is_horizontal else vertical_vp
-                est_directions = locations - vp.direction
-
-                direction = normalize(est_directions[0]) * 0.5 * line.length
-
-                line = Line(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4))
-
                 candidates.append((line, is_horizontal))
 
-        candidates.sort(key=lambda x:x[0].length * hed_mean, reverse=True)
+        candidates.sort(key=lambda x:x[0].length, reverse=True)
 
         return candidates
 
