@@ -7,7 +7,7 @@ import time
 
 from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
-from .utils import resize_array, random_color, overlay_mask
+from .utils import resize_array, random_color, overlay_mask, normalize
 from .planegeometry import Dimension
 from .extractsurfaces import box_like
 from .vanishingpointfinder import draw_vp, angle_with_vp
@@ -140,9 +140,8 @@ class RectangleFinder():
         self.vertices = vertices
         self.hed = hed
 
-    def solve(self, max_iterations=2000, max_time=10.0, angle_threshold=np.radians(5), min_vp_mean=0.1, min_hed_mean=0.1):
+    def solve(self, max_iterations=3000, max_time=1.0, angle_threshold=np.radians(5), min_vp_mean=0.1, min_hed_mean=0.1):
         
-        start_time = time.time() 
         if len(self.vertices) < 2 or len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
             return []
 
@@ -169,6 +168,8 @@ class RectangleFinder():
         for line_data in horizontal_vp.inliers:
             points.append((line_data[0], line_data[1]))
             points.append((line_data[2], line_data[3]))
+
+        start_time = time.time() 
 
         for ransac_iter in range(max_iterations):
             if time.time() - start_time > max_time:
@@ -206,9 +207,12 @@ class RectangleFinder():
                 if hed_mean < min_hed_mean:
                     continue
 
-                # hed_std = np.std(samples)
-                # if hed_std > 0.5:
-                #     continue
+                vp = horizontal_vp if is_horizontal else vertical_vp
+                est_directions = locations - vp.direction
+
+                direction = normalize(est_directions[0]) * 0.5 * line.length
+
+                line = Line(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4))
 
                 candidates.append((line, is_horizontal))
 
