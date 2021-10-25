@@ -116,16 +116,15 @@ class BarrierFinder():
         
         def build_barriers(surfaceTypes=None, labels=None, min_angle_threshold=np.radians(30), max_angle_threshold=np.radians(170)):
             for surface in self.room.get_surfaces(surfaceTypes=surfaceTypes, labels=labels):
-                vertices = []
+                
                 for poly in surface.polygons:
-                    vertices.extend(find_vertices(surface, poly, min_angle_threshold, max_angle_threshold))
-                    
-                self.barrier_candidates.append(SurfaceVertices(surface, vertices))
+                    vertices = find_vertices(surface, poly, min_angle_threshold, max_angle_threshold)
+                    self.barrier_candidates.append(SurfaceVertices(surface, vertices))
                 
         
-        build_barriers([SurfaceType.Ceiling], min_angle_threshold=np.radians(15))
-        build_barriers([SurfaceType.Floor, SurfaceType.Wall, SurfaceType.WallLike])
-        build_barriers(labels=box_like)
+        #build_barriers([SurfaceType.Ceiling], min_angle_threshold=np.radians(15))
+        build_barriers([SurfaceType.Wall, SurfaceType.WallLike])
+        #build_barriers(labels=box_like)
 
         return self.barrier_candidates
 
@@ -138,9 +137,17 @@ class RectangleFinder():
         self.surface = surface
         self.vertices = vertices
 
-    def solve(self, max_iterations=500, max_time=0.25):
+    def solve(self, max_iterations=500, max_time=0.25, angle_threshold=np.radians(5)):
         
         start_time = time.time() 
+        if len(self.vertices) < 5 or self.surface.horizontal_vp is None or len(self.surface.horizontal_vp) == 0 \
+            or self.surface.vertical_vp is None or len(self.surface.vertical_vp) == 0:
+            return []
+
+        horizontal_vp = self.surface.horizontal_vp[0]
+        vertical_vp = self.surface.vertical_vp[0]
+
+        candidates = []
 
         for ransac_iter in range(max_iterations):
             if time.time() - start_time > max_time:
@@ -148,8 +155,25 @@ class RectangleFinder():
 
             random.shuffle(self.vertices)
 
-            vertices = self.vertices[:3]
+            vertex_a = self.vertices[0]
+            vertex_b = self.vertices[1]
 
+            line = Line(np.array([(vertex_a.center[0], vertex_a.center[1], vertex_b.center[0], vertex_b.center[1])], dtype=np.int).reshape(4))
+
+            horiz_line = Line(np.array([(line.point_a[0], line.point_a[1], line.point_a[0] + horizontal_vp.direction[0], line.point_a[1] + horizontal_vp.direction[1])], dtype=np.int).reshape(4))
+            horiz_angle = line_angle_difference(line.angle, horiz_line.angle)
+
+            vert_line = Line(np.array([(line.point_a[0], line.point_a[1], line.point_a[0] + vertical_vp.direction[0], line.point_a[1] + vertical_vp.direction[1])], dtype=np.int).reshape(4))
+            vert_angle = line_angle_difference(line.angle, vert_line.angle)
+
+            if horiz_angle < angle_threshold:
+                candidates.append((line, horiz_angle))
+            elif vert_angle < angle_threshold:
+                candidates.append((line, vert_angle))
+
+        candidates.sort(key=lambda x:x[0].length * np.cos(x[1]), reverse=True)
+
+        return candidates
 
         
 class PipelineBarrierFinder(PipelineStep):
@@ -173,9 +197,12 @@ class PipelineBarrierFinder(PipelineStep):
 
         self.candidates = BarrierFinder(self.data).solve()
 
+        self.found_lines = []
+
         for candidate in self.candidates:
             rf = RectangleFinder(self.data, candidate.surface, candidate.vertices)
-            rf.solve()
+            lines = rf.solve()
+            self.found_lines.extend(lines[:10])
 
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers", self.get_debug_image())
@@ -217,8 +244,12 @@ class PipelineBarrierFinder(PipelineStep):
             thickness = 2 if candidate.surface.surfaceType.is_major else 1
             for vertex in candidate.vertices:
                 cv2.drawMarker(img, vertex.center, color=color, thickness=thickness)
-            
 
+        
+        for line, angle in self.found_lines:
+                
+            line.draw(img, color=(255,255,255), thickness=1)
+            
 
         return img
 

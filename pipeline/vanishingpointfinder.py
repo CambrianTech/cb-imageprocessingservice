@@ -216,7 +216,7 @@ class PipelineVanishingPointFinder(PipelineStep):
                 if on_image_edge(point_a, self.image) and on_image_edge(point_b, self.image):
                     continue
 
-                line = Line(np.array([(point_b[0], point_b[1], point_a[0], point_a[1])], dtype=np.int).reshape(4))
+                line = Line(np.array([(point_b[0], point_b[1], point_a[0], point_a[1])], dtype=np.int).reshape(4), group="contour")
                 if line.length > min_length:
                     lines.append(line)
         

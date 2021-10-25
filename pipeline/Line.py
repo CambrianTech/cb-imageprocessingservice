@@ -2,6 +2,7 @@ import math
 import numpy as np
 import numba as nb
 import cv2
+import uuid
 from numba.experimental import jitclass
 from collections.abc import Sequence
 from scipy.spatial import distance
@@ -18,7 +19,7 @@ from cambrian.LineFunctions import LineFunctions
 #             ])
 
 class Line(Sequence):
-    def __init__(self, data, sx=1, sy=1):
+    def __init__(self, data, sx=1, sy=1, group=None, id=uuid.uuid4()):
         super().__init__()
         self.data = data
         self.data[0] *= sx
@@ -26,6 +27,10 @@ class Line(Sequence):
         self.data[1] *= sy
         self.data[3] *= sy
         self.recalculate()
+
+        #for tracking
+        self.group = group
+        self.id = id
 
         self.dead = False
 
@@ -109,7 +114,7 @@ class Line(Sequence):
 
 
             if line_a.dead:
-                lines[i] = Line(np.array([(data[0][0], data[0][1], data[1][0], data[1][1])], dtype=np.int).reshape(4))
+                lines[i] = Line(np.array([(data[0][0], data[0][1], data[1][0], data[1][1])], dtype=np.int).reshape(4), group=lines[i].group, id=lines[i].id)
 
         return list(filter(lambda x: not x.dead, lines))
 
