@@ -51,6 +51,10 @@ class VanishingPoint:
             self._inliers = np.array(self.lines)[self.votes > 0]
 
         return self._inliers
+
+    @property
+    def direction(self):
+        return self.model[:2] / self.model[2]
         
 class Edglets:
     def __init__(self, locations, directions, strengths):
@@ -259,7 +263,7 @@ class PipelineVanishingPointFinder(PipelineStep):
         if len(vertical_lines) > 1:
             vertical_lines = Line.merge(vertical_lines, search_width=self.diagonal/200, angle_threshold=math.radians(5))
             vpf = VanishingPointFinder(vertical_lines)
-            self.vertical_vp = vpf.solve(threshold_inlier=np.radians(5), max_time=0.5)
+            self.vertical_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
             if self.vertical_vp is None:
                 self.vertical_vp = vpf.solve(threshold_inlier=np.radians(20))
 
