@@ -92,8 +92,8 @@ class BarrierFinder():
                 point_b = poly[(i+1) % num_pts][0]
                 point_c = poly[(i+2) % num_pts][0]
 
-                # if on_image_edge(point_b, self.image) and (on_image_edge(point_a, self.image) or on_image_edge(point_c, self.image)):
-                #     continue
+                if on_image_edge(point_b, self.image) and (on_image_edge(point_a, self.image) or on_image_edge(point_c, self.image)):
+                    continue
 
                 line_a = Line(np.array([(point_b[0], point_b[1], point_a[0], point_a[1])], dtype=np.int).reshape(4))
                 line_b = Line(np.array([(point_b[0], point_b[1], point_c[0], point_c[1])], dtype=np.int).reshape(4))
