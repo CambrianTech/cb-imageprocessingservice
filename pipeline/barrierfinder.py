@@ -140,7 +140,7 @@ class RectangleFinder():
         self.vertices = vertices
         self.hed = hed
 
-    def solve(self, max_iterations=5000, max_time=3.0, angle_threshold=np.radians(3), min_vp_mean=0.1, min_hed_mean=0.1):
+    def solve(self, max_iterations=2000, max_time=10.0, angle_threshold=np.radians(5), min_vp_mean=0.1, min_hed_mean=0.1):
         
         start_time = time.time() 
         if len(self.vertices) < 2 or len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
