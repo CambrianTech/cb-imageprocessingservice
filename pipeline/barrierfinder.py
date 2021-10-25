@@ -140,7 +140,7 @@ class RectangleFinder():
         self.vertices = vertices
         self.hed = hed
 
-    def solve(self, max_iterations=500, max_time=1.0, angle_threshold=np.radians(3), min_confidence=0.3):
+    def solve(self, max_iterations=500, max_time=1.0, angle_threshold=np.radians(1.5), min_vp_confidence=0.2, min_hed_confidence=0.3):
         
         start_time = time.time() 
         if len(self.vertices) < 2 or len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
@@ -152,8 +152,8 @@ class RectangleFinder():
         candidates = []
         vp_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
 
-        draw_vp(vp_mask, horizontal_vp, color=255, thickness=2)
-        draw_vp(vp_mask, vertical_vp, color=255, thickness=2) 
+        draw_vp(vp_mask, horizontal_vp, color=255, thickness=5)
+        draw_vp(vp_mask, vertical_vp, color=255, thickness=5) 
 
         theta_thresh = np.cos(angle_threshold)
 
@@ -184,13 +184,13 @@ class RectangleFinder():
                 samples = LineFunctions.get_line_samples(line.point_a, line.point_b, vp_mask, num_samples)
                 vp_confidence = sum(samples) / num_samples
 
-                if vp_confidence < min_confidence:
+                if vp_confidence < min_vp_confidence:
                     continue
 
                 samples = LineFunctions.get_line_samples(line.point_a, line.point_b, self.hed, num_samples)
                 hed_confidence = sum(samples) / num_samples
 
-                if hed_confidence < 0.1:
+                if hed_confidence < min_hed_confidence:
                     continue
 
                 candidates.append((line, is_horizontal))

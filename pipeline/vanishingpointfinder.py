@@ -236,7 +236,7 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         self.surfaces = []
 
-        self.surfaces.extend(data["room"].get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.Wall, SurfaceType.WallLike]))
+        self.surfaces.extend(data["room"].get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.Wall, SurfaceType.WallLike, SurfaceType.Ceiling]))
         self.surfaces.extend(data["room"].get_surfaces(labels=box_like))
 
 
