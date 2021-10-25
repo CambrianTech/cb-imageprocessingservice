@@ -175,10 +175,10 @@ class RectangleFinder():
             if time.time() - start_time > max_time:
                 break
 
-            random.shuffle(points)
+            items = random.sample(points, 2)
 
-            point_a = points[0]
-            point_b = points[1]
+            point_a = items[0]
+            point_b = items[1]
 
             line = Line(np.array([(point_a[0], point_a[1], point_b[0], point_b[1])], dtype=np.int).reshape(4))
 
