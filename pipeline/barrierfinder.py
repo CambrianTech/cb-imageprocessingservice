@@ -3,8 +3,9 @@ from scipy import ndimage
 import cv2
 from skimage.morphology import remove_small_objects
 import random
-from .ade20k import ADE20K
+import time
 
+from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .utils import resize_array, random_color, overlay_mask
 from .planegeometry import Dimension
@@ -91,8 +92,8 @@ class BarrierFinder():
                 point_b = poly[(i+1) % num_pts][0]
                 point_c = poly[(i+2) % num_pts][0]
 
-                if on_image_edge(point_b, self.image) and (on_image_edge(point_a, self.image) or on_image_edge(point_c, self.image)):
-                    continue
+                # if on_image_edge(point_b, self.image) and (on_image_edge(point_a, self.image) or on_image_edge(point_c, self.image)):
+                #     continue
 
                 line_a = Line(np.array([(point_b[0], point_b[1], point_a[0], point_a[1])], dtype=np.int).reshape(4))
                 line_b = Line(np.array([(point_b[0], point_b[1], point_c[0], point_c[1])], dtype=np.int).reshape(4))
@@ -126,8 +127,59 @@ class BarrierFinder():
         build_barriers([SurfaceType.Floor, SurfaceType.Wall, SurfaceType.WallLike])
         build_barriers(labels=box_like)
 
+        return self.barrier_candidates
+
+class RectangleFinder():
+    def __init__(self, data, surface, vertices):
+        super().__init__()
+        self.data = data
+        self.room = data["room"]
+        self.image = self.data["downscaled"]
+        self.surface = surface
+        self.vertices = vertices
+
+    def solve(self, max_iterations=500, max_time=0.25):
+        
+        start_time = time.time() 
+
+        for ransac_iter in range(max_iterations):
+            if time.time() - start_time > max_time:
+                break
+
+            random.shuffle(self.vertices)
+
+            vertices = self.vertices[:3]
+
+
+        
+class PipelineBarrierFinder(PipelineStep):
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.Barriers
+
+    @property
+    def required_keys(self) -> list:
+        return ["room", "downscaled", "isolated", "lines"]
+
+    @property
+    def output_keys(self) -> list:
+        return []
+
+    def run(self, data):
+
+        self.data = data
+        self.image = self.data["downscaled"]
+        self.room = self.data["room"]
+
+        self.candidates = BarrierFinder(self.data).solve()
+
+        for candidate in self.candidates:
+            rf = RectangleFinder(self.data, candidate.surface, candidate.vertices)
+            rf.solve()
+
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers", self.get_debug_image())
+
 
     def get_debug_image(self):
 
@@ -148,7 +200,7 @@ class BarrierFinder():
 
         #Line.draw_all(img, self.data["lines"], color=(80,80,80), thickness=2)
 
-        for candidate in self.barrier_candidates:
+        for candidate in self.candidates:
 
             color_a = (0, 0, 255) if candidate.surface.surfaceType.is_major else (0, 0, 180)
             color_b = (255, 255, 0) if candidate.surface.surfaceType.is_major else (180, 180, 0)
@@ -160,7 +212,7 @@ class BarrierFinder():
                 cv2.line(img, vertex.line_a.point_a, vertex.line_a.point_b, color_a, thickness=2)
                 cv2.line(img, vertex.line_b.point_a, vertex.line_b.point_b, color_b, thickness=2)
         
-        for candidate in self.barrier_candidates:
+        for candidate in self.candidates:
             color = (255, 0, 0) if candidate.surface.surfaceType.is_major else (255, 255, 255)
             thickness = 2 if candidate.surface.surfaceType.is_major else 1
             for vertex in candidate.vertices:
@@ -170,21 +222,4 @@ class BarrierFinder():
 
         return img
 
-
-class PipelineBarrierFinder(PipelineStep):
-    @property
-    def index(self) -> PipelineStepIndex:
-        return PipelineStepIndex.Barriers
-
-    @property
-    def required_keys(self) -> list:
-        return ["room", "downscaled", "isolated", "lines"]
-
-    @property
-    def output_keys(self) -> list:
-        return []
-
-    def run(self, data):
-
-        BarrierFinder(data).solve()
 

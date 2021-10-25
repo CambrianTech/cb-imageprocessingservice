@@ -101,7 +101,7 @@ class VanishingPointFinder():
 
         return Edglets(locations, directions, strengths)
 
-    def solve(self, num_ransac_iter=500, threshold_inlier=math.radians(7), max_time=0.25, measure_area=False):
+    def solve(self, max_iterations=500, threshold_inlier=math.radians(7), max_time=0.25, measure_area=False):
 
         self.edgelets = self.compute_edgelets()
 
@@ -119,10 +119,10 @@ class VanishingPointFinder():
         
         pi_2 = np.pi/2       
 
-        num_ransac_iter = min(num_ransac_iter, len(self.lines) * 30)
+        max_iterations = min(max_iterations, len(self.lines) * 30)
         start_time = time.time() 
 
-        for ransac_iter in range(num_ransac_iter):
+        for ransac_iter in range(max_iterations):
             if time.time() - start_time > max_time:
                 break
 
