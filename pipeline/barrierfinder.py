@@ -167,7 +167,8 @@ class RectangleFinder():
             points.append(line.point_b)
 
         for line_data in horizontal_vp.inliers:
-            points.append((line_data[0], line_data[1]))  
+            points.append((line_data[0], line_data[1]))
+            points.append((line_data[2], line_data[3]))
 
         for ransac_iter in range(max_iterations):
             if time.time() - start_time > max_time:
@@ -205,9 +206,9 @@ class RectangleFinder():
                 if hed_mean < min_hed_mean:
                     continue
 
-                hed_std = np.std(samples)
-                if hed_std > 0.3:
-                    continue
+                # hed_std = np.std(samples)
+                # if hed_std > 0.5:
+                #     continue
 
                 candidates.append((line, is_horizontal))
 
