@@ -124,8 +124,8 @@ class BarrierFinder():
                     self.barrier_candidates.append(SurfaceVertices(surface, vertices))
                 
         
-        #build_barriers([SurfaceType.Ceiling], min_angle_threshold=np.radians(15))
-        build_barriers([SurfaceType.Wall, SurfaceType.WallLike])
+        #build_barriers([SurfaceType.Floor])
+        build_barriers([SurfaceType.Wall])
         build_barriers(labels=box_like)
 
         return self.barrier_candidates
@@ -140,7 +140,7 @@ class RectangleFinder():
         self.vertices = vertices
         self.hed = hed
 
-    def solve(self, max_iterations=500, max_time=1.0, angle_threshold=np.radians(1.5), min_vp_confidence=0.2, min_hed_confidence=0.3):
+    def solve(self, max_iterations=3000, max_time=10.0, angle_threshold=np.radians(5), min_vp_confidence=0.01, min_hed_confidence=0.0):
         
         start_time = time.time() 
         if len(self.vertices) < 2 or len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
@@ -152,19 +152,31 @@ class RectangleFinder():
         candidates = []
         vp_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
 
-        draw_vp(vp_mask, horizontal_vp, color=255, thickness=5)
-        draw_vp(vp_mask, vertical_vp, color=255, thickness=5) 
+        draw_vp(vp_mask, horizontal_vp, color=1, thickness=1)
+        draw_vp(vp_mask, vertical_vp, color=1, thickness=1) 
 
         theta_thresh = np.cos(angle_threshold)
+
+        points = []
+        for poly in self.surface.polygons:
+            for point in poly:
+                points.append(point[0])
+
+        for line in self.surface.lines:
+            points.append(line.point_a)
+            points.append(line.point_b)
+
+        for line_data in horizontal_vp.inliers:
+            points.append((line_data[0], line_data[1]))  
 
         for ransac_iter in range(max_iterations):
             if time.time() - start_time > max_time:
                 break
 
-            random.shuffle(self.vertices)
+            random.shuffle(points)
 
-            point_a = self.vertices[0].center
-            point_b = self.vertices[1].center
+            point_a = points[0]
+            point_b = points[1]
 
             line = Line(np.array([(point_a[0], point_a[1], point_b[0], point_b[1])], dtype=np.int).reshape(4))
 
@@ -264,15 +276,15 @@ class PipelineBarrierFinder(PipelineStep):
         #         cv2.line(img, vertex.line_a.point_a, vertex.line_a.point_b, color_a, thickness=2)
         #         cv2.line(img, vertex.line_b.point_a, vertex.line_b.point_b, color_b, thickness=2)
         
-        for candidate in self.candidates:
-            color = (255, 0, 0) if candidate.surface.surfaceType.is_major else (255, 255, 255)
-            thickness = 2 if candidate.surface.surfaceType.is_major else 1
-            for vertex in candidate.vertices:
-                cv2.drawMarker(img, vertex.center, color=color, thickness=thickness)
+        # for candidate in self.candidates:
+        #     color = (255, 0, 0) if candidate.surface.surfaceType.is_major else (255, 255, 255)
+        #     thickness = 2 if candidate.surface.surfaceType.is_major else 1
+        #     for vertex in candidate.vertices:
+        #         cv2.drawMarker(img, vertex.center, color=color, thickness=thickness)
 
         
         for line, angle in self.found_lines:
-            line.draw(img, color=(255,255,255), thickness=2)
+            line.draw(img, color=(255,255,255), thickness=1)
             
 
         return img
