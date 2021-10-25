@@ -31,6 +31,7 @@ class Surface():
         self._polygons = None
         self._normals_color = None
         self._lines = None
+        self._border_lines = None
 
         self._semantic_labels = None
 
@@ -115,25 +116,36 @@ class Surface():
 
         if self._lines is None:
             self._lines = []
+            self._border_lines = []
             for i in range(len(self.data["lines"])):
                 line = self.data["lines"][i]
                 for contour in self.contours:
                     area = cv2.contourArea(contour)
-                    padding = math.sqrt(area) / 10
+                    padding = math.sqrt(area) / 20
 
                     def is_inside(point):
                         #positive (inside), negative (outside), or zero (on an edge)
-                        dist = cv2.pointPolygonTest(contour, point, True)
+                        dist = cv2.pointPolygonTest(contour, point, False)
                         return dist >= 0 or abs(dist) <= padding
 
                     midpoint_a = ((line.point_a[0] + line.midpoint[0]) / 2, (line.point_a[1] + line.midpoint[1]) / 2)
                     midpoint_b = ((line.point_b[0] + line.midpoint[0]) / 2, (line.point_b[1] + line.midpoint[1]) / 2)
 
-                    if is_inside(line.midpoint) and (is_inside(midpoint_a) or is_inside(midpoint_b)):
+                    dist = cv2.pointPolygonTest(contour, line.midpoint, True)
+                    is_border = abs(dist) <= padding
+
+                    if (dist >= 0 or is_border) and (is_inside(midpoint_a) or is_inside(midpoint_b)):
                         self._lines.append(line)
+                        if is_border:
+                            self._border_lines.append(line)
                         break
                             
         return self._lines
+
+    @property
+    def border_lines(self) -> list:
+        self.lines
+        return self._border_lines
 
     @property
     def angle(self): #from floor

@@ -140,7 +140,7 @@ class RectangleFinder():
         self.vertices = vertices
         self.hed = hed
 
-    def solve(self, max_iterations=3000, max_time=10.0, angle_threshold=np.radians(5), min_vp_confidence=0.01, min_hed_confidence=0.0):
+    def solve(self, max_iterations=5000, max_time=3.0, angle_threshold=np.radians(3), min_vp_mean=0.1, min_hed_mean=0.1):
         
         start_time = time.time() 
         if len(self.vertices) < 2 or len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
@@ -162,7 +162,7 @@ class RectangleFinder():
             for point in poly:
                 points.append(point[0])
 
-        for line in self.surface.lines:
+        for line in self.surface.border_lines:
             points.append(line.point_a)
             points.append(line.point_b)
 
@@ -194,20 +194,24 @@ class RectangleFinder():
                 num_samples = int(max(line.length / 5, 3))
 
                 samples = LineFunctions.get_line_samples(line.point_a, line.point_b, vp_mask, num_samples)
-                vp_confidence = sum(samples) / num_samples
+                vp_mean = np.mean(samples)
 
-                if vp_confidence < min_vp_confidence:
+                if vp_mean < min_vp_mean:
                     continue
 
                 samples = LineFunctions.get_line_samples(line.point_a, line.point_b, self.hed, num_samples)
-                hed_confidence = sum(samples) / num_samples
+                hed_mean = np.mean(samples)
 
-                if hed_confidence < min_hed_confidence:
+                if hed_mean < min_hed_mean:
+                    continue
+
+                hed_std = np.std(samples)
+                if hed_std > 0.3:
                     continue
 
                 candidates.append((line, is_horizontal))
 
-        candidates.sort(key=lambda x:x[0].length * hed_confidence, reverse=True)
+        candidates.sort(key=lambda x:x[0].length * hed_mean, reverse=True)
 
         return candidates
 
@@ -235,6 +239,8 @@ class PipelineBarrierFinder(PipelineStep):
 
         self.found_lines = []
         hed = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
+        hed = cv2.normalize(hed, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
 
         for candidate in self.candidates:
             rf = RectangleFinder(self.data, candidate.surface, candidate.vertices, hed)
