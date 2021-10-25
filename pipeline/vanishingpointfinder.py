@@ -14,6 +14,23 @@ from .Line import Line, line_angle_difference, on_image_edge
 from .room import Room, Surface
 from .ade20k import ADE20K
 
+find_horizontal = True
+
+def angle_with_vp(model, locations, directions):
+
+    vp = model[:2] / model[2]
+
+    est_directions = locations - vp
+
+    dot_prod = np.sum(est_directions * directions, axis=1)
+    abs_prod = np.linalg.norm(directions, axis=1) * \
+               np.linalg.norm(est_directions, axis=1)
+    abs_prod[abs_prod == 0] = 1e-5
+
+    cosine_theta = np.abs(dot_prod / abs_prod)
+
+    return cosine_theta
+
 class VanishingPoint:
     def __init__(self, lines, model, votes, measure_area=False):
 
@@ -91,21 +108,25 @@ class VanishingPointFinder():
         strengths = []
 
         for line in self.lines:
-            p0, p1 = np.array([line.point_a[0], line.point_a[1]]), np.array([line.point_b[0], line.point_b[1]])
-
             locations.append(line.midpoint)
-            directions.append(p1 - p0)
+            directions.append(line.direction)
             strengths.append(line.length)
 
 
         locations = np.array(locations)
-        directions = np.array(directions)
         strengths = np.array(strengths)
         directions = np.array(directions) / np.linalg.norm(directions, axis=1)[:, np.newaxis]
 
         return Edglets(locations, directions, strengths)
 
-    def solve(self, max_iterations=500, threshold_inlier=math.radians(7), max_time=0.25, measure_area=False):
+    def compute_votes(self, model, threshold_inlier):
+
+        cosine_theta = angle_with_vp(model, self.edgelets.locations, self.edgelets.directions)
+        theta_thresh = np.cos(threshold_inlier)
+
+        return (cosine_theta > theta_thresh) * self.edgelets.strengths
+
+    def solve(self, max_iterations=1000, threshold_inlier=math.radians(3), max_time=0.25, measure_area=False):
 
         self.edgelets = self.compute_edgelets()
 
@@ -167,25 +188,10 @@ class VanishingPointFinder():
 
         return self.vanishing_points
 
-
-    def compute_votes(self, model, threshold_inlier):
-
-        vp = model[:2] / model[2]
-
-        est_directions = self.edgelets.locations - vp
-
-        dot_prod = np.sum(est_directions * self.edgelets.directions, axis=1)
-        abs_prod = np.linalg.norm(self.edgelets.directions, axis=1) * \
-                   np.linalg.norm(est_directions, axis=1)
-        abs_prod[abs_prod == 0] = 1e-5
-
-        cosine_theta = np.abs(dot_prod / abs_prod)
-
-        theta_thresh = np.cos(threshold_inlier)
-
-        return (cosine_theta > theta_thresh) * self.edgelets.strengths
-
-
+def draw_vp(img, vp, color, thickness=1):
+    for line_data in vp.inliers:
+        line = Line(line_data)
+        line.draw(img, color=color, thickness=thickness)
 
 class PipelineVanishingPointFinder(PipelineStep):
     @property
@@ -253,7 +259,6 @@ class PipelineVanishingPointFinder(PipelineStep):
                 vertical, horizontal = partition(lambda x: line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
                 horizontal = Line.merge(horizontal, search_width=self.diagonal/200, search_length=1.1)
 
-                #find horizontal vanishing points for this surface
                 vpf = VanishingPointFinder(horizontal)
                 surface.horizontal_vp = vpf.solve(measure_area=True)
 
@@ -264,7 +269,7 @@ class PipelineVanishingPointFinder(PipelineStep):
             vertical_lines = Line.merge(vertical_lines, search_width=self.diagonal/200, angle_threshold=math.radians(5))
             vpf = VanishingPointFinder(vertical_lines)
             self.vertical_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
-            if self.vertical_vp is None:
+            if len(self.vertical_vp) == 0:
                 self.vertical_vp = vpf.solve(threshold_inlier=np.radians(20))
 
 
@@ -279,24 +284,19 @@ class PipelineVanishingPointFinder(PipelineStep):
     def get_debug_image(self, data):
            
         img = self.image.copy()
-
-        def draw_vp(vp, color):
-            for line_data in vp.inliers:
-                line = Line(line_data)
-                line.draw(img, color=color)
     
         #draw all lines
         Line.draw_all(img, self.all_lines, color=(80,80,80))
 
         if self.vertical_vp is not None and len(self.vertical_vp) > 0:
-            draw_vp(self.vertical_vp[0], color=(0,255,0))
+            draw_vp(img, self.vertical_vp[0], color=(0,255,0))
 
         for surface in self.surfaces:
             if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
-                draw_vp(surface.horizontal_vp[0], color=random_color())
+                draw_vp(img, surface.horizontal_vp[0], color=random_color())
 
             if surface.vp and len(surface.vp):
-                draw_vp(surface.vp[0], color=random_color())
+                draw_vp(img, surface.vp[0], color=random_color())
             
         return img
 

@@ -10,7 +10,9 @@ from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .utils import resize_array, random_color, overlay_mask
 from .planegeometry import Dimension
 from .extractsurfaces import box_like
+from .vanishingpointfinder import draw_vp, angle_with_vp
 from .logging import log_image, log_segmentation_image, im_logging_enabled
+from cambrian.LineFunctions import LineFunctions
 from .Line import line_angle_difference, Line, on_image_edge
 from .room import Room, Surface
 
@@ -92,8 +94,8 @@ class BarrierFinder():
                 point_b = poly[(i+1) % num_pts][0]
                 point_c = poly[(i+2) % num_pts][0]
 
-                if on_image_edge(point_b, self.image) and (on_image_edge(point_a, self.image) or on_image_edge(point_c, self.image)):
-                    continue
+                # if on_image_edge(point_a, self.image) and on_image_edge(point_c, self.image):
+                #     continue
 
                 line_a = Line(np.array([(point_b[0], point_b[1], point_a[0], point_a[1])], dtype=np.int).reshape(4))
                 line_b = Line(np.array([(point_b[0], point_b[1], point_c[0], point_c[1])], dtype=np.int).reshape(4))
@@ -114,7 +116,7 @@ class BarrierFinder():
             return candidates
 
         
-        def build_barriers(surfaceTypes=None, labels=None, min_angle_threshold=np.radians(30), max_angle_threshold=np.radians(170)):
+        def build_barriers(surfaceTypes=None, labels=None, min_angle_threshold=np.radians(15), max_angle_threshold=np.radians(170)):
             for surface in self.room.get_surfaces(surfaceTypes=surfaceTypes, labels=labels):
                 
                 for poly in surface.polygons:
@@ -124,30 +126,36 @@ class BarrierFinder():
         
         #build_barriers([SurfaceType.Ceiling], min_angle_threshold=np.radians(15))
         build_barriers([SurfaceType.Wall, SurfaceType.WallLike])
-        #build_barriers(labels=box_like)
+        build_barriers(labels=box_like)
 
         return self.barrier_candidates
 
 class RectangleFinder():
-    def __init__(self, data, surface, vertices):
+    def __init__(self, data, surface, vertices, hed):
         super().__init__()
         self.data = data
         self.room = data["room"]
         self.image = self.data["downscaled"]
         self.surface = surface
         self.vertices = vertices
+        self.hed = hed
 
-    def solve(self, max_iterations=500, max_time=0.25, angle_threshold=np.radians(5)):
+    def solve(self, max_iterations=500, max_time=1.0, angle_threshold=np.radians(3), min_confidence=0.3):
         
         start_time = time.time() 
-        if len(self.vertices) < 5 or self.surface.horizontal_vp is None or len(self.surface.horizontal_vp) == 0 \
-            or self.surface.vertical_vp is None or len(self.surface.vertical_vp) == 0:
+        if len(self.vertices) < 2 or len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
             return []
 
         horizontal_vp = self.surface.horizontal_vp[0]
         vertical_vp = self.surface.vertical_vp[0]
 
         candidates = []
+        vp_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+
+        draw_vp(vp_mask, horizontal_vp, color=255, thickness=2)
+        draw_vp(vp_mask, vertical_vp, color=255, thickness=2) 
+
+        theta_thresh = np.cos(angle_threshold)
 
         for ransac_iter in range(max_iterations):
             if time.time() - start_time > max_time:
@@ -155,23 +163,39 @@ class RectangleFinder():
 
             random.shuffle(self.vertices)
 
-            vertex_a = self.vertices[0]
-            vertex_b = self.vertices[1]
+            point_a = self.vertices[0].center
+            point_b = self.vertices[1].center
 
-            line = Line(np.array([(vertex_a.center[0], vertex_a.center[1], vertex_b.center[0], vertex_b.center[1])], dtype=np.int).reshape(4))
+            line = Line(np.array([(point_a[0], point_a[1], point_b[0], point_b[1])], dtype=np.int).reshape(4))
 
-            horiz_line = Line(np.array([(line.point_a[0], line.point_a[1], line.point_a[0] + horizontal_vp.direction[0], line.point_a[1] + horizontal_vp.direction[1])], dtype=np.int).reshape(4))
-            horiz_angle = line_angle_difference(line.angle, horiz_line.angle)
+            directions = np.array([line.direction]) 
+            directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
+            locations = np.array([line.midpoint])
 
-            vert_line = Line(np.array([(line.point_a[0], line.point_a[1], line.point_a[0] + vertical_vp.direction[0], line.point_a[1] + vertical_vp.direction[1])], dtype=np.int).reshape(4))
-            vert_angle = line_angle_difference(line.angle, vert_line.angle)
+            vert_theta = angle_with_vp(vertical_vp.model, locations, directions)
+            horiz_theta = angle_with_vp(horizontal_vp.model, locations, directions)
+            
+            is_vertical = vert_theta > theta_thresh
+            is_horizontal = horiz_theta > theta_thresh
 
-            if horiz_angle < angle_threshold:
-                candidates.append((line, horiz_angle))
-            elif vert_angle < angle_threshold:
-                candidates.append((line, vert_angle))
+            if is_vertical or is_horizontal:
+                num_samples = int(max(line.length / 5, 3))
 
-        candidates.sort(key=lambda x:x[0].length * np.cos(x[1]), reverse=True)
+                samples = LineFunctions.get_line_samples(line.point_a, line.point_b, vp_mask, num_samples)
+                vp_confidence = sum(samples) / num_samples
+
+                if vp_confidence < min_confidence:
+                    continue
+
+                samples = LineFunctions.get_line_samples(line.point_a, line.point_b, self.hed, num_samples)
+                hed_confidence = sum(samples) / num_samples
+
+                if hed_confidence < 0.1:
+                    continue
+
+                candidates.append((line, is_horizontal))
+
+        candidates.sort(key=lambda x:x[0].length * hed_confidence, reverse=True)
 
         return candidates
 
@@ -198,11 +222,12 @@ class PipelineBarrierFinder(PipelineStep):
         self.candidates = BarrierFinder(self.data).solve()
 
         self.found_lines = []
+        hed = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
 
         for candidate in self.candidates:
-            rf = RectangleFinder(self.data, candidate.surface, candidate.vertices)
+            rf = RectangleFinder(self.data, candidate.surface, candidate.vertices, hed)
             lines = rf.solve()
-            self.found_lines.extend(lines[:10])
+            self.found_lines.extend(lines)
 
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers", self.get_debug_image())
@@ -227,17 +252,17 @@ class PipelineBarrierFinder(PipelineStep):
 
         #Line.draw_all(img, self.data["lines"], color=(80,80,80), thickness=2)
 
-        for candidate in self.candidates:
+        # for candidate in self.candidates:
 
-            color_a = (0, 0, 255) if candidate.surface.surfaceType.is_major else (0, 0, 180)
-            color_b = (255, 255, 0) if candidate.surface.surfaceType.is_major else (180, 180, 0)
+        #     color_a = (0, 0, 255) if candidate.surface.surfaceType.is_major else (0, 0, 180)
+        #     color_b = (255, 255, 0) if candidate.surface.surfaceType.is_major else (180, 180, 0)
 
-            for vertex in candidate.vertices:
-                cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_a.angle), np.degrees(vertex.line_b.angle), (255, 0, 255), thickness=1) 
-                #cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_b.angle), np.degrees(vertex.line_a.angle) + 360, [255, 0, 0], thickness=2) 
+        #     for vertex in candidate.vertices:
+        #         cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_a.angle), np.degrees(vertex.line_b.angle), (255, 0, 255), thickness=1) 
+        #         #cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_b.angle), np.degrees(vertex.line_a.angle) + 360, [255, 0, 0], thickness=2) 
 
-                cv2.line(img, vertex.line_a.point_a, vertex.line_a.point_b, color_a, thickness=2)
-                cv2.line(img, vertex.line_b.point_a, vertex.line_b.point_b, color_b, thickness=2)
+        #         cv2.line(img, vertex.line_a.point_a, vertex.line_a.point_b, color_a, thickness=2)
+        #         cv2.line(img, vertex.line_b.point_a, vertex.line_b.point_b, color_b, thickness=2)
         
         for candidate in self.candidates:
             color = (255, 0, 0) if candidate.surface.surfaceType.is_major else (255, 255, 255)
@@ -247,8 +272,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         
         for line, angle in self.found_lines:
-                
-            line.draw(img, color=(255,255,255), thickness=1)
+            line.draw(img, color=(255,255,255), thickness=2)
             
 
         return img

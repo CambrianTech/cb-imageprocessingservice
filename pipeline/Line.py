@@ -48,11 +48,15 @@ class Line(Sequence):
 
     @property
     def point_a(self):
-        return (self.data[0], self.data[1])
+        return (int(self.data[0]), int(self.data[1]))
 
     @property
     def point_b(self):
-        return (self.data[2], self.data[3])
+        return (int(self.data[2]), int(self.data[3]))
+
+    @property
+    def direction(self):
+        return np.array((int(self.data[2]-self.data[0]), int(self.data[3] - self.data[1])))
 
     def draw(self, img, color=(255,50,255,255), thickness=2, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
         cv2.line(img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
