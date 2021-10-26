@@ -5,6 +5,7 @@ from skimage.morphology import remove_small_objects
 import random
 import time
 from scipy.spatial import distance
+import math
 
 from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
@@ -26,7 +27,7 @@ class BarrierFinder():
         self.surface = surface
         self.hed = hed
 
-    def solve(self, max_iterations=3000, max_time=0.5, min_distance=50, max_distance=1000, angle_threshold=np.radians(5), min_vp_mean=0.1, min_hed_mean=0.1):
+    def solve(self, max_iterations=3000, max_time=0.5, min_distance=50, max_distance=1000, angle_threshold=np.radians(5), min_vp_mean=0.15, min_hed_mean=0.2):
         
         if len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
             return []
@@ -37,8 +38,8 @@ class BarrierFinder():
         candidates = []
         vp_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
 
-        draw_vp(vp_mask, horizontal_vp, color=1, thickness=1)
-        draw_vp(vp_mask, vertical_vp, color=1, thickness=1) 
+        draw_vp(vp_mask, horizontal_vp, color=1, thickness=3)
+        draw_vp(vp_mask, vertical_vp, color=1, thickness=3) 
 
         theta_thresh = np.cos(angle_threshold)
 
@@ -100,21 +101,22 @@ class BarrierFinder():
                 line = Line(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4))
 
                 num_samples = int(min(max(line.length / 10, 5), 15))
-                samples = LineFunctions.get_line_samples(line.point_a, line.point_b, vp_mask, num_samples)
-                vp_mean = np.mean(samples)
 
-                if vp_mean < min_vp_mean:
+                def under_threshold(img, threshold, func=np.mean):
+                    if threshold < 0:
+                        return False
+                    samples = LineFunctions.get_line_samples(line.point_a, line.point_b, img, num_samples)
+                    return func(samples) < threshold
+
+                if under_threshold(self.hed, min_hed_mean) or under_threshold(vp_mask, min_vp_mean):
                     continue
 
-                samples = LineFunctions.get_line_samples(line.point_a, line.point_b, self.hed, num_samples)
-                hed_mean = np.mean(samples)
+                candidates.append(line)
 
-                if hed_mean < min_hed_mean:
-                    continue
-
-                candidates.append((line, is_horizontal))
-
-        candidates.sort(key=lambda x:x[0].length, reverse=True)
+        #diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
+        #candidates = Line.merge(candidates, search_width=diagonal/600)
+        
+        candidates.sort(key=lambda x:x.length, reverse=True)
 
         return candidates
 
@@ -174,7 +176,8 @@ class PipelineBarrierFinder(PipelineStep):
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
-        for line, angle in self.found_lines:
+        for line in self.found_lines:
+
             line.draw(img, color=(255,255,255), thickness=1)            
 
         return img
