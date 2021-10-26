@@ -71,6 +71,10 @@ def log_image(data:dict, name:str, image, extension=".jpg"):
         _log_image(data, name, image, extension)
 
 def _log_image(data:dict, name:str, image, extension=".jpg", quality=95):
+    parts = os.path.splitext(name)
+    if len(parts)==2 and len(parts[1]) > 2:
+        name = parts[0]
+        extension = parts[1]
     path = make_log_path(data, name, extension)
     #print("Save image %s" % path)
     success = cv2.imwrite(path, cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB) if len(image.shape) == 3 else image.astype(np.uint8), [int(cv2.IMWRITE_JPEG_QUALITY), quality])

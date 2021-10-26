@@ -27,7 +27,7 @@ class BarrierFinder():
         self.surface = surface
         self.hed = hed
 
-    def solve(self, max_iterations=3000, max_time=0.5, min_distance=50, max_distance=1000, angle_threshold=np.radians(4), min_vp_mean=0.1, min_hed_mean=0.2):
+    def solve(self, max_iterations=3000, max_time=0.5, min_distance=50, max_distance=1000, angle_threshold=np.radians(3), min_vp_mean=0.1, min_hed_mean=0.15):
         
         if len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
             return []
@@ -178,7 +178,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         for line in self.found_lines:
 
-            line.draw(img, color=(255,0,255), thickness=1)            
+            line.draw(img, color=(255,255,0), thickness=1)            
 
         return img
 
