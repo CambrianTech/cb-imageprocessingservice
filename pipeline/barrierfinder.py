@@ -176,7 +176,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         for i in range(len(self.room.surfaces)):
             surface = self.room.surfaces[i]
-            color = convert_color((hues[i],255,255), cv2.COLOR_HSV2RGB_FULL)
+            color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
 
             Line.draw_all(img, surface.barriers, color=color, thickness=1)            
 

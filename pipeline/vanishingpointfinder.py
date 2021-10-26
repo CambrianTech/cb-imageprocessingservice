@@ -112,7 +112,6 @@ class VanishingPointFinder():
             directions.append(line.direction)
             strengths.append(line.length)
 
-
         locations = np.array(locations)
         strengths = np.array(strengths)
         directions = np.array(directions) / np.linalg.norm(directions, axis=1)[:, np.newaxis]
@@ -126,7 +125,7 @@ class VanishingPointFinder():
 
         return (cosine_theta > theta_thresh) * self.edgelets.strengths
 
-    def solve(self, max_iterations=1000, threshold_inlier=math.radians(3), max_time=0.25, measure_area=False):
+    def solve(self, max_iterations=2000, threshold_inlier=math.radians(2), max_time=0.33, measure_area=False):
 
         self.edgelets = self.compute_edgelets()
 
@@ -144,7 +143,7 @@ class VanishingPointFinder():
         
         pi_2 = np.pi/2       
 
-        max_iterations = min(max_iterations, len(self.lines) * 30)
+        max_iterations = min(max_iterations, len(self.lines) * 40)
         start_time = time.time() 
 
         for ransac_iter in range(max_iterations):
