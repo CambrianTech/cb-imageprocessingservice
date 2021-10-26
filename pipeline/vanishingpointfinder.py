@@ -235,9 +235,8 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         self.surfaces = []
 
-        self.surfaces.extend(data["room"].get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.Wall, SurfaceType.WallLike, SurfaceType.Ceiling]))
+        self.surfaces.extend(data["room"].get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.Wall, SurfaceType.Ceiling]))
         self.surfaces.extend(data["room"].get_surfaces(labels=box_like))
-
 
         #find single vertical vanishing point
         pi_2 = np.pi/2
