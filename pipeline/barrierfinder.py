@@ -4,6 +4,7 @@ import cv2
 from skimage.morphology import remove_small_objects
 import random
 import time
+from scipy.spatial import distance
 
 from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
@@ -16,133 +17,18 @@ from cambrian.LineFunctions import LineFunctions
 from .Line import line_angle_difference, Line, on_image_edge
 from .room import Room, Surface
 
-class SurfaceVertices():
-    def __init__(self, surface, vertices):
-        self.surface = surface
-        self.vertices = vertices
-
-class Vertex():
-    def __init__(self, center, line_a, line_b):
-        self.center = center
-        self.line_a = line_a
-        self.line_b = line_b
-        self.radius = int(min(min(self.line_a.length, self.line_b.length), 30))
-
-    def get_samples(self, image, outside=False):
-
-        x_min, x_max = self.center[0] - self.radius, self.center[0] + self.radius
-        y_min, y_max = self.center[1] - self.radius, self.center[1] + self.radius
-
-        x_offset = 0
-        if x_min < 0: 
-            x_offset = x_min
-            x_min = 0
-        elif x_max >= image.shape[1]: 
-            x_offset = image.shape[1] - x_max + 1
-            x_max = image.shape[1] - 1
-
-        y_offset = 0
-        if y_min < 0: 
-            y_offset = y_min
-            y_min = 0
-        elif y_max >= image.shape[0]: 
-            y_offset = image.shape[0] - y_max + 1
-            y_max = image.shape[0] - 1
-
-        mask = np.zeros((y_max - y_min, x_max - x_min), dtype=np.uint8)
-
-        if outside:
-            start_angle = self.line_b.angle
-            stop_angle = self.line_a.angle + 2 * np.pi
-        else:
-            start_angle = self.line_a.angle
-            stop_angle = self.line_b.angle
-
-        cv2.ellipse(mask, (self.radius + x_offset, self.radius + y_offset), (self.radius, self.radius), 0, np.degrees(start_angle), np.degrees(stop_angle), [255, 255, 255], thickness=cv2.FILLED)
-
-        image_arc = image[y_min:y_max, x_min:x_max][mask > 0]
-
-        segments, counts = np.unique(image_arc, return_counts=True)
-        sorted_labels = sorted(zip(segments.tolist(), counts.tolist()), key=lambda x:-x[1])
-        
-        return sorted_labels
-
 class BarrierFinder():
-
-    def __init__(self, data):
-        super().__init__()
-        self.data = data
-        self.room = data["room"]
-        self.image = self.data["downscaled"]
-
-    def solve(self):
-        
-        #ceilings do not have as many things on them, so iterate across contours, looking for points downward
-        #images may lack floors, ceilings, or both
-
-        distance_check = self.image.shape[0] / 30
-        min_length = self.image.shape[0] / 50
-
-        self.barrier_candidates = []
-
-        def find_vertices(surface, poly, min_angle_threshold, max_angle_threshold):
-            num_pts = len(poly)
-            candidates = []
-
-            for i in range(num_pts):
-                point_a = poly[i][0]
-                point_b = poly[(i+1) % num_pts][0]
-                point_c = poly[(i+2) % num_pts][0]
-
-                # if on_image_edge(point_a, self.image) and on_image_edge(point_c, self.image):
-                #     continue
-
-                line_a = Line(np.array([(point_b[0], point_b[1], point_a[0], point_a[1])], dtype=np.int).reshape(4))
-                line_b = Line(np.array([(point_b[0], point_b[1], point_c[0], point_c[1])], dtype=np.int).reshape(4))
-
-                if line_a.length < min_length or line_b.length < min_length:
-                    continue
-
-                angle = line_angle_difference(line_a.angle, line_b.angle)
-
-                if angle < min_angle_threshold or angle > max_angle_threshold:
-                    continue
-
-                #check for type differential of the labels inside an arc (see debug arc):
-                vertex = Vertex(point_b, line_a, line_b)
-                
-                candidates.append(vertex)
-
-            return candidates
-
-        
-        def build_barriers(surfaceTypes=None, labels=None, min_angle_threshold=np.radians(15), max_angle_threshold=np.radians(170)):
-            for surface in self.room.get_surfaces(surfaceTypes=surfaceTypes, labels=labels):
-                
-                for poly in surface.polygons:
-                    vertices = find_vertices(surface, poly, min_angle_threshold, max_angle_threshold)
-                    self.barrier_candidates.append(SurfaceVertices(surface, vertices))
-                
-        
-        #build_barriers([SurfaceType.Floor])
-        build_barriers([SurfaceType.Wall])
-        build_barriers(labels=box_like)
-
-        return self.barrier_candidates
-
-class RectangleFinder():
-    def __init__(self, data, surface, vertices, hed):
+    def __init__(self, data, surface, hed):
         super().__init__()
         self.data = data
         self.room = data["room"]
         self.image = self.data["downscaled"]
         self.surface = surface
-        self.vertices = vertices
         self.hed = hed
 
-    def solve(self, max_iterations=3000, max_time=1.0, angle_threshold=np.radians(5), min_vp_mean=0.1, min_hed_mean=0.1):
+    def solve(self, max_iterations=3000, max_time=0.5, min_distance=50, angle_threshold=np.radians(5), min_vp_mean=0.1, min_hed_mean=0.1):
         
-        if len(self.vertices) < 2 or len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
+        if len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
             return []
 
         horizontal_vp = self.surface.horizontal_vp[0]
@@ -169,7 +55,14 @@ class RectangleFinder():
             points.append((line_data[0], line_data[1]))
             points.append((line_data[2], line_data[3]))
 
-        start_time = time.time() 
+        if len(points) < 5:
+            return []
+
+        #max_iterations = min(len(points) * 20, max_iterations)
+
+        start_time = time.time()
+
+        min_distance_sq = min_distance * min_distance
 
         for ransac_iter in range(max_iterations):
             if time.time() - start_time > max_time:
@@ -179,6 +72,9 @@ class RectangleFinder():
 
             point_a = items[0]
             point_b = items[1]
+
+            if distance.sqeuclidean(point_a, point_b) < min_distance_sq:
+                continue
 
             line = Line(np.array([(point_a[0], point_a[1], point_b[0], point_b[1])], dtype=np.int).reshape(4))
 
@@ -200,7 +96,7 @@ class RectangleFinder():
 
                 line = Line(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4))
 
-                num_samples = int(max(line.length / 5, 3))
+                num_samples = int(min(max(line.length / 10, 5), 15))
                 samples = LineFunctions.get_line_samples(line.point_a, line.point_b, vp_mask, num_samples)
                 vp_mean = np.mean(samples)
 
@@ -239,15 +135,16 @@ class PipelineBarrierFinder(PipelineStep):
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
 
-        self.candidates = BarrierFinder(self.data).solve()
-
         self.found_lines = []
         hed = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
         hed = cv2.normalize(hed, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
+        self.surfaces = []
+        self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall]))
+        self.surfaces.extend(self.room.get_surfaces(labels=box_like))
 
-        for candidate in self.candidates:
-            rf = RectangleFinder(self.data, candidate.surface, candidate.vertices, hed)
+        for surface in self.surfaces:
+            rf = BarrierFinder(self.data, surface, hed)
             lines = rf.solve()
             self.found_lines.extend(lines)
 
@@ -272,30 +169,8 @@ class PipelineBarrierFinder(PipelineStep):
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
-        #Line.draw_all(img, self.data["lines"], color=(80,80,80), thickness=2)
-
-        # for candidate in self.candidates:
-
-        #     color_a = (0, 0, 255) if candidate.surface.surfaceType.is_major else (0, 0, 180)
-        #     color_b = (255, 255, 0) if candidate.surface.surfaceType.is_major else (180, 180, 0)
-
-        #     for vertex in candidate.vertices:
-        #         cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_a.angle), np.degrees(vertex.line_b.angle), (255, 0, 255), thickness=1) 
-        #         #cv2.ellipse(img, vertex.center, (vertex.radius, vertex.radius), 0, np.degrees(vertex.line_b.angle), np.degrees(vertex.line_a.angle) + 360, [255, 0, 0], thickness=2) 
-
-        #         cv2.line(img, vertex.line_a.point_a, vertex.line_a.point_b, color_a, thickness=2)
-        #         cv2.line(img, vertex.line_b.point_a, vertex.line_b.point_b, color_b, thickness=2)
-        
-        # for candidate in self.candidates:
-        #     color = (255, 0, 0) if candidate.surface.surfaceType.is_major else (255, 255, 255)
-        #     thickness = 2 if candidate.surface.surfaceType.is_major else 1
-        #     for vertex in candidate.vertices:
-        #         cv2.drawMarker(img, vertex.center, color=color, thickness=thickness)
-
-        
         for line, angle in self.found_lines:
-            line.draw(img, color=(255,255,255), thickness=1)
-            
+            line.draw(img, color=(255,255,255), thickness=1)            
 
         return img
 
