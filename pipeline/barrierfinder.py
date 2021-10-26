@@ -114,7 +114,7 @@ class BarrierFinder():
                 candidates.append(line)
 
         diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
-        candidates = Line.merge(candidates, search_width=diagonal/200)
+        candidates = Line.merge(candidates, search_width=diagonal/200, search_length=1.2)
         
         candidates.sort(key=lambda x:x.length, reverse=True)
 
