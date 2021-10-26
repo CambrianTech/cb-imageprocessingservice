@@ -27,7 +27,7 @@ class BarrierFinder():
         self.surface = surface
         self.hed = hed
 
-    def solve(self, max_iterations=3000, max_time=0.5, min_distance=50, max_distance=1000, angle_threshold=np.radians(5), min_vp_mean=0.15, min_hed_mean=0.2):
+    def solve(self, max_iterations=3000, max_time=0.5, min_distance=50, max_distance=1000, angle_threshold=np.radians(4), min_vp_mean=0.1, min_hed_mean=0.2):
         
         if len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
             return []
@@ -38,8 +38,8 @@ class BarrierFinder():
         candidates = []
         vp_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
 
-        draw_vp(vp_mask, horizontal_vp, color=1, thickness=3)
-        draw_vp(vp_mask, vertical_vp, color=1, thickness=3) 
+        draw_vp(vp_mask, horizontal_vp, color=1, thickness=2)
+        draw_vp(vp_mask, vertical_vp, color=1, thickness=2) 
 
         theta_thresh = np.cos(angle_threshold)
 
@@ -113,8 +113,8 @@ class BarrierFinder():
 
                 candidates.append(line)
 
-        #diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
-        #candidates = Line.merge(candidates, search_width=diagonal/600)
+        diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
+        candidates = Line.merge(candidates, search_width=diagonal/200)
         
         candidates.sort(key=lambda x:x.length, reverse=True)
 
@@ -156,7 +156,7 @@ class PipelineBarrierFinder(PipelineStep):
             self.found_lines.extend(lines)
 
         if im_logging_enabled(self.data):
-            log_image(self.data, "barriers", self.get_debug_image())
+            log_image(self.data, "barriers.png", self.get_debug_image())
 
 
     def get_debug_image(self):
@@ -178,7 +178,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         for line in self.found_lines:
 
-            line.draw(img, color=(255,255,255), thickness=1)            
+            line.draw(img, color=(255,0,255), thickness=1)            
 
         return img
 
