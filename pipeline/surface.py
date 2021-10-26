@@ -117,10 +117,15 @@ class Surface():
         if self._lines is None:
             self._lines = []
             self._border_lines = []
+            self._min_area = 1000
+            self._max_area = 1
             for i in range(len(self.data["lines"])):
                 line = self.data["lines"][i]
                 for contour in self.contours:
                     area = cv2.contourArea(contour)
+                    self._min_area = min(area, self._min_area)
+                    self._max_area = max(area, self._max_area)
+
                     padding = math.sqrt(area) / 20
 
                     def is_inside(point):
@@ -146,6 +151,16 @@ class Surface():
     def border_lines(self) -> list:
         self.lines
         return self._border_lines
+
+    @property
+    def min_area(self) -> float:
+        self.lines
+        return self._min_area
+
+    @property
+    def max_area(self) -> list:
+        self.lines
+        return self._max_area
 
     @property
     def angle(self): #from floor

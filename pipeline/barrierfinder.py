@@ -26,7 +26,7 @@ class BarrierFinder():
         self.surface = surface
         self.hed = hed
 
-    def solve(self, max_iterations=3000, max_time=0.5, min_distance=50, angle_threshold=np.radians(5), min_vp_mean=0.1, min_hed_mean=0.1):
+    def solve(self, max_iterations=3000, max_time=0.5, min_distance=50, max_distance=1000, angle_threshold=np.radians(5), min_vp_mean=0.1, min_hed_mean=0.1):
         
         if len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
             return []
@@ -63,6 +63,7 @@ class BarrierFinder():
         start_time = time.time()
 
         min_distance_sq = min_distance * min_distance
+        max_distance_sq = max_distance * max_distance
 
         for ransac_iter in range(max_iterations):
             if time.time() - start_time > max_time:
@@ -73,7 +74,9 @@ class BarrierFinder():
             point_a = items[0]
             point_b = items[1]
 
-            if distance.sqeuclidean(point_a, point_b) < min_distance_sq:
+            length_sq = distance.sqeuclidean(point_a, point_b)
+
+            if length_sq < min_distance_sq or length_sq > max_distance_sq:
                 continue
 
             line = Line(np.array([(point_a[0], point_a[1], point_b[0], point_b[1])], dtype=np.int).reshape(4))
@@ -145,7 +148,9 @@ class PipelineBarrierFinder(PipelineStep):
 
         for surface in self.surfaces:
             rf = BarrierFinder(self.data, surface, hed)
-            lines = rf.solve()
+            min_size = np.sqrt(surface.min_area) / 2
+            max_size = np.sqrt(surface.max_area) * 2
+            lines = rf.solve(min_distance=min_size, max_distance=max_size)
             self.found_lines.extend(lines)
 
         if im_logging_enabled(self.data):
