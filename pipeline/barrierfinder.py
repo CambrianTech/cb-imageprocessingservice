@@ -9,7 +9,7 @@ import math
 
 from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
-from .utils import resize_array, random_color, overlay_mask, normalize
+from .utils import resize_array, random_color, overlay_mask, normalize, convert_color
 from .planegeometry import Dimension
 from .extractsurfaces import box_like
 from .vanishingpointfinder import draw_vp, angle_with_vp
@@ -140,7 +140,6 @@ class PipelineBarrierFinder(PipelineStep):
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
 
-        self.found_lines = []
         hed = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
         hed = cv2.normalize(hed, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
@@ -152,8 +151,7 @@ class PipelineBarrierFinder(PipelineStep):
             rf = BarrierFinder(self.data, surface, hed)
             min_size = np.sqrt(surface.min_area) / 2
             max_size = np.sqrt(surface.max_area) * 2
-            lines = rf.solve(min_distance=min_size, max_distance=max_size)
-            self.found_lines.extend(lines)
+            surface.barriers = rf.solve(min_distance=min_size, max_distance=max_size)
 
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers.png", self.get_debug_image())
@@ -176,9 +174,11 @@ class PipelineBarrierFinder(PipelineStep):
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
-        for line in self.found_lines:
+        for i in range(len(self.room.surfaces)):
+            surface = self.room.surfaces[i]
+            color = convert_color((hues[i],255,255), cv2.COLOR_HSV2RGB_FULL)
 
-            line.draw(img, color=(255,255,0), thickness=1)            
+            Line.draw_all(img, surface.barriers, color=color, thickness=1)            
 
         return img
 

@@ -34,6 +34,7 @@ class Surface():
         self._border_lines = None
 
         self._semantic_labels = None
+        self.barriers = []
 
         self._normal = None
         self._offset = None
