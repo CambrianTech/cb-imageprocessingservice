@@ -58,7 +58,7 @@ class Line(Sequence):
     def direction(self):
         return np.array((int(self.data[2]-self.data[0]), int(self.data[3] - self.data[1])))
 
-    def draw(self, img, color=(255,50,255,255), thickness=2, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
+    def draw(self, img, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
         cv2.line(img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
 
     def reshape(self, *args):
