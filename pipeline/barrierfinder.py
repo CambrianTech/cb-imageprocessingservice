@@ -17,6 +17,30 @@ from cambrian.LineFunctions import LineFunctions
 from .Line import line_angle_difference, Line, on_image_edge
 from .room import Room, Surface
 
+class Barrier():
+    def __init__(self, line, is_vertical, search_width=5, length_multiplier=1.5):
+        self.line = line
+        self.is_vertical = is_vertical
+        self.source_lines = [line]
+        self.indices = [line.id]
+        self.search_width = search_width
+        self.length_multiplier = length_multiplier
+
+    def intersects(self, line):
+        rect_a = self.line.bounding_box(self.search_width, length_multiplier=self.length_multiplier)
+        rect_b = line.bounding_box(self.search_width, length_multiplier=self.length_multiplier)
+        result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+
+        return result != 0
+
+    def merge(self, line):
+        line_data = LineFunctions.merge_lines((self.line.point_a, self.line.point_b), (line.point_a, line.point_b))
+        self.line = Line(np.array([(line_data[0][0], line_data[0][1], line_data[1][0], line_data[1][1])], dtype=np.int).reshape(4))
+        self.source_lines.append(line)
+
+    def extend_to(self, line):
+        print("Extend to point")
+
 class BarrierFinder():
     def __init__(self, data, surface, hed):
         super().__init__()
@@ -48,6 +72,7 @@ class BarrierFinder():
         for poly in self.surface.polygons:
             num_pts = len(poly)
             last_line = None
+
             for i in range(num_pts):
                 point_a = poly[i][0]
                 point_b = poly[(i+1) % num_pts][0]
@@ -79,14 +104,23 @@ class BarrierFinder():
                     direction = normalize(est_directions[0]) * 0.5 * line.length
                     line = Line(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4))
 
+                    match = next(filter(lambda x: x.intersects(line), barriers), None)
 
-                    barriers.append(line)
+                    if match is not None:
+                        if LineFunctions.line_angle_difference(line.angle, match.line.angle) < alter_angle_threshold:
+                            match.merge(line)
+                            continue
+                        else:
+                            match.extend_to(line)
+                    
+                    barriers.append(Barrier(line, is_vertical))
 
+                    last_line = line
 
-                if last_line is not None:
+                elif last_line is not None:
                     angle = line_angle_difference(line.angle, last_line.angle)
 
-                last_line = line
+                
 
                 
         return barriers
@@ -150,8 +184,8 @@ class PipelineBarrierFinder(PipelineStep):
             max_size = np.sqrt(surface.max_area) * 2
             surface.barriers = bf.solve(min_length=min_size, max_length=max_size)
 
-        lf = LegFinder(self.data)
-        lf.solve()
+        # lf = LegFinder(self.data)
+        # lf.solve()
 
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers.png", self.get_debug_image())
@@ -163,8 +197,8 @@ class PipelineBarrierFinder(PipelineStep):
         hues = random.sample(range(0, 360), len(self.room.surfaces))
 
         #overlay probs
-        for i in range(len(self.surfaces)):
-            surface = self.surfaces[i]
+        for i in range(len(self.room.surfaces)):
+            surface = self.room.surfaces[i]
             mask = surface.mask > 0
 
             max_value = 0.9
@@ -174,8 +208,8 @@ class PipelineBarrierFinder(PipelineStep):
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
-        for i in range(len(self.surfaces)):
-            surface = self.surfaces[i]
+        for i in range(len(self.room.surfaces)):
+            surface = self.room.surfaces[i]
             color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
 
             for poly in surface.contours:
@@ -188,8 +222,8 @@ class PipelineBarrierFinder(PipelineStep):
 
                     line.draw(img, color=color)
 
-            for line in surface.barriers:
-                line.draw(img, color=color, thickness=2)
+            for barrier in surface.barriers:
+                barrier.line.draw(img, color=color, thickness=2)
 
         return img
 
