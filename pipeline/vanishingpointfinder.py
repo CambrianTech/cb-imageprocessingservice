@@ -8,7 +8,7 @@ from enum import IntEnum
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .utils import resize_array, random_color, overlay_mask, partition
 from .planegeometry import Dimension
-from .extractsurfaces import box_like
+from .extractsurfaces import box_like, legged_objects
 from .logging import log_image, log_segmentation_image, im_logging_enabled
 from .Line import Line, line_angle_difference, on_image_edge
 from .room import Room, Surface
@@ -230,6 +230,7 @@ class PipelineVanishingPointFinder(PipelineStep):
 
     def run(self, data):
 
+        self.room = data["room"]
         self.image = data["downscaled"]
         self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
@@ -266,15 +267,13 @@ class PipelineVanishingPointFinder(PipelineStep):
         if len(vertical_lines) > 1:
             vertical_lines = Line.merge(vertical_lines, search_width=self.diagonal/200, angle_threshold=math.radians(5))
             vpf = VanishingPointFinder(vertical_lines)
-            self.vertical_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
-            if len(self.vertical_vp) == 0:
-                self.vertical_vp = vpf.solve(threshold_inlier=np.radians(20))
-
+            self.room.vertical_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
+            if len(self.room.vertical_vp) == 0:
+                self.room.vertical_vp = vpf.solve(threshold_inlier=np.radians(20))
 
         for surface in self.surfaces:
             if surface.vertical_vp is None:
-                surface.vertical_vp = self.vertical_vp
-
+                surface.vertical_vp = self.room.vertical_vp
 
         if im_logging_enabled(data):
             log_image(data, "vanishing_points", self.get_debug_image(data))
@@ -286,8 +285,8 @@ class PipelineVanishingPointFinder(PipelineStep):
         #draw all lines
         Line.draw_all(img, self.all_lines, color=(80,80,80))
 
-        if self.vertical_vp is not None and len(self.vertical_vp) > 0:
-            draw_vp(img, self.vertical_vp[0], color=(0,255,0))
+        if self.room.vertical_vp is not None and len(self.room.vertical_vp) > 0:
+            draw_vp(img, self.room.vertical_vp[0], color=(0,255,0))
 
         for surface in self.surfaces:
             if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:

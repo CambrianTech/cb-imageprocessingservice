@@ -1,7 +1,6 @@
 import numpy as np
 from scipy import ndimage
 import cv2
-from skimage.morphology import remove_small_objects
 import random
 import time
 from scipy.spatial import distance
@@ -11,7 +10,7 @@ from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .utils import resize_array, random_color, overlay_mask, normalize, convert_color
 from .planegeometry import Dimension
-from .extractsurfaces import box_like
+from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import draw_vp, angle_with_vp
 from .logging import log_image, log_segmentation_image, im_logging_enabled
 from cambrian.LineFunctions import LineFunctions
@@ -120,6 +119,30 @@ class BarrierFinder():
 
         return candidates
 
+class LegFinder():
+    def __init__(self, data):
+        super().__init__()
+        self.data = data
+        self.room = data["room"]
+        self.image = self.data["downscaled"]
+        
+
+    def solve(self, max_iterations=3000):
+
+        self.surfaces = self.room.get_surfaces(surfaceTypes=[SurfaceType.Other, SurfaceType.Floor])
+        
+        for surface in self.surfaces:
+            surface.barriers = surface.border_lines
+            
+            
+        # start_time = time.time()
+        # for ransac_iter in range(max_iterations):
+        #     if time.time() - start_time > max_time:
+        #         break
+
+            
+
+
         
 class PipelineBarrierFinder(PipelineStep):
     @property
@@ -153,6 +176,9 @@ class PipelineBarrierFinder(PipelineStep):
             max_size = np.sqrt(surface.max_area) * 2
             surface.barriers = rf.solve(min_distance=min_size, max_distance=max_size)
 
+        lf = LegFinder(self.data)
+        lf.solve()
+
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers.png", self.get_debug_image())
 
@@ -178,7 +204,7 @@ class PipelineBarrierFinder(PipelineStep):
             surface = self.room.surfaces[i]
             color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
 
-            Line.draw_all(img, surface.barriers, color=color, thickness=1)            
+            Line.draw_all(img, surface.barriers, color=color, thickness=1)       
 
         return img
 
