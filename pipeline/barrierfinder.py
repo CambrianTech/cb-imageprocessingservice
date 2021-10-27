@@ -18,15 +18,17 @@ from .Line import line_angle_difference, Line, on_image_edge
 from .room import Room, Surface
 
 class Barrier():
-    def __init__(self, line, is_vertical, search_width=5, length_multiplier=1.5):
+    def __init__(self, line, search_width=10, length_multiplier=3.0):
         self.line = line
-        self.is_vertical = is_vertical
         self.source_lines = [line]
         self.indices = [line.id]
         self.search_width = search_width
         self.length_multiplier = length_multiplier
 
     def intersects(self, line):
+        if line.group != self.line.group:
+            return False
+
         rect_a = self.line.bounding_box(self.search_width, length_multiplier=self.length_multiplier)
         rect_b = line.bounding_box(self.search_width, length_multiplier=self.length_multiplier)
         result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
@@ -69,9 +71,11 @@ class BarrierFinder():
         max_length_sq = max_length * max_length
 
         barriers = []
+        group = -1
         for poly in self.surface.polygons:
             num_pts = len(poly)
             last_line = None
+            group += 1
 
             for i in range(num_pts):
                 point_a = poly[i][0]
@@ -102,7 +106,7 @@ class BarrierFinder():
                     est_directions = locations - vp.direction
 
                     direction = normalize(est_directions[0]) * 0.5 * line.length
-                    line = Line(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4))
+                    line = Line(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4), group=group)
 
                     match = next(filter(lambda x: x.intersects(line), barriers), None)
 
@@ -112,8 +116,9 @@ class BarrierFinder():
                             continue
                         else:
                             match.extend_to(line)
+                            group += 1
                     
-                    barriers.append(Barrier(line, is_vertical))
+                    barriers.append(Barrier(line))
 
                     last_line = line
 
@@ -224,6 +229,10 @@ class PipelineBarrierFinder(PipelineStep):
 
             for barrier in surface.barriers:
                 barrier.line.draw(img, color=color, thickness=2)
+
+            for barrier in surface.barriers:
+                cv2.drawMarker(img, barrier.line.point_a, color=color)
+                cv2.drawMarker(img, barrier.line.point_b, color=color)
 
         return img
 
