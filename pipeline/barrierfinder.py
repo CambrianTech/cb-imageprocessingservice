@@ -18,7 +18,7 @@ from .Line import line_angle_difference, Line, on_image_edge
 from .room import Room, Surface
 
 class Barrier():
-    def __init__(self, line, search_width=10, length_multiplier=3.0):
+    def __init__(self, line, search_width=6, length_multiplier=3.0):
         self.line = line
         self.source_lines = [line]
         self.indices = [line.id]
