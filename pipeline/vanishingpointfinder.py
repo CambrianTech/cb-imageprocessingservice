@@ -236,8 +236,9 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         self.surfaces = []
 
-        self.surfaces.extend(data["room"].get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.Wall, SurfaceType.Ceiling]))
+        self.surfaces.extend(data["room"].get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.Wall]))
         self.surfaces.extend(data["room"].get_surfaces(labels=box_like))
+        #self.surfaces.extend(data["room"].get_surfaces(labels=legged_objects))
 
         #find single vertical vanishing point
         pi_2 = np.pi/2
@@ -249,12 +250,8 @@ class PipelineVanishingPointFinder(PipelineStep):
             lines = surface.lines.copy()
             lines.extend(self.get_contour_lines(surface))
             self.all_lines.extend(lines)
-
-            if surface.surfaceType == SurfaceType.Floor or surface.surfaceType == SurfaceType.Ceiling:
-                #used for legs and objects setting upon:
-                vpf = VanishingPointFinder(lines)
-                surface.vp = vpf.solve()
-            else:                
+   
+            if surface.surfaceType == SurfaceType.Wall or surface.bestLabel in box_like:                
                 vertical, horizontal = partition(lambda x: line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
                 horizontal = Line.merge(horizontal, search_width=self.diagonal/200, search_length=1.1)
 
@@ -262,6 +259,9 @@ class PipelineVanishingPointFinder(PipelineStep):
                 surface.horizontal_vp = vpf.solve(measure_area=True)
 
                 vertical_lines.extend(vertical)
+            else:
+                vpf = VanishingPointFinder(lines)
+                surface.vp = vpf.solve(threshold_inlier=math.radians(5), max_iterations=500, max_time=0.2)
 
         #find vertical vanishing point for entire room
         if len(vertical_lines) > 1:
@@ -269,7 +269,7 @@ class PipelineVanishingPointFinder(PipelineStep):
             vpf = VanishingPointFinder(vertical_lines)
             self.room.vertical_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
             if len(self.room.vertical_vp) == 0:
-                self.room.vertical_vp = vpf.solve(threshold_inlier=np.radians(20))
+                self.room.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
 
         for surface in self.surfaces:
             if surface.vertical_vp is None:

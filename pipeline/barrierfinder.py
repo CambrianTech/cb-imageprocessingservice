@@ -188,12 +188,12 @@ class PipelineBarrierFinder(PipelineStep):
         hed = cv2.normalize(hed, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
         self.surfaces = []
-        self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall]))
+        self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike]))
         self.surfaces.extend(self.room.get_surfaces(labels=box_like))
 
         for surface in self.surfaces:
             bf = BarrierFinder(self.data, surface, hed)
-            min_size = np.sqrt(surface.min_area) / 2
+            min_size = np.sqrt(surface.min_area) / 3
             max_size = np.sqrt(surface.max_area) * 2
             surface.barriers = bf.solve(min_length=min_size, max_length=max_size)
 
