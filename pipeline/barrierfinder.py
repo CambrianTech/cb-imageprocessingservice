@@ -54,7 +54,7 @@ class BarrierFinder():
 
     def solve(self, angle_threshold=np.radians(7), alter_angle_threshold=np.radians(7), min_length=50, max_length=1000):
         
-        if len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
+        if self.surface.horizontal_vp is None or len(self.surface.horizontal_vp) == 0 or self.surface.vertical_vp is None or len(self.surface.vertical_vp) == 0:
             return []
 
         horizontal_vp = self.surface.horizontal_vp[0]
