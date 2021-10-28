@@ -52,7 +52,7 @@ class BarrierFinder():
         self.surface = surface
         self.hed = hed
 
-    def solve(self, angle_threshold=np.radians(5), alter_angle_threshold=np.radians(7), min_length=50, max_length=1000):
+    def solve(self, angle_threshold=np.radians(7), alter_angle_threshold=np.radians(7), min_length=50, max_length=1000):
         
         if len(self.surface.horizontal_vp) == 0 or len(self.surface.vertical_vp) == 0:
             return []
@@ -76,6 +76,8 @@ class BarrierFinder():
             num_pts = len(poly)
             last_line = None
             group += 1
+
+            was_vertical=None
 
             for i in range(num_pts):
                 point_a = poly[i][0]
@@ -108,17 +110,23 @@ class BarrierFinder():
                     direction = normalize(est_directions[0]) * 0.5 * line.length
                     line = Line(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4), group=group)
 
+                    if was_vertical != None and was_vertical != is_vertical:
+                        #made a legit turn, do not allow grouping with past barriers (could check angle?)
+                        #delete ones we've skipped over here
+                        group += 1
+
+                    was_vertical = is_vertical
+
                     match = next(filter(lambda x: x.intersects(line), barriers), None)
 
                     if match is not None:
                         if LineFunctions.line_angle_difference(line.angle, match.line.angle) < alter_angle_threshold:
                             match.merge(line)
                             continue
-                        else:
-                            match.extend_to(line)
-                            group += 1
                     
                     barriers.append(Barrier(line))
+
+                    
 
                     last_line = line
 
