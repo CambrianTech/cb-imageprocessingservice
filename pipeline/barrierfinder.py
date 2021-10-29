@@ -52,7 +52,70 @@ class BarrierFinder():
         self.surface = surface
         self.hed = hed
 
-    def solve(self, angle_threshold=np.radians(7), alter_angle_threshold=np.radians(7), min_length=50, max_length=1000):
+    def border_search(self, poly, group, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold):
+
+        min_length_sq = min_length * min_length
+        max_length_sq = max_length * max_length
+        theta_thresh = np.cos(angle_threshold)
+
+        was_vertical = None
+
+        num_pts = len(poly)
+        last_line = None
+        group += 1
+
+        barriers = []
+
+        for i in range(num_pts):
+            point_a = poly[i][0]
+            point_b = poly[(i+1) % num_pts][0]
+
+            length_sq = distance.sqeuclidean(point_a, point_b)
+
+            if length_sq < min_length_sq or length_sq > max_length_sq:
+                continue
+
+            if on_image_edge(point_a, self.image) and on_image_edge(point_b, self.image):
+                continue
+            
+            line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
+
+            directions = np.array([line.direction]) 
+            directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
+            locations = np.array([line.midpoint])
+
+            vert_theta = angle_with_vp(vertical_vp.model, locations, directions)
+            horiz_theta = angle_with_vp(horizontal_vp.model, locations, directions)
+
+            is_vertical = vert_theta > theta_thresh
+            is_horizontal = horiz_theta > theta_thresh
+
+            if is_vertical or is_horizontal:
+                vp = horizontal_vp if is_horizontal else vertical_vp
+                est_directions = locations - vp.direction
+
+                direction = normalize(est_directions[0]) * 0.5 * line.length
+                line = Line(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4), group=group)
+
+                if was_vertical != None and was_vertical != is_vertical:
+                    #made a legit turn, do not allow grouping with past barriers (could check angle?)
+                    #delete ones we've skipped over here
+                    group += 1
+
+                was_vertical = is_vertical
+
+                match = next(filter(lambda x: x.intersects(line), barriers), None)
+
+                if match is not None:
+                    if LineFunctions.line_angle_difference(line.angle, match.line.angle) < angle_threshold:
+                        match.merge(line)
+                        continue
+                
+                barriers.append(Barrier(line))
+
+        return barriers
+
+    def solve(self, angle_threshold=np.radians(7), min_length=50, max_length=1000):
         
         if self.surface.horizontal_vp is None or len(self.surface.horizontal_vp) == 0 or self.surface.vertical_vp is None or len(self.surface.vertical_vp) == 0:
             return []
@@ -60,68 +123,11 @@ class BarrierFinder():
         horizontal_vp = self.surface.horizontal_vp[0]
         vertical_vp = self.surface.vertical_vp[0]
 
-        theta_thresh = np.cos(angle_threshold)
-
-        min_length_sq = min_length * min_length
-        max_length_sq = max_length * max_length
-
         barriers = []
         group = -1
 
         for poly in self.surface.polygons:
-            num_pts = len(poly)
-            last_line = None
-            group += 1
-
-            was_vertical = None
-
-            for i in range(num_pts):
-                point_a = poly[i][0]
-                point_b = poly[(i+1) % num_pts][0]
-
-                length_sq = distance.sqeuclidean(point_a, point_b)
-
-                if length_sq < min_length_sq or length_sq > max_length_sq:
-                    continue
-
-                if on_image_edge(point_a, self.image) and on_image_edge(point_b, self.image):
-                    continue
-                
-                line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
-
-                directions = np.array([line.direction]) 
-                directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
-                locations = np.array([line.midpoint])
-
-                vert_theta = angle_with_vp(vertical_vp.model, locations, directions)
-                horiz_theta = angle_with_vp(horizontal_vp.model, locations, directions)
-
-                is_vertical = vert_theta > theta_thresh
-                is_horizontal = horiz_theta > theta_thresh
-
-                if is_vertical or is_horizontal:
-                    vp = horizontal_vp if is_horizontal else vertical_vp
-                    est_directions = locations - vp.direction
-
-                    direction = normalize(est_directions[0]) * 0.5 * line.length
-                    line = Line(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4), group=group)
-
-                    if was_vertical != None and was_vertical != is_vertical:
-                        #made a legit turn, do not allow grouping with past barriers (could check angle?)
-                        #delete ones we've skipped over here
-                        group += 1
-
-                    was_vertical = is_vertical
-
-                    match = next(filter(lambda x: x.intersects(line), barriers), None)
-
-                    if match is not None:
-                        if LineFunctions.line_angle_difference(line.angle, match.line.angle) < alter_angle_threshold:
-                            match.merge(line)
-                            continue
-                    
-                    barriers.append(Barrier(line))
-
+            barriers.extend(self.border_search(poly, group, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold))
                 
         return barriers
         
