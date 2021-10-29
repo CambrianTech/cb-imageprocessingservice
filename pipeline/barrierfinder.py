@@ -60,24 +60,20 @@ class BarrierFinder():
         horizontal_vp = self.surface.horizontal_vp[0]
         vertical_vp = self.surface.vertical_vp[0]
 
-        candidates = []
-        vp_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
-
         theta_thresh = np.cos(angle_threshold)
-
-        test_length = 5
 
         min_length_sq = min_length * min_length
         max_length_sq = max_length * max_length
 
         barriers = []
         group = -1
+
         for poly in self.surface.polygons:
             num_pts = len(poly)
             last_line = None
             group += 1
 
-            was_vertical=None
+            was_vertical = None
 
             for i in range(num_pts):
                 point_a = poly[i][0]
@@ -125,15 +121,6 @@ class BarrierFinder():
                             continue
                     
                     barriers.append(Barrier(line))
-
-                    
-
-                    last_line = line
-
-                elif last_line is not None:
-                    angle = line_angle_difference(line.angle, last_line.angle)
-
-                
 
                 
         return barriers
