@@ -52,7 +52,7 @@ class BarrierFinder():
         self.surface = surface
         self.hed = hed
 
-    def border_search(self, poly, group, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold):
+    def border_search(self, poly, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold):
 
         min_length_sq = min_length * min_length
         max_length_sq = max_length * max_length
@@ -61,8 +61,7 @@ class BarrierFinder():
         was_vertical = None
 
         num_pts = len(poly)
-        last_line = None
-        group += 1
+        group = 0
 
         barriers = []
 
@@ -123,13 +122,13 @@ class BarrierFinder():
         horizontal_vp = self.surface.horizontal_vp[0]
         vertical_vp = self.surface.vertical_vp[0]
 
-        barriers = []
-        group = -1
+        surface_barriers = []
 
         for poly in self.surface.polygons:
-            barriers.extend(self.border_search(poly, group, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold))
+            barriers = self.border_search(poly, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
+            surface_barriers.extend(barriers)
                 
-        return barriers
+        return surface_barriers
         
 
 class LegFinder():
