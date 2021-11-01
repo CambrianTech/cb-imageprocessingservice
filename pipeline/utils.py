@@ -153,6 +153,7 @@ def convert_color(color, conversion):
 def put_text(img, text, origin, color, shadow_offset=(1,1), font=cv2.FONT_HERSHEY_SIMPLEX, size=1, thickness=1, line_type=cv2.LINE_AA, shadow=False, highlights=False):
 
     dimensions = cv2.getTextSize(text, font, size, thickness)[0]
+    origin = (int(origin[0]), int(origin[1]))
 
     loc = min(max(origin[0], 10), img.shape[1] - dimensions[0] - 10), min(max(origin[1], 10 + dimensions[1] // 2), img.shape[0] - dimensions[1] // 2 - 10)
 

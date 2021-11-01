@@ -8,7 +8,7 @@ import math
 
 from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
-from .utils import resize_array, random_color, overlay_mask, normalize, convert_color
+from .utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import draw_vp, angle_with_vp
@@ -17,9 +17,16 @@ from cambrian.LineFunctions import LineFunctions
 from .Line import line_angle_difference, Line, on_image_edge
 from .room import Room, Surface
 
+class BarrierLine(Line):
+    def __init__(self, data, group, start_index, stop_index):
+        super().__init__(data, group=group)
+        self.start_index = start_index
+        self.stop_index = stop_index
+
 class Barrier():
-    def __init__(self, line, search_width=6, length_multiplier=3.0):
+    def __init__(self, line, poly_length, search_width=6, length_multiplier=3.0):
         self.line = line
+        self.poly_length = poly_length
         self.source_lines = [line]
         self.indices = [line.id]
         self.search_width = search_width
@@ -35,13 +42,24 @@ class Barrier():
 
         return result != 0
 
-    def merge(self, line):
+    @property
+    def start_index(self):
+        return self.line.start_index % self.poly_length
+
+    @property
+    def stop_index(self):
+        return self.line.stop_index % self.poly_length
+
+    def merge(self, line:BarrierLine):
         line_data = LineFunctions.merge_lines((self.line.point_a, self.line.point_b), (line.point_a, line.point_b))
-        self.line = Line(np.array([(line_data[0][0], line_data[0][1], line_data[1][0], line_data[1][1])], dtype=np.int).reshape(4))
+        start_index = min(self.line.start_index, line.start_index)
+        stop_index = max(self.line.stop_index, line.stop_index)
+        self.line = BarrierLine(np.array([(line_data[0][0], line_data[0][1], line_data[1][0], line_data[1][1])], dtype=np.int).reshape(4), group=line.group, start_index=start_index, stop_index=stop_index)
         self.source_lines.append(line)
 
     def extend_to(self, line):
         print("Extend to point")
+
 
 class BarrierFinder():
     def __init__(self, data, surface, hed):
@@ -52,7 +70,7 @@ class BarrierFinder():
         self.surface = surface
         self.hed = hed
 
-    def border_search(self, poly, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold):
+    def border_search(self, poly, clockwise, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold):
 
         min_length_sq = min_length * min_length
         max_length_sq = max_length * max_length
@@ -65,9 +83,15 @@ class BarrierFinder():
 
         barriers = []
 
+        #0, 1, 2 -> 3
+
         for i in range(num_pts):
-            point_a = poly[i][0]
-            point_b = poly[(i+1) % num_pts][0]
+
+            index_a = i if clockwise else (num_pts - i - 1)
+            index_b = (i+1 if clockwise else (num_pts - i - 2)) % num_pts
+
+            point_a = poly[index_a][0]
+            point_b = poly[index_b][0]
 
             length_sq = distance.sqeuclidean(point_a, point_b)
 
@@ -94,7 +118,8 @@ class BarrierFinder():
                 est_directions = locations - vp.direction
 
                 direction = normalize(est_directions[0]) * 0.5 * line.length
-                line = Line(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4), group=group)
+                line = BarrierLine(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4), \
+                    group=group, start_index=i, stop_index=i+1) #i+1 may extend into start by modulous division, but must be kept track of
 
                 if was_vertical != None and was_vertical != is_vertical:
                     #made a legit turn, do not allow grouping with past barriers (could check angle?)
@@ -110,9 +135,25 @@ class BarrierFinder():
                         match.merge(line)
                         continue
                 
-                barriers.append(Barrier(line))
+                barriers.append(Barrier(line, poly_length=num_pts))
 
         return barriers
+
+    def reintegrate_barriers(self, poly, barriers):
+
+        num_pts = len(poly)
+        for i in range(num_pts):
+            j = (i+1) % num_pts
+
+            start_index = i
+            stop_index = j
+
+            #point_a = poly[i][0]
+            #point_b = poly[(i+1) % num_pts][0]
+
+
+            
+
 
     def solve(self, angle_threshold=np.radians(7), min_length=50, max_length=1000):
         
@@ -125,7 +166,9 @@ class BarrierFinder():
         surface_barriers = []
 
         for poly in self.surface.polygons:
-            barriers = self.border_search(poly, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
+            barriers = self.border_search(poly, False, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
+            self.reintegrate_barriers(poly, barriers)
+
             surface_barriers.extend(barriers)
                 
         return surface_barriers
@@ -233,6 +276,8 @@ class PipelineBarrierFinder(PipelineStep):
             for barrier in surface.barriers:
                 cv2.drawMarker(img, barrier.line.point_a, color=color)
                 cv2.drawMarker(img, barrier.line.point_b, color=color)
+
+                #put_text(img, "%d-%d" % (barrier.start_index, barrier.stop_index), barrier.line.midpoint, color, size=0.3)
 
         return img
 
