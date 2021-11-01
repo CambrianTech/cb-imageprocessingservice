@@ -24,20 +24,18 @@ class BarrierLine(Line):
         self.stop_index = stop_index
 
 class Barrier():
-    def __init__(self, line, poly_length, search_width=6, length_multiplier=3.0):
+    def __init__(self, line, poly_length):
         self.line = line
         self.poly_length = poly_length
         self.source_lines = [line]
         self.indices = [line.id]
-        self.search_width = search_width
-        self.length_multiplier = length_multiplier
 
-    def intersects(self, line):
+    def intersects(self, line, search_width=13, length_multiplier=3.0):
         if line.group != self.line.group:
             return False
 
-        rect_a = self.line.bounding_box(self.search_width, length_multiplier=self.length_multiplier)
-        rect_b = line.bounding_box(self.search_width, length_multiplier=self.length_multiplier)
+        rect_a = self.line.bounding_box(search_width, length_multiplier=length_multiplier)
+        rect_b = line.bounding_box(search_width, length_multiplier=length_multiplier)
         result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
 
         return result != 0
@@ -83,7 +81,9 @@ class BarrierFinder():
 
         barriers = []
 
-        #0, 1, 2 -> 3
+        diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
+
+        search_width = int(diagonal / 50)
 
         for i in range(num_pts):
 
@@ -128,7 +128,7 @@ class BarrierFinder():
 
                 was_vertical = is_vertical
 
-                match = next(filter(lambda x: x.intersects(line), barriers), None)
+                match = next(filter(lambda x: x.intersects(line, search_width=search_width), barriers), None)
 
                 if match is not None:
                     if LineFunctions.line_angle_difference(line.angle, match.line.angle) < angle_threshold:
@@ -166,10 +166,16 @@ class BarrierFinder():
         surface_barriers = []
 
         for poly in self.surface.polygons:
-            barriers = self.border_search(poly, False, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
-            self.reintegrate_barriers(poly, barriers)
+            barriers_a = self.border_search(poly, True, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
+            barriers_b = self.border_search(poly, False, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
 
+            barriers = []
+            barriers.extend(barriers_a)
+            barriers.extend(barriers_b)
+            
             surface_barriers.extend(barriers)
+
+            self.reintegrate_barriers(poly, barriers)
                 
         return surface_barriers
         
