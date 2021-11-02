@@ -190,9 +190,9 @@ class BarrierFinder():
             barriers, occupied = self.reintegrate_barriers(poly, barriers)
             surface_barriers.extend(barriers)
 
-            # barriers = self.border_search(poly, False, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
-            # barriers, occupied = self.reintegrate_barriers(poly, barriers, occupied)
-            # surface_barriers.extend(barriers)
+            barriers = self.border_search(poly, False, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
+            barriers, occupied = self.reintegrate_barriers(poly, barriers, occupied)
+            surface_barriers.extend(barriers)
             
                 
         return surface_barriers
