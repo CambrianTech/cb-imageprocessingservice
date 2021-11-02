@@ -48,6 +48,10 @@ class Barrier():
     def stop_index(self):
         return self.line.stop_index % self.poly_length
 
+    @property
+    def length(self):
+        return self.line.stop_index - self.line.start_index
+
     def merge(self, line:BarrierLine):
         line_data = LineFunctions.merge_lines((self.line.point_a, self.line.point_b), (line.point_a, line.point_b))
         start_index = min(self.line.start_index, line.start_index)
@@ -139,15 +143,34 @@ class BarrierFinder():
 
         return barriers
 
-    def reintegrate_barriers(self, poly, barriers):
+    def reintegrate_barriers(self, poly, barriers, occupied=None):
 
-        num_pts = len(poly)
-        for i in range(num_pts):
-            j = (i+1) % num_pts
+        if occupied is None:
+            occupied = np.full(len(poly), False)
 
-            start_index = i
-            stop_index = j
+        filtered = []
 
+        for barrier in sorted(barriers, key=lambda x:x.length, reverse=True):
+
+            if barrier.start_index < barrier.stop_index:
+                count = np.count_nonzero(occupied[barrier.start_index:barrier.stop_index])
+            else:
+                count = np.count_nonzero(occupied[barrier.start_index:]) + np.count_nonzero(occupied[0:barrier.stop_index])
+
+            if count > 0:
+                #print({"count":count, "start":barrier.start_index, "stop":barrier.stop_index}, {"barrier len": barrier.length, "poly len": len(poly)})
+                continue
+
+            if barrier.start_index < barrier.stop_index:
+                occupied[barrier.start_index:barrier.stop_index] = True
+            else:
+                occupied[barrier.start_index:] = True
+                occupied[0:barrier.stop_index] = True            
+
+            filtered.append(barrier)
+
+
+        return filtered, occupied
             #point_a = poly[i][0]
             #point_b = poly[(i+1) % num_pts][0]
 
@@ -166,16 +189,14 @@ class BarrierFinder():
         surface_barriers = []
 
         for poly in self.surface.polygons:
-            barriers_a = self.border_search(poly, True, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
-            barriers_b = self.border_search(poly, False, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
-
-            barriers = []
-            barriers.extend(barriers_a)
-            barriers.extend(barriers_b)
-            
+            barriers = self.border_search(poly, True, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
+            barriers, occupied = self.reintegrate_barriers(poly, barriers)
             surface_barriers.extend(barriers)
 
-            self.reintegrate_barriers(poly, barriers)
+            barriers = self.border_search(poly, False, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
+            barriers, occupied = self.reintegrate_barriers(poly, barriers, occupied)
+            surface_barriers.extend(barriers)
+            
                 
         return surface_barriers
         
@@ -266,15 +287,15 @@ class PipelineBarrierFinder(PipelineStep):
             surface = self.room.surfaces[i]
             color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
 
-            for poly in surface.contours:
-                num_pts = len(poly)
-                for i in range(num_pts):
-                    point_a = poly[i][0]
-                    point_b = poly[(i+1) % num_pts][0]
+            # for poly in surface.contours:
+            #     num_pts = len(poly)
+            #     for i in range(num_pts):
+            #         point_a = poly[i][0]
+            #         point_b = poly[(i+1) % num_pts][0]
 
-                    line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
+            #         line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
 
-                    line.draw(img, color=color)
+            #         line.draw(img, color=color)
 
             for barrier in surface.barriers:
                 barrier.line.draw(img, color=color, thickness=2)
