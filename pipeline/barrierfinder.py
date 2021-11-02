@@ -175,9 +175,6 @@ class BarrierFinder():
             #point_b = poly[(i+1) % num_pts][0]
 
 
-            
-
-
     def solve(self, angle_threshold=np.radians(7), min_length=50, max_length=1000):
         
         if self.surface.horizontal_vp is None or len(self.surface.horizontal_vp) == 0 or self.surface.vertical_vp is None or len(self.surface.vertical_vp) == 0:
@@ -193,9 +190,9 @@ class BarrierFinder():
             barriers, occupied = self.reintegrate_barriers(poly, barriers)
             surface_barriers.extend(barriers)
 
-            barriers = self.border_search(poly, False, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
-            barriers, occupied = self.reintegrate_barriers(poly, barriers, occupied)
-            surface_barriers.extend(barriers)
+            # barriers = self.border_search(poly, False, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
+            # barriers, occupied = self.reintegrate_barriers(poly, barriers, occupied)
+            # surface_barriers.extend(barriers)
             
                 
         return surface_barriers
