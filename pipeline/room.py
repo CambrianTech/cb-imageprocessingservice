@@ -44,6 +44,8 @@ class Room(Geometry):
 
         self.refine_surfaces(min_confidence=0.1) #preserve plane context information i.e. probs < min_confidence are ignored
         log_image(self.data, "room_refined", self.get_debug_image())
+        
+        #self.remove_invalid_surfaces()
 
         self.add_missing_surfaces()
         log_image(self.data, "room_missing_added", self.get_debug_image())
@@ -51,9 +53,7 @@ class Room(Geometry):
         self.refine_surfaces(debug_suffix="_final")
         log_image(self.data, "room_refined_again", self.get_debug_image())
 
-        self.merge_like_surfaces()    
-
-        #self.remove_invalid_surfaces()    
+        self.merge_like_surfaces()        
 
         log_image(self.data, "room", self.get_debug_image())
 
