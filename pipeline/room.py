@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import uuid
 import random
+import math
 
 import warnings #skimage warnings excessive:
 warnings.filterwarnings("ignore")
@@ -23,6 +24,15 @@ from termcolor import colored
 
 #python info on object oriented methods and properties
 #https://stackoverflow.com/questions/2736255/abstract-attributes-in-python
+
+def contour_squareness(contour, contour_area=None, contour_length=None):
+    if contour_area is None:
+        contour_area = cv2.contourArea(contour)
+    if contour_length is None:
+        contour_length =  cv2.arcLength(contour, True)
+
+    return math.sqrt(contour_area) / (0.25 * contour_length)
+
 class Room(Geometry):
 
     def analyze(self):
@@ -36,9 +46,10 @@ class Room(Geometry):
         log_image(self.data, "room_refined", self.get_debug_image())
 
         self.add_missing_surfaces()
-        log_image(self.data, "room_modified", self.get_debug_image())
+        log_image(self.data, "room_missing_added", self.get_debug_image())
 
-        self.refine_surfaces()
+        self.refine_surfaces(debug_suffix="_final")
+        log_image(self.data, "room_refined_again", self.get_debug_image())
 
         self.merge_like_surfaces()    
 
@@ -59,7 +70,7 @@ class Room(Geometry):
         if len(candidates) > 1:
             #todo: sort if more than one, for walls, above and below the wall is the best match
             print("Find match for missing %s amongst %d candidates" % (surfaceType.name, len(candidates)))
-            normal = np.mean(self.data["normals"], axis=(0, 1)) #todo: use 3d vector normal angle difference instead (eg dot product/arcos).
+            normal = np.mean(self.data["normals"][mask]) #todo: use 3d vector normal angle difference instead (eg dot product/arcos).
             candidates.sort(key=lambda x: distance.sqeuclidean(normal, x.normals_color))
 
         return candidates[0]
@@ -96,11 +107,15 @@ class Room(Geometry):
             valid_contours = []
             if contours is not None:
                 for contour in contours:
-                    if cv2.contourArea(contour) > area_threshold:
-                        valid_contours.append(contour)
+                    area = cv2.contourArea(contour)
+                    if area > area_threshold:
+                        #check shape too:
+                        squareness =  contour_squareness(contour, contour_area=area)
+                        if squareness >= 0.5:
+                            valid_contours.append(contour)
 
             #draw
-            if room_missing is not None:
+            if room_missing is not None and len(valid_contours) > 0:
                 cv2.drawContours(room_missing, np.array(valid_contours), -1, color, cv2.FILLED)
                 log_image(self.data, "room_missing", room_missing)
 
@@ -119,6 +134,7 @@ class Room(Geometry):
                 new_surface = None
                 reference_surface = None
 
+                #add missing one by one
                 for i in range(max_clusters):
                     index = valid_clusters[i]
                     surface = self.surfaces[index]
@@ -143,12 +159,14 @@ class Room(Geometry):
                 new_offset = None
 
                 if new_surface is None and surfaceType.is_major:
+
                     reference_surface = self.find_best_surface(surfaceType, contour_mask)
                     
                     if reference_surface is not None:
                         new_surface = reference_surface.clone()
                         new_surface.surfaceType = surfaceType
                         new_surface.set_mask(contour_mask)
+                        #print("Reference_surface", reference_surface.name, indexes, counts)
                     elif surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling:
                         complimentary_type = SurfaceType.Floor if surfaceType == SurfaceType.Ceiling else SurfaceType.Ceiling
                         reference_surface = self.find_best_surface(complimentary_type, contour_mask)
@@ -168,9 +186,9 @@ class Room(Geometry):
                         
 
                 if new_surface is not None:
-                    print(colored("Creating new %s using %s as reference" % (surfaceType.name, reference_surface.name), 'green'))
-                    #log_image(self.data, new_surface.name, new_surface.mask * 255)
+                    
                     self.add_surface(new_surface)
+                    print(colored("Creating new %s (%s) using %s as reference" % (surfaceType.name, new_surface.name, reference_surface.name), 'green'))
             
 
     def merge_like_surfaces(self, angle_threshold=np.radians(20)):
@@ -208,7 +226,7 @@ class Room(Geometry):
                             surfaces[i]._alteration = "%.2fm %.2fd" % (distance_between, angle_threshold)
 
         
-    def refine_surfaces(self, min_confidence=None, use_lines=True):
+    def refine_surfaces(self, min_confidence=None, use_lines=True, debug_suffix=""):
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
         
         if use_lines:
@@ -241,13 +259,13 @@ class Room(Geometry):
             if use_lines:
                 watershed_mask[lines_mask > 0] = 0
 
-            log_markers(self.data, "room_%s_markers" % surfaceType.name, markers, mask=watershed_mask)
+            log_markers(self.data, "room_%s_markers%s" % (surfaceType.name, debug_suffix), markers, mask=watershed_mask)
 
             #perform watershed:
             markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
             markers[markers<0] = 0
 
-            log_markers(self.data, "room_%s_watershed" % surfaceType.name, markers, mask=watershed_mask)
+            log_markers(self.data, "room_%s_watershed%s" % (surfaceType.name, debug_suffix), markers, mask=watershed_mask)
 
             #commit to mask
             for index in range(num_surfaces):
