@@ -65,8 +65,8 @@ class Room(Geometry):
         self.refine_surfaces(min_confidence=0.1) #preserve plane context information i.e. probs < min_confidence are ignored
         log_image(self.data, "room_refined", self.get_debug_image())
 
-        self.remove_invalid_surfaces()
-        log_image(self.data, "room_removed", self.get_debug_image())
+        #self.remove_invalid_surfaces()
+        #log_image(self.data, "room_removed", self.get_debug_image())
 
         self.add_missing_surfaces()
         log_image(self.data, "room_missing_added", self.get_debug_image())
@@ -129,7 +129,7 @@ class Room(Geometry):
             if contours is not None:
                 for contour in contours:
                     area = cv2.contourArea(contour)
-                    if area > area_threshold and (surfaceType != SurfaceType.Wall or narrowness(contour) < 2.0):
+                    if area > area_threshold:
                         valid_contours.append(contour)
 
             #draw
@@ -318,11 +318,11 @@ class Room(Geometry):
             for i in range(len(surface.contours)):
                 contour = surface.contours[i]
                 area = cv2.contourArea(contour)
-                narrow = narrowness(contour)
-                if area < min_area or narrow > 2.1:
+
+                if area < min_area:
                     invalid_contours.append(contour)
                     
-                print("Surface %s(%d) area: %d narrowness: %.2f" % (surface.name, i, area, narrow))
+                #print("Surface %s(%d) area: %d narrowness: %.2f" % (surface.name, i, area, narrow))
             
 
             if len(invalid_contours) == len(surface.contours):
