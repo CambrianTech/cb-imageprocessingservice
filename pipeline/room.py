@@ -10,6 +10,7 @@ warnings.filterwarnings("ignore")
 
 from skimage.segmentation import watershed
 from skimage.color import rgb2gray
+from scipy.stats import mode
 from scipy.spatial import distance
 
 from .geometry import Geometry
@@ -25,13 +26,32 @@ from termcolor import colored
 #python info on object oriented methods and properties
 #https://stackoverflow.com/questions/2736255/abstract-attributes-in-python
 
-def contour_squareness(contour, contour_area=None, contour_length=None):
-    if contour_area is None:
-        contour_area = cv2.contourArea(contour)
-    if contour_length is None:
-        contour_length =  cv2.arcLength(contour, True)
+def narrowness(contour, epsilon_factor=0.06):
+    peri = cv2.arcLength(contour, True)
+    epsilon = epsilon_factor * peri
+    #print(epsilon)
+    points = cv2.approxPolyDP(contour, epsilon, True)
+    if len(points) < 3:
+        return np.inf
 
-    return math.sqrt(contour_area) / (0.25 * contour_length)
+    area = cv2.contourArea(points)
+    square_side_length = math.sqrt(area)
+
+    num_points = len(points)
+    
+    #use np.diff or something better
+    lengths = []
+    for i in range(num_points):
+        point_a = points[i][0]
+        point_b = points[(i+1) % num_points][0]
+        lengths.append(distance.euclidean(point_a, point_b))
+
+    lengths = np.array(lengths)
+    mean_length = np.mean(lengths)
+    #mode_length = mode(lengths).mode[0]
+
+    return mean_length / square_side_length
+
 
 class Room(Geometry):
 
@@ -44,8 +64,9 @@ class Room(Geometry):
 
         self.refine_surfaces(min_confidence=0.1) #preserve plane context information i.e. probs < min_confidence are ignored
         log_image(self.data, "room_refined", self.get_debug_image())
-        
-        #self.remove_invalid_surfaces()
+
+        self.remove_invalid_surfaces()
+        log_image(self.data, "room_removed", self.get_debug_image())
 
         self.add_missing_surfaces()
         log_image(self.data, "room_missing_added", self.get_debug_image())
@@ -108,11 +129,8 @@ class Room(Geometry):
             if contours is not None:
                 for contour in contours:
                     area = cv2.contourArea(contour)
-                    if area > area_threshold:
-                        #check shape too:
-                        squareness =  contour_squareness(contour, contour_area=area)
-                        if squareness >= 0.5:
-                            valid_contours.append(contour)
+                    if area > area_threshold and (surfaceType != SurfaceType.Wall or narrowness(contour) < 2.0):
+                        valid_contours.append(contour)
 
             #draw
             if room_missing is not None and len(valid_contours) > 0:
@@ -166,7 +184,7 @@ class Room(Geometry):
                         new_surface = reference_surface.clone()
                         new_surface.surfaceType = surfaceType
                         new_surface.set_mask(contour_mask)
-                        #print("Reference_surface", reference_surface.name, indexes, counts)
+                        print("Reference_surface", reference_surface.name, indexes, counts)
                     elif surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling:
                         complimentary_type = SurfaceType.Floor if surfaceType == SurfaceType.Ceiling else SurfaceType.Ceiling
                         reference_surface = self.find_best_surface(complimentary_type, contour_mask)
@@ -287,17 +305,34 @@ class Room(Geometry):
         for surfaceType in SurfaceType: 
             expand_into_type(surfaceType)
 
-    def remove_invalid_surfaces(self):
+    def remove_invalid_surfaces(self, min_area=1/500):
 
-        print("remove invalid")
+        total_area = self.image.shape[0] * self.image.shape[1]
+        area_threshold = int(total_area * min_area)
 
-        # for surface in surfaces:
+        print("Remove invalid wall parts. min area:", area_threshold)
 
-        #     dot_product = np.dot(surface.normal, unit_vector_2)
-        #     surface.planar_group = Group(surface)
+        for surface in self.get_surfaces([SurfaceType.Wall]):
+            invalid_contours = []
 
-        #     self.planar_groups.append(Group())
+            for i in range(len(surface.contours)):
+                contour = surface.contours[i]
+                area = cv2.contourArea(contour)
+                narrow = narrowness(contour)
+                if area < min_area or narrow > 2.1:
+                    invalid_contours.append(contour)
+                    
+                print("Surface %s(%d) area: %d narrowness: %.2f" % (surface.name, i, area, narrow))
+            
 
+            if len(invalid_contours) == len(surface.contours):
+                surface.destroy() #totally invalid
+                print(colored("Removing surface %s" % surface.name, "red"))
+            elif len(invalid_contours) > 0:
+                print(colored("Removing %d contours from surface %s" % (len(invalid_contours), surface.name), "yellow"))
+                mask = surface.mask.copy()
+                cv2.drawContours(mask, np.array(invalid_contours), -1, 0, cv2.FILLED)
+                surface.set_mask(mask)
         
     def get_debug_image(self):
 
