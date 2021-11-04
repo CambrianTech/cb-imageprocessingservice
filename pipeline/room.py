@@ -29,8 +29,9 @@ from termcolor import colored
 def narrowness(contour, epsilon_factor=0.06):
     peri = cv2.arcLength(contour, True)
     epsilon = epsilon_factor * peri
-    #print(epsilon)
-    points = cv2.approxPolyDP(contour, epsilon, True)
+    hull = cv2.convexHull(contour)
+    points = cv2.approxPolyDP(hull, epsilon, True)
+    
     if len(points) < 3:
         return np.inf
 
@@ -44,13 +45,16 @@ def narrowness(contour, epsilon_factor=0.06):
     for i in range(num_points):
         point_a = points[i][0]
         point_b = points[(i+1) % num_points][0]
-        lengths.append(distance.euclidean(point_a, point_b))
+        length = distance.euclidean(point_a, point_b)
+        if length > square_side_length:
+            lengths.append(distance.euclidean(point_a, point_b))
 
     lengths = np.array(lengths)
-    mean_length = np.mean(lengths)
+    #mean_length = np.mean(lengths)
+    total_length = np.sum(lengths)
     #mode_length = mode(lengths).mode[0]
 
-    return mean_length / square_side_length
+    return total_length / square_side_length
 
 
 class Room(Geometry):
@@ -65,8 +69,8 @@ class Room(Geometry):
         self.refine_surfaces(min_confidence=0.1) #preserve plane context information i.e. probs < min_confidence are ignored
         log_image(self.data, "room_refined", self.get_debug_image())
 
-        #self.remove_invalid_surfaces()
-        #log_image(self.data, "room_removed", self.get_debug_image())
+        self.remove_invalid_surfaces()
+        log_image(self.data, "room_removed", self.get_debug_image())
 
         self.add_missing_surfaces()
         log_image(self.data, "room_missing_added", self.get_debug_image())
@@ -184,7 +188,7 @@ class Room(Geometry):
                         new_surface = reference_surface.clone()
                         new_surface.surfaceType = surfaceType
                         new_surface.set_mask(contour_mask)
-                        print("Reference_surface", reference_surface.name, indexes, counts)
+                        #print("Reference_surface", reference_surface.name, indexes, counts)
                     elif surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling:
                         complimentary_type = SurfaceType.Floor if surfaceType == SurfaceType.Ceiling else SurfaceType.Ceiling
                         reference_surface = self.find_best_surface(complimentary_type, contour_mask)
@@ -305,24 +309,29 @@ class Room(Geometry):
         for surfaceType in SurfaceType: 
             expand_into_type(surfaceType)
 
-    def remove_invalid_surfaces(self, min_area=1/500):
+    def remove_invalid_surfaces(self, min_length=1/50, narrowness_threshold=5):
 
         total_area = self.image.shape[0] * self.image.shape[1]
-        area_threshold = int(total_area * min_area)
+        length_threshold = math.sqrt(total_area) * min_length
 
-        print("Remove invalid wall parts. min area:", area_threshold)
+        print("Remove invalid wall parts. length_threshold:", length_threshold)
 
         for surface in self.get_surfaces([SurfaceType.Wall]):
             invalid_contours = []
 
-            for i in range(len(surface.contours)):
-                contour = surface.contours[i]
-                area = cv2.contourArea(contour)
+            scaled_length_threshold = length_threshold / (1 + abs(surface.offset))
 
-                if area < min_area:
+            for i in range(len(surface.contours)):
+
+                contour = surface.contours[i]
+                narrow = narrowness(contour)
+                side_width = math.sqrt(cv2.contourArea(contour)) / narrow
+
+                if (side_width < scaled_length_threshold or np.isinf(narrow)) and narrow > narrowness_threshold:
                     invalid_contours.append(contour)
-                    
-                #print("Surface %s(%d) area: %d narrowness: %.2f" % (surface.name, i, area, narrow))
+                    print(colored("Surface %s(%d) narrowness: %.2f > %.2f, width: %.2f < %.2f, offset: %.2f" % (surface.name, i, narrow, narrowness_threshold, side_width, scaled_length_threshold, surface.offset), "red"))
+                else:
+                    print("Surface %s(%d) narrowness: %.2f <= %.2f or width: %.2f >= %.2f, offset: %.2f" % (surface.name, i, narrow, narrowness_threshold, side_width, scaled_length_threshold, surface.offset))
             
 
             if len(invalid_contours) == len(surface.contours):
