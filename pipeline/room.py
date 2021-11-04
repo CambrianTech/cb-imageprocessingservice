@@ -162,6 +162,9 @@ class Room(Geometry):
                 #add missing one by one
                 for i in range(max_clusters):
                     index = valid_clusters[i]
+                    if index >= len(self.surfaces):
+                        continue
+
                     surface = self.surfaces[index]
 
                     if surface.surfaceType == surfaceType or surface.surfaceType.is_pair(surfaceType):
