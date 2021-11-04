@@ -69,10 +69,12 @@ class Room(Geometry):
         self.refine_surfaces(min_confidence=0.1) #preserve plane context information i.e. probs < min_confidence are ignored
         log_image(self.data, "room_refined", self.get_debug_image())
 
-        self.remove_invalid_surfaces()
-        log_image(self.data, "room_removed", self.get_debug_image())
+        invalid_mask = self.remove_invalid_surfaces()
+        
+        if cv2.countNonZero(invalid_mask) > 0:
+            log_segmentation_image(self.data, "room_invalid", invalid_mask, self.image, labelset=["valid","invalid"])
 
-        self.add_missing_surfaces()
+        self.add_missing_surfaces(invalid_mask)
         log_image(self.data, "room_missing_added", self.get_debug_image())
 
         self.refine_surfaces(debug_suffix="_final")
@@ -100,7 +102,7 @@ class Room(Geometry):
 
         return candidates[0]
 
-    def add_missing_surfaces(self, min_area=1/1200):
+    def add_missing_surfaces(self, invalid_mask, min_area=1/1200):
 
         total_area = self.image.shape[0] * self.image.shape[1]
         area_threshold = int(total_area * min_area)
@@ -123,6 +125,7 @@ class Room(Geometry):
             #find missing
             remaining_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
             remaining_mask[self.isolated_labels == surfaceType] = 1
+            remaining_mask[invalid_mask > 0] = 0
 
             if total_mask is not None:
                 remaining_mask[total_mask > 0] = 0
@@ -313,7 +316,8 @@ class Room(Geometry):
 
         total_area = self.image.shape[0] * self.image.shape[1]
         length_threshold = math.sqrt(total_area) * min_length
-
+        
+        all_invalid_contours = []
         print("Remove invalid wall parts. length_threshold:", length_threshold)
 
         for surface in self.get_surfaces([SurfaceType.Wall]):
@@ -333,6 +337,7 @@ class Room(Geometry):
                 else:
                     print("Surface %s(%d) narrowness: %.2f <= %.2f or width: %.2f >= %.2f, offset: %.2f" % (surface.name, i, narrow, narrowness_threshold, side_width, scaled_length_threshold, surface.offset))
             
+            all_invalid_contours.extend(invalid_contours)
 
             if len(invalid_contours) == len(surface.contours):
                 surface.destroy() #totally invalid
@@ -342,6 +347,10 @@ class Room(Geometry):
                 mask = surface.mask.copy()
                 cv2.drawContours(mask, np.array(invalid_contours), -1, 0, cv2.FILLED)
                 surface.set_mask(mask)
+
+        invalid_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+        cv2.drawContours(invalid_mask, np.array(all_invalid_contours), -1, 1, cv2.FILLED)
+        return invalid_mask
         
     def get_debug_image(self):
 

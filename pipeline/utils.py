@@ -53,8 +53,12 @@ def get_segmentation_image(labels, image, avg=False, resize=True, get_legend=Fal
         if avg: color = np.mean(img_seg[labels == label], axis=0)
         img_seg[labels == label] = color
 
-        if get_legend and label <= labelset.max_index() and len(img_seg[labels == label]) > min_matches:
-            legend.append((labelset(label+labelset.value_offset()), (int(color[0]), int(color[1]), int(color[2]))))
+        if get_legend and len(img_seg[labels == label]) > min_matches:
+            if type(labelset) == list:
+                legend.append((labelset[label], (int(color[0]), int(color[1]), int(color[2]))))
+            elif label <= labelset.max_index():
+                legend.append((labelset(label+labelset.value_offset()).name, (int(color[0]), int(color[1]), int(color[2]))))
+
     if get_legend:
         return img_seg, legend
     return img_seg

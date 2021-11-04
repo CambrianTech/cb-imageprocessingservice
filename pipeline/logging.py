@@ -104,7 +104,7 @@ def draw_legend(data:dict, debug:np.ndarray, legend:tuple):
         cv2.circle(debug, (x+radius, y+radius), radius, text_color, min(thickness, 2))
         x += 2 * radius + padding
         text_y = y + text_height + int(2 * font_scale)
-        cv2.putText(debug, label.name, (x, text_y), font, font_scale, text_color, thickness, cv2.LINE_AA)
+        cv2.putText(debug, label, (x, text_y), font, font_scale, text_color, thickness, cv2.LINE_AA)
 
         x = start_location[0]
         y += line_height
