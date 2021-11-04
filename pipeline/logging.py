@@ -122,11 +122,11 @@ def log_markers(data:dict, name, markers, mask=None, num_labels=None):
 
         _log_image(data, name, debug)
 
-def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", show_legend=True, labelset=ADE20K,  opacity=0.5, get_image=False):
+def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", show_legend=True, labelset=ADE20K,  opacity=0.5, get_image=False, min_matches=100):
     
     if get_image or im_logging_enabled(data, LogLevel.Segmentation):
         
-        debug = get_segmentation_image(segmentation, image, avg, get_legend=show_legend, labelset=labelset)
+        debug = get_segmentation_image(segmentation, image, avg, get_legend=show_legend, labelset=labelset, min_matches=min_matches)
 
         if show_legend:
             debug, legend = debug

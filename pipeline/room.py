@@ -71,8 +71,8 @@ class Room(Geometry):
 
         invalid_mask = self.remove_invalid_surfaces()
         
-        if cv2.countNonZero(invalid_mask) > 0:
-            log_segmentation_image(self.data, "room_invalid", invalid_mask, self.image, labelset=["valid","invalid"])
+        if cv2.countNonZero(invalid_mask) > 50:
+            log_segmentation_image(self.data, "room_invalid", invalid_mask, self.image, labelset=["valid","invalid"], min_matches=50)
 
         self.add_missing_surfaces(invalid_mask)
         log_image(self.data, "room_missing_added", self.get_debug_image())
@@ -353,6 +353,8 @@ class Room(Geometry):
 
         invalid_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
         cv2.drawContours(invalid_mask, np.array(all_invalid_contours), -1, 1, cv2.FILLED)
+        self.refresh_surfaces()
+        
         return invalid_mask
         
     def get_debug_image(self):
