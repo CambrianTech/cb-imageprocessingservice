@@ -22,11 +22,13 @@ class PipelineStepIndex(IntEnum):
     SolveRoom = 9
     VanishingPoints = 10
     Barriers = 11
-    EstimatePose = 12
-    Refine = 13
-    Superpixels = 14
-    CombinePlaneMasks = 15
-    Output = 16
+    FindTrim = 12
+    FindLegs = 13
+    EstimatePose = 14
+    Refine = 15
+    Superpixels = 16
+    CombinePlaneMasks = 17
+    Output = 18
 
 #Keep major (floor, wall, ceiling) even, "Like" versions odd. 
 #Perhaps write class method

@@ -197,32 +197,6 @@ class BarrierFinder():
                 
         return surface_barriers
         
-
-class LegFinder():
-    def __init__(self, data):
-        super().__init__()
-        self.data = data
-        self.room = data["room"]
-        self.image = self.data["downscaled"]
-        
-
-    def solve(self, max_iterations=3000):
-
-        self.surfaces = self.room.get_surfaces(surfaceTypes=[SurfaceType.Other, SurfaceType.Floor])
-        
-        for surface in self.surfaces:
-
-            surface.barriers = surface.border_lines
-            
-            
-        # start_time = time.time()
-        # for ransac_iter in range(max_iterations):
-        #     if time.time() - start_time > max_time:
-        #         break
-
-            
-
-
         
 class PipelineBarrierFinder(PipelineStep):
     @property
@@ -256,9 +230,6 @@ class PipelineBarrierFinder(PipelineStep):
             max_size = np.sqrt(surface.max_area) * 2
             surface.barriers = bf.solve(min_length=min_size, max_length=max_size)
 
-        # lf = LegFinder(self.data)
-        # lf.solve()
-
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers.png", self.get_debug_image())
 
@@ -284,24 +255,12 @@ class PipelineBarrierFinder(PipelineStep):
             surface = self.room.surfaces[i]
             color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
 
-            # for poly in surface.contours:
-            #     num_pts = len(poly)
-            #     for i in range(num_pts):
-            #         point_a = poly[i][0]
-            #         point_b = poly[(i+1) % num_pts][0]
-
-            #         line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
-
-            #         line.draw(img, color=color)
-
             for barrier in surface.barriers:
                 barrier.line.draw(img, color=color, thickness=2)
 
             for barrier in surface.barriers:
                 cv2.drawMarker(img, barrier.line.point_a, color=color)
                 cv2.drawMarker(img, barrier.line.point_b, color=color)
-
-                #put_text(img, "%d-%d" % (barrier.start_index, barrier.stop_index), barrier.line.midpoint, color, size=0.3)
 
         return img
 
