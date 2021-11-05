@@ -11,7 +11,7 @@ from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
-from .vanishingpointfinder import draw_vp, angle_with_vp
+from .vanishingpointfinder import angle_with_vp
 from .logging import log_image, log_segmentation_image, im_logging_enabled
 from cambrian.LineFunctions import LineFunctions
 from .Line import line_angle_difference, Line, on_image_edge

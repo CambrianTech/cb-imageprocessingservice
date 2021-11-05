@@ -61,6 +61,9 @@ class Room(Geometry):
 
     def analyze(self):
 
+        self.lines_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+        Line.draw_all(self.lines_mask, self.data["lines"], color=(255,255,255), thickness=1, lineType=cv2.LINE_4)
+
         log_segmentation_image(self.data, "semantic_labels", self.semantic_labels, self.image)
         
         self.analyze_surfaces()
@@ -101,6 +104,21 @@ class Room(Geometry):
             candidates.sort(key=lambda x: distance.sqeuclidean(normal, x.normals_color))
 
         return candidates[0]
+
+    def find_trim(self):
+
+        #detect trim around edges and (1/3rd of center horizontal, around 1 meter high) of walls using horizontal vp inliers.
+        #create segmentation category?
+
+        walls = self.get_surfaces([SurfaceType.Wall])
+
+        debug = self.image.copy()
+
+        for wall in walls:
+            if wall.horizontal_vp is not None and len(wall.horizontal_vp) > 0:
+                Line.draw_all(debug, wall.horizontal_vp[0].inlier_lines, color=random_color())
+
+        log_image(self.data, "room_trim", debug)
 
     def add_missing_surfaces(self, invalid_mask, min_area=1/1200):
 
@@ -257,10 +275,6 @@ class Room(Geometry):
     def refine_surfaces(self, min_confidence=None, use_lines=True, debug_suffix=""):
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
         
-        if use_lines:
-            lines_mask = np.zeros(watershed_image.shape, dtype=np.uint8)
-            Line.draw_all(lines_mask, self.data["lines"], color=(255,255,255), thickness=1, lineType=cv2.LINE_4)
-
         def expand_into_type(surfaceType:SurfaceType):
             surfaces = self.get_surfaces([surfaceType])
 
@@ -285,7 +299,7 @@ class Room(Geometry):
             watershed_mask = np.zeros(total_mask.shape, dtype=np.int32)
             watershed_mask[self.isolated_labels == surfaceType.index] = 1
             if use_lines:
-                watershed_mask[lines_mask > 0] = 0
+                watershed_mask[self.lines_mask > 0] = 0
 
             log_markers(self.data, "room_%s_markers%s" % (surfaceType.name, debug_suffix), markers, mask=watershed_mask)
 
@@ -300,7 +314,7 @@ class Room(Geometry):
                 surface = surfaces[index]
                 mask = np.zeros_like(surface.mask)
                 mask[markers == (index + 1)] = 1
-                mask[lines_mask > 0] = 0
+                mask[self.lines_mask > 0] = 0
                 kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(2,2))
                 mask = cv2.dilate(mask, kernel)
 
@@ -354,7 +368,7 @@ class Room(Geometry):
         invalid_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
         cv2.drawContours(invalid_mask, np.array(all_invalid_contours), -1, 1, cv2.FILLED)
         self.refresh_surfaces()
-        
+
         return invalid_mask
         
     def get_debug_image(self):
