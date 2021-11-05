@@ -48,9 +48,7 @@ class PipelineTrimFinder(PipelineStep):
 
         #detect trim around edges and (1/3rd of center horizontal, around 1 meter high) of walls using horizontal vp inliers.
         #create segmentation category?
-
-        self.surfaces = []
-        self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike]))
+        self.surfaces = self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike, SurfaceType.Floor, SurfaceType.Ceiling])
 
         if im_logging_enabled(self.data):
             log_image(self.data, "trim.png", self.get_debug_image())

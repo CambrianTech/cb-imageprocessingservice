@@ -40,6 +40,16 @@ def resize_array(array, shape):
 
     return array_lr
 
+def sample_at_point(img, point, size=20):
+    half_size = size // 2
+    x1 = max(point[0] - half_size, 0)
+    x2 = min(x1 + half_size, img.shape[1]-1)
+
+    y1 = max(point[1] - half_size, 0)
+    y2 = min(y1 + half_size, img.shape[0]-1)
+
+    return img[y1:y2, x1:x2]
+
 def get_segmentation_image(labels, image, avg=False, resize=True, get_legend=False, min_matches=100, labelset=ADE20K):
     if resize:
         img_seg = cv2.resize(image, (labels.shape[1], labels.shape[0]))

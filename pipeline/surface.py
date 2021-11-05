@@ -10,7 +10,7 @@ from termcolor import colored
 
 from .core import SurfaceType
 from .geometry import Geometry
-from .utils import convert_color, put_text
+from .utils import convert_color, put_text, sample_at_point
 from .Line import line_angle_difference, Line
 from .ade20k import ADE20K
 
@@ -28,6 +28,7 @@ class Surface():
         self._cloned_from = -1
         self._plane_mask = None
         self._contours = None
+        self.moments = None
         self._polygons = None
         self._normals_color = None
         self._lines = None
@@ -108,8 +109,16 @@ class Surface():
 
     @property
     def normals_color(self) -> tuple:
-        if self._normals_color is None:
-            self._normals_color = np.mean(self.data["normals"], axis=(0, 1))
+        if self._normals_color is None and len(self.mask) > 0:
+
+            mask_sample = sample_at_point(self.mask, point=self.center, size=100)
+            sample = sample_at_point(self.geometry.normals, point=self.center, size=100)
+
+            if cv2.countNonZero(mask_sample) > 10:
+                self._normals_color = cv2.mean(sample, mask_sample)[:3]
+            else:
+                self._normals_color = cv2.mean(self.geometry.normals, self.mask)[:3]
+
         return self._normals_color
 
     @property

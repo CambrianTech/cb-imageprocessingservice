@@ -4,9 +4,27 @@ import numpy as np
 import pickle
 from enum import IntFlag
 from termcolor import colored
+from time import time
 
 from .ade20k import ADE20K
 from .utils import get_segmentation_image
+
+class Timer():
+
+    def __init__(self, prefix=None, color="cyan"):
+        self.prefix = prefix
+        self.color = color
+        self.reset()
+
+    def reset(self):
+        self.checktime = time()
+
+    def log_elapsed(self, name):
+        elapsed = time() - self.checktime
+        if self.prefix is not None:
+            name = self.prefix + "." + name
+        print(colored("%s took %.2f seconds" % (name, elapsed), self.color))
+        self.reset()
 
 class LogLevel(IntFlag):
     Nothing =       0

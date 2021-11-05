@@ -16,8 +16,8 @@ from scipy.spatial import distance
 from .geometry import Geometry
 from .core import SurfaceType
 from .surface import Surface
-from .utils import convert_color, put_text, overlay_mask, random_color
-from .logging import im_logging_enabled, log_image, log_segmentation_image, log_markers
+from .utils import convert_color, put_text, overlay_mask, random_color, sample_at_point
+from .logging import im_logging_enabled, log_image, log_segmentation_image, log_markers, Timer
 from .Line import line_angle_difference, Line, on_image_edge
 from .ade20k import ADE20K
 
@@ -56,69 +56,77 @@ def narrowness(contour, epsilon_factor=0.06):
 
     return total_length / square_side_length
 
-
 class Room(Geometry):
 
     def analyze(self):
 
+        timer = Timer("room")
+
+        #prepare
         self.lines_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
         Line.draw_all(self.lines_mask, self.data["lines"], color=(255,255,255), thickness=1, lineType=cv2.LINE_4)
 
         log_segmentation_image(self.data, "semantic_labels", self.semantic_labels, self.image)
-        
+
+        timer.log_elapsed("setup")
+
         self.analyze_surfaces()
         log_image(self.data, "room_initial", self.get_debug_image())
 
+        timer.log_elapsed("analyze_surfaces")
+
         self.refine_surfaces(min_confidence=0.1) #preserve plane context information i.e. probs < min_confidence are ignored
         log_image(self.data, "room_refined", self.get_debug_image())
+
+        timer.log_elapsed("refine_surfaces")
 
         invalid_mask = self.remove_invalid_surfaces()
         
         if cv2.countNonZero(invalid_mask) > 50:
             log_segmentation_image(self.data, "room_invalid", invalid_mask, self.image, labelset=["valid","invalid"], min_matches=50)
 
+        timer.log_elapsed("remove_invalid_surfaces")
+
         self.add_missing_surfaces(invalid_mask)
         log_image(self.data, "room_missing_added", self.get_debug_image())
+
+        timer.log_elapsed("add_missing_surfaces")
 
         self.refine_surfaces(debug_suffix="_final")
         log_image(self.data, "room_refined_again", self.get_debug_image())
 
+        timer.log_elapsed("room.refine_surfaces")
+
         self.merge_like_surfaces()        
 
         log_image(self.data, "room", self.get_debug_image())
+
+        timer.log_elapsed("merge_like_surfaces")
 
     def analyze_surfaces(self):
         #perform initial analysis
         for surface in self.surfaces:
             surface.analyze()
 
-    def find_best_surface(self, surfaceType, mask):
+    def find_best_surface(self, surfaceType, mask, mask_center):
+
         candidates = self.get_surfaces([surfaceType])
+        
         if len(candidates) == 0:
             return None
 
         if len(candidates) > 1:
-            #todo: sort if more than one, for walls, above and below the wall is the best match
-            print("Find match for missing %s amongst %d candidates" % (surfaceType.name, len(candidates)))
-            normal = np.mean(self.data["normals"][mask]) #todo: use 3d vector normal angle difference instead (eg dot product/arcos).
-            candidates.sort(key=lambda x: distance.sqeuclidean(normal, x.normals_color))
+
+            mask_sample = sample_at_point(mask, point=mask_center)
+
+            if cv2.countNonZero(mask_sample) > 0:
+                sample = sample_at_point(self.normals, point=mask_center)
+                normal = cv2.mean(sample, mask_sample)[:3]
+                candidates.sort(key=lambda x: distance.sqeuclidean(mask_center, x.center) * distance.sqeuclidean(normal, x.normals_color))
+            else:
+                candidates.sort(key=lambda x: distance.sqeuclidean(mask_center, x.center))
 
         return candidates[0]
-
-    def find_trim(self):
-
-        #detect trim around edges and (1/3rd of center horizontal, around 1 meter high) of walls using horizontal vp inliers.
-        #create segmentation category?
-
-        walls = self.get_surfaces([SurfaceType.Wall])
-
-        debug = self.image.copy()
-
-        for wall in walls:
-            if wall.horizontal_vp is not None and len(wall.horizontal_vp) > 0:
-                Line.draw_all(debug, wall.horizontal_vp[0].inlier_lines, color=random_color())
-
-        log_image(self.data, "room_trim", debug)
 
     def add_missing_surfaces(self, invalid_mask, min_area=1/1200):
 
@@ -161,6 +169,7 @@ class Room(Geometry):
             if room_missing is not None and len(valid_contours) > 0:
                 cv2.drawContours(room_missing, np.array(valid_contours), -1, color, cv2.FILLED)
                 log_image(self.data, "room_missing", room_missing)
+
 
             #add missing
             for contour in valid_contours:
@@ -206,7 +215,12 @@ class Room(Geometry):
 
                 if new_surface is None and surfaceType.is_major:
 
-                    reference_surface = self.find_best_surface(surfaceType, contour_mask)
+                    moments = cv2.moments(contour_mask)
+
+                    cX = int(moments["m10"] / moments["m00"])
+                    cY = int(moments["m01"] / moments["m00"])
+
+                    reference_surface = self.find_best_surface(surfaceType, contour_mask, (cX, cY))
                     
                     if reference_surface is not None:
                         new_surface = reference_surface.clone()
@@ -215,7 +229,7 @@ class Room(Geometry):
                         #print("Reference_surface", reference_surface.name, indexes, counts)
                     elif surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling:
                         complimentary_type = SurfaceType.Floor if surfaceType == SurfaceType.Ceiling else SurfaceType.Ceiling
-                        reference_surface = self.find_best_surface(complimentary_type, contour_mask)
+                        reference_surface = self.find_best_surface(complimentary_type, contour_mask, (cX, cY))
 
                         if reference_surface is not None:
                             print("Generate %s using %s as opposing surface" % (surfaceType.name, reference_surface.name))
