@@ -36,6 +36,7 @@ class Geometry():
         self._surfaces = {}
         self._probs = None
         self._index_mask = None
+        self._normals = None
 
         ade_seg_c = np.dstack(tuple(self.data["isolated"]))
         self.isolated_labels = np.int32(np.argmax(ade_seg_c, -1))
@@ -74,6 +75,13 @@ class Geometry():
     @property
     def image(self):
         return self.data["downscaled"]
+
+
+    @property
+    def normals(self):
+        if self._normals is None:
+            self._normals = cv2.resize(self.data["normals"], (self.image.shape[1], self.image.shape[0]))
+        return self._normals
 
     @property
     def surfaces(self):

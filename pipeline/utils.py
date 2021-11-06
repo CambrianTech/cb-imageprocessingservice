@@ -40,6 +40,16 @@ def resize_array(array, shape):
 
     return array_lr
 
+def sample_at_point(img, point, size=20):
+    half_size = size // 2
+    x1 = max(point[0] - half_size, 0)
+    x2 = min(x1 + half_size, img.shape[1]-1)
+
+    y1 = max(point[1] - half_size, 0)
+    y2 = min(y1 + half_size, img.shape[0]-1)
+
+    return img[y1:y2, x1:x2]
+
 def get_segmentation_image(labels, image, avg=False, resize=True, get_legend=False, min_matches=100, labelset=ADE20K):
     if resize:
         img_seg = cv2.resize(image, (labels.shape[1], labels.shape[0]))
@@ -53,8 +63,12 @@ def get_segmentation_image(labels, image, avg=False, resize=True, get_legend=Fal
         if avg: color = np.mean(img_seg[labels == label], axis=0)
         img_seg[labels == label] = color
 
-        if get_legend and label <= labelset.max_index() and len(img_seg[labels == label]) > min_matches:
-            legend.append((labelset(label+labelset.value_offset()), (int(color[0]), int(color[1]), int(color[2]))))
+        if get_legend and len(img_seg[labels == label]) > min_matches:
+            if type(labelset) == list:
+                legend.append((labelset[label], (int(color[0]), int(color[1]), int(color[2]))))
+            elif label <= labelset.max_index():
+                legend.append((labelset(label+labelset.value_offset()).name, (int(color[0]), int(color[1]), int(color[2]))))
+
     if get_legend:
         return img_seg, legend
     return img_seg
@@ -153,6 +167,7 @@ def convert_color(color, conversion):
 def put_text(img, text, origin, color, shadow_offset=(1,1), font=cv2.FONT_HERSHEY_SIMPLEX, size=1, thickness=1, line_type=cv2.LINE_AA, shadow=False, highlights=False):
 
     dimensions = cv2.getTextSize(text, font, size, thickness)[0]
+    origin = (int(origin[0]), int(origin[1]))
 
     loc = min(max(origin[0], 10), img.shape[1] - dimensions[0] - 10), min(max(origin[1], 10 + dimensions[1] // 2), img.shape[0] - dimensions[1] // 2 - 10)
 

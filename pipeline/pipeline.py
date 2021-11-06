@@ -27,6 +27,8 @@ from .surfacerefinement import PipelineSurfaceRefinement
 from .roomsolver import PipelineRoomSolver
 from .vanishingpointfinder import PipelineVanishingPointFinder
 from .barrierfinder import PipelineBarrierFinder
+from .trimfinder import PipelineTrimFinder
+from .legfinder import PipelineLegFinder
 
 class PipelineNoOp(PipelineStep):
 
@@ -120,6 +122,8 @@ class Pipeline():
         all_steps[PipelineStepIndex.SolveRoom] = PipelineRoomSolver
         all_steps[PipelineStepIndex.VanishingPoints] = PipelineVanishingPointFinder
         all_steps[PipelineStepIndex.Barriers] = PipelineBarrierFinder
+        all_steps[PipelineStepIndex.FindTrim] = PipelineTrimFinder
+        all_steps[PipelineStepIndex.FindLegs] = PipelineLegFinder
         all_steps[PipelineStepIndex.Geometry] = PipelinePlaneGeometry
         all_steps[PipelineStepIndex.EstimatePose] = PipelinePoseEstimator
         all_steps[PipelineStepIndex.Refine] = PipelineSurfaceRefinement
@@ -132,6 +136,10 @@ class Pipeline():
             all_steps[PipelineStepIndex.Geometry] = None
             all_steps[PipelineStepIndex.EstimatePose] = None
             all_steps[PipelineStepIndex.SolveRoom] = None
+            all_steps[PipelineStepIndex.VanishingPoints] = None
+            all_steps[PipelineStepIndex.Barriers] = None
+            all_steps[PipelineStepIndex.FindTrim] = None
+            all_steps[PipelineStepIndex.FindLegs] = None
             all_steps[PipelineStepIndex.Refine] = PipelineRefinePlaneMasks
         
 

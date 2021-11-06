@@ -4,9 +4,27 @@ import numpy as np
 import pickle
 from enum import IntFlag
 from termcolor import colored
+from time import time
 
 from .ade20k import ADE20K
 from .utils import get_segmentation_image
+
+class Timer():
+
+    def __init__(self, prefix=None, color="cyan"):
+        self.prefix = prefix
+        self.color = color
+        self.reset()
+
+    def reset(self):
+        self.checktime = time()
+
+    def log_elapsed(self, name):
+        elapsed = time() - self.checktime
+        if self.prefix is not None:
+            name = self.prefix + "." + name
+        print(colored("%s took %.2f seconds" % (name, elapsed), self.color))
+        self.reset()
 
 class LogLevel(IntFlag):
     Nothing =       0
@@ -104,7 +122,7 @@ def draw_legend(data:dict, debug:np.ndarray, legend:tuple):
         cv2.circle(debug, (x+radius, y+radius), radius, text_color, min(thickness, 2))
         x += 2 * radius + padding
         text_y = y + text_height + int(2 * font_scale)
-        cv2.putText(debug, label.name, (x, text_y), font, font_scale, text_color, thickness, cv2.LINE_AA)
+        cv2.putText(debug, label, (x, text_y), font, font_scale, text_color, thickness, cv2.LINE_AA)
 
         x = start_location[0]
         y += line_height
@@ -122,11 +140,11 @@ def log_markers(data:dict, name, markers, mask=None, num_labels=None):
 
         _log_image(data, name, debug)
 
-def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", show_legend=True, labelset=ADE20K,  opacity=0.5, get_image=False):
+def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", show_legend=True, labelset=ADE20K,  opacity=0.5, get_image=False, min_matches=100):
     
     if get_image or im_logging_enabled(data, LogLevel.Segmentation):
         
-        debug = get_segmentation_image(segmentation, image, avg, get_legend=show_legend, labelset=labelset)
+        debug = get_segmentation_image(segmentation, image, avg, get_legend=show_legend, labelset=labelset, min_matches=min_matches)
 
         if show_legend:
             debug, legend = debug

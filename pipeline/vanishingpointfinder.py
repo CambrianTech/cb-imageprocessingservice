@@ -41,6 +41,7 @@ class VanishingPoint:
 
         self._score = None
         self._inliers = None
+        self._inlier_lines = None
 
         #cv2.minAreaRect(InputArray  points)
 
@@ -68,6 +69,13 @@ class VanishingPoint:
             self._inliers = np.array(self.lines)[self.votes > 0]
 
         return self._inliers
+
+    @property
+    def inlier_lines(self):
+        if self._inlier_lines is None:
+            self._inlier_lines = list(map(lambda line_data: Line(line_data), self.inliers))
+
+        return self._inlier_lines
 
     @property
     def direction(self):
@@ -187,11 +195,6 @@ class VanishingPointFinder():
 
         return self.vanishing_points
 
-def draw_vp(img, vp, color, thickness=1):
-    for line_data in vp.inliers:
-        line = Line(line_data)
-        line.draw(img, color=color, thickness=thickness)
-
 class PipelineVanishingPointFinder(PipelineStep):
     @property
     def index(self) -> PipelineStepIndex:
@@ -286,14 +289,14 @@ class PipelineVanishingPointFinder(PipelineStep):
         Line.draw_all(img, self.all_lines, color=(80,80,80))
 
         if self.room.vertical_vp is not None and len(self.room.vertical_vp) > 0:
-            draw_vp(img, self.room.vertical_vp[0], color=(0,255,0))
+            Line.draw_all(img, self.room.vertical_vp[0].inlier_lines, color=(0,255,0), thickness=2)
 
         for surface in self.surfaces:
             if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
-                draw_vp(img, surface.horizontal_vp[0], color=random_color())
+                Line.draw_all(img, surface.horizontal_vp[0].inlier_lines, color=random_color(), thickness=2)
 
             if surface.vp and len(surface.vp):
-                draw_vp(img, surface.vp[0], color=random_color())
+                Line.draw_all(img, surface.vp[0].inlier_lines, color=random_color(), thickness=2)
             
         return img
 

@@ -8,40 +8,60 @@ import math
 
 from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
-from .utils import resize_array, random_color, overlay_mask, normalize, convert_color
+from .utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
-from .vanishingpointfinder import draw_vp, angle_with_vp
+from .vanishingpointfinder import angle_with_vp
 from .logging import log_image, log_segmentation_image, im_logging_enabled
 from cambrian.LineFunctions import LineFunctions
 from .Line import line_angle_difference, Line, on_image_edge
 from .room import Room, Surface
 
+class BarrierLine(Line):
+    def __init__(self, data, group, start_index, stop_index):
+        super().__init__(data, group=group)
+        self.start_index = start_index
+        self.stop_index = stop_index
+
 class Barrier():
-    def __init__(self, line, search_width=6, length_multiplier=3.0):
+    def __init__(self, line, poly_length):
         self.line = line
+        self.poly_length = poly_length
         self.source_lines = [line]
         self.indices = [line.id]
-        self.search_width = search_width
-        self.length_multiplier = length_multiplier
 
-    def intersects(self, line):
+    def intersects(self, line, search_width=13, length_multiplier=3.0):
         if line.group != self.line.group:
             return False
 
-        rect_a = self.line.bounding_box(self.search_width, length_multiplier=self.length_multiplier)
-        rect_b = line.bounding_box(self.search_width, length_multiplier=self.length_multiplier)
+        rect_a = self.line.bounding_box(search_width, length_multiplier=length_multiplier)
+        rect_b = line.bounding_box(search_width, length_multiplier=length_multiplier)
         result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
 
         return result != 0
 
-    def merge(self, line):
+    @property
+    def start_index(self):
+        return self.line.start_index % self.poly_length
+
+    @property
+    def stop_index(self):
+        return self.line.stop_index % self.poly_length
+
+    @property
+    def length(self):
+        return self.line.stop_index - self.line.start_index
+
+    def merge(self, line:BarrierLine):
         line_data = LineFunctions.merge_lines((self.line.point_a, self.line.point_b), (line.point_a, line.point_b))
-        self.line = Line(np.array([(line_data[0][0], line_data[0][1], line_data[1][0], line_data[1][1])], dtype=np.int).reshape(4))
+        start_index = min(self.line.start_index, line.start_index)
+        stop_index = max(self.line.stop_index, line.stop_index)
+        self.line = BarrierLine(np.array([(line_data[0][0], line_data[0][1], line_data[1][0], line_data[1][1])], dtype=np.int).reshape(4), group=line.group, start_index=start_index, stop_index=stop_index)
         self.source_lines.append(line)
 
     def extend_to(self, line):
         print("Extend to point")
+
 
 class BarrierFinder():
     def __init__(self, data, surface, hed):
@@ -52,7 +72,110 @@ class BarrierFinder():
         self.surface = surface
         self.hed = hed
 
-    def solve(self, angle_threshold=np.radians(7), alter_angle_threshold=np.radians(7), min_length=50, max_length=1000):
+    def border_search(self, poly, clockwise, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold):
+
+        min_length_sq = min_length * min_length
+        max_length_sq = max_length * max_length
+        theta_thresh = np.cos(angle_threshold)
+
+        was_vertical = None
+
+        num_pts = len(poly)
+        group = 0
+
+        barriers = []
+
+        diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
+
+        search_width = int(diagonal / 50)
+
+        for i in range(num_pts):
+
+            index_a = i if clockwise else (num_pts - i - 1)
+            index_b = (i+1 if clockwise else (num_pts - i - 2)) % num_pts
+
+            point_a = poly[index_a][0]
+            point_b = poly[index_b][0]
+
+            length_sq = distance.sqeuclidean(point_a, point_b)
+
+            if length_sq < min_length_sq or length_sq > max_length_sq:
+                continue
+
+            if on_image_edge(point_a, self.image) and on_image_edge(point_b, self.image):
+                continue
+            
+            line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
+
+            directions = np.array([line.direction]) 
+            directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
+            locations = np.array([line.midpoint])
+
+            vert_theta = angle_with_vp(vertical_vp.model, locations, directions)
+            horiz_theta = angle_with_vp(horizontal_vp.model, locations, directions)
+
+            is_vertical = vert_theta > theta_thresh
+            is_horizontal = horiz_theta > theta_thresh
+
+            if is_vertical or is_horizontal:
+                vp = horizontal_vp if is_horizontal else vertical_vp
+                est_directions = locations - vp.direction
+
+                direction = normalize(est_directions[0]) * 0.5 * line.length
+                line = BarrierLine(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4), \
+                    group=group, start_index=i, stop_index=i+1) #i+1 may extend into start by modulous division, but must be kept track of
+
+                if was_vertical != None and was_vertical != is_vertical:
+                    #made a legit turn, do not allow grouping with past barriers (could check angle?)
+                    #delete ones we've skipped over here
+                    group += 1
+
+                was_vertical = is_vertical
+
+                match = next(filter(lambda x: x.intersects(line, search_width=search_width), barriers), None)
+
+                if match is not None:
+                    if LineFunctions.line_angle_difference(line.angle, match.line.angle) < angle_threshold:
+                        match.merge(line)
+                        continue
+                
+                barriers.append(Barrier(line, poly_length=num_pts))
+
+        return barriers
+
+    def reintegrate_barriers(self, poly, barriers, occupied=None):
+
+        if occupied is None:
+            occupied = np.full(len(poly), False)
+
+        filtered = []
+
+        for barrier in sorted(barriers, key=lambda x:x.length, reverse=True):
+
+            if barrier.start_index < barrier.stop_index:
+                count = np.count_nonzero(occupied[barrier.start_index:barrier.stop_index])
+            else:
+                count = np.count_nonzero(occupied[barrier.start_index:]) + np.count_nonzero(occupied[0:barrier.stop_index])
+
+            if count > 0:
+                #print({"count":count, "start":barrier.start_index, "stop":barrier.stop_index}, {"barrier len": barrier.length, "poly len": len(poly)})
+                continue
+
+            if barrier.start_index < barrier.stop_index:
+                occupied[barrier.start_index:barrier.stop_index] = True
+            else:
+                occupied[barrier.start_index:] = True
+                occupied[0:barrier.stop_index] = True            
+
+            filtered.append(barrier)
+
+
+        return filtered, occupied
+            #point_a = poly[i][0]
+            #point_b = poly[(i+1) % num_pts][0]
+
+
+    def solve(self, angle_threshold=np.radians(7), min_length=50, max_length=1000):
         
         if self.surface.horizontal_vp is None or len(self.surface.horizontal_vp) == 0 or self.surface.vertical_vp is None or len(self.surface.vertical_vp) == 0:
             return []
@@ -60,97 +183,20 @@ class BarrierFinder():
         horizontal_vp = self.surface.horizontal_vp[0]
         vertical_vp = self.surface.vertical_vp[0]
 
-        theta_thresh = np.cos(angle_threshold)
-
-        min_length_sq = min_length * min_length
-        max_length_sq = max_length * max_length
-
-        barriers = []
-        group = -1
+        surface_barriers = []
 
         for poly in self.surface.polygons:
-            num_pts = len(poly)
-            last_line = None
-            group += 1
+            barriers = self.border_search(poly, True, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
+            barriers, occupied = self.reintegrate_barriers(poly, barriers)
+            surface_barriers.extend(barriers)
 
-            was_vertical = None
-
-            for i in range(num_pts):
-                point_a = poly[i][0]
-                point_b = poly[(i+1) % num_pts][0]
-
-                length_sq = distance.sqeuclidean(point_a, point_b)
-
-                if length_sq < min_length_sq or length_sq > max_length_sq:
-                    continue
-
-                if on_image_edge(point_a, self.image) and on_image_edge(point_b, self.image):
-                    continue
+            barriers = self.border_search(poly, False, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
+            barriers, occupied = self.reintegrate_barriers(poly, barriers, occupied)
+            surface_barriers.extend(barriers)
+            
                 
-                line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
-
-                directions = np.array([line.direction]) 
-                directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
-                locations = np.array([line.midpoint])
-
-                vert_theta = angle_with_vp(vertical_vp.model, locations, directions)
-                horiz_theta = angle_with_vp(horizontal_vp.model, locations, directions)
-
-                is_vertical = vert_theta > theta_thresh
-                is_horizontal = horiz_theta > theta_thresh
-
-                if is_vertical or is_horizontal:
-                    vp = horizontal_vp if is_horizontal else vertical_vp
-                    est_directions = locations - vp.direction
-
-                    direction = normalize(est_directions[0]) * 0.5 * line.length
-                    line = Line(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4), group=group)
-
-                    if was_vertical != None and was_vertical != is_vertical:
-                        #made a legit turn, do not allow grouping with past barriers (could check angle?)
-                        #delete ones we've skipped over here
-                        group += 1
-
-                    was_vertical = is_vertical
-
-                    match = next(filter(lambda x: x.intersects(line), barriers), None)
-
-                    if match is not None:
-                        if LineFunctions.line_angle_difference(line.angle, match.line.angle) < alter_angle_threshold:
-                            match.merge(line)
-                            continue
-                    
-                    barriers.append(Barrier(line))
-
-                
-        return barriers
+        return surface_barriers
         
-
-class LegFinder():
-    def __init__(self, data):
-        super().__init__()
-        self.data = data
-        self.room = data["room"]
-        self.image = self.data["downscaled"]
-        
-
-    def solve(self, max_iterations=3000):
-
-        self.surfaces = self.room.get_surfaces(surfaceTypes=[SurfaceType.Other, SurfaceType.Floor])
-        
-        for surface in self.surfaces:
-
-            surface.barriers = surface.border_lines
-            
-            
-        # start_time = time.time()
-        # for ransac_iter in range(max_iterations):
-        #     if time.time() - start_time > max_time:
-        #         break
-
-            
-
-
         
 class PipelineBarrierFinder(PipelineStep):
     @property
@@ -184,9 +230,6 @@ class PipelineBarrierFinder(PipelineStep):
             max_size = np.sqrt(surface.max_area) * 2
             surface.barriers = bf.solve(min_length=min_size, max_length=max_size)
 
-        # lf = LegFinder(self.data)
-        # lf.solve()
-
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers.png", self.get_debug_image())
 
@@ -211,16 +254,6 @@ class PipelineBarrierFinder(PipelineStep):
         for i in range(len(self.room.surfaces)):
             surface = self.room.surfaces[i]
             color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
-
-            for poly in surface.contours:
-                num_pts = len(poly)
-                for i in range(num_pts):
-                    point_a = poly[i][0]
-                    point_b = poly[(i+1) % num_pts][0]
-
-                    line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
-
-                    line.draw(img, color=color)
 
             for barrier in surface.barriers:
                 barrier.line.draw(img, color=color, thickness=2)
