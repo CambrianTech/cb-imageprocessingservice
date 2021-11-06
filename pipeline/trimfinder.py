@@ -8,7 +8,7 @@ import math
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
 from .logging import log_image, im_logging_enabled
 from .utils import convert_color
-
+from .Line import Line
 
 class TrimFinder():
     def __init__(self, data, surface):
@@ -23,6 +23,10 @@ class TrimFinder():
         if self.surface.horizontal_vp is None or len(self.surface.horizontal_vp) == 0:
             return []
 
+        surface_barriers = self.surface.horizontal_vp[0].inlier_lines
+
+        # for line in self.surface.horizontal_vp[0].inlier_lines:
+        #     surface_barriers.extend(line)
             
         return surface_barriers
         
@@ -50,30 +54,27 @@ class PipelineTrimFinder(PipelineStep):
         #create segmentation category?
         self.surfaces = self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike, SurfaceType.Floor, SurfaceType.Ceiling])
 
+        for surface in self.surfaces:
+            tf = TrimFinder(self.data, surface)
+            surface.trim_lines = tf.solve()
+
         if im_logging_enabled(self.data):
             log_image(self.data, "trim.png", self.get_debug_image())
 
 
     def get_debug_image(self):
 
-        img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV_FULL)
-        hues = random.sample(range(0, 360), len(self.room.surfaces))
-
-        #overlay probs
-        for i in range(len(self.room.surfaces)):
-            surface = self.room.surfaces[i]
-            mask = surface.mask > 0
-
-            max_value = 0.9
-            if max_value > 0:
-                img_hsv[:, :, 0][mask] = hues[i]
-                img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.15)
+        hues = random.sample(range(0, 360), len(self.surfaces))
                     
-        img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
+        img = self.image.copy()
 
-        for i in range(len(self.room.surfaces)):
-            surface = self.room.surfaces[i]
+        Line.draw_all(img, self.data["lines"], color=(0,255,0), thickness=1)
+
+        for i in range(len(self.surfaces)):
+            surface = self.surfaces[i]
             color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
+
+            Line.draw_all(img, surface.trim_lines, color=color, thickness=2)
 
 
         return img
