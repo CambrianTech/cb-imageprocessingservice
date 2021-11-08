@@ -130,7 +130,7 @@ class Room(Geometry):
 
         return candidates[0]
 
-    def add_missing_surfaces(self, invalid_mask, min_area=1/1200):
+    def add_missing_surfaces(self, invalid_mask=None, min_area=1/1200):
 
         total_area = self.image.shape[0] * self.image.shape[1]
         area_threshold = int(total_area * min_area)
@@ -254,7 +254,7 @@ class Room(Geometry):
                     print(colored("Creating new %s (%s) using %s as reference" % (surfaceType.name, new_surface.name, reference_surface.name), 'green'))
             
 
-    def merge_like_surfaces(self, angle_threshold=np.radians(20)):
+    def merge_like_surfaces(self, angle_threshold=np.radians(30)):
 
         for surfaceType in SurfaceType:
             
@@ -374,6 +374,7 @@ class Room(Geometry):
                 else:
                     inner_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
                     cv2.drawContours(inner_mask, np.array(contour), 0, 1, cv2.FILLED)
+                    
                     innerMean, innerStd = cv2.meanStdDev(self.image, mask=inner_mask)
 
                     outer_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
@@ -387,7 +388,7 @@ class Room(Geometry):
                     #really want the standard deviation here, but opencv is returning ZEROS:
                     #threshold = meanDiff + innerStd * meanDiff
 
-                    #print("surface %s(%d) %.2f" % (surface.name, i, meanDiff))
+                    print("surface %s(%d) %.2f" % (surface.name, i, meanDiff))
 
                     if meanDiff < 10:
                         #print("remove %s" % name, meanDiff)
