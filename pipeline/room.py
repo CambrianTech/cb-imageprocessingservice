@@ -367,12 +367,9 @@ class Room(Geometry):
                 if area > max_area:
                     continue
 
-                valid = area > 0
-
                 name = "Surface %s(%d)" % (surface.name, i)
 
                 if area < min_area:
-                    print("Remove %s" % name)
                     invalid_contours.append(contour)
                 else:
                     inner_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
@@ -387,12 +384,13 @@ class Room(Geometry):
 
                     meanDiff = np.max(np.abs(innerMean - outerMean))
 
+                    #really want the standard deviation here, but opencv is returning ZEROS:
                     #threshold = meanDiff + innerStd * meanDiff
 
-                    print("surface %s(%d) %.2f" % (surface.name, i, meanDiff))
+                    #print("surface %s(%d) %.2f" % (surface.name, i, meanDiff))
 
-                    if meanDiff < 40:
-                        print("remove %s" % name, meanDiff)
+                    if meanDiff < 10:
+                        #print("remove %s" % name, meanDiff)
                         invalid_contours.append(contour)
                    
             all_invalid_contours.extend(invalid_contours)
