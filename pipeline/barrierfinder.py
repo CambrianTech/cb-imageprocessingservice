@@ -87,7 +87,7 @@ class BarrierFinder():
 
         diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
-        search_width = int(diagonal / 50)
+        search_width = int(diagonal / 100)
 
         for i in range(num_pts):
 
