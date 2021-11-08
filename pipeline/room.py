@@ -254,7 +254,7 @@ class Room(Geometry):
                     print(colored("Creating new %s (%s) using %s as reference" % (surfaceType.name, new_surface.name, reference_surface.name), 'green'))
             
 
-    def merge_like_surfaces(self, angle_threshold=np.radians(30)):
+    def merge_like_surfaces(self, angle_threshold=np.radians(30), angle_threshold_force=np.radians(20)):
 
         for surfaceType in SurfaceType:
             
@@ -285,8 +285,13 @@ class Room(Geometry):
                     #todo: check for intersection. In elevator image, wall sitting out front is being incorrectly merged. if it's fairly parallel, don't
                     if surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling or (angle < angle_threshold and distance_between < distance_error):
                         if surfaceType != SurfaceType.Other or surfaces[i].bestLabel == surfaces[j].bestLabel:
-                            surfaces[i].merge(surfaces[j])
-                            surfaces[i]._alteration = "%.2fm %.2fd" % (distance_between, angle_threshold)
+                            offset_diff = abs(surfaces[i].offset - surfaces[j].offset) / max(abs(surfaces[i].offset), abs(surfaces[j].offset))
+                            
+                            #print("angle", angle, "offset", offset_diff)
+
+                            if offset_diff < 0.05 or angle < angle_threshold_force: 
+                                surfaces[i].merge(surfaces[j])
+                                surfaces[i]._alteration = "%.2fm %.2fd" % (distance_between, angle_threshold)
 
         
     def refine_surfaces(self, min_confidence=None, use_lines=True, debug_suffix=""):
