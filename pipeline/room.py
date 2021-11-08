@@ -16,7 +16,7 @@ from scipy.spatial import distance
 from .geometry import Geometry
 from .core import SurfaceType
 from .surface import Surface
-from .utils import convert_color, put_text, overlay_mask, random_color, sample_at_point
+from .utils import convert_color, put_text, overlay_mask, random_color, sample_at_point, scale_contour
 from .logging import im_logging_enabled, log_image, log_segmentation_image, log_markers, Timer
 from .Line import line_angle_difference, Line, on_image_edge
 from .ade20k import ADE20K
@@ -83,7 +83,9 @@ class Room(Geometry):
         invalid_mask = self.remove_invalid_surfaces()
         
         if cv2.countNonZero(invalid_mask) > 50:
-            log_segmentation_image(self.data, "room_invalid", invalid_mask, self.image, labelset=["valid","invalid"], min_matches=50)
+            debug = self.image.copy()
+            debug[invalid_mask > 0] = [0,255,0]
+            log_image(self.data, "room_removed", debug)
 
         timer.log_elapsed("remove_invalid_surfaces")
 
@@ -344,27 +346,73 @@ class Room(Geometry):
         for surfaceType in SurfaceType: 
             expand_into_type(surfaceType)
 
-    def remove_invalid_surfaces(self, min_length=1/50, narrowness_threshold=5):
+    def remove_invalid_surfaces(self, min_area_threshold=1/1000, max_area_threshold=1/50, scale=1.2):
 
         total_area = self.image.shape[0] * self.image.shape[1]
-        length_threshold = math.sqrt(total_area) * min_length
+        max_area = total_area * max_area_threshold
+        min_area = total_area * min_area_threshold
         
         all_invalid_contours = []
-        print("Remove invalid wall parts. length_threshold:", length_threshold)
+        print("Remove invalid wall parts.")
 
         for surface in self.get_surfaces([SurfaceType.Wall]):
             invalid_contours = []
 
-            scaled_length_threshold = length_threshold / (1 + abs(surface.offset))
-
             for i in range(len(surface.contours)):
                 contour = surface.contours[i]
+
+                M = cv2.moments(contour)
+                area = M['m00']
+
+                if area > max_area:
+                    continue
+
+                valid = area > 0
+
+                name = "Surface %s(%d)" % (surface.name, i)
+
+                if area < min_area:
+                    print("Remove %s" % name)
+                    invalid_contours.append(contour)
+                else:
+                    inner_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+                    cv2.drawContours(inner_mask, np.array(contour), 0, 1, cv2.FILLED)
+                    innerMean, innerStd = cv2.meanStdDev(self.image, mask=inner_mask)
+
+                    outer_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+                    contour_expanded = scale_contour(contour, scale, moments=M)
+                    cv2.drawContours(outer_mask, np.array(contour_expanded), 0, 1, cv2.FILLED)
+                    #outer_mask[inner_mask] = 0
+                    outerMean, outerStd = cv2.meanStdDev(self.image, mask=outer_mask)
+
+                    meanDiff = np.max(np.abs(innerMean - outerMean))
+
+                    #threshold = meanDiff + innerStd * meanDiff
+
+                    print("surface %s(%d) %.2f" % (surface.name, i, meanDiff))
+
+                    if meanDiff < 40:
+                        print("remove %s" % name, meanDiff)
+                        invalid_contours.append(contour)
+                   
+            all_invalid_contours.extend(invalid_contours)
+
+            if len(invalid_contours) == len(surface.contours):
+                surface.destroy() #totally invalid
+                print(colored("Removing surface %s" % surface.name, "red"))
+            elif len(invalid_contours) > 0:
+                print(colored("Removing %d contours from surface %s" % (len(invalid_contours), surface.name), "yellow"))
+                mask = surface.mask.copy()
+                cv2.drawContours(mask, np.array(invalid_contours), -1, 0, cv2.FILLED)
+                surface.set_mask(mask)
 
                 #todo: look inside contour for validity
 
         invalid_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
-        cv2.drawContours(invalid_mask, np.array(all_invalid_contours), -1, 1, cv2.FILLED)
-        self.refresh_surfaces()
+
+        if len(all_invalid_contours) > 0:
+            cv2.drawContours(invalid_mask, np.array(all_invalid_contours), -1, 1, cv2.FILLED)
+            self.refresh_surfaces()
 
         return invalid_mask
         
