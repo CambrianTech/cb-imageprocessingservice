@@ -154,6 +154,21 @@ def normalize(v):
        return v
     return v / norm
 
+def scale_contour(cnt, scale, moments=None):
+
+    if moments is None:
+        moments = cv2.moments(cnt)
+
+    cx = int(moments['m10']/moments['m00'])
+    cy = int(moments['m01']/moments['m00'])
+
+    cnt_norm = cnt - [cx, cy]
+    cnt_scaled = cnt_norm * scale
+    cnt_scaled = cnt_scaled + [cx, cy]
+    cnt_scaled = cnt_scaled.astype(np.int32)
+
+    return cnt_scaled
+
 def convert_color(color, conversion):
     #return tuple(int(i) for i in cv2.cvtColor(img, conversion).flatten())
     

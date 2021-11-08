@@ -48,7 +48,7 @@ class PipelineLegFinder(PipelineStep):
         self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.FloorLike]))
 
         if im_logging_enabled(self.data):
-            log_image(self.data, "trim.png", self.get_debug_image())
+            log_image(self.data, "legs.png", self.get_debug_image())
 
 
     def get_debug_image(self):

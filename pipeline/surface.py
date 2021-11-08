@@ -199,11 +199,22 @@ class Surface():
     @property
     def contours(self):
         if self._contours is None:
-            self._contours, self.hierarchy = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            self.moments = cv2.moments(self._contours[0]) if len(self._contours) > 0 else None
+            #make a 1 pixel border so that edge contours aren't zero area
+            mask_bordered = cv2.copyMakeBorder(self.mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0) 
+            self._contours, self.hierarchy = cv2.findContours(mask_bordered, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-            if self.moments is None or self.moments["m00"] == 0:
-                self.moments = cv2.moments(self.mask)
+            #remove border offset:
+            for contour in self._contours:
+                shape = contour.shape
+                contour = (contour.flatten() - 1).reshape(shape)
+
+            self.moments = cv2.moments(self.mask)
+            
+            # self.moments = cv2.moments(self._contours[0]) if len(self._contours) > 0 else None
+
+            # if self.moments is None or self.moments["m00"] == 0:
+            #     self.moments = cv2.moments(self.mask)
+
 
         return self._contours
 
