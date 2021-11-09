@@ -118,7 +118,7 @@ class Line(Sequence):
 
 
             if line_a.dead:
-                lines[i] = Line(np.array([(data[0][0], data[0][1], data[1][0], data[1][1])], dtype=np.int).reshape(4), group=lines[i].group, id=lines[i].id)
+                lines[i] = Line(np.array([data[0][0], data[0][1], data[1][0], data[1][1]], dtype=np.int), group=lines[i].group, id=lines[i].id)
 
         return list(filter(lambda x: not x.dead, lines))
 

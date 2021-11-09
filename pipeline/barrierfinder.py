@@ -29,8 +29,9 @@ class Barrier():
         self.poly_length = poly_length
         self.source_lines = [line]
         self.indices = [line.id]
+        self.destroyed = False
 
-    def intersects(self, line, search_width=13, length_multiplier=3.0):
+    def intersects(self, line, search_width=13, length_multiplier=5.0):
         if line.group != self.line.group:
             return False
 
@@ -52,11 +53,13 @@ class Barrier():
     def length(self):
         return self.line.stop_index - self.line.start_index
 
-    def merge(self, line:BarrierLine):
-        line_data = LineFunctions.merge_lines((self.line.point_a, self.line.point_b), (line.point_a, line.point_b))
+    def merge(self, line:BarrierLine, merged_data=None):
+        if merged_data is None:
+            merged_data = LineFunctions.merge_lines((self.line.point_a, self.line.point_b), (line.point_a, line.point_b))
+
         start_index = min(self.line.start_index, line.start_index)
         stop_index = max(self.line.stop_index, line.stop_index)
-        self.line = BarrierLine(np.array([(line_data[0][0], line_data[0][1], line_data[1][0], line_data[1][1])], dtype=np.int).reshape(4), group=line.group, start_index=start_index, stop_index=stop_index)
+        self.line = BarrierLine(np.array([merged_data[0][0], merged_data[0][1], merged_data[1][0], merged_data[1][1]], dtype=np.int), group=line.group, start_index=start_index, stop_index=stop_index)
         self.source_lines.append(line)
 
     def extend_to(self, line):
@@ -87,7 +90,7 @@ class BarrierFinder():
 
         diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
-        search_width = int(diagonal / 100)
+        search_width = int(diagonal / 50)
 
         for i in range(num_pts):
 
@@ -122,7 +125,7 @@ class BarrierFinder():
                 est_directions = locations - vp.direction
 
                 direction = normalize(est_directions[0]) * 0.5 * line.length
-                line = BarrierLine(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int).reshape(4), \
+                line = BarrierLine(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int), \
                     group=group, start_index=i, stop_index=i+1) #i+1 may extend into start by modulous division, but must be kept track of
 
                 if was_vertical != None and was_vertical != is_vertical:
@@ -136,7 +139,10 @@ class BarrierFinder():
 
                 if match is not None:
                     if LineFunctions.line_angle_difference(line.angle, match.line.angle) < angle_threshold:
-                        match.merge(line)
+                        #check for 
+                        merged_result = LineFunctions.merge_lines((match.line.point_a, match.line.point_b), (line.point_a, line.point_b))
+
+                        match.merge(line, merged_result)
                         continue
                 
                 barriers.append(Barrier(line, poly_length=num_pts))
@@ -158,7 +164,7 @@ class BarrierFinder():
                 count = np.count_nonzero(occupied[barrier.start_index:]) + np.count_nonzero(occupied[0:barrier.stop_index])
 
             if count > 0:
-                #print({"count":count, "start":barrier.start_index, "stop":barrier.stop_index}, {"barrier len": barrier.length, "poly len": len(poly)})
+                print({"count":count, "start":barrier.start_index, "stop":barrier.stop_index}, {"barrier len": barrier.length, "poly len": len(poly)})
                 continue
 
             if barrier.start_index < barrier.stop_index:
@@ -186,14 +192,34 @@ class BarrierFinder():
         surface_barriers = []
 
         for poly in self.surface.polygons:
+            #both directions:
+
+            #clockwise:
             barriers = self.border_search(poly, True, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
+            #remove ones skipped by others:
             barriers, occupied = self.reintegrate_barriers(poly, barriers)
             surface_barriers.extend(barriers)
 
+            #counter_clockwise:
             barriers = self.border_search(poly, False, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
             barriers, occupied = self.reintegrate_barriers(poly, barriers, occupied)
             surface_barriers.extend(barriers)
-            
+        
+
+        #link/merge barriers:
+        diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
+        search_width = diagonal / 50
+
+        for i in range(len(surface_barriers)):
+            barrier_a = surface_barriers[i]
+
+            best_match = None
+            for j in range(i+1, len(surface_barriers)):
+                barrier_b = surface_barriers[j]
+
+                #barrier_b.intersects()
+
+
                 
         return surface_barriers
         
