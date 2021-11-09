@@ -81,6 +81,12 @@ class BarrierFinder():
         max_length_sq = max_length * max_length
         theta_thresh = np.cos(angle_threshold)
 
+        def line_stats(point_a, point_b):
+            merged_result_len = distance.euclidean(point_a, point_b)
+            num_samples = int(merged_result_len / 5) + 1
+            samples = LineFunctions.get_line_samples(point_a, point_b, self.image, num_samples)
+            return np.mean(samples, axis=0), np.std(samples, axis=0)
+
         was_vertical = None
 
         num_pts = len(poly)
@@ -142,8 +148,18 @@ class BarrierFinder():
                         #check for 
                         merged_result = LineFunctions.merge_lines((match.line.point_a, match.line.point_b), (line.point_a, line.point_b))
 
-                        match.merge(line, merged_result)
-                        continue
+                        mean_line_a, std_line_a = line_stats(line.point_a, line.point_b)
+                        mean_line_b, std_line_b = line_stats(match.line.point_a, match.line.point_b)
+                        
+                        diff = np.linalg.norm(mean_line_b - mean_line_a)
+                        std = min(np.linalg.norm(std_line_a), np.linalg.norm(std_line_b))
+
+                        # print(diff, std)
+                        # exit()
+
+                        if diff < std * 10:
+                            match.merge(line, merged_result)
+                            continue
                 
                 barriers.append(Barrier(line, poly_length=num_pts))
 
@@ -164,7 +180,7 @@ class BarrierFinder():
                 count = np.count_nonzero(occupied[barrier.start_index:]) + np.count_nonzero(occupied[0:barrier.stop_index])
 
             if count > 0:
-                print({"count":count, "start":barrier.start_index, "stop":barrier.stop_index}, {"barrier len": barrier.length, "poly len": len(poly)})
+                #print({"count":count, "start":barrier.start_index, "stop":barrier.stop_index}, {"barrier len": barrier.length, "poly len": len(poly)})
                 continue
 
             if barrier.start_index < barrier.stop_index:
