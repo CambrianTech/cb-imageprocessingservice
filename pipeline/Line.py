@@ -154,14 +154,16 @@ def sqeuclidean(point_a, point_b):
 
 @nb.jit(nopython=True)
 def on_image_edge(point, image, min_distance=3):
+    edge = 0x0
     if point[0] <= min_distance:
-        return 1
-    elif point[0] >= image.shape[1] - min_distance - 1:
-        return 3
-    elif point[1] <= min_distance:
-        return 2
-    elif point[1] >= image.shape[0] - min_distance - 1:
-        return 4
+        edge |= 0x0001
+    if point[0] >= image.shape[1] - min_distance - 1:
+        edge |= 0x0010
+    if point[1] <= min_distance:
+        edge |= 0x0100
+    if point[1] >= image.shape[0] - min_distance - 1:
+        edge |= 0x1000
+    return edge
 
 @nb.jit(nopython=True)
 def merge_line_pair(line_a, line_b):
