@@ -81,11 +81,19 @@ class BarrierFinder():
         max_length_sq = max_length * max_length
         theta_thresh = np.cos(angle_threshold)
 
-        def line_stats(point_a, point_b):
+        def _line_stats(point_a, point_b):
             merged_result_len = distance.euclidean(point_a, point_b)
-            num_samples = int(merged_result_len / 5) + 1
+            num_samples = int(merged_result_len + 1)
             samples = LineFunctions.get_line_samples(point_a, point_b, self.image, num_samples)
-            return np.mean(samples, axis=0), np.std(samples, axis=0)
+            return  np.mean(samples, axis=0), np.std(samples, axis=0)
+
+        def line_stats(point_a, point_b):
+            values = [_line_stats(point_a, point_b), \
+                      _line_stats((point_a[0] - 1, point_a[1] - 1), (point_b[0] - 1, point_b[1] - 1)), \
+                      _line_stats((point_a[0] + 1, point_a[1] + 1), (point_b[0] + 1, point_b[1] + 1))]
+
+            values.sort(key=lambda x: np.linalg.norm(x[1]))
+            return values[0]
 
         was_vertical = None
 
@@ -152,12 +160,16 @@ class BarrierFinder():
                         mean_line_b, std_line_b = line_stats(match.line.point_a, match.line.point_b)
                         
                         diff = np.linalg.norm(mean_line_b - mean_line_a)
+
+                        #mean = min(np.linalg.norm(mean_line_a), np.linalg.norm(mean_line_b))
                         std = min(np.linalg.norm(std_line_a), np.linalg.norm(std_line_b))
 
-                        # print(diff, std)
-                        # exit()
+                        #cabinet 5: 42.04354087596048 38.03833631464182 245.3443258180998
 
-                        if diff < std * 10:
+                        threshold = std * 6
+                        #print(self.surface.name, diff, threshold)
+
+                        if diff < threshold:
                             match.merge(line, merged_result)
                             continue
                 
@@ -293,12 +305,18 @@ class PipelineBarrierFinder(PipelineStep):
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
+
         for i in range(len(self.room.surfaces)):
             surface = self.room.surfaces[i]
             color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
 
+            #cv2.drawContours(img, surface.polygons, -1, color, 1)
+
+            # if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
+            #     Line.draw_all(img, surface.horizontal_vp[0].inlier_lines, color=color, thickness=1)
+
             for barrier in surface.barriers:
-                barrier.line.draw(img, color=color, thickness=2)
+                barrier.line.draw(img, color=color, thickness=3)
 
             for barrier in surface.barriers:
                 cv2.drawMarker(img, barrier.line.point_a, color=color)
