@@ -163,6 +163,17 @@ class Surface():
         return self._border_lines
 
     @property
+    def vanishing_points(self) -> list:
+        vps = []    
+        if self.horizontal_vp is not None and len(self.horizontal_vp) > 0:
+            vps.append(self.horizontal_vp[0])
+
+        if self.vertical_vp is not None and len(self.vertical_vp) > 0:
+            vps.append(self.vertical_vp[0])
+
+        return vps
+
+    @property
     def min_area(self) -> float:
         self.lines
         return self._min_area

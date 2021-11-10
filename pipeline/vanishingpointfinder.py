@@ -45,11 +45,8 @@ class VanishingPoint:
 
         #cv2.minAreaRect(InputArray  points)
 
-    def __eq__(self, other):
-        return self.score() == other.score()
-
     def __lt__(self, other):
-        return self.score() < other.score()
+        return self.score < other.score
 
     @property
     def score(self):

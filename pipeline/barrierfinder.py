@@ -75,7 +75,7 @@ class BarrierFinder():
         self.surface = surface
         self.hed = hed
 
-    def border_search(self, poly, clockwise, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold):
+    def border_search(self, poly, clockwise, vps, min_length, max_length, angle_threshold):
 
         min_length_sq = min_length * min_length
         max_length_sq = max_length * max_length
@@ -95,7 +95,7 @@ class BarrierFinder():
             values.sort(key=lambda x: np.linalg.norm(x[1]))
             return values[0]
 
-        was_vertical = None
+        last_vp_match = None
 
         num_pts = len(poly)
         group = 0
@@ -128,52 +128,55 @@ class BarrierFinder():
             directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
             locations = np.array([line.midpoint])
 
-            vert_theta = angle_with_vp(vertical_vp.model, locations, directions)
-            horiz_theta = angle_with_vp(horizontal_vp.model, locations, directions)
+            vp_match = None
 
-            is_vertical = vert_theta > theta_thresh
-            is_horizontal = horiz_theta > theta_thresh
+            for vp in vps:
+                theta = angle_with_vp(vp.model, locations, directions)
+                if theta > theta_thresh:
+                    vp_match = vp
+                    break
 
-            if is_vertical or is_horizontal:
-                vp = horizontal_vp if is_horizontal else vertical_vp
-                est_directions = locations - vp.direction
+            if vp_match is None:
+                continue
 
-                direction = normalize(est_directions[0]) * 0.5 * line.length
-                line = BarrierLine(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int), \
-                    group=group, start_index=i, stop_index=i+1) #i+1 may extend into start by modulous division, but must be kept track of
+            est_directions = locations - vp_match.direction
 
-                if was_vertical != None and was_vertical != is_vertical:
-                    #made a legit turn, do not allow grouping with past barriers (could check angle?)
-                    #delete ones we've skipped over here
-                    group += 1
+            direction = normalize(est_directions[0]) * 0.5 * line.length
+            line = BarrierLine(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int), \
+                group=group, start_index=i, stop_index=i+1) #i+1 may extend into start by modulous division, but must be kept track of
 
-                was_vertical = is_vertical
+            if last_vp_match != None and last_vp_match != vp_match:
+                #made a legit turn, do not allow grouping with past barriers (could check angle?)
+                #delete ones we've skipped over here
+                group += 1
 
-                match = next(filter(lambda x: x.intersects(line, search_width=search_width), barriers), None)
+            last_vp_match = vp_match
 
-                if match is not None:
-                    if LineFunctions.line_angle_difference(line.angle, match.line.angle) < angle_threshold:
-                        #check for 
-                        merged_result = LineFunctions.merge_lines((match.line.point_a, match.line.point_b), (line.point_a, line.point_b))
+            match = next(filter(lambda x: x.intersects(line, search_width=search_width), barriers), None)
 
-                        mean_line_a, std_line_a = line_stats(line.point_a, line.point_b)
-                        mean_line_b, std_line_b = line_stats(match.line.point_a, match.line.point_b)
-                        
-                        diff = np.linalg.norm(mean_line_b - mean_line_a)
+            if match is not None:
+                if LineFunctions.line_angle_difference(line.angle, match.line.angle) < angle_threshold:
+                    #check for 
+                    merged_result = LineFunctions.merge_lines((match.line.point_a, match.line.point_b), (line.point_a, line.point_b))
 
-                        #mean = min(np.linalg.norm(mean_line_a), np.linalg.norm(mean_line_b))
-                        std = min(np.linalg.norm(std_line_a), np.linalg.norm(std_line_b))
+                    mean_line_a, std_line_a = line_stats(line.point_a, line.point_b)
+                    mean_line_b, std_line_b = line_stats(match.line.point_a, match.line.point_b)
+                    
+                    diff = np.linalg.norm(mean_line_b - mean_line_a)
 
-                        #cabinet 5: 42.04354087596048 38.03833631464182 245.3443258180998
+                    #mean = min(np.linalg.norm(mean_line_a), np.linalg.norm(mean_line_b))
+                    std = min(np.linalg.norm(std_line_a), np.linalg.norm(std_line_b))
 
-                        threshold = std * 7
-                        #print(self.surface.name, diff, threshold)
+                    #cabinet 5: 42.04354087596048 38.03833631464182 245.3443258180998
 
-                        if diff < threshold:
-                            match.merge(line, merged_result)
-                            continue
-                
-                barriers.append(Barrier(line, poly_length=num_pts))
+                    threshold = std * 7
+                    #print(self.surface.name, diff, threshold)
+
+                    if diff < threshold:
+                        match.merge(line, merged_result)
+                        continue
+            
+            barriers.append(Barrier(line, poly_length=num_pts))
 
         return barriers
 
@@ -211,11 +214,8 @@ class BarrierFinder():
 
     def solve(self, angle_threshold=np.radians(7), min_length=50, max_length=1000):
         
-        if self.surface.horizontal_vp is None or len(self.surface.horizontal_vp) == 0 or self.surface.vertical_vp is None or len(self.surface.vertical_vp) == 0:
+        if len(self.surface.vanishing_points) < 0:
             return []
-
-        horizontal_vp = self.surface.horizontal_vp[0]
-        vertical_vp = self.surface.vertical_vp[0]
 
         surface_barriers = []
 
@@ -223,13 +223,13 @@ class BarrierFinder():
             #both directions:
 
             #clockwise:
-            barriers = self.border_search(poly, True, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
+            barriers = self.border_search(poly, True, self.surface.vanishing_points, min_length, max_length, angle_threshold)
             #remove ones skipped by others:
             barriers, occupied = self.reintegrate_barriers(poly, barriers)
             surface_barriers.extend(barriers)
 
             #counter_clockwise:
-            barriers = self.border_search(poly, False, horizontal_vp, vertical_vp, min_length, max_length, angle_threshold)
+            barriers = self.border_search(poly, False, self.surface.vanishing_points, min_length, max_length, angle_threshold)
             barriers, occupied = self.reintegrate_barriers(poly, barriers, occupied)
             surface_barriers.extend(barriers)
         
@@ -305,6 +305,7 @@ class PipelineBarrierFinder(PipelineStep):
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
+        theta_thresh = np.cos(np.radians(7))
 
         for i in range(len(self.room.surfaces)):
             surface = self.room.surfaces[i]
@@ -312,8 +313,32 @@ class PipelineBarrierFinder(PipelineStep):
 
             #cv2.drawContours(img, surface.polygons, -1, color, 1)
 
-            # if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
-            #     Line.draw_all(img, surface.horizontal_vp[0].inlier_lines, color=color, thickness=1)
+            for poly in surface.polygons:
+                num_pts = len(poly)
+
+                for j in range(num_pts):
+                    point_a = poly[j][0]
+                    point_b = poly[(j + 1) % num_pts][0]
+
+                    line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
+
+                    directions = np.array([line.direction]) 
+                    directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
+                    locations = np.array([line.midpoint])
+
+                    match = False
+
+                    for vp in surface.vanishing_points:
+                        theta = angle_with_vp(vp.model, locations, directions)
+                        if theta > theta_thresh:
+                            match = True
+                            break
+                    
+                    if match:
+                        cv2.line(img, point_a, point_b, color, thickness=1)
+
+            
+            #Line.draw_all(img, surface.horizontal_vp[0].inlier_lines, color=color, thickness=1)
 
             for barrier in surface.barriers:
                 barrier.line.draw(img, color=color, thickness=3)
