@@ -138,7 +138,7 @@ class BarrierFinder():
             est_line = BarrierLine(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int), \
                 group=group, start_index=i, stop_index=i+1) #i+1 may extend into start by modulous division, but must be kept track of
 
-            if LineFunctions.line_angle_difference(line.angle, est_line.angle) < angle_threshold / 2:
+            if LineFunctions.line_angle_difference(line.angle, est_line.angle) < angle_threshold * 3 / 2:
                 line = est_line
 
             if last_vp_match != None and last_vp_match != vp_match:
@@ -165,7 +165,7 @@ class BarrierFinder():
 
                     #cabinet 5: 42.04354087596048 38.03833631464182 245.3443258180998
 
-                    threshold = std * 7
+                    threshold = std * 4
                     #print(self.surface.name, diff, threshold)
 
                     if diff < threshold:
