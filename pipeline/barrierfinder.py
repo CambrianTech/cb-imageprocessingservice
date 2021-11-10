@@ -166,7 +166,7 @@ class BarrierFinder():
 
                         #cabinet 5: 42.04354087596048 38.03833631464182 245.3443258180998
 
-                        threshold = std * 6
+                        threshold = std * 7
                         #print(self.surface.name, diff, threshold)
 
                         if diff < threshold:
