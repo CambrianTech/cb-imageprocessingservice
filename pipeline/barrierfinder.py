@@ -204,7 +204,7 @@ class BarrierFinder():
             #point_a = poly[i][0]
             #point_b = poly[(i+1) % num_pts][0]
 
-    def inlier_search(self, poly, padding):
+    def inlier_search(self, poly, vp_lines, padding):
 
         def on_the_border(line):
             #positive (inside), negative (outside), or zero (on an edge)
@@ -214,9 +214,8 @@ class BarrierFinder():
             return abs(dist_a) <= padding and abs(dist_b) <= padding and abs(dist_midpoint) <= padding
 
         
-        inlier_lines = (list(filter(lambda line: on_the_border(line), self.surface.lines)))
-            
-            
+
+        inlier_lines = (list(filter(lambda line: on_the_border(line), vp_lines)))
 
         return inlier_lines
             
@@ -230,6 +229,17 @@ class BarrierFinder():
 
         diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
         padding = diagonal / 40
+
+        inlier_surfaces = []
+        inlier_surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike, SurfaceType.Ceiling, SurfaceType.Floor]))
+        inlier_surfaces.extend(self.room.get_surfaces(labels=box_like))
+
+        vp_lines = []
+        for surface in inlier_surfaces:
+            for vp in surface.vanishing_points:
+                for line in vp.inlier_lines:
+                    if line not in vp_lines:
+                        vp_lines.append(line)
 
         #pull barriers from surface contours:
         for poly in self.surface.polygons:
@@ -247,7 +257,7 @@ class BarrierFinder():
             surface_barriers.extend(barriers)
 
             #pull barriers from inlier lines near surface edges:
-            inlier_lines.extend(self.inlier_search(poly, padding))
+            inlier_lines.extend(self.inlier_search(poly, vp_lines, padding))
             
 
         filtered_lines = inlier_lines
