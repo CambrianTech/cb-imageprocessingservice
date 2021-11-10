@@ -122,28 +122,24 @@ class BarrierFinder():
             if on_image_edge(point_a, self.image) and on_image_edge(point_b, self.image):
                 continue
             
-            line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
+            line = BarrierLine(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]), group=group, start_index=i, stop_index=i+1)
 
             directions = np.array([line.direction]) 
             directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
             locations = np.array([line.midpoint])
 
-            vp_match = None
+            vp_match = next(filter(lambda vp: angle_with_vp(vp.model, locations, directions) > theta_thresh, vps), None)
 
-            for vp in vps:
-                theta = angle_with_vp(vp.model, locations, directions)
-                if theta > theta_thresh:
-                    vp_match = vp
-                    break
-
-            if vp_match is None:
-                continue
+            if vp_match is None: continue
 
             est_directions = locations - vp_match.direction
 
             direction = normalize(est_directions[0]) * 0.5 * line.length
-            line = BarrierLine(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int), \
+            est_line = BarrierLine(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int), \
                 group=group, start_index=i, stop_index=i+1) #i+1 may extend into start by modulous division, but must be kept track of
+
+            if LineFunctions.line_angle_difference(line.angle, est_line.angle) < angle_threshold / 2:
+                line = est_line
 
             if last_vp_match != None and last_vp_match != vp_match:
                 #made a legit turn, do not allow grouping with past barriers (could check angle?)
@@ -326,15 +322,9 @@ class PipelineBarrierFinder(PipelineStep):
                     directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
                     locations = np.array([line.midpoint])
 
-                    match = False
-
-                    for vp in surface.vanishing_points:
-                        theta = angle_with_vp(vp.model, locations, directions)
-                        if theta > theta_thresh:
-                            match = True
-                            break
+                    vp_match = next(filter(lambda vp: angle_with_vp(vp.model, locations, directions) > theta_thresh, surface.vanishing_points), None)
                     
-                    if match:
+                    if vp_match is not None:
                         cv2.line(img, point_a, point_b, color, thickness=1)
 
             
