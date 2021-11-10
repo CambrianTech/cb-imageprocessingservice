@@ -171,6 +171,9 @@ class Surface():
         if self.vertical_vp is not None and len(self.vertical_vp) > 0:
             vps.append(self.vertical_vp[0])
 
+        if self.vp is not None and len(self.vp) > 0:
+            vps.append(self.vp[0])
+
         return vps
 
     @property

@@ -260,7 +260,7 @@ class PipelineBarrierFinder(PipelineStep):
         self.room = self.data["room"]
 
         self.surfaces = []
-        self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike]))
+        self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike, SurfaceType.Floor, SurfaceType.Ceiling]))
         self.surfaces.extend(self.room.get_surfaces(labels=box_like))
 
         for surface in self.surfaces:
