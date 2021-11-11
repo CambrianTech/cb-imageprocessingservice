@@ -320,11 +320,11 @@ class PipelineBarrierFinder(PipelineStep):
     def get_debug_image(self):
 
         img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV_FULL)
-        hues = random.sample(range(0, 360), len(self.surfaces))
+        hues = random.sample(range(0, 360), len(self.room.surfaces))
 
         #overlay probs
-        for i in range(len(self.surfaces)):
-            surface = self.surfaces[i]
+        for i in range(len(self.room.surfaces)):
+            surface = self.room.surfaces[i]
             mask = surface.mask > 0
 
             max_value = 0.9
@@ -334,8 +334,8 @@ class PipelineBarrierFinder(PipelineStep):
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
-        for i in range(len(self.surfaces)):
-            surface = self.surfaces[i]
+        for i in range(len(self.room.surfaces)):
+            surface = self.room.surfaces[i]
             color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
 
             # for vp in surface.vanishing_points:
