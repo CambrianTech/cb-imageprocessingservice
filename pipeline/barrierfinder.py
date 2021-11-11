@@ -269,9 +269,9 @@ class BarrierFinder():
             poly_lines = list(map(lambda x: x.line, surface_barriers))
 
             #pull barriers from inlier lines near surface edges:
-            area = cv2.contourArea(poly, True)
-            
-            length = math.sqrt(area)
+            area = cv2.contourArea(poly)
+
+            length = math.sqrt(area) if area > 0 else diagonal / 10
             inner_padding = length / 10
             outer_padding = length / 20
             poly_lines.extend(self.inlier_search(poly, vp_lines, inner_padding, outer_padding))
