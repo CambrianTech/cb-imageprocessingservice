@@ -334,8 +334,6 @@ class PipelineBarrierFinder(PipelineStep):
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
-        theta_thresh = np.cos(np.radians(7))
-
         for i in range(len(self.surfaces)):
             surface = self.surfaces[i]
             color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
