@@ -226,7 +226,7 @@ class BarrierFinder():
 
         return inlier_lines
             
-    def find(self, angle_threshold=np.radians(7), min_length=5, max_length=1000):
+    def find(self, angle_threshold=np.radians(5), min_length=5, max_length=1000):
         
         if len(self.surface.vanishing_points) < 0:
             return []
