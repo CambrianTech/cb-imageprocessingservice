@@ -226,26 +226,17 @@ class BarrierFinder():
 
         return inlier_lines
             
-    def find(self, angle_threshold=np.radians(5), min_length=5, max_length=1000):
+    def find(self, vp_lines, angle_threshold=np.radians(5), min_length=5, max_length=1000):
         
         if len(self.surface.vanishing_points) < 0:
             return []
 
-
         diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
-        inlier_surfaces = []
-        inlier_surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike, SurfaceType.Ceiling, SurfaceType.Floor]))
-        inlier_surfaces.extend(self.room.get_surfaces(labels=box_like))
-
-        vp_lines = []
-        for surface in inlier_surfaces:
-            for vp in surface.vanishing_points:
-                for line in vp.inlier_lines:
-                    if line not in vp_lines:
-                        vp_lines.append(line)
-
         #pull barriers from surface contours:
+
+        #for vp in self.surface.vanishing_points:
+
         
         line_groups = []
 
@@ -279,7 +270,7 @@ class BarrierFinder():
             outer_padding = length / 20
             poly_lines.extend(self.inlier_search(poly, vp_lines, inner_padding, outer_padding))
             
-            poly_lines = Line.merge(poly_lines, search_width=diagonal/100, search_length=1.5, angle_threshold=math.radians(3))
+            poly_lines = Line.merge(poly_lines, search_width=diagonal/200, search_length=1.5, angle_threshold=math.radians(3))
 
             line_groups.append(poly_lines)
             
@@ -347,15 +338,33 @@ class PipelineBarrierFinder(PipelineStep):
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
 
+        diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
+
         self.surfaces = []
         self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike]))
         self.surfaces.extend(self.room.get_surfaces(labels=box_like))
+
+        self.vp_lines = []
+
+        inlier_surfaces = []
+        inlier_surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike, SurfaceType.Floor]))
+        inlier_surfaces.extend(self.room.get_surfaces(labels=box_like))
+
+        for surface in inlier_surfaces:
+            for vp in surface.vanishing_points:
+                self.vp_lines.extend(vp.inlier_lines)
+
+        ceilings = self.room.get_surfaces(surfaceTypes=[SurfaceType.Ceiling])
+        for surface in inlier_surfaces:
+            self.vp_lines.extend(surface.border_lines)
+
+        self.vp_lines = Line.merge(self.vp_lines, search_width=diagonal/200, search_length=1.2, angle_threshold=math.radians(5))
 
         #find initial barriers
         for surface in self.surfaces:
             bf = BarrierFinder(self.data, surface)
             max_size = np.sqrt(surface.max_area) * 2
-            surface.barriers = bf.find(max_length=max_size)
+            surface.barriers = bf.find(self.vp_lines, max_length=max_size)
 
         #solve for best match
         # for surface in self.surfaces:
@@ -373,17 +382,19 @@ class PipelineBarrierFinder(PipelineStep):
         img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV_FULL)
         hues = random.sample(range(0, 360), len(self.room.surfaces))
 
-        #overlay probs
-        for i in range(len(self.room.surfaces)):
-            surface = self.room.surfaces[i]
-            mask = surface.mask > 0
+        # #overlay probs
+        # for i in range(len(self.room.surfaces)):
+        #     surface = self.room.surfaces[i]
+        #     mask = surface.mask > 0
 
-            max_value = 0.9
-            if max_value > 0:
-                img_hsv[:, :, 0][mask] = hues[i]
-                img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.15)
+        #     max_value = 0.9
+        #     if max_value > 0:
+        #         img_hsv[:, :, 0][mask] = hues[i]
+        #         img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.15)
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
+
+        Line.draw_all(img, self.vp_lines, color=(0,255,0))
 
         for i in range(len(self.room.surfaces)):
             surface = self.room.surfaces[i]
