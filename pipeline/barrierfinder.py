@@ -226,7 +226,7 @@ class BarrierFinder():
 
         return inlier_lines
             
-    def solve(self, angle_threshold=np.radians(7), min_length=5, max_length=1000):
+    def find(self, angle_threshold=np.radians(7), min_length=5, max_length=1000):
         
         if len(self.surface.vanishing_points) < 0:
             return []
@@ -269,7 +269,10 @@ class BarrierFinder():
             poly_lines = list(map(lambda x: x.line, surface_barriers))
 
             #pull barriers from inlier lines near surface edges:
-            area = cv2.contourArea(poly)
+            moments = cv2.moments(poly)
+            area = moments['m00']
+
+            centroid = (int(moments['m10'] / area), int(moments['m01'] / area)) if area > 0 else None
 
             length = math.sqrt(area) if area > 0 else diagonal / 10
             inner_padding = length / 10
@@ -280,9 +283,49 @@ class BarrierFinder():
 
             line_groups.append(poly_lines)
             
+            #filter out ones that have a match further away from the center but in the same direction
+            if centroid is None:
+                continue
+
+            removed = []
+
+            for i in range(len(poly_lines)):
+                line_a = poly_lines[i]
+                matches = []
+
+                for j in range(i+1, len(poly_lines)):
+                    line_b = poly_lines[j]
+
+                    if LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold:
+                        continue
+
+                    #now same angle:
+
+
 
         
         return line_groups
+
+class BarrierSolver():
+    def __init__(self, data, surface):
+        super().__init__()
+        self.data = data
+        self.room = data["room"]
+        self.image = self.data["downscaled"]
+        self.surface = surface
+
+
+    def solve(self, max_iterations=2000, threshold_inlier=math.radians(2), max_time=0.33, measure_area=False):     
+
+        max_iterations = min(max_iterations, len(self.surface.barriers) * 40)
+        start_time = time.time() 
+
+        num_samples = random.randint(2, len(self.barriers))
+        for ransac_iter in range(max_iterations):
+            if time.time() - start_time > max_time:
+                break
+
+
         
         
 class PipelineBarrierFinder(PipelineStep):
@@ -308,10 +351,18 @@ class PipelineBarrierFinder(PipelineStep):
         self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike]))
         self.surfaces.extend(self.room.get_surfaces(labels=box_like))
 
+        #find initial barriers
         for surface in self.surfaces:
             bf = BarrierFinder(self.data, surface)
             max_size = np.sqrt(surface.max_area) * 2
-            surface.barriers = bf.solve(max_length=max_size)
+            surface.barriers = bf.find(max_length=max_size)
+
+        #solve for best match
+        # for surface in self.surfaces:
+        #     bs = BarrierSolver(self.data, surface)
+        #     bs.solve()
+
+
 
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers.png", self.get_debug_image())

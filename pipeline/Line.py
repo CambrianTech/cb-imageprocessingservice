@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from scipy.spatial import distance
 from bisect import bisect_left, bisect_right
 from cambrian.LineFunctions import LineFunctions
+from .utils import normalize
 
 # @jitclass(spec=[
 #             ("x0", nb.types.float32), ("y0", nb.types.float32), ("x1", nb.types.float32), ("y1", nb.types.float32), 
@@ -54,9 +55,13 @@ class Line(Sequence):
     def point_b(self):
         return (int(self.data[2]), int(self.data[3]))
 
-    @property
+    @property #todo: should this be normalized (be sure to convert to float)?
     def direction(self):
-        return np.array((int(self.data[2]-self.data[0]), int(self.data[3] - self.data[1])))
+        return normalize(np.array([self.data[2]-self.data[0], self.data[3] - self.data[1]], dtype=float))
+
+    @property
+    def normal(self):
+        return np.array([-self.direction[1], self.direction[0]], dtype=float)
 
     def draw(self, img, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
         cv2.line(img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
