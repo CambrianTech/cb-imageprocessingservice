@@ -32,10 +32,8 @@ class Surface():
         self._polygons = None
         self._normals_color = None
         self._lines = None
-        self._border_lines = None
 
         self._semantic_labels = None
-        self.barriers = []
         self.barrier_lines = []
 
         self._normal = None
@@ -127,7 +125,6 @@ class Surface():
 
         if self._lines is None:
             self._lines = []
-            self._border_lines = []
             self._min_area = 1000
             self._max_area = 1
             for i in range(len(self.data["lines"])):
@@ -153,16 +150,9 @@ class Surface():
 
                     if is_inside(dist) and (is_inside(dist_a) or is_inside(dist_b)):
                         self._lines.append(line)
-                        if abs(dist_a - dist_b) < padding and abs(dist_a) < padding and abs(dist_b) < padding:
-                            self._border_lines.append(line)
                         break
                             
         return self._lines
-
-    @property
-    def border_lines(self) -> list:
-        self.lines
-        return self._border_lines
 
     @property
     def vanishing_points(self) -> list:

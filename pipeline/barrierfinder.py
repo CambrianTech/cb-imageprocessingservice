@@ -8,7 +8,7 @@ import math
 
 from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
-from .utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text
+from .utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text, adjust_mask
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import angle_with_vp
@@ -344,40 +344,26 @@ class PipelineBarrierFinder(PipelineStep):
         self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike]))
         self.surfaces.extend(self.room.get_surfaces(labels=box_like))
 
-        inlier_surfaces = self.surfaces.copy()
-        inlier_surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.Ceiling]))
-
         self.lines = []
-        candidates = []
 
-        for surface in inlier_surfaces:
-            candidates.extend(surface.border_lines)
-            
-            for vp in surface.vanishing_points:
-                candidates.extend(vp.inlier_lines)
+        def inside_mask(mask, point):
+            if point[0] < mask.shape[1] and point[1] < mask.shape[0]:
+                return expanded_mask[point[1], point[0]] > 0
+            return False
 
-        for line in candidates:
-            if line not in self.lines:
-                self.lines.append(line)
+        for surface in self.surfaces:
+            surface.barrier_lines = []
+            expanded_mask = adjust_mask(cv2.dilate, surface.mask)
+
+            for line in self.data["lines"]:
+                if inside_mask(expanded_mask, line.point_a):
+                    surface.barrier_lines.append(line)
 
         # ceilings = self.room.get_surfaces(surfaceTypes=[SurfaceType.Ceiling])
         # for surface in ceilings:
         #     self.vp_lines.extend(surface.border_lines)
 
-        self.lines = Line.merge(self.lines, search_width=diagonal/200, search_length=1.2, angle_threshold=math.radians(5))
-
-        #find initial barriers
-        for surface in self.surfaces:
-            bf = BarrierFinder(self.data, surface)
-            max_size = np.sqrt(surface.max_area) * 2
-            surface.barriers = bf.find(self.lines, max_length=max_size)
-
-        #solve for best match
-        # for surface in self.surfaces:
-        #     bs = BarrierSolver(self.data, surface)
-        #     bs.solve()
-
-
+        #self.lines = Line.merge(self.lines, search_width=diagonal/200, search_length=1.2, angle_threshold=math.radians(5))
 
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers.png", self.get_debug_image())
@@ -388,40 +374,21 @@ class PipelineBarrierFinder(PipelineStep):
         img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV_FULL)
         hues = random.sample(range(0, 360), len(self.room.surfaces))
 
-        # #overlay probs
-        # for i in range(len(self.room.surfaces)):
-        #     surface = self.room.surfaces[i]
-        #     mask = surface.mask > 0
+        #overlay probs
+        for i in range(len(self.room.surfaces)):
+            surface = self.room.surfaces[i]
+            mask = surface.mask > 0
 
-        #     max_value = 0.9
-        #     if max_value > 0:
-        #         img_hsv[:, :, 0][mask] = hues[i]
-        #         img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.15)
+            max_value = 0.9
+            if max_value > 0:
+                img_hsv[:, :, 0][mask] = hues[i]
+                img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.15)
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
-
-        Line.draw_all(img, self.lines, color=(0,255,0))
 
         for i in range(len(self.room.surfaces)):
             surface = self.room.surfaces[i]
             color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
-
-            # for vp in surface.vanishing_points:
-            #     Line.draw_all(img, vp.inlier_lines, color=color)
-
-            #cv2.drawContours(contour_mask, [contour], 0, (1,1,1), cv2.FILLED)
-
-            #cv2.drawContours(img, surface.contours, -1, color, 1)
-            
-            #Line.draw_all(img, surface.horizontal_vp[0].inlier_lines, color=color, thickness=1)
-
-            for barrier_lines in surface.barriers:
-                Line.draw_all(img, barrier_lines, color=color, thickness=2)
-
-            # for barrier in surface.barriers:
-            #     cv2.drawMarker(img, barrier.point_a, color=color)
-            #     cv2.drawMarker(img, barrier.point_b, color=color)
+            Line.draw_all(img, surface.barrier_lines, color=color, thickness=2)
 
         return img
-
-
