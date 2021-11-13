@@ -77,6 +77,19 @@ class VanishingPoint:
     @property
     def direction(self):
         return self.model[:2] / self.model[2]
+
+    def get_inliers(self, lines, angle_threshold=np.radians(3)):
+        
+        locations = np.array(list(map(lambda x: x.midpoint, lines)))
+        directions = np.array(list(map(lambda x: x.direction, lines)))
+        directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
+
+        cosine_thetas = angle_with_vp(self.model, locations, directions)
+
+        theta_thresh = np.cos(angle_threshold)
+        indices = np.argwhere(cosine_thetas > theta_thresh).flatten()
+        
+        return [lines[i] for i in indices]
         
 class Edglets:
     def __init__(self, locations, directions, strengths):
