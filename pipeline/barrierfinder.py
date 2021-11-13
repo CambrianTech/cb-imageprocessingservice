@@ -391,6 +391,11 @@ class PipelineBarrierFinder(PipelineStep):
                     point_a = poly[i][0]
                     point_b = poly[(i+1) % num_pts][0]
 
+                    line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
+                    barrier_lines.append(line)
+
+            barrier_lines = Line.merge(barrier_lines, search_width=diagonal/200, search_length=1.2, angle_threshold=math.radians(3))            
+
             self.barriers[surface.uniqueId] = (surface, mask_edges, barrier_lines)
 
         # ceilings = self.room.get_surfaces(surfaceTypes=[SurfaceType.Ceiling])
