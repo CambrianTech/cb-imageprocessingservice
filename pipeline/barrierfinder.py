@@ -357,17 +357,32 @@ class PipelineBarrierFinder(PipelineStep):
             barrier_lines = []
 
             #just look at mask edges:
-            scale = 200 / diagonal
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7))
+            # scale = 200 / diagonal
+            # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7))
             
-            downscaled = cv2.resize(surface.mask, (int(surface.mask.shape[1] * scale), int(surface.mask.shape[0] * scale)), cv2.INTER_NEAREST)
-            mask_edges = cv2.dilate(downscaled, kernel, iterations=1)
-            contracted = cv2.erode(downscaled, kernel, iterations=2)
-            mask_edges[contracted > 0] = 0
-            mask_edges = cv2.resize(mask_edges, (self.image.shape[1], self.image.shape[0]), cv2.INTER_NEAREST)
+            # downscaled = cv2.resize(surface.mask, (int(surface.mask.shape[1] * scale), int(surface.mask.shape[0] * scale)), cv2.INTER_NEAREST)
+            # mask_edges = cv2.dilate(downscaled, kernel, iterations=1)
+            # contracted = cv2.erode(downscaled, kernel, iterations=2)
+            # mask_edges[contracted > 0] = 0
+            # mask_edges = cv2.resize(mask_edges, (self.image.shape[1], self.image.shape[0]), cv2.INTER_NEAREST)
+
+            padding = 10
+            surface_mask = cv2.copyMakeBorder(surface.mask, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0) 
+            trans = cv2.distanceTransform(1-surface_mask, cv2.DIST_L2, 5)
+            _, outer_mask = cv2.threshold(trans, 0.04 * trans.max(), 1, 0)
+
+            trans = cv2.distanceTransform(surface_mask, cv2.DIST_L2, 5)
+            _, inner_mask = cv2.threshold(trans, 0.4 * trans.max(), 1, 0)
+
+            mask_edges = 1 - inner_mask - outer_mask
+            mask_edges[mask_edges < 0] = 0
+            mask_edges = mask_edges[padding:-padding,padding:-padding]
 
             for line in self.data["lines"]:
-                if inside_mask(mask_edges, line.midpoint):
+                point_a = (line.point_a[0] + line.midpoint[0]) / 2, (line.point_a[1] + line.midpoint[1]) / 2
+                point_b = (line.point_b[0] + line.midpoint[0]) / 2, (line.point_b[1] + line.midpoint[1]) / 2
+
+                if inside_mask(mask_edges, line.midpoint) and (inside_mask(mask_edges, point_a) or inside_mask(mask_edges, point_b)):
                     barrier_lines.append(line)
 
             for poly in surface.polygons:
@@ -398,6 +413,7 @@ class PipelineBarrierFinder(PipelineStep):
             surface = self.room.surfaces[i]
             #mask = (self.barriers[surface.uniqueId][1] if surface.uniqueId in self.barriers else surface.mask) > 0
             mask = surface.mask > 0
+            
             max_value = 0.9
             if max_value > 0:
                 img_hsv[:, :, 0][mask] = hues[i]
