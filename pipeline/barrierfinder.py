@@ -369,7 +369,7 @@ class PipelineBarrierFinder(PipelineStep):
             padding = 10
             surface_mask = cv2.copyMakeBorder(surface.mask, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0) 
             trans = cv2.distanceTransform(1-surface_mask, cv2.DIST_L2, 5)
-            _, outer_mask = cv2.threshold(trans, 0.04 * trans.max(), 1, 0)
+            _, outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
 
             trans = cv2.distanceTransform(surface_mask, cv2.DIST_L2, 5)
             _, inner_mask = cv2.threshold(trans, 0.4 * trans.max(), 1, 0)
