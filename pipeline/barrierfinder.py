@@ -348,16 +348,35 @@ class PipelineBarrierFinder(PipelineStep):
 
         def inside_mask(mask, point):
             if point[0] < mask.shape[1] and point[1] < mask.shape[0]:
-                return expanded_mask[point[1], point[0]] > 0
+                return mask[int(point[1]), int(point[0])] > 0
             return False
 
+        self.barriers = {}
+
         for surface in self.surfaces:
-            surface.barrier_lines = []
-            expanded_mask = adjust_mask(cv2.dilate, surface.mask)
+            barrier_lines = []
+
+            #just look at mask edges:
+            scale = 200 / diagonal
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7))
+            
+            downscaled = cv2.resize(surface.mask, (int(surface.mask.shape[1] * scale), int(surface.mask.shape[0] * scale)), cv2.INTER_NEAREST)
+            mask_edges = cv2.dilate(downscaled, kernel, iterations=1)
+            contracted = cv2.erode(downscaled, kernel, iterations=2)
+            mask_edges[contracted > 0] = 0
+            mask_edges = cv2.resize(mask_edges, (self.image.shape[1], self.image.shape[0]), cv2.INTER_NEAREST)
 
             for line in self.data["lines"]:
-                if inside_mask(expanded_mask, line.point_a):
-                    surface.barrier_lines.append(line)
+                if inside_mask(mask_edges, line.midpoint):
+                    barrier_lines.append(line)
+
+            for poly in surface.polygons:
+                num_pts = len(poly)
+                for i in range(num_pts):
+                    point_a = poly[i][0]
+                    point_b = poly[(i+1) % num_pts][0]
+
+            self.barriers[surface.uniqueId] = (surface, mask_edges, barrier_lines)
 
         # ceilings = self.room.get_surfaces(surfaceTypes=[SurfaceType.Ceiling])
         # for surface in ceilings:
@@ -377,8 +396,8 @@ class PipelineBarrierFinder(PipelineStep):
         #overlay probs
         for i in range(len(self.room.surfaces)):
             surface = self.room.surfaces[i]
+            #mask = (self.barriers[surface.uniqueId][1] if surface.uniqueId in self.barriers else surface.mask) > 0
             mask = surface.mask > 0
-
             max_value = 0.9
             if max_value > 0:
                 img_hsv[:, :, 0][mask] = hues[i]
@@ -389,6 +408,12 @@ class PipelineBarrierFinder(PipelineStep):
         for i in range(len(self.room.surfaces)):
             surface = self.room.surfaces[i]
             color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
-            Line.draw_all(img, surface.barrier_lines, color=color, thickness=2)
+
+            if surface.uniqueId not in self.barriers:
+                continue
+                
+            barrier = self.barriers[surface.uniqueId]
+
+            Line.draw_all(img, barrier[2], color=color, thickness=2)
 
         return img
