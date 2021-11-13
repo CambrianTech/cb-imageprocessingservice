@@ -153,7 +153,7 @@ class Surface():
 
                     if is_inside(dist) and (is_inside(dist_a) or is_inside(dist_b)):
                         self._lines.append(line)
-                        if abs(dist_a - dist_b) < padding:
+                        if abs(dist_a - dist_b) < padding and abs(dist_a) < padding and abs(dist_b) < padding:
                             self._border_lines.append(line)
                         break
                             

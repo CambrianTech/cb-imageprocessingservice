@@ -220,7 +220,7 @@ class BarrierFinder():
             mid_inside = dist_midpoint > 0
             mid_ok = dist_midpoint < inner_padding if mid_inside else abs(dist_midpoint) < outer_padding            
 
-            return a_ok and b_ok and mid_ok
+            return mid_ok and (abs(dist_a - dist_midpoint) < inner_padding / 3 or abs(dist_b - dist_midpoint) < inner_padding / 3)
 
         inlier_lines = (list(filter(lambda line: on_the_border(line), vp_lines)))
 
@@ -265,30 +265,30 @@ class BarrierFinder():
 
             centroid = (int(moments['m10'] / area), int(moments['m01'] / area)) if area > 0 else None
 
-            length = math.sqrt(area) if area > 0 else diagonal / 10
+            length = math.sqrt(area) if area > 0 else diagonal / 50
             inner_padding = length / 10
-            outer_padding = length / 20
+            outer_padding = length / 10 
             poly_lines.extend(self.inlier_search(poly, vp_lines, inner_padding, outer_padding))
             
             poly_lines = Line.merge(poly_lines, search_width=diagonal/200, search_length=1.5, angle_threshold=math.radians(3))
 
             line_groups.append(poly_lines)
             
-            #filter out ones that have a match further away from the center but in the same direction
-            if centroid is None:
-                continue
+            # #filter out ones that have a match further away from the center but in the same direction
+            # if centroid is None:
+            #     continue
 
-            removed = []
+            # removed = []
 
-            for i in range(len(poly_lines)):
-                line_a = poly_lines[i]
-                matches = []
+            # for i in range(len(poly_lines)):
+            #     line_a = poly_lines[i]
+            #     matches = []
 
-                for j in range(i+1, len(poly_lines)):
-                    line_b = poly_lines[j]
+            #     for j in range(i+1, len(poly_lines)):
+            #         line_b = poly_lines[j]
 
-                    if LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold:
-                        continue
+            #         if LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold:
+            #             continue
 
                     #now same angle:
 
@@ -344,28 +344,33 @@ class PipelineBarrierFinder(PipelineStep):
         self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike]))
         self.surfaces.extend(self.room.get_surfaces(labels=box_like))
 
-        inlier_surfaces = []
-        inlier_surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike, SurfaceType.Floor, SurfaceType.Ceiling]))
-        inlier_surfaces.extend(self.room.get_surfaces(labels=box_like))
+        inlier_surfaces = self.surfaces.copy()
+        inlier_surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.Ceiling]))
 
-        self.vp_lines = []
+        self.lines = []
+        candidates = []
+
         for surface in inlier_surfaces:
+            candidates.extend(surface.border_lines)
+            
             for vp in surface.vanishing_points:
-                for line in vp.inlier_lines:
-                    if line not in self.vp_lines:
-                        self.vp_lines.append(line)
+                candidates.extend(vp.inlier_lines)
+
+        for line in candidates:
+            if line not in self.lines:
+                self.lines.append(line)
 
         # ceilings = self.room.get_surfaces(surfaceTypes=[SurfaceType.Ceiling])
         # for surface in ceilings:
         #     self.vp_lines.extend(surface.border_lines)
 
-        self.vp_lines = Line.merge(self.vp_lines, search_width=diagonal/200, search_length=1.2, angle_threshold=math.radians(5))
+        self.lines = Line.merge(self.lines, search_width=diagonal/200, search_length=1.2, angle_threshold=math.radians(5))
 
         #find initial barriers
         for surface in self.surfaces:
             bf = BarrierFinder(self.data, surface)
             max_size = np.sqrt(surface.max_area) * 2
-            surface.barriers = bf.find(self.vp_lines, max_length=max_size)
+            surface.barriers = bf.find(self.lines, max_length=max_size)
 
         #solve for best match
         # for surface in self.surfaces:
@@ -395,7 +400,7 @@ class PipelineBarrierFinder(PipelineStep):
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
-        Line.draw_all(img, self.vp_lines, color=(0,255,0))
+        Line.draw_all(img, self.lines, color=(0,255,0))
 
         for i in range(len(self.room.surfaces)):
             surface = self.room.surfaces[i]
