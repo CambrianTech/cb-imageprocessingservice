@@ -139,20 +139,21 @@ class Surface():
 
                     padding = math.sqrt(area) / 20
 
-                    def is_inside(point):
-                        #positive (inside), negative (outside), or zero (on an edge)
-                        dist = cv2.pointPolygonTest(contour, point, False)
+                    #positive (inside), negative (outside), or zero (on an edge)
+                    def is_inside(dist):
                         return dist >= 0 or abs(dist) <= padding
 
                     midpoint_a = ((line.point_a[0] + line.midpoint[0]) / 2, (line.point_a[1] + line.midpoint[1]) / 2)
+                    dist_a = cv2.pointPolygonTest(contour, midpoint_a, True)
+
                     midpoint_b = ((line.point_b[0] + line.midpoint[0]) / 2, (line.point_b[1] + line.midpoint[1]) / 2)
+                    dist_b = cv2.pointPolygonTest(contour, midpoint_b, True)
 
                     dist = cv2.pointPolygonTest(contour, line.midpoint, True)
-                    is_border = abs(dist) <= padding
 
-                    if (dist >= 0 or is_border) and (is_inside(midpoint_a) or is_inside(midpoint_b)):
+                    if is_inside(dist) and (is_inside(dist_a) or is_inside(dist_b)):
                         self._lines.append(line)
-                        if is_border:
+                        if abs(dist_a - dist_b) < padding:
                             self._border_lines.append(line)
                         break
                             

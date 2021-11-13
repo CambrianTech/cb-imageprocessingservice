@@ -344,19 +344,20 @@ class PipelineBarrierFinder(PipelineStep):
         self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike]))
         self.surfaces.extend(self.room.get_surfaces(labels=box_like))
 
-        self.vp_lines = []
-
         inlier_surfaces = []
-        inlier_surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike, SurfaceType.Floor]))
+        inlier_surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike, SurfaceType.Floor, SurfaceType.Ceiling]))
         inlier_surfaces.extend(self.room.get_surfaces(labels=box_like))
 
+        self.vp_lines = []
         for surface in inlier_surfaces:
             for vp in surface.vanishing_points:
-                self.vp_lines.extend(vp.inlier_lines)
+                for line in vp.inlier_lines:
+                    if line not in self.vp_lines:
+                        self.vp_lines.append(line)
 
-        ceilings = self.room.get_surfaces(surfaceTypes=[SurfaceType.Ceiling])
-        for surface in inlier_surfaces:
-            self.vp_lines.extend(surface.border_lines)
+        # ceilings = self.room.get_surfaces(surfaceTypes=[SurfaceType.Ceiling])
+        # for surface in ceilings:
+        #     self.vp_lines.extend(surface.border_lines)
 
         self.vp_lines = Line.merge(self.vp_lines, search_width=diagonal/200, search_length=1.2, angle_threshold=math.radians(5))
 
