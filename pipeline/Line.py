@@ -89,8 +89,6 @@ class Line(Sequence):
     
         min_dist_sq = search_width * search_width
 
-        lines.sort()
-
         for i in range(len(lines)):
             
             line_a = lines[i]
@@ -119,6 +117,7 @@ class Line(Sequence):
 
             if line_a.dead:
                 lines[i] = Line(np.array([data[0][0], data[0][1], data[1][0], data[1][1]], dtype=np.int), group=line_a.group, id=line_a.id)
+
 
         return list(filter(lambda x: not x.dead, lines))
 
