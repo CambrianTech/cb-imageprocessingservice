@@ -89,6 +89,8 @@ class Line(Sequence):
 
     @classmethod
     def merge(cls, lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
+
+        lines = [line.copy() for line in lines]
     
         min_dist_sq = search_width * search_width
 
