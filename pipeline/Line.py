@@ -80,6 +80,9 @@ class Line(Sequence):
     def in_range(self, lines, angle_threshold):
         return list(filter(lambda line: not line.dead and LineFunctions.line_angle_difference(self.angle, line.angle) <= angle_threshold, lines)) 
 
+    def copy(self):
+        return Line(self.data)
+
     @classmethod
     def draw_all(cls, img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
         [line.draw(img, color=color, thickness=thickness, sx=sx, sy=sy, lineType=lineType) for line in lines]
@@ -112,12 +115,11 @@ class Line(Sequence):
                 if result != 0:
                     line_a.dead = True
                     line_b.dead = True
-                    data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
 
+                    data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
 
             if line_a.dead:
                 lines[i] = Line(np.array([data[0][0], data[0][1], data[1][0], data[1][1]], dtype=np.int), group=line_a.group, id=line_a.id)
-
 
         return list(filter(lambda x: not x.dead, lines))
 

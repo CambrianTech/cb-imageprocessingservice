@@ -373,7 +373,7 @@ class PipelineBarrierFinder(PipelineStep):
             _, outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
 
             trans = cv2.distanceTransform(surface_mask, cv2.DIST_L2, 5)
-            _, inner_mask = cv2.threshold(trans, 0.4 * trans.max(), 1, 0)
+            _, inner_mask = cv2.threshold(trans, 0.5 * trans.max(), 1, 0)
 
             mask_edges = 1 - inner_mask - outer_mask
             mask_edges[mask_edges < 0] = 0
@@ -388,7 +388,7 @@ class PipelineBarrierFinder(PipelineStep):
                 point_b = (line.point_b[0] + line.midpoint[0]) / 2, (line.point_b[1] + line.midpoint[1]) / 2
 
                 if inside_mask(mask_edges, line.midpoint) and (inside_mask(mask_edges, point_a) or inside_mask(mask_edges, point_b)):
-                    barrier_lines.append(line)
+                    barrier_lines.append(line.copy())
 
             for poly in surface.polygons:
                 num_pts = len(poly)
@@ -400,9 +400,9 @@ class PipelineBarrierFinder(PipelineStep):
                         continue
 
                     line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
-                    barrier_lines.append(line)
+                    #barrier_lines.append(line)
 
-            barrier_lines = Line.merge(barrier_lines, self.diagonal/400, search_length=1.2, angle_threshold=math.radians(5))            
+            barrier_lines = Line.merge(barrier_lines, search_width=self.diagonal/200, search_length=1.2)          
 
             self.barriers[surface.uniqueId] = (surface, mask_edges, barrier_lines)
 
@@ -420,8 +420,8 @@ class PipelineBarrierFinder(PipelineStep):
         for i in range(len(self.room.surfaces)):
             surface = self.room.surfaces[i]
             
-            mask = (self.barriers[surface.uniqueId][1] if surface.uniqueId in self.barriers else surface.mask) > 0
-            #mask = surface.mask > 0
+            #mask = (self.barriers[surface.uniqueId][1] if surface.uniqueId in self.barriers else surface.mask) > 0
+            mask = surface.mask > 0
             
             max_value = 0.9
             if max_value > 0:
