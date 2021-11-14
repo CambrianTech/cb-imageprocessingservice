@@ -10,7 +10,7 @@ from .utils import resize_array, random_color, overlay_mask, partition
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
 from .logging import log_image, log_segmentation_image, im_logging_enabled
-from .Line import Line, line_angle_difference, on_image_edge
+from .Line import Line, line_angle_difference, line_on_image_edge
 from .room import Room, Surface
 from .ade20k import ADE20K
 
@@ -231,7 +231,7 @@ class PipelineVanishingPointFinder(PipelineStep):
                 point_a = poly[i][0]
                 point_b = poly[(i+1) % num_pts][0]
 
-                if on_image_edge(point_a, self.image) and on_image_edge(point_b, self.image):
+                if line_on_image_edge(point_a, point_b, self.image):
                     continue
 
                 line = Line(np.array([point_b[0], point_b[1], point_a[0], point_a[1]]), group="contour")

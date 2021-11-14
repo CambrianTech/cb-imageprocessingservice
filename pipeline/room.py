@@ -18,7 +18,7 @@ from .core import SurfaceType
 from .surface import Surface
 from .utils import convert_color, put_text, overlay_mask, random_color, sample_at_point, scale_contour
 from .logging import im_logging_enabled, log_image, log_segmentation_image, log_markers, Timer
-from .Line import line_angle_difference, Line, on_image_edge
+from .Line import line_angle_difference, Line
 from .ade20k import ADE20K
 
 from termcolor import colored
