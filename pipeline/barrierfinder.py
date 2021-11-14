@@ -400,7 +400,7 @@ class PipelineBarrierFinder(PipelineStep):
                         continue
 
                     line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
-                    #barrier_lines.append(line)
+                    barrier_lines.append(line)
 
             barrier_lines = Line.merge(barrier_lines, search_width=self.diagonal/200, search_length=1.2)          
 
