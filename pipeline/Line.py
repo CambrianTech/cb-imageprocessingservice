@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from scipy.spatial import distance
 from bisect import bisect_left, bisect_right
 from cambrian.LineFunctions import LineFunctions
+from .utils import normalize
 
 # @jitclass(spec=[
 #             ("x0", nb.types.float32), ("y0", nb.types.float32), ("x1", nb.types.float32), ("y1", nb.types.float32), 
@@ -41,10 +42,7 @@ class Line(Sequence):
         return len(self.data)
 
     def __lt__(self, other):
-        return self.angle < other.angle
-    
-    def __eq__(self, other):
-        return self.angle == other.angle
+        return line_angle_difference(self.angle, other.angle)
 
     @property
     def point_a(self):
@@ -54,9 +52,13 @@ class Line(Sequence):
     def point_b(self):
         return (int(self.data[2]), int(self.data[3]))
 
-    @property
+    @property #todo: should this be normalized (be sure to convert to float)?
     def direction(self):
-        return np.array((int(self.data[2]-self.data[0]), int(self.data[3] - self.data[1])))
+        return normalize(np.array([self.data[2]-self.data[0], self.data[3] - self.data[1]], dtype=float))
+
+    @property
+    def normal(self):
+        return np.array([-self.direction[1], self.direction[0]], dtype=float)
 
     def draw(self, img, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
         cv2.line(img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
@@ -76,30 +78,31 @@ class Line(Sequence):
     #     return rotated_rects_points(self.midpoint, (self.length * length_multiplier, width), self.angle)
 
     def in_range(self, lines, angle_threshold):
-        return list(filter(lambda line: not line.dead 
-                                        and LineFunctions.line_angle_difference(self.angle, line.angle) < angle_threshold 
-                                        and line != self, lines)) 
+        return list(filter(lambda line: not line.dead and LineFunctions.line_angle_difference(self.angle, line.angle) <= angle_threshold, lines)) 
+
+    def copy(self):
+        return Line(self.data)
 
     @classmethod
     def draw_all(cls, img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
         [line.draw(img, color=color, thickness=thickness, sx=sx, sy=sy, lineType=lineType) for line in lines]
 
     @classmethod
-    def merge(cls, lines, search_width, search_length=1.01, angle_threshold=math.radians(3), max_iterations=1e5):
+    def merge(cls, lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
+
+        lines = [line.copy() for line in lines]
     
         min_dist_sq = search_width * search_width
 
-        iterations = 0
         for i in range(len(lines)):
-            if (iterations > max_iterations): break
+            
             line_a = lines[i]
-            iterations += 1
             if line_a.dead: continue
 
             rect_a = line_a.bounding_box(search_width, length_multiplier=search_length)
             data = (line_a.point_a, line_a.point_b)
 
-            candidates = line_a.in_range(lines, angle_threshold)
+            candidates = line_a.in_range(lines[:i] + lines[i+1:], angle_threshold)
 
             for line_b in candidates:
 
@@ -114,11 +117,11 @@ class Line(Sequence):
                 if result != 0:
                     line_a.dead = True
                     line_b.dead = True
+
                     data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
 
-
             if line_a.dead:
-                lines[i] = Line(np.array([data[0][0], data[0][1], data[1][0], data[1][1]], dtype=np.int), group=lines[i].group, id=lines[i].id)
+                lines[i] = Line(np.array([data[0][0], data[0][1], data[1][0], data[1][1]], dtype=np.int), group=line_a.group, id=line_a.id)
 
         return list(filter(lambda x: not x.dead, lines))
 
@@ -153,7 +156,7 @@ def sqeuclidean(point_a, point_b):
     return dx * dx + dy * dy
 
 @nb.jit(nopython=True)
-def on_image_edge(point, image, min_distance=3):
+def point_on_image_edge(point, image, min_distance=3):
     edge = 0x0
     if point[0] <= min_distance:
         edge |= 0x0001
@@ -164,6 +167,10 @@ def on_image_edge(point, image, min_distance=3):
     if point[1] >= image.shape[0] - min_distance - 1:
         edge |= 0x1000
     return edge
+
+@nb.jit(nopython=True)
+def line_on_image_edge(point_a, point_b, image, min_distance=3):
+    return point_on_image_edge(point_a, image, min_distance) and point_on_image_edge(point_a, image, min_distance) & point_on_image_edge(point_b, image, min_distance) > 0
 
 @nb.jit(nopython=True)
 def merge_line_pair(line_a, line_b):

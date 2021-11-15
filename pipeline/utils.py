@@ -40,6 +40,15 @@ def resize_array(array, shape):
 
     return array_lr
 
+def adjust_mask(func, mask, size=5, iterations=1, scale=0.5, maintain_size=True, interpolation=cv2.INTER_NEAREST):
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(size,size))
+    shape = mask.shape
+    result = cv2.resize(mask, (int(shape[1] * scale), int(shape[0] * scale)), interpolation)
+    result = func(result, kernel, iterations=iterations)
+    if maintain_size:
+        result = cv2.resize(result, (shape[1], shape[0]), interpolation)
+    return result
+
 def sample_at_point(img, point, size=20):
     half_size = size // 2
     x1 = max(point[0] - half_size, 0)

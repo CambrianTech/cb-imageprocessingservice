@@ -77,15 +77,15 @@ class PipelineLineFinder(PipelineStep):
         #find lines in BW image
         bw_lines_a = find_lines(bw, min_length)
         lines.extend(bw_lines_a)
-        log_lines(bw_lines_a, "bw_lines_fld")
+        #log_lines(bw_lines_a, "bw_lines_fld")
 
         bw_lines_b = find_lines(bw, min_length, True, ang_th=17) #ang_th=22.5 was getting false positives
         lines.extend(bw_lines_b)
-        log_lines(bw_lines_b, "bw_lines_lsd")
+        #log_lines(bw_lines_b, "bw_lines_lsd")
 
         lines = Line.merge(lines, search_length=1.0, search_width=diagonal/800, angle_threshold=math.radians(3))
 
-        log_lines(lines, "bw_lines")
+        #log_lines(lines, "bw_lines")
 
         #find lines in hed hed edges
         sx = data["downscaled"].shape[1] / data["hed"].shape[1]
@@ -94,12 +94,12 @@ class PipelineLineFinder(PipelineStep):
         hed = data["hed"].copy()
         hed = cv2.bilateralFilter(hed, 13, 40, 9) #todo: apply non-maxima-suppression (NMS) to image instead
         hed_lines = find_lines(hed, min_length, use_lsd=True, ang_th=12) #ang_th=22.5 was getting false positives
-        log_lines(hed_lines, "hed_lines_initial")
+        #log_lines(hed_lines, "hed_lines_initial")
 
         hed_lines = Line.merge(hed_lines, search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(3))
 
         if len(hed_lines) > 0: 
-            log_lines(hed_lines, "hed_lines")
+            #log_lines(hed_lines, "hed_lines")
             lines.extend(hed_lines)
 
         #find lines in normals
@@ -114,7 +114,7 @@ class PipelineLineFinder(PipelineStep):
         if len(normals_lines) > 0:
             #cleanup normals
             normals_lines = Line.merge(normals_lines, search_width=diagonal/300)
-            log_lines(normals_lines, "normals_lines")
+            #log_lines(normals_lines, "normals_lines")
             lines.extend(normals_lines)
 
         # #find lines in gabor edges:
