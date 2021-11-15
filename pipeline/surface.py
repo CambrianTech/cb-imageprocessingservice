@@ -170,12 +170,13 @@ class Surface():
 
     @property
     def neighbors(self) -> list:
-        
+
         if self._neighbors is None:
             self._neighbors = []
 
             #probably many ways this can be optimized: downsized mask, countNonZero, etc.
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
+            min_distance = 3
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(min_distance, min_distance))
             mask_expanded = cv2.dilate(self.mask, kernel, iterations=1)
 
             for candidate in self.geometry.surfaces:
@@ -217,8 +218,10 @@ class Surface():
 
     def mask_changed(self):
         self._contours = None
+        self._polygons = None
         self._semantic_labels = None
         self._normals_color = None
+        self._neighbors = None
 
         self.geometry.invalidate()
 
