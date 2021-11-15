@@ -99,7 +99,7 @@ class Room(Geometry):
 
         timer.log_elapsed("room.refine_surfaces")
 
-        self.merge_like_surfaces()        
+        self.merge_like_surfaces()
 
         log_image(self.data, "room", self.get_debug_image())
 

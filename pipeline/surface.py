@@ -32,6 +32,7 @@ class Surface():
         self._polygons = None
         self._normals_color = None
         self._lines = None
+        self._neighbors = None
 
         self._semantic_labels = None
 
@@ -166,6 +167,26 @@ class Surface():
             vps.append(self.vp[0])
 
         return vps
+
+    @property
+    def neighbors(self) -> list:
+        
+        if self._neighbors is None:
+            self._neighbors = []
+
+            #probably many ways this can be optimized: downsized mask, countNonZero, etc.
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
+            mask_expanded = cv2.dilate(self.mask, kernel, iterations=1)
+
+            for candidate in self.geometry.surfaces:
+                if candidate == self: continue
+
+                #check for self in candidate to save time, or check for overlap
+                if (candidate._neighbors is not None and self in candidate._neighbors) \
+                    or cv2.countNonZero(np.bitwise_and(candidate.mask, mask_expanded)) > 0: 
+                    self._neighbors.append(candidate)
+
+        return self._neighbors
 
     @property
     def min_area(self) -> float:
