@@ -55,12 +55,7 @@ class SurfaceBarriers():
             point_b = (line.point_b[0] + line.midpoint[0]) / 2, (line.point_b[1] + line.midpoint[1]) / 2
 
             if inside_mask(self.mask_edges, line.midpoint) and (inside_mask(self.mask_edges, point_a) or inside_mask(self.mask_edges, point_b)):
-                #check for validity with vanishing point:
-                direction = normalize(np.array([self.surface.center[0] - line.midpoint[0], self.surface.center[1] - line.midpoint[1]]))
-
-                matching_vp = next(filter(lambda vp: len(animal) > 5, self.surface.vanishing_points), None)
-                
-                barrier_lines.append(line)
+                barrier_lines.append(line)                    
 
         for poly in self.surface.polygons:
             num_pts = len(poly)
@@ -74,7 +69,26 @@ class SurfaceBarriers():
                 line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
                 barrier_lines.append(line)
 
-        return Line.merge(barrier_lines, search_width=self.diagonal/200, search_length=1.2)
+        candidates = Line.merge(barrier_lines, search_width=self.diagonal/200, search_length=1.2)
+
+        #filter and correct to vp
+        filtered_candidates = []
+        for line in candidates:
+            
+            #check for validity with center:
+            #midpoint_angle = LineFunctions.line_angle(self.surface.center[0], self.surface.center[1], line.midpoint[0], line.midpoint[1])
+
+            #check for validity with vanishing point:
+            vp_match = next(filter(lambda vp: vp.is_inlier(line, np.radians(5)), self.surface.vanishing_points), None)
+
+            if vp_match is None:
+                continue
+
+            filtered_candidates.append(line)
+
+        filtered_candidates = Line.merge(filtered_candidates, search_width=self.diagonal/200)
+
+        return filtered_candidates
 
     def debug(self, img, color):
         Line.draw_all(img, self.barrier_candidates, color=color, thickness=2) 
