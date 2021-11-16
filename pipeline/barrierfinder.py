@@ -17,285 +17,65 @@ from cambrian.LineFunctions import LineFunctions
 from .Line import line_angle_difference, Line, line_on_image_edge
 from .room import Room, Surface
 
-class BarrierLine(Line):
-    def __init__(self, data, group, start_index, stop_index):
-        super().__init__(data, group=group)
-        self.start_index = start_index
-        self.stop_index = stop_index
-
-class Barrier():
-    def __init__(self, line, poly_length):
-        self.line = line
-        self.poly_length = poly_length
-        self.source_lines = [line]
-        self.indices = [line.id]
-        self.destroyed = False
-
-    def intersects(self, line, search_width=13, length_multiplier=5.0):
-        if line.group != self.line.group:
-            return False
-
-        rect_a = self.line.bounding_box(search_width, length_multiplier=length_multiplier)
-        rect_b = line.bounding_box(search_width, length_multiplier=length_multiplier)
-        result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
-
-        return result != 0
-
-    @property
-    def start_index(self):
-        return self.line.start_index % self.poly_length
-
-    @property
-    def stop_index(self):
-        return self.line.stop_index % self.poly_length
-
-    @property
-    def length(self):
-        return self.line.stop_index - self.line.start_index
-
-    def merge(self, line:BarrierLine, merged_data=None):
-        if merged_data is None:
-            merged_data = LineFunctions.merge_lines((self.line.point_a, self.line.point_b), (line.point_a, line.point_b))
-
-        start_index = min(self.line.start_index, line.start_index)
-        stop_index = max(self.line.stop_index, line.stop_index)
-        self.line = BarrierLine(np.array([merged_data[0][0], merged_data[0][1], merged_data[1][0], merged_data[1][1]], dtype=np.int), group=line.group, start_index=start_index, stop_index=stop_index)
-        self.source_lines.append(line)
-
-    def extend_to(self, line):
-        print("Extend to point")
-
-
-class BarrierFinder():
+class SurfaceBarriers():
     def __init__(self, data, surface):
-        super().__init__()
         self.data = data
-        self.room = data["room"]
-        self.image = self.data["downscaled"]
         self.surface = surface
+        self.image = self.data["downscaled"]
+        self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
+        self.barrier_candidates = self.get_barrier_candidates()
 
-    def line_semantics(self, point_a, point_b):
-        merged_result_len = distance.euclidean(point_a, point_b)
-        num_samples = int(merged_result_len + 1)
-        samples = LineFunctions.get_line_samples(point_a, point_b, self.surface.geometry.semantic_labels, num_samples)
+    def get_barrier_candidates(self):
+
+        def inside_mask(mask, point):
+            if point[0] < mask.shape[1] and point[1] < mask.shape[0]:
+                return mask[int(point[1]), int(point[0])] > 0
+            return False
         
-        unique, counts = np.unique(samples, return_counts=True)
-        unique_counts = zip(unique.tolist(), counts.tolist())
-        return sorted(unique_counts, key=lambda x:x[1], reverse=True)
+        padding = 10
+        surface_mask = cv2.copyMakeBorder(self.surface.mask, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0) 
+        trans = cv2.distanceTransform(1-surface_mask, cv2.DIST_L2, 5)
+        _, outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
 
-    def find_merged_match(self, line, search_width, barriers, angle_threshold):
+        trans = cv2.distanceTransform(surface_mask, cv2.DIST_L2, 5)
+        _, inner_mask = cv2.threshold(trans, 0.5 * trans.max(), 1, 0)
 
-        match = next(filter(lambda x: x.intersects(line, search_width=search_width), barriers), None)
+        self.mask_edges = 1 - inner_mask - outer_mask
+        self.mask_edges[self.mask_edges < 0] = 0
+        self.mask_edges = self.mask_edges[padding:-padding,padding:-padding]
 
-        if match is None: return None, None
+        barrier_lines = []
 
-        if LineFunctions.line_angle_difference(line.angle, match.line.angle) > angle_threshold:
-            return None, None
+        for line in self.data["lines"]:
 
-        merged_result = LineFunctions.merge_lines((match.line.point_a, match.line.point_b), (line.point_a, line.point_b))
-        merged_semantics = self.line_semantics(merged_result[0], merged_result[1])
-        merged_label = ADE20K(merged_semantics[0][0] + 1)
-        merged_counts_ratio = merged_semantics[0][1] / (merged_semantics[0][1] + merged_semantics[1][1]) if len(merged_semantics) > 1 else 1
-
-        #print(self.surface.name, merged_label, merged_counts_ratio)
-        
-        if self.surface.bestLabel == merged_label and merged_counts_ratio > 0.7:
-            return match, merged_result
-
-        return None, None
-
-
-    def border_search(self, poly, clockwise, vps, min_length, max_length, angle_threshold):
-
-        min_length_sq = min_length * min_length
-        max_length_sq = max_length * max_length
-        theta_thresh = np.cos(angle_threshold)
-
-        last_vp_match = None
-
-        num_pts = len(poly)
-        group = 0
-
-        barriers = []
-
-        diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
-
-        search_width = int(diagonal / 50)
-
-        for i in range(num_pts):
-
-            index_a = i if clockwise else (num_pts - i - 1)
-            index_b = (i+1 if clockwise else (num_pts - i - 2)) % num_pts
-
-            point_a = poly[index_a][0]
-            point_b = poly[index_b][0]
-
-            length_sq = distance.sqeuclidean(point_a, point_b)
-
-            if length_sq < min_length_sq or length_sq > max_length_sq:
+            if line_on_image_edge(line.point_a, line.point_b, self.image):
                 continue
 
-            if line_on_image_edge(point_a, point_b, self.image):
-                continue
-            
-            line = BarrierLine(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]), group=group, start_index=i, stop_index=i+1)
+            point_a = (line.point_a[0] + line.midpoint[0]) / 2, (line.point_a[1] + line.midpoint[1]) / 2
+            point_b = (line.point_b[0] + line.midpoint[0]) / 2, (line.point_b[1] + line.midpoint[1]) / 2
 
-            directions = np.array([line.direction]) 
-            directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
-            locations = np.array([line.midpoint])
-
-            vp_match = next(filter(lambda vp: angle_with_vp(vp.model, locations, directions) > theta_thresh, vps), None)
-
-            if vp_match is None: continue
-
-            est_directions = locations - vp_match.direction
-
-            direction = normalize(est_directions[0]) * 0.5 * line.length
-            est_line = BarrierLine(np.array([line.midpoint[0] - direction[0], line.midpoint[1] - direction[1], line.midpoint[0] + direction[0], line.midpoint[1] + direction[1]], dtype=np.int), \
-                group=group, start_index=i, stop_index=i+1) #i+1 may extend into start by modulous division, but must be kept track of
-
-            if LineFunctions.line_angle_difference(line.angle, est_line.angle) <= angle_threshold / 2:
-                line = est_line
-
-            if last_vp_match != None and last_vp_match != vp_match:
-                #made a legit turn, do not allow grouping with past barriers (could check angle?)
-                #delete ones we've skipped over here
-                group += 1
-
-            last_vp_match = vp_match
-
-            match, merged_result = self.find_merged_match(line, search_width, barriers, angle_threshold)
-
-            if match is not None:
-                match.merge(line, merged_result)
-            else:
-                barriers.append(Barrier(line, poly_length=num_pts))
-
-        return barriers
-
-    def reintegrate_barriers(self, poly, barriers, occupied=None):
-
-        if occupied is None:
-            occupied = np.full(len(poly), False)
-
-        filtered = []
-
-        for barrier in sorted(barriers, key=lambda x:x.length, reverse=True):
-
-            if barrier.start_index < barrier.stop_index:
-                count = np.count_nonzero(occupied[barrier.start_index:barrier.stop_index])
-            else:
-                count = np.count_nonzero(occupied[barrier.start_index:]) + np.count_nonzero(occupied[0:barrier.stop_index])
-
-            if count > 0:
-                #print({"count":count, "start":barrier.start_index, "stop":barrier.stop_index}, {"barrier len": barrier.length, "poly len": len(poly)})
-                continue
-
-            if barrier.start_index < barrier.stop_index:
-                occupied[barrier.start_index:barrier.stop_index] = True
-            else:
-                occupied[barrier.start_index:] = True
-                occupied[0:barrier.stop_index] = True            
-
-            filtered.append(barrier)
-
-
-        return filtered, occupied
-            #point_a = poly[i][0]
-            #point_b = poly[(i+1) % num_pts][0]
-
-    def inlier_search(self, poly, vp_lines, inner_padding, outer_padding):
-
-        def on_the_border(line):
-            #positive (inside), negative (outside), or zero (on an edge)
-            dist_a = cv2.pointPolygonTest(poly, line.point_a, True)
-            a_inside = dist_a > 0
-            a_ok = dist_a < inner_padding if a_inside else abs(dist_a) < outer_padding
-
-            dist_b = cv2.pointPolygonTest(poly, line.point_b, True)
-            b_inside = dist_b > 0
-            b_ok = dist_b < inner_padding if b_inside else abs(dist_b) < outer_padding
-
-            dist_midpoint = cv2.pointPolygonTest(poly, line.midpoint, True)
-            mid_inside = dist_midpoint > 0
-            mid_ok = dist_midpoint < inner_padding if mid_inside else abs(dist_midpoint) < outer_padding            
-
-            return mid_ok and (abs(dist_a - dist_midpoint) < inner_padding / 3 or abs(dist_b - dist_midpoint) < inner_padding / 3)
-
-        inlier_lines = (list(filter(lambda line: on_the_border(line), vp_lines)))
-
-        return inlier_lines
-            
-    def find(self, vp_lines, angle_threshold=np.radians(5), min_length=5, max_length=1000):
-        
-        if len(self.surface.vanishing_points) < 0:
-            return []
-
-        diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
-
-        #pull barriers from surface contours:
-
-        #for vp in self.surface.vanishing_points:
-
-        
-        line_groups = []
+            if inside_mask(self.mask_edges, line.midpoint) and (inside_mask(self.mask_edges, point_a) or inside_mask(self.mask_edges, point_b)):
+                #check for validity with vanishing point:
+                
+                barrier_lines.append(line.copy())
 
         for poly in self.surface.polygons:
-            #both directions:
+            num_pts = len(poly)
+            for i in range(num_pts):
+                point_a = poly[i][0]
+                point_b = poly[(i+1) % num_pts][0]
 
-            surface_barriers = []
+                if line_on_image_edge(point_a, point_b, self.image):
+                    continue
 
-            #clockwise:
-            barriers = self.border_search(poly, True, self.surface.vanishing_points, min_length, max_length, angle_threshold)
-            #remove ones skipped by others:
-            barriers, occupied = self.reintegrate_barriers(poly, barriers)
-            surface_barriers.extend(barriers)
+                line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
+                barrier_lines.append(line)
 
-            # #counter_clockwise:
-            barriers = self.border_search(poly, False, self.surface.vanishing_points, min_length, max_length, angle_threshold)
-            barriers, occupied = self.reintegrate_barriers(poly, barriers, occupied)
-            surface_barriers.extend(barriers)
+        return Line.merge(barrier_lines, search_width=self.diagonal/200, search_length=1.2)
 
-            #collect lines for polygon
-            poly_lines = list(map(lambda x: x.line, surface_barriers))
-
-            #pull barriers from inlier lines near surface edges:
-            moments = cv2.moments(poly)
-            area = moments['m00']
-
-            centroid = (int(moments['m10'] / area), int(moments['m01'] / area)) if area > 0 else None
-
-            length = math.sqrt(area) if area > 0 else diagonal / 50
-            inner_padding = length / 10
-            outer_padding = length / 10 
-            poly_lines.extend(self.inlier_search(poly, vp_lines, inner_padding, outer_padding))
-            
-            poly_lines = Line.merge(poly_lines, search_width=diagonal/200, search_length=1.5, angle_threshold=math.radians(3))
-
-            line_groups.append(poly_lines)
-            
-            # #filter out ones that have a match further away from the center but in the same direction
-            # if centroid is None:
-            #     continue
-
-            # removed = []
-
-            # for i in range(len(poly_lines)):
-            #     line_a = poly_lines[i]
-            #     matches = []
-
-            #     for j in range(i+1, len(poly_lines)):
-            #         line_b = poly_lines[j]
-
-            #         if LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold:
-            #             continue
-
-                    #now same angle:
-
-
-
+    def debug(self, img, color):
+        Line.draw_all(img, self.barrier_candidates, color=color, thickness=2) 
         
-        return line_groups
 
 class BarrierSolver():
     def __init__(self, data, surface):
@@ -342,54 +122,10 @@ class PipelineBarrierFinder(PipelineStep):
 
         self.lines = []
 
-        def inside_mask(mask, point):
-            if point[0] < mask.shape[1] and point[1] < mask.shape[0]:
-                return mask[int(point[1]), int(point[0])] > 0
-            return False
-
         self.barriers = {}
 
         for surface in self.surfaces:
-            barrier_lines = []
-
-            padding = 10
-            surface_mask = cv2.copyMakeBorder(surface.mask, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0) 
-            trans = cv2.distanceTransform(1-surface_mask, cv2.DIST_L2, 5)
-            _, outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
-
-            trans = cv2.distanceTransform(surface_mask, cv2.DIST_L2, 5)
-            _, inner_mask = cv2.threshold(trans, 0.5 * trans.max(), 1, 0)
-
-            mask_edges = 1 - inner_mask - outer_mask
-            mask_edges[mask_edges < 0] = 0
-            mask_edges = mask_edges[padding:-padding,padding:-padding]
-
-            for line in self.data["lines"]:
-
-                if line_on_image_edge(line.point_a, line.point_b, self.image):
-                    continue
-
-                point_a = (line.point_a[0] + line.midpoint[0]) / 2, (line.point_a[1] + line.midpoint[1]) / 2
-                point_b = (line.point_b[0] + line.midpoint[0]) / 2, (line.point_b[1] + line.midpoint[1]) / 2
-
-                if inside_mask(mask_edges, line.midpoint) and (inside_mask(mask_edges, point_a) or inside_mask(mask_edges, point_b)):
-                    barrier_lines.append(line.copy())
-
-            for poly in surface.polygons:
-                num_pts = len(poly)
-                for i in range(num_pts):
-                    point_a = poly[i][0]
-                    point_b = poly[(i+1) % num_pts][0]
-
-                    if line_on_image_edge(point_a, point_b, self.image):
-                        continue
-
-                    line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
-                    barrier_lines.append(line)
-
-            barrier_lines = Line.merge(barrier_lines, search_width=self.diagonal/200, search_length=1.2)          
-
-            self.barriers[surface.uniqueId] = (surface, mask_edges, barrier_lines)
+            self.barriers[surface.uniqueId] = SurfaceBarriers(self.data, surface)
 
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers.png", self.get_debug_image())
@@ -421,11 +157,7 @@ class PipelineBarrierFinder(PipelineStep):
             surface = self.room.surfaces[i]
             color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
 
-            if surface.uniqueId not in self.barriers:
-                continue
-                
-            barrier = self.barriers[surface.uniqueId]
-
-            Line.draw_all(img, barrier[2], color=color, thickness=2)
+            if surface.uniqueId in self.barriers:
+                self.barriers[surface.uniqueId].debug(img, color)
 
         return img
