@@ -56,8 +56,11 @@ class SurfaceBarriers():
 
             if inside_mask(self.mask_edges, line.midpoint) and (inside_mask(self.mask_edges, point_a) or inside_mask(self.mask_edges, point_b)):
                 #check for validity with vanishing point:
+                direction = normalize(np.array([self.surface.center[0] - line.midpoint[0], self.surface.center[1] - line.midpoint[1]]))
+
+                matching_vp = next(filter(lambda vp: len(animal) > 5, self.surface.vanishing_points), None)
                 
-                barrier_lines.append(line.copy())
+                barrier_lines.append(line)
 
         for poly in self.surface.polygons:
             num_pts = len(poly)
