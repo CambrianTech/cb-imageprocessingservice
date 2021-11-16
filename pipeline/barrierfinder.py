@@ -75,8 +75,10 @@ class SurfaceBarriers():
         filtered_candidates = []
         for line in candidates:
             
-            #check for validity with center:
-            #midpoint_angle = LineFunctions.line_angle(self.surface.center[0], self.surface.center[1], line.midpoint[0], line.midpoint[1])
+            #check for validity with center: (todo: use closest polygonal point)
+            midpoint_angle = LineFunctions.line_angle(self.surface.center[0], self.surface.center[1], line.midpoint[0], line.midpoint[1])
+            if line_angle_difference(midpoint_angle, line.angle) < np.radians(20):
+                continue
 
             #check for validity with vanishing point:
             vp_match = next(filter(lambda vp: vp.is_inlier(line, np.radians(5)), self.surface.vanishing_points), None)
