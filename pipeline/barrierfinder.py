@@ -352,20 +352,6 @@ class PipelineBarrierFinder(PipelineStep):
         for surface in self.surfaces:
             barrier_lines = []
 
-            if surface.surfaceType == SurfaceType.Wall:
-                neighboring_walls = list(filter(lambda s:s.surfaceType == SurfaceType.Wall, surface.neighbors))
-                print("Surface %s has neighbors:" % surface.name, [neighbor.name for neighbor in neighboring_walls])
-
-            #just look at mask edges:
-            # scale = 200 / diagonal
-            # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7))
-            
-            # downscaled = cv2.resize(surface.mask, (int(surface.mask.shape[1] * scale), int(surface.mask.shape[0] * scale)), cv2.INTER_NEAREST)
-            # mask_edges = cv2.dilate(downscaled, kernel, iterations=1)
-            # contracted = cv2.erode(downscaled, kernel, iterations=2)
-            # mask_edges[contracted > 0] = 0
-            # mask_edges = cv2.resize(mask_edges, (self.image.shape[1], self.image.shape[0]), cv2.INTER_NEAREST)
-
             padding = 10
             surface_mask = cv2.copyMakeBorder(surface.mask, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0) 
             trans = cv2.distanceTransform(1-surface_mask, cv2.DIST_L2, 5)

@@ -363,6 +363,10 @@ class Room(Geometry):
         for surface in self.get_surfaces([SurfaceType.Wall]):
             invalid_contours = []
 
+            if surface.surfaceType == SurfaceType.Wall:
+                neighboring_walls = list(filter(lambda s:s.surfaceType == SurfaceType.Wall, surface.neighbors))
+                print("Surface %s has neighbors:" % surface.name, [neighbor.name for neighbor in neighboring_walls])
+
             for i in range(len(surface.contours)):
                 contour = surface.contours[i]
 
