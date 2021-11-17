@@ -69,12 +69,10 @@ class SurfaceBarriers():
         _, outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
 
         trans = cv2.distanceTransform(surface_mask, cv2.DIST_L2, 5)
-        _, inner_mask = cv2.threshold(trans, 0.2 * trans.max(), 1, 0)
+        _, inner_mask = cv2.threshold(trans, 0.5 * trans.max(), 1, 0)
         inner_mask = inner_mask.astype(np.uint8)
 
-        contours, hierarchy = cv2.findContours(inner_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        self.shapes = list(map(lambda contour: cv2.approxPolyDP(contour, 0.003 * cv2.arcLength(contour, True), True), contours))
+        self.shapes = list(map(lambda contour: cv2.approxPolyDP(contour, 0.003 * cv2.arcLength(contour, True), True), self.surface.contours))
 
         self.mask_edges = 1 - inner_mask - outer_mask
         self.mask_edges[self.mask_edges < 0] = 0
@@ -91,7 +89,9 @@ class SurfaceBarriers():
             point_b = (line.point_b[0] + line.midpoint[0]) / 2, (line.point_b[1] + line.midpoint[1]) / 2
 
             if inside_mask(self.mask_edges, line.midpoint) and (inside_mask(self.mask_edges, point_a) or inside_mask(self.mask_edges, point_b)):
-                candidates.append(line)                    
+                candidates.append(line)
+
+        candidates = Line.merge(candidates, search_width=self.diagonal/200, search_length=1.2)          
 
         for poly in self.surface.polygons:
             num_pts = len(poly)
@@ -105,7 +105,7 @@ class SurfaceBarriers():
                 line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
                 candidates.append(line)
 
-        #candidates = Line.merge(barrier_lines, search_width=self.diagonal/200, search_length=1.2)
+        candidates = Line.merge(candidates, search_width=self.diagonal/200, search_length=1.0)
 
         #filter and correct to vp
         barriers = []
@@ -117,15 +117,18 @@ class SurfaceBarriers():
             #     continue
 
             #check for validity with vanishing point:
-            vp_match = next(filter(lambda vp: vp.is_inlier(line, np.radians(5)), self.surface.vanishing_points), None)
+            # vp_match = next(filter(lambda vp: vp.is_inlier(line, np.radians(5)), self.surface.vanishing_points), None)
 
-            if vp_match is None:
-                continue
+            # if vp_match is None:
+            #     continue
 
             barrier = Barrier(self, line)
 
+            # barriers.append(barrier)
+
+            #should be fairly perpendicular:
             barrier_angle = LineFunctions.line_angle(barrier.closest_point[0], barrier.closest_point[1], line.midpoint[0], line.midpoint[1])
-            if line_angle_difference(barrier_angle, line.angle) > np.radians(30):
+            if line_angle_difference(barrier_angle, line.angle) > np.radians(45):
                 barriers.append(barrier)
 
         return barriers
