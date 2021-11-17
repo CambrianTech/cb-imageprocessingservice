@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import random
-
+from scipy.spatial import distance
 from .ade20k import ADE20K
 
 def partition(pred, iterable):
@@ -177,6 +177,30 @@ def scale_contour(cnt, scale, moments=None):
     cnt_scaled = cnt_scaled.astype(np.int32)
 
     return cnt_scaled
+
+def closest_polygon_side(contour, point):
+    #return (distance, point, and indices) of closest line in polygon or contour by midpoints
+
+    num_pts = len(contour)
+    min_dist_sq = np.inf
+    min_indices = None
+    min_point = None
+
+    for i in range(num_pts):
+        j=(i+1) % num_pts
+        point_a = contour[i][0]
+        point_b = contour[j][0]
+
+        midpoint = (point_a[0] + point_b[0]) / 2, (point_a[1] + point_b[1]) / 2
+
+        dist_sq = distance.sqeuclidean(midpoint, point)
+        if dist_sq < min_dist_sq:
+            min_indices = (i,j)
+            min_point = midpoint
+            min_dist_sq = dist_sq
+
+    return np.sqrt(min_dist_sq), min_point, min_indices
+
 
 def convert_color(color, conversion):
     #return tuple(int(i) for i in cv2.cvtColor(img, conversion).flatten())
