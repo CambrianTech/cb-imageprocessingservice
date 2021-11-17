@@ -191,6 +191,8 @@ def closest_polygon_side(contour, point):
         point_a = contour[i][0]
         point_b = contour[j][0]
 
+        if point_a[0] == point_b[0] and point_a[1] == point_b[1]: continue
+
         midpoint = (point_a[0] + point_b[0]) / 2, (point_a[1] + point_b[1]) / 2
 
         dist_sq = distance.sqeuclidean(midpoint, point)

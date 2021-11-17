@@ -60,6 +60,9 @@ class Line(Sequence):
     def normal(self):
         return np.array([-self.direction[1], self.direction[0]], dtype=float)
 
+    def closest_point(self, point):
+        return closest_line_point(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], point[0], point[1])
+
     def draw(self, img, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
         cv2.line(img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
 
@@ -144,6 +147,13 @@ def line_angle_difference(x, y): #minimum angle between lines segments cannot di
 def line_angle(x0, y0, x1, y1):
     #return np.arctan2(y1 - y0, x1 - x0)
     return math.atan2(float(y1 - y0), float(x1 - x0))
+
+@nb.jit(nopython=True)
+def closest_line_point(x0, y0, x1, y1, px, py): #minimum angle between lines segments cannot differ by more than 90 degrees
+    dx, dy = x1-x0, y1-y0
+    det = dx*dx + dy*dy
+    a = (dy*(py-y0)+dx*(px-x0))/det
+    return (x0+a*dx), (y0+a*dy)
 
 @nb.jit(nopython=True)
 def bounding_box(line, width, length_multiplier=1.0):
