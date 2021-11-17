@@ -72,9 +72,13 @@ class SurfaceBarriers():
 
         trans = cv2.distanceTransform(surface_mask, cv2.DIST_L2, 5)
         _, inner_mask = cv2.threshold(trans, 0.5 * trans.max(), 1, 0)
-        inner_mask = inner_mask.astype(np.uint8)
 
-        self.shapes = list(map(lambda contour: cv2.approxPolyDP(contour, 0.003 * cv2.arcLength(contour, True), True), self.surface.contours))
+        trans = cv2.distanceTransform(surface_mask, cv2.DIST_L2, 5)
+        _, shape_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
+        shape_mask = shape_mask[padding:-padding,padding:-padding].astype(np.uint8)
+        contours, _ = cv2.findContours(shape_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        self.shapes = list(map(lambda contour: cv2.approxPolyDP(contour, 0.003 * cv2.arcLength(contour, True), True), contours))
 
         self.mask_edges = 1 - inner_mask - outer_mask
         self.mask_edges[self.mask_edges < 0] = 0
@@ -107,7 +111,7 @@ class SurfaceBarriers():
                 line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
                 candidates.append(line)
 
-        candidates = Line.merge(candidates, search_width=self.diagonal/200, search_length=1.0)
+        candidates = Line.merge(candidates, search_width=self.diagonal/400, search_length=1.0)
 
         #filter and correct to vp
         barriers = []
@@ -125,10 +129,9 @@ class SurfaceBarriers():
                 continue
 
             barrier = Barrier(self, line, vp_match)
+            #barriers.append(barrier)
 
-            # barriers.append(barrier)
-
-            #should be fairly perpendicular:
+            # #should be fairly perpendicular:
             barrier_angle = LineFunctions.line_angle(barrier.closest_point[0], barrier.closest_point[1], line.midpoint[0], line.midpoint[1])
             if line_angle_difference(barrier_angle, line.angle) > np.radians(45):
                 barriers.append(barrier)
