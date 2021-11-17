@@ -18,9 +18,10 @@ from .Line import line_angle_difference, Line, line_on_image_edge
 from .room import Room, Surface
 
 class Barrier():
-    def __init__(self, surface_barrier, line):
+    def __init__(self, surface_barrier, line, vanishing_point):
         self.surface_barrier = surface_barrier
         self.line = line
+        self.vanishing_point = vanishing_point
 
         min_dist = np.inf
         point_a = None
@@ -47,9 +48,10 @@ class Barrier():
         #cv2.drawMarker(img, point_b, (255,0,0))
 
 class SurfaceBarriers():
-    def __init__(self, data, surface):
+    def __init__(self, data, surface, vanishing_points):
         self.data = data
         self.surface = surface
+        self.vanishing_points = vanishing_points
         self.image = self.data["downscaled"]
         self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
@@ -117,12 +119,12 @@ class SurfaceBarriers():
             #     continue
 
             #check for validity with vanishing point:
-            # vp_match = next(filter(lambda vp: vp.is_inlier(line, np.radians(5)), self.surface.vanishing_points), None)
+            vp_match = next(filter(lambda vp: vp.is_inlier(line, np.radians(5)), self.vanishing_points), None)
 
-            # if vp_match is None:
-            #     continue
+            if vp_match is None:
+                continue
 
-            barrier = Barrier(self, line)
+            barrier = Barrier(self, line, vp_match)
 
             # barriers.append(barrier)
 
@@ -185,12 +187,18 @@ class PipelineBarrierFinder(PipelineStep):
         self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike]))
         self.surfaces.extend(self.room.get_surfaces(labels=box_like))
 
+        self.vanishing_points = []
+        for surface in self.surfaces:
+            for vp in surface.vanishing_points:
+                if vp not in self.vanishing_points:
+                    self.vanishing_points.append(vp)
+
         self.lines = []
 
         self.barriers = {}
 
         for surface in self.surfaces:
-            self.barriers[surface.uniqueId] = SurfaceBarriers(self.data, surface)
+            self.barriers[surface.uniqueId] = SurfaceBarriers(self.data, surface, self.vanishing_points)
 
         if im_logging_enabled(self.data):
             log_image(self.data, "barriers.png", self.get_debug_image())
