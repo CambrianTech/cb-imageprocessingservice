@@ -195,11 +195,28 @@ def closest_polygon_side(contour, point):
 
         midpoint = (point_a[0] + point_b[0]) / 2, (point_a[1] + point_b[1]) / 2
 
-        dist_sq = distance.sqeuclidean(midpoint, point)
-        if dist_sq < min_dist_sq:
+        #midpoints between point a and midpoint
+        point_a = (point_a[0] + midpoint[0]) / 2, (point_a[1] + midpoint[1]) / 2
+        point_b = (point_b[0] + midpoint[0]) / 2, (point_b[1] + midpoint[1]) / 2
+
+        dist_point_a_sq = distance.sqeuclidean(point_a, point)
+        dist_point_b_sq = distance.sqeuclidean(point_b, point)
+        dist_midpoint_sq = distance.sqeuclidean(midpoint, point)
+
+        if dist_point_a_sq < min_dist_sq:
+            min_indices = (i,j)
+            min_point = point_a
+            min_dist_sq = dist_point_a_sq
+
+        if dist_point_b_sq < min_dist_sq:
+            min_indices = (i,j)
+            min_point = point_b
+            min_dist_sq = dist_point_b_sq
+
+        if dist_midpoint_sq < min_dist_sq:
             min_indices = (i,j)
             min_point = midpoint
-            min_dist_sq = dist_sq
+            min_dist_sq = dist_midpoint_sq
 
     return np.sqrt(min_dist_sq), min_point, min_indices
 
