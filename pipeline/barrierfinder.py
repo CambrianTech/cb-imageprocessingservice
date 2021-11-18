@@ -8,7 +8,7 @@ import math
 
 from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
-from .utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text, adjust_mask, closest_polygon_side
+from .utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text, adjust_mask
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import angle_with_vp
@@ -17,27 +17,111 @@ from cambrian.LineFunctions import LineFunctions
 from .Line import line_angle_difference, Line, line_on_image_edge
 from .room import Room, Surface
 
+def closest_polygon_side(contour, point, min_length_threshold=None, max_length_threshold=None):
+    #return (distance, point, and indices) of closest line in polygon or contour by midpoints
+
+    num_pts = len(contour)
+    min_dist_sq = np.inf
+    min_index = None
+
+    min_length_threshold_sq = None if min_length_threshold is None else min_length_threshold * min_length_threshold
+    max_length_threshold_sq = None if max_length_threshold is None else max_length_threshold * max_length_threshold
+
+    for i in range(num_pts):
+        point_a = contour[i][0]
+        point_b = contour[(i+1) % num_pts][0]
+
+        if point_a[0] == point_b[0] and point_a[1] == point_b[1]: continue
+
+        if min_length_threshold_sq is not None or max_length_threshold_sq is not None:
+            length_sq = distance.sqeuclidean(point_a, point_b)
+
+            if min_length_threshold_sq is not None and length_sq < min_length_threshold_sq: continue
+            if max_length_threshold_sq is not None and length_sq > max_length_threshold_sq: continue
+
+        midpoint = (point_a[0] + point_b[0]) / 2, (point_a[1] + point_b[1]) / 2
+
+        #midpoints between point a and midpoint
+        point_a = (point_a[0] + midpoint[0]) / 2, (point_a[1] + midpoint[1]) / 2
+        point_b = (point_b[0] + midpoint[0]) / 2, (point_b[1] + midpoint[1]) / 2
+
+        dist_point_a_sq = distance.sqeuclidean(point_a, point)
+        dist_point_b_sq = distance.sqeuclidean(point_b, point)
+        dist_midpoint_sq = distance.sqeuclidean(midpoint, point)
+
+        if dist_point_a_sq < min_dist_sq:
+            min_index = i
+            min_dist_sq = dist_point_a_sq
+
+        if dist_point_b_sq < min_dist_sq:
+            min_index = i
+            min_dist_sq = dist_point_b_sq
+
+        if dist_midpoint_sq < min_dist_sq:
+            min_index = i
+            min_dist_sq = dist_midpoint_sq
+
+    if min_index is None:
+        if min_length_threshold is not None:
+            return closest_polygon_side(contour, point, min_length_threshold=None, max_length_threshold=max_length_threshold)
+        elif max_length_threshold is not None:
+            return closest_polygon_side(contour, point, min_length_threshold=None, max_length_threshold=None)
+        
+    return min_index, np.sqrt(min_dist_sq)
+
 class Barrier():
-    def __init__(self, surface_barrier, line, vanishing_point):
+    def __init__(self, surface_barrier, line, vanishing_point, angle_threshold):
         self.surface_barrier = surface_barrier
         self.line = line
         self.vanishing_point = vanishing_point
+        self.shape_line = None
+        self.closest_point = None
 
         min_dist = np.inf
-        point_a = None
-        point_b = None
+        min_shape = None
+        min_index = None
 
         for i in range(len(self.surface_barrier.shapes)):
             shape = self.surface_barrier.shapes[i]
-            dist, point, indices  = closest_polygon_side(shape, self.line.midpoint)
+            index, dist = closest_polygon_side(shape, self.line.midpoint)
 
             if dist < min_dist:
                 min_dist = dist
-                point_a = shape[indices[0]][0]
-                point_b = shape[indices[1]][0]
+                min_index = index
+                min_shape = shape
         
-        self.shape_line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
-        self.closest_point = self.shape_line.closest_point(self.line.midpoint)
+        if min_shape is not None:
+            #now check these indices, and indices before and after, for the most like line by angle:
+            num_pts = len(min_shape)
+
+            a = min_index - 1
+            if a < 0: a = num_pts - 1
+            b = min_index
+            c = (min_index + 1) % num_pts
+            d = (min_index + 2) % num_pts
+
+            point_a = min_shape[a][0]
+            point_b = min_shape[b][0]
+            point_c = min_shape[c][0]
+            point_d = min_shape[d][0]
+
+            ab_angle = LineFunctions.line_angle_difference(LineFunctions.line_angle(point_a[0], point_a[1], point_b[0], point_b[1]), line.angle)
+            bc_angle = LineFunctions.line_angle_difference(LineFunctions.line_angle(point_b[0], point_b[1], point_c[0], point_c[1]), line.angle)
+            cd_angle = LineFunctions.line_angle_difference(LineFunctions.line_angle(point_c[0], point_c[1], point_d[0], point_d[1]), line.angle)
+
+            best_angle = ab_angle
+            best_points = point_a, point_b
+
+            if bc_angle < best_angle:
+                best_angle = bc_angle
+                best_points = point_b, point_c
+
+            if cd_angle < best_angle:
+                best_angle = cd_angle
+                best_points = point_c, point_d
+            
+            self.shape_line = Line(np.array([best_points[0][0], best_points[0][1], best_points[1][0], best_points[1][1]]))
+            self.closest_point = self.shape_line.closest_point(self.line.midpoint)
 
     def debug(self, img, color):
         self.line.draw(img, color=color, thickness=2)
@@ -45,7 +129,7 @@ class Barrier():
         point_b = (int(self.closest_point[0]), int(self.closest_point[1]))
         
         cv2.line(img, point_a, point_b, color, 1)
-        #cv2.drawMarker(img, point_b, (255,0,0))
+        cv2.line(img, (int(self.shape_line.point_a[0]), int(self.shape_line.point_a[1])),(int(self.shape_line.point_b[0]), int(self.shape_line.point_b[1])), color, 1)
 
 class SurfaceBarriers():
     def __init__(self, data, surface, vanishing_points):
@@ -57,7 +141,7 @@ class SurfaceBarriers():
 
         self.barrier_candidates = self.get_barrier_candidates()
 
-    def get_barrier_candidates(self):
+    def get_barrier_candidates(self, angle_threshold=np.radians(45)):
 
         def inside_mask(mask, point):
             if point[0] < mask.shape[1] and point[1] < mask.shape[0]:
@@ -128,41 +212,40 @@ class SurfaceBarriers():
             if vp_match is None:
                 continue
 
-            barrier = Barrier(self, line, vp_match)
+            barrier = Barrier(self, line, vp_match, angle_threshold)
 
             # #should be fairly perpendicular:
             #barrier_angle = LineFunctions.line_angle(barrier.closest_point[0], barrier.closest_point[1], line.midpoint[0], line.midpoint[1])
-            if line_angle_difference(barrier.shape_line.angle, line.angle) < np.radians(45):
+            if line_angle_difference(barrier.shape_line.angle, line.angle) < angle_threshold:
                 barriers.append(barrier)
 
         return barriers
 
     def debug(self, img, color):
         for shape in self.shapes:
-            cv2.drawContours(img, [shape], -1, color=color, thickness=1)
+            cv2.drawContours(img, [shape], -1, color=(255,255,255), thickness=1)
 
-        Line.draw_all(img, self.candidates, color=(255,255,255), thickness=1)
+        Line.draw_all(img, self.candidates, color=(0,0,0), thickness=1)
 
         for barrier in self.barrier_candidates:
-            barrier.debug(img, color=color) 
-        
+            barrier.debug(img, color=color)
         
 
 class BarrierSolver():
-    def __init__(self, data, surface):
+    def __init__(self, data, surface_barriers):
         super().__init__()
         self.data = data
         self.room = data["room"]
         self.image = self.data["downscaled"]
-        self.surface = surface
+        self.surface_barriers = surface_barriers
 
 
     def solve(self, max_iterations=2000, threshold_inlier=math.radians(2), max_time=0.33, measure_area=False):     
 
-        max_iterations = min(max_iterations, len(self.surface.barriers) * 40)
+        max_iterations = min(max_iterations, len(self.surface_barriers) * 40)
         start_time = time.time() 
 
-        num_samples = random.randint(2, len(self.barriers))
+        num_samples = random.randint(2, len(self.surface_barriers))
         for ransac_iter in range(max_iterations):
             if time.time() - start_time > max_time:
                 break
@@ -205,7 +288,10 @@ class PipelineBarrierFinder(PipelineStep):
             self.barriers[surface.uniqueId] = SurfaceBarriers(self.data, surface, self.vanishing_points)
 
         if im_logging_enabled(self.data):
-            log_image(self.data, "barriers.png", self.get_debug_image())
+            log_image(self.data, "potential_barriers.png", self.get_debug_image())
+
+        bs = BarrierSolver(self.data, self.barriers)
+        bs.solve()
 
 
     def get_debug_image(self):
