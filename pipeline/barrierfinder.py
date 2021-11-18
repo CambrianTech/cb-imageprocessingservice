@@ -70,7 +70,7 @@ def closest_polygon_side(contour, point, min_length_threshold=None, max_length_t
     return min_index, np.sqrt(min_dist_sq)
 
 class Barrier():
-    def __init__(self, surface_barrier, line, vanishing_point, angle_threshold):
+    def __init__(self, surface_barrier, line, vanishing_point):
         self.surface_barrier = surface_barrier
         self.line = line
         self.vanishing_point = vanishing_point
@@ -212,7 +212,7 @@ class SurfaceBarriers():
             if vp_match is None:
                 continue
 
-            barrier = Barrier(self, line, vp_match, angle_threshold)
+            barrier = Barrier(self, line, vp_match)
 
             # #should be fairly perpendicular:
             #barrier_angle = LineFunctions.line_angle(barrier.closest_point[0], barrier.closest_point[1], line.midpoint[0], line.midpoint[1])
