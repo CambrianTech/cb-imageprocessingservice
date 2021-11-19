@@ -8,7 +8,7 @@ import math
 
 from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
-from .utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text, adjust_mask
+from .utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text, adjust_mask, partition
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import angle_with_vp
@@ -138,9 +138,9 @@ class BarrierGroup():
     def add_barrier(self, barrier):
         self.barriers.append(barrier)
 
-    def match_score(self, test_barrier, search_width, min_angle_diff):
+    def match_score(self, test_barrier, min_angle_diff, search_width, length_multiplier):
 
-        test_rect = test_barrier.line.bounding_box(search_width, length_multiplier=0.9)
+        test_rect = test_barrier.line.bounding_box(search_width, length_multiplier)
 
         score = 0
 
@@ -154,7 +154,7 @@ class BarrierGroup():
             if test_barrier.vanishing_point != barrier.vanishing_point:
                 continue
 
-            rect = test_barrier.line.bounding_box(search_width, length_multiplier=0.9)
+            rect = barrier.line.bounding_box(search_width, length_multiplier)
 
             result, region = cv2.rotatedRectangleIntersection(rect, test_rect)
 
@@ -168,7 +168,18 @@ class BarrierGroup():
         points = []
         marker_color = random_color()
         for barrier in self.barriers:
+            points.append(barrier.line.point_a)
+            points.append(barrier.line.point_b)
+
             cv2.drawMarker(img, (int(barrier.line.midpoint[0]), int(barrier.line.midpoint[1])), marker_color, thickness=2)
+
+        rect = cv2.minAreaRect(np.array(points))
+        rect_width = min(rect[1][0], rect[1][1])
+
+        if rect_width > 2:
+            box = cv2.boxPoints(rect)
+            box = np.int0(box)
+            cv2.drawContours(img, [box], 0, (255,0,0), 1)
 
 class SurfaceBarriers():
     def __init__(self, data, surface, vanishing_points):
@@ -263,27 +274,47 @@ class SurfaceBarriers():
 
     def group_barriers(self, min_angle_diff=np.radians(5)):
         
-        search_width = self.diagonal / 400
-
         barrier_groups = []
 
-        for barrier in self.barrier_candidates:
-
+        def get_best_match(search_width, length_multiplier):
             best_match = None
             best_score = 0
 
             for test_group in barrier_groups:
 
-                score = test_group.match_score(barrier, search_width=search_width, min_angle_diff=min_angle_diff)
+                score = test_group.match_score(barrier, min_angle_diff=min_angle_diff, search_width=search_width, length_multiplier=length_multiplier)
 
                 if score > best_score:
                     best_match = test_group
                     best_score = score
+
+            return best_match
+
+        search_width=self.diagonal/80
+        length_multiplier=0.8
+
+        #group width-wise
+        for barrier in self.barrier_candidates:
+
+            best_match = get_best_match(search_width=search_width, length_multiplier=length_multiplier)
                     
             if best_match is None:
                 barrier_groups.append(BarrierGroup(barrier))
             else:
                 best_match.add_barrier(barrier)
+
+        #retry ones without siblings, wider field
+        barrier_groups, poor_barrier_groups = partition(lambda x: len(x.barriers) > 1, barrier_groups)
+
+        for group in poor_barrier_groups:
+            for barrier in group.barriers:
+
+                best_match = get_best_match(search_width=search_width, length_multiplier=length_multiplier)
+
+                if best_match is None:
+                    barrier_groups.append(BarrierGroup(barrier))
+                else:
+                    best_match.add_barrier(barrier)
 
         return barrier_groups
 
