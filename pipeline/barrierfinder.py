@@ -154,6 +154,12 @@ class BarrierGroup():
             if test_barrier.vanishing_point != barrier.vanishing_point:
                 continue
 
+            # length_ratio = test_barrier.line.length / barrier.line.length
+            # length_ratio = min(length_ratio, 1/length_ratio)
+
+            # if length_ratio < 0.1:
+            #     continue
+
             rect = barrier.line.bounding_box(search_width, length_multiplier)
 
             result, region = cv2.rotatedRectangleIntersection(rect, test_rect)
@@ -171,7 +177,7 @@ class BarrierGroup():
             points.append(barrier.line.point_a)
             points.append(barrier.line.point_b)
 
-            cv2.drawMarker(img, (int(barrier.line.midpoint[0]), int(barrier.line.midpoint[1])), marker_color, thickness=2)
+            #cv2.drawMarker(img, (int(barrier.line.midpoint[0]), int(barrier.line.midpoint[1])), marker_color, thickness=2)
 
         rect = cv2.minAreaRect(np.array(points))
         rect_width = min(rect[1][0], rect[1][1])
@@ -272,7 +278,7 @@ class SurfaceBarriers():
 
         return barriers
 
-    def group_barriers(self, min_angle_diff=np.radians(5)):
+    def group_barriers(self, min_angle_diff=np.radians(10)):
         
         barrier_groups = []
 
@@ -290,8 +296,8 @@ class SurfaceBarriers():
 
             return best_match
 
-        search_width=self.diagonal/80
-        length_multiplier=0.8
+        search_width=self.diagonal/50
+        length_multiplier=0.7
 
         #group width-wise
         for barrier in self.barrier_candidates:
