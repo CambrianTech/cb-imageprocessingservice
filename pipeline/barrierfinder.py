@@ -131,6 +131,45 @@ class Barrier():
         cv2.line(img, point_a, point_b, color, 1)
         cv2.line(img, (int(self.shape_line.point_a[0]), int(self.shape_line.point_a[1])),(int(self.shape_line.point_b[0]), int(self.shape_line.point_b[1])), color, 1)
 
+class BarrierGroup():
+    def __init__(self, barrier):
+        self.barriers = [barrier]
+
+    def add_barrier(self, barrier):
+        self.barriers.append(barrier)
+
+    def match_score(self, test_barrier, search_width, min_angle_diff):
+
+        test_rect = test_barrier.line.bounding_box(search_width, length_multiplier=0.9)
+
+        score = 0
+
+        for barrier in self.barriers:
+
+            angle = LineFunctions.line_angle_difference(barrier.line.angle, test_barrier.line.angle)
+
+            if angle > min_angle_diff: 
+                continue
+
+            if test_barrier.vanishing_point != barrier.vanishing_point:
+                continue
+
+            rect = test_barrier.line.bounding_box(search_width, length_multiplier=0.9)
+
+            result, region = cv2.rotatedRectangleIntersection(rect, test_rect)
+
+            if result != 0:
+                score += 1
+
+        return score
+
+    def debug(self, img, color):
+
+        points = []
+        marker_color = random_color()
+        for barrier in self.barriers:
+            cv2.drawMarker(img, (int(barrier.line.midpoint[0]), int(barrier.line.midpoint[1])), marker_color, thickness=2)
+
 class SurfaceBarriers():
     def __init__(self, data, surface, vanishing_points):
         self.data = data
@@ -140,6 +179,7 @@ class SurfaceBarriers():
         self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
         self.barrier_candidates = self.get_barrier_candidates()
+        self.barrier_groups = self.group_barriers()
 
     def get_barrier_candidates(self, angle_threshold=np.radians(45)):
 
@@ -221,6 +261,33 @@ class SurfaceBarriers():
 
         return barriers
 
+    def group_barriers(self, min_angle_diff=np.radians(5)):
+        
+        search_width = self.diagonal / 400
+
+        barrier_groups = []
+
+        for barrier in self.barrier_candidates:
+
+            best_match = None
+            best_score = 0
+
+            for test_group in barrier_groups:
+
+                score = test_group.match_score(barrier, search_width=search_width, min_angle_diff=min_angle_diff)
+
+                if score > best_score:
+                    best_match = test_group
+                    best_score = score
+                    
+            if best_match is None:
+                barrier_groups.append(BarrierGroup(barrier))
+            else:
+                best_match.add_barrier(barrier)
+
+        return barrier_groups
+
+
     def debug(self, img, color):
         for shape in self.shapes:
             cv2.drawContours(img, [shape], -1, color=(255,255,255), thickness=1)
@@ -229,6 +296,9 @@ class SurfaceBarriers():
 
         for barrier in self.barrier_candidates:
             barrier.debug(img, color=color)
+
+        for barrier_group in self.barrier_groups:
+            barrier_group.debug(img, color=color)
         
 
 class BarrierSolver():
