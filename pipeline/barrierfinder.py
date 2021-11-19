@@ -126,24 +126,24 @@ class Barrier():
         #get neighbor, if any
         self.surface_neighbor = None
 
-        def get_potential_neighbor(normal, padding=3.0):
-            test_point = normal * padding + np.array(self.line.midpoint)
+        def get_potential_neighbor(normal):
+            distance = min(self.shape_line.length, self.surface_barrier.diagonal / 100)
+            test_point = normal * distance + np.array(self.line.midpoint)
             return self.surface_barrier.data["room"].surface_at_point(test_point)
 
-        test_surface = get_potential_neighbor(self.line.normal_a)
+        test_surface_a = get_potential_neighbor(self.line.normal_a)
+        test_surface_b = get_potential_neighbor(self.line.normal_b)
 
-        if test_surface is not None and test_surface != self.surface_barrier.surface:
-            self.surface_neighbor = test_surface
-        else:
-            test_surface = get_potential_neighbor(self.line.normal_b)
-            if test_surface is not None and test_surface != self.surface_barrier.surface:
-                self.surface_neighbor = test_surface
-
-        # if self.surface_neighbor is not None:
-        #     print(self.surface_neighbor.name, self.surface_barrier.surface.name)
+        if test_surface_a != test_surface_b:
+            self.surface_neighbor = test_surface_a if test_surface_a is not None else test_surface_b
 
     def debug(self, img, color):
-        self.line.draw(img, color=color, thickness=2)
+
+        if self.surface_neighbor is not None:
+            self.line.draw(img, color=color, thickness=3)
+        else:
+            self.line.draw(img, color=color, thickness=1)
+
         point_a = (int(self.line.midpoint[0]), int(self.line.midpoint[1]))
         point_b = (int(self.closest_point[0]), int(self.closest_point[1]))
         
@@ -173,8 +173,7 @@ class BarrierGroup():
             if test_barrier.vanishing_point != barrier.vanishing_point:
                 continue
 
-            if test_barrier.surface_neighbor is not None and barrier.surface_neighbor is not None and \
-                test_barrier.surface_neighbor != barrier.surface_neighbor:
+            if test_barrier.surface_neighbor != barrier.surface_neighbor:
                 continue
 
             # length_ratio = test_barrier.line.length / barrier.line.length
@@ -229,7 +228,7 @@ class SurfaceBarriers():
         self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
         self.barrier_candidates = self.get_barrier_candidates()
-        self.barrier_groups = self.group_barriers()
+        #self.barrier_groups = self.group_barriers()
 
     def get_barrier_candidates(self, angle_threshold=np.radians(45)):
 
@@ -333,30 +332,32 @@ class SurfaceBarriers():
         length_multiplier=0.7
 
         #group width-wise
+        orphaned = []
         for barrier in self.barrier_candidates:
 
             best_match = get_best_match(search_width=search_width, length_multiplier=length_multiplier)
                     
-            if best_match is None:
+            if best_match is not None:
+                best_match.add_barrier(barrier)
+            elif barrier.surface_neighbor is not None:
                 barrier_groups.append(BarrierGroup(barrier))
             else:
-                best_match.add_barrier(barrier)
+                orphaned.append(barrier)
 
         #retry ones without siblings, wider field
         barrier_groups, poor_barrier_groups = partition(lambda x: len(x.barriers) > 1, barrier_groups)
-
+        
         for group in poor_barrier_groups:
-            for barrier in group.barriers:
+            orphaned.extend(group.barriers)        
 
-                best_match = get_best_match(search_width=search_width, length_multiplier=length_multiplier)
+        for barrier in orphaned:
 
-                if best_match is None:
-                    barrier_groups.append(BarrierGroup(barrier))
-                else:
-                    best_match.add_barrier(barrier)
+            best_match = get_best_match(search_width=search_width, length_multiplier=length_multiplier)
 
-        #filter out meaningless barriers, ones not between surfaces
-        barrier_groups = list(filter(lambda group: group.surface_neighbor is not None, barrier_groups))
+            if best_match is not None:
+                best_match.add_barrier(barrier)
+            elif barrier.surface_neighbor is not None:
+                barrier_groups.append(BarrierGroup(barrier))
 
         return barrier_groups
 
@@ -370,8 +371,8 @@ class SurfaceBarriers():
         for barrier in self.barrier_candidates:
             barrier.debug(img, color=color)
 
-        for barrier_group in self.barrier_groups:
-            barrier_group.debug(img, color=color)
+        # for barrier_group in self.barrier_groups:
+        #     barrier_group.debug(img, color=color)
         
 
 class BarrierSolver():
