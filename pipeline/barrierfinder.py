@@ -123,6 +123,25 @@ class Barrier():
             self.shape_line = Line(np.array([best_points[0][0], best_points[0][1], best_points[1][0], best_points[1][1]]))
             self.closest_point = self.shape_line.closest_point(self.line.midpoint)
 
+        #get neighbor, if any
+        self.surface_neighbor = None
+
+        def get_potential_neighbor(normal, padding=3.0):
+            test_point = normal * padding + np.array(self.line.midpoint)
+            return self.surface_barrier.data["room"].surface_at_point(test_point)
+
+        test_surface = get_potential_neighbor(self.line.normal_a)
+
+        if test_surface is not None and test_surface != self.surface_barrier.surface:
+            self.surface_neighbor = test_surface
+        else:
+            test_surface = get_potential_neighbor(self.line.normal_b)
+            if test_surface is not None and test_surface != self.surface_barrier.surface:
+                self.surface_neighbor = test_surface
+
+        # if self.surface_neighbor is not None:
+        #     print(self.surface_neighbor.name, self.surface_barrier.surface.name)
+
     def debug(self, img, color):
         self.line.draw(img, color=color, thickness=2)
         point_a = (int(self.line.midpoint[0]), int(self.line.midpoint[1]))
@@ -154,6 +173,10 @@ class BarrierGroup():
             if test_barrier.vanishing_point != barrier.vanishing_point:
                 continue
 
+            if test_barrier.surface_neighbor is not None and barrier.surface_neighbor is not None and \
+                test_barrier.surface_neighbor != barrier.surface_neighbor:
+                continue
+
             # length_ratio = test_barrier.line.length / barrier.line.length
             # length_ratio = min(length_ratio, 1/length_ratio)
 
@@ -169,6 +192,15 @@ class BarrierGroup():
 
         return score
 
+    @property
+    def surface_neighbor(self):
+        #return first one: they must all be the same for all my barriers, see filtering in self.match_score
+        for barrier in self.barriers:
+            if barrier.surface_neighbor is not None:
+                return barrier.surface_neighbor
+
+        return None
+
     def debug(self, img, color):
 
         points = []
@@ -182,10 +214,10 @@ class BarrierGroup():
         rect = cv2.minAreaRect(np.array(points))
         rect_width = min(rect[1][0], rect[1][1])
 
-        if rect_width > 2:
-            box = cv2.boxPoints(rect)
-            box = np.int0(box)
-            cv2.drawContours(img, [box], 0, (255,0,0), 1)
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
+        cv2.drawContours(img, [box], 0, (255,0,0), 1)
+            
 
 class SurfaceBarriers():
     def __init__(self, data, surface, vanishing_points):
@@ -193,6 +225,7 @@ class SurfaceBarriers():
         self.surface = surface
         self.vanishing_points = vanishing_points
         self.image = self.data["downscaled"]
+        self.room = self.data["room"]
         self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
         self.barrier_candidates = self.get_barrier_candidates()
@@ -321,6 +354,9 @@ class SurfaceBarriers():
                     barrier_groups.append(BarrierGroup(barrier))
                 else:
                     best_match.add_barrier(barrier)
+
+        #filter out meaningless barriers, ones not between surfaces
+        barrier_groups = list(filter(lambda group: group.surface_neighbor is not None, barrier_groups))
 
         return barrier_groups
 

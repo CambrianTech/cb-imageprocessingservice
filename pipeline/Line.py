@@ -57,8 +57,12 @@ class Line(Sequence):
         return normalize(np.array([self.data[2]-self.data[0], self.data[3] - self.data[1]], dtype=float))
 
     @property
-    def normal(self):
+    def normal_a(self):
         return np.array([-self.direction[1], self.direction[0]], dtype=float)
+
+    @property
+    def normal_b(self):
+        return np.array([self.direction[1], -self.direction[0]], dtype=float)
 
     def closest_point(self, point):
         return closest_line_point(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], point[0], point[1])
