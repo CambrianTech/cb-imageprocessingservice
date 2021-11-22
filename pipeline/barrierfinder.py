@@ -127,10 +127,10 @@ class Barrier():
         self.surface_neighbor = None
 
         def get_neighbor_points(normal, num_pts=None):
-            max_distance = min(self.line.length, self.surface_barrier.diagonal / 50)
+            max_distance = min(self.line.length / 2, self.surface_barrier.diagonal / 50)
 
             points = []
-            distances = [max_distance/3, max_distance/2, max_distance]
+            distances = range(int(max_distance / 2), int(max_distance), int(max_distance / 5)) if max_distance > 10 else [max_distance]
 
             for distance in distances:
                 line_points = self.line.get_points(self.surface_barrier.image.shape[1], self.surface_barrier.image.shape[0], num_pts)
