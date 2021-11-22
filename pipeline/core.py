@@ -49,10 +49,10 @@ class SurfaceType(SemanticLabel):
         return self.index % 2 == 0
 
     def is_pair(self, label):
-        return self.compliment == label
+        return self.complement == label
 
     @property
-    def compliment(self):
+    def complement(self):
         if self.is_major:
             return None if self == SurfaceType.Other else SurfaceType(self.index + 1)
         else: 

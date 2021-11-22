@@ -33,6 +33,7 @@ class Surface():
         self._normals_color = None
         self._lines = None
         self._neighbors = None
+        self.parent = None
 
         self._semantic_labels = None
 

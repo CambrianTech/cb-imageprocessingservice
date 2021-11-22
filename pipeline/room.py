@@ -105,6 +105,8 @@ class Room(Geometry):
 
         timer.log_elapsed("merge_like_surfaces")
 
+        self.assign_parents()
+
     def analyze_surfaces(self):
         #perform initial analysis
         for surface in self.surfaces:
@@ -231,8 +233,8 @@ class Room(Geometry):
                         new_surface.set_mask(contour_mask)
                         #print("Reference_surface", reference_surface.name, indexes, counts)
                     elif surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling:
-                        complimentary_type = SurfaceType.Floor if surfaceType == SurfaceType.Ceiling else SurfaceType.Ceiling
-                        reference_surface = self.find_best_surface(complimentary_type, contour_mask, (cX, cY))
+                        complementary_type = SurfaceType.Floor if surfaceType == SurfaceType.Ceiling else SurfaceType.Ceiling
+                        reference_surface = self.find_best_surface(complementary_type, contour_mask, (cX, cY))
 
                         if reference_surface is not None:
                             print("Generate %s using %s as opposing surface" % (surfaceType.name, reference_surface.name))
@@ -423,6 +425,25 @@ class Room(Geometry):
             self.refresh_surfaces()
 
         return invalid_mask
+
+    def assign_parents(self):
+
+        child_surfaces = self.get_surfaces(surfaceTypes=[SurfaceType.WallLike, SurfaceType.FloorLike, SurfaceType.CeilingLike, SurfaceType.Other])
+
+        for child_surface in child_surfaces:
+
+            candidates = child_surface.neighbors.copy() if child_surface.surfaceType.complement is None else list(filter(lambda x: x.surfaceType == child_surface.surfaceType.complement, child_surface.neighbors))
+
+            if len(candidates) == 0:
+                continue
+            elif len(candidates) == 1:
+                child_surface.parent = candidates[0]
+                continue
+
+            #sort by most interior to
+            candidates.sort(key=lambda x:distance.sqeuclidean(child_surface.center, x.center))
+
+            child_surface.parent = candidates[0]
         
     def get_debug_image(self):
 

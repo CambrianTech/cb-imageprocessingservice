@@ -292,6 +292,8 @@ class SurfaceBarriers():
 
             if inside_mask(self.mask_edges, line.midpoint) and (inside_mask(self.mask_edges, point_a) or inside_mask(self.mask_edges, point_b)):
                 self.candidates.append(line)
+            elif self.surface.parent is not None:
+                print('%s: Search within parent %s' % (self.surface.name, self.surface.parent.name))
 
         self.candidates = Line.merge(self.candidates, search_width=self.diagonal/200, search_length=1.2)          
 
