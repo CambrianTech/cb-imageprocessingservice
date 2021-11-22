@@ -167,6 +167,10 @@ class Surface():
         if self.vp is not None and len(self.vp) > 0:
             vps.append(self.vp[0])
 
+        if self.parent is not None:
+            #might need to share between. A picture frame or window would share vanishing points with its parent and vice versa
+            vps.extend(self.parent.vanishing_points)
+
         return vps
 
     @property

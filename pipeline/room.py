@@ -428,11 +428,12 @@ class Room(Geometry):
 
     def assign_parents(self):
 
-        child_surfaces = self.get_surfaces(surfaceTypes=[SurfaceType.WallLike, SurfaceType.FloorLike, SurfaceType.CeilingLike, SurfaceType.Other])
+        child_surfaces = self.get_surfaces(surfaceTypes=[SurfaceType.WallLike, SurfaceType.FloorLike, SurfaceType.CeilingLike])
 
         for child_surface in child_surfaces:
 
             candidates = child_surface.neighbors.copy() if child_surface.surfaceType.complement is None else list(filter(lambda x: x.surfaceType == child_surface.surfaceType.complement, child_surface.neighbors))
+            candidates = list(filter(lambda x: x.parent is None, candidates))
 
             if len(candidates) == 0:
                 continue

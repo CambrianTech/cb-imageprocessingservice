@@ -473,7 +473,7 @@ class PipelineBarrierFinder(PipelineStep):
         for i in range(len(self.room.surfaces)):
             surface = self.room.surfaces[i]
             
-            #mask = (self.barriers[surface.uniqueId][1] if surface.uniqueId in self.barriers else surface.mask) > 0
+            #mask = (self.barriers[surface.uniqueId].mask_edges if surface.uniqueId in self.barriers else surface.mask) > 0
             mask = surface.mask > 0
             
             max_value = 0.9
