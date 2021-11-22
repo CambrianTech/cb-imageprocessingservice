@@ -196,7 +196,7 @@ class BarrierGroup():
             if test_barrier.vanishing_point != barrier.vanishing_point:
                 continue
 
-            if test_barrier.surface_neighbor != barrier.surface_neighbor:
+            if test_barrier.surface_neighbor != barrier.surface_neighbor and test_barrier.surface_neighbor != None and barrier.surface_neighbor != None:
                 continue
 
             # length_ratio = test_barrier.line.length / barrier.line.length
@@ -251,7 +251,7 @@ class SurfaceBarriers():
         self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
         self.barrier_candidates = self.get_barrier_candidates()
-        #self.barrier_groups = self.group_barriers()
+        self.barrier_groups = self.group_barriers()
 
     def get_barrier_candidates(self, angle_threshold=np.radians(45)):
 
@@ -351,7 +351,7 @@ class SurfaceBarriers():
 
             return best_match
 
-        search_width=self.diagonal/50
+        search_width=self.diagonal/40
         length_multiplier=0.7
 
         #group width-wise
@@ -394,8 +394,8 @@ class SurfaceBarriers():
         for barrier in self.barrier_candidates:
             barrier.debug(img, color=color)
 
-        # for barrier_group in self.barrier_groups:
-        #     barrier_group.debug(img, color=color)
+        for barrier_group in self.barrier_groups:
+            barrier_group.debug(img, color=color)
         
 
 class BarrierSolver():
