@@ -127,7 +127,7 @@ class Barrier():
         self.surface_neighbor = None
 
         def get_neighbor_points(normal, num_pts=None):
-            max_distance = max(self.shape_line.length, self.surface_barrier.diagonal / 50)
+            max_distance = min(self.line.length / 2, self.surface_barrier.diagonal / 50)
 
             points = []
             distances = [max_distance/2, max_distance]
@@ -145,7 +145,7 @@ class Barrier():
             return points
 
         def get_potential_neighbor(normal, num_pts=None):
-            points = get_neighbor_points(normal, num_pts)
+            points = get_neighbor_points(normal, int(num_pts))
             surface = None
 
             for point in points:
@@ -154,8 +154,8 @@ class Barrier():
                     return surface
             return surface
 
-        test_surface_a = get_potential_neighbor(self.line.normal_a, 5)
-        test_surface_b = get_potential_neighbor(self.line.normal_b, 5)
+        test_surface_a = get_potential_neighbor(self.line.normal_a, min(self.line.length / 2, 11))
+        test_surface_b = get_potential_neighbor(self.line.normal_b, min(self.line.length / 2, 11))
 
         if test_surface_a != test_surface_b:
             self.surface_neighbor = test_surface_a if test_surface_a is not None else test_surface_b
