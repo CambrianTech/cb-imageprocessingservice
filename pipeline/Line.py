@@ -19,6 +19,9 @@ from .utils import normalize
 #             ("midpoint", nb.types.UniTuple(nb.types.float32, 2)),
 #             ])
 
+def out_of_range(x, y, width, height):
+    return x < 0 or y < 0 or x >= width or y >= height
+
 class Line(Sequence):
     def __init__(self, data, sx=1, sy=1, group=None, id=uuid.uuid4()):
         super().__init__()
@@ -51,6 +54,12 @@ class Line(Sequence):
     @property
     def point_b(self):
         return (int(self.data[2]), int(self.data[3]))
+
+    def get_points(self, width, height, num_points=None):
+        if num_points is None:
+            num_points = int(math.ceil(self.length))
+
+        return list(filter(lambda p: not out_of_range(p[0], p[1], width, height), np.linspace(self.point_b, self.point_a, num_points)))
 
     @property #todo: should this be normalized (be sure to convert to float)?
     def direction(self):

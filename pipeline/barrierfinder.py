@@ -126,13 +126,37 @@ class Barrier():
         #get neighbor, if any
         self.surface_neighbor = None
 
-        def get_potential_neighbor(normal):
-            distance = min(self.shape_line.length, self.surface_barrier.diagonal / 50)
-            test_point = normal * distance + np.array(self.line.midpoint)
-            return self.surface_barrier.data["room"].surface_at_point(test_point)
+        
+        def get_neighbor_points(normal, num_pts=None):
+            max_distance = min(self.shape_line.length, self.surface_barrier.diagonal / 50)
 
-        test_surface_a = get_potential_neighbor(self.line.normal_a)
-        test_surface_b = get_potential_neighbor(self.line.normal_b)
+            points = []
+            distances = [max_distance/2, max_distance]
+
+            for distance in distances:
+                line_points = self.line.get_points(self.surface_barrier.image.shape[1], self.surface_barrier.image.shape[0], num_pts)
+                
+                if len(line_points) > 2:
+                    line_points = line_points[1:-1]
+
+                for line_point in line_points:
+                    test_point = normal * distance + np.array(line_point)
+                    points.append(test_point)
+
+            return points
+
+        def get_potential_neighbor(normal, num_pts=None):
+            points = get_neighbor_points(normal, num_pts)
+            surface = None
+
+            for point in points:
+                surface = self.surface_barrier.data["room"].surface_at_point(point)
+                if surface != self.surface_barrier.surface:
+                    return surface
+            return surface
+
+        test_surface_a = get_potential_neighbor(self.line.normal_a, 5)
+        test_surface_b = get_potential_neighbor(self.line.normal_b, 5)
 
         if test_surface_a != test_surface_b:
             self.surface_neighbor = test_surface_a if test_surface_a is not None else test_surface_b
