@@ -157,7 +157,7 @@ class Barrier():
         test_surface_a = get_potential_neighbor(self.line.normal_a, 7)
         test_surface_b = get_potential_neighbor(self.line.normal_b, 7)
 
-        if test_surface_a != test_surface_b:
+        if test_surface_a is not None or test_surface_b is not None:
             self.surface_neighbor = test_surface_a if test_surface_a is not None else test_surface_b
 
     def debug(self, img, color):
@@ -260,26 +260,16 @@ class SurfaceBarriers():
                 return mask[int(point[1]), int(point[0])] > 0
             return False
 
-        
+
         padding = 10
-        surface_mask = cv2.copyMakeBorder(self.surface.mask, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0) 
-        trans = cv2.distanceTransform(1-surface_mask, cv2.DIST_L2, 5)
-        _, outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
-
-        trans = cv2.distanceTransform(surface_mask, cv2.DIST_L2, 5)
-        _, inner_mask = cv2.threshold(trans, 0.5 * trans.max(), 1, 0)
-
+        surface_mask = cv2.copyMakeBorder(self.surface.mask, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0)
         trans = cv2.distanceTransform(surface_mask, cv2.DIST_L2, 5)
         _, shape_mask = cv2.threshold(trans, 0.1 * trans.max(), 1, 0)
+
         shape_mask = shape_mask[padding:-padding,padding:-padding].astype(np.uint8)
         contours, _ = cv2.findContours(shape_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         self.shapes = list(map(lambda contour: cv2.approxPolyDP(contour, 0.003 * cv2.arcLength(contour, True), True), contours))
-
-        self.mask_edges = 1 - inner_mask - outer_mask
-        self.mask_edges[self.mask_edges < 0] = 0
-        self.mask_edges = self.mask_edges[padding:-padding,padding:-padding]
-
         self.candidates = []
 
         for line in self.data["lines"]:
@@ -290,10 +280,14 @@ class SurfaceBarriers():
             point_a = (line.point_a[0] + line.midpoint[0]) / 2, (line.point_a[1] + line.midpoint[1]) / 2
             point_b = (line.point_b[0] + line.midpoint[0]) / 2, (line.point_b[1] + line.midpoint[1]) / 2
 
-            if inside_mask(self.mask_edges, line.midpoint) and (inside_mask(self.mask_edges, point_a) or inside_mask(self.mask_edges, point_b)):
+            if inside_mask(self.surface.mask_edges, line.midpoint) and (inside_mask(self.surface.mask_edges, point_a) or inside_mask(self.surface.mask_edges, point_b)):
                 self.candidates.append(line)
-            elif self.surface.parent is not None:
-                print('%s: Search within parent %s' % (self.surface.name, self.surface.parent.name))
+            # elif self.surface.parent is not None:
+            #     if self.surface.parent.surfaceType == SurfaceType.Wall:
+            #         self.candidates.append(line)
+
+                #self.candidates.append(line)
+                #print('%s: Search within parent %s' % (self.surface.name, self.surface.parent.name))
 
         self.candidates = Line.merge(self.candidates, search_width=self.diagonal/200, search_length=1.2)          
 

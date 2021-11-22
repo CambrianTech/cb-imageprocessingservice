@@ -428,7 +428,7 @@ class Room(Geometry):
 
     def assign_parents(self):
 
-        child_surfaces = self.get_surfaces(surfaceTypes=[SurfaceType.WallLike, SurfaceType.FloorLike, SurfaceType.CeilingLike])
+        child_surfaces = self.get_surfaces(surfaceTypes=[SurfaceType.WallLike, SurfaceType.FloorLike, SurfaceType.CeilingLike, SurfaceType.Other])
 
         for child_surface in child_surfaces:
 
@@ -441,7 +441,7 @@ class Room(Geometry):
                 child_surface.parent = candidates[0]
                 continue
 
-            #sort by most interior to
+            #sort by most interior. May want to look at vanishing points or just lines clustering in angle.
             candidates.sort(key=lambda x:distance.sqeuclidean(child_surface.center, x.center))
 
             child_surface.parent = candidates[0]

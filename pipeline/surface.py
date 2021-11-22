@@ -23,6 +23,7 @@ class Surface():
         self.surfaceType = surfaceType
         self.geometry = None
         self._mask = None
+        self._mask_edges = None
         self._alteration = None
         self.destroyed = False
         self._cloned_from = -1
@@ -221,12 +222,31 @@ class Surface():
         self._mask = mask
         self.mask_changed()
 
+    @property
+    def mask_edges(self):
+        if self._mask_edges is None:
+            padding = 10
+            surface_mask = cv2.copyMakeBorder(self.mask, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0) 
+            trans = cv2.distanceTransform(1-surface_mask, cv2.DIST_L2, 5)
+            _, outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
+
+            trans = cv2.distanceTransform(surface_mask, cv2.DIST_L2, 5)
+            _, inner_mask = cv2.threshold(trans, 0.5 * trans.max(), 1, 0)
+
+            self._mask_edges = 1 - inner_mask - outer_mask
+            self._mask_edges[self._mask_edges < 0] = 0
+            self._mask_edges = self._mask_edges[padding:-padding,padding:-padding]
+
+        return self._mask_edges
+
+
     def mask_changed(self):
         self._contours = None
         self._polygons = None
         self._semantic_labels = None
         self._normals_color = None
         self._neighbors = None
+        self._mask_edges = None
 
         self.geometry.invalidate()
 
