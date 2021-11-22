@@ -127,7 +127,7 @@ class Barrier():
         self.surface_neighbor = None
 
         def get_potential_neighbor(normal):
-            distance = min(self.shape_line.length, self.surface_barrier.diagonal / 100)
+            distance = min(self.shape_line.length, self.surface_barrier.diagonal / 50)
             test_point = normal * distance + np.array(self.line.midpoint)
             return self.surface_barrier.data["room"].surface_at_point(test_point)
 
