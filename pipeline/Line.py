@@ -22,6 +22,68 @@ from .utils import normalize
 def out_of_range(x, y, width, height):
     return x < 0 or y < 0 or x >= width or y >= height
 
+class Point(tuple):
+    def __new__(cls, x, y=None):
+        if y is not None:
+            return Point.__new__(cls, (x, y))
+        return tuple.__new__(cls, x)
+
+    @property
+    def x(self):
+        return self[0]
+
+    @property
+    def y(self):
+        return self[1]
+
+class RotatedRect(tuple):
+
+    def __new__(cls, x):
+        return tuple.__new__(cls, x)
+
+    @property
+    def center(self) -> Point:
+        return Point(self[0])
+
+    @property
+    def width(self) -> float:
+        return self[1][0]
+
+    @property
+    def height(self) -> float:
+        return self[1][1]
+
+    @property
+    def angle(self) -> float:
+        return self.line.angle
+
+    @property
+    def points(self):
+        if self._points is None:
+            self._points = np.int0(cv2.boxPoints(self))
+        return self._points
+
+    _points = None
+    @property
+    def points(self):
+        if self._points is None:
+            self._points = np.int0(cv2.boxPoints(self))
+        return self._points
+
+    _line = None
+    @property
+    def line(self):
+        if self._line is None:
+            if self.width > self.height:
+                point_a = (self.points[0][0] + self.points[1][0]) / 2, (self.points[0][1] + self.points[1][1]) / 2
+                point_b = (self.points[2][0] + self.points[3][0]) / 2, (self.points[2][1] + self.points[3][1]) / 2 
+            else:
+                point_a = (self.points[1][0] + self.points[2][0]) / 2, (self.points[1][1] + self.points[2][1]) / 2
+                point_b = (self.points[3][0] + self.points[0][0]) / 2, (self.points[3][1] + self.points[0][1]) / 2 
+
+            self._line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
+        return self._line
+
 class Line(Sequence):
     def __init__(self, data, sx=1, sy=1, group=None, id=uuid.uuid4()):
         super().__init__()

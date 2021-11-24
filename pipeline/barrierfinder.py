@@ -8,13 +8,13 @@ import math
 
 from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
-from .utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text, adjust_mask, partition, RotatedRect
+from .utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text, adjust_mask, partition
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import angle_with_vp
 from .logging import log_image, log_segmentation_image, im_logging_enabled
 from cambrian.LineFunctions import LineFunctions
-from .Line import line_angle_difference, Line, line_on_image_edge
+from .Line import line_angle_difference, Line, line_on_image_edge, RotatedRect
 from .room import Room, Surface
 
 def closest_polygon_side(contour, point, min_length_threshold=None, max_length_threshold=None):
@@ -234,7 +234,6 @@ class BarrierGroup():
                 points.append(barrier.line.point_a)
                 points.append(barrier.line.point_b)
             self._points = np.array(points)
-
         return self._points
 
     @property
@@ -242,15 +241,6 @@ class BarrierGroup():
         if self._bounds is None:
             self._bounds = RotatedRect(cv2.minAreaRect(self.points))
         return self._bounds
-
-    def like(self, other, angle_threshold=np.radians(5)):
-        
-        if self.bounds.angle_with(other.bounds) > angle_threshold:
-            return False
-
-        intersection, coords = self.bounds.intersection(other.bounds)
-        
-        return False
 
     def merge(self, other):
         self.barriers.extend(other.barriers)
@@ -261,6 +251,7 @@ class BarrierGroup():
 
         rect_width = min(self.bounds[1][0], self.bounds[1][1])
         cv2.drawContours(img, [self.bounds.points], 0, (255,0,0), 1)
+        self.bounds.line.draw(img, color=(0,0,255))
             
 
 class SurfaceBarriers():
@@ -407,6 +398,8 @@ class SurfaceBarriers():
 
     def merge_barriers(self):
 
+        return
+        
         for i in range(len(self.barrier_groups)):
             group_a = self.barrier_groups[i]
 
@@ -415,9 +408,7 @@ class SurfaceBarriers():
             for j in range(i + 1, len(self.barrier_groups)):
                 group_b = self.barrier_groups[j]
 
-                if group_a.like(group_a):
-                    group_a.merge(group_b)
-                    group_b.dead = True
+                #test for collision of center lines
 
 
     def debug(self, img, color):
@@ -516,6 +507,8 @@ class PipelineBarrierFinder(PipelineStep):
                 img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.15)
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
+
+        Line.draw_all(img, self.data["lines"], (255,255,255))
 
         for i in range(len(self.room.surfaces)):
             surface = self.room.surfaces[i]
