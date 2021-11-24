@@ -22,6 +22,8 @@ class Point(tuple):
 
 class RotatedRect(tuple):
 
+    _points = None
+
     def __new__(cls, x):
         return tuple.__new__(cls, x)
 
@@ -40,6 +42,12 @@ class RotatedRect(tuple):
     @property
     def angle(self) -> float:
         return np.radians(self[2])
+
+    @property
+    def points(self):
+        if self._points is None:
+            self._points = cv2.boxPoints(self)
+        return self._points
 
     def intersection(self, other):
         return cv2.rotatedRectangleIntersection(self, other)
