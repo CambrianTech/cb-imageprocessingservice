@@ -243,6 +243,20 @@ class BarrierGroup():
             self._bounds = RotatedRect(cv2.minAreaRect(self.points))
         return self._bounds
 
+    def like(self, other, angle_threshold=np.radians(5)):
+        
+        if self.bounds.angle_with(other.bounds) > angle_threshold:
+            return False
+
+        intersection, coords = self.bounds.intersection(other.bounds)
+        
+        return False
+
+    def merge(self, other):
+        self.barriers.extend(other.barriers)
+        self._points = None
+        self._bounds = None
+
     def debug(self, img, color):
 
         rect_width = min(self.bounds[1][0], self.bounds[1][1])
@@ -260,8 +274,11 @@ class SurfaceBarriers():
         self.room = self.data["room"]
         self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
+    def find_barriers(self):
         self.barrier_candidates = self.get_barrier_candidates()
         self.barrier_groups = self.group_barriers()
+
+        self.merge_barriers()
 
     def get_barrier_candidates(self, angle_threshold=np.radians(45)):
 
@@ -390,6 +407,20 @@ class SurfaceBarriers():
 
         return barrier_groups
 
+    def merge_barriers(self):
+
+        for i in range(len(self.barrier_groups)):
+            group_a = self.barrier_groups[i]
+
+            if group_a.dead: continue
+            
+            for j in range(i + 1, len(self.barrier_groups)):
+                group_b = self.barrier_groups[j]
+
+                if group_a.like(group_a):
+                    group_a.merge(group_b)
+                    group_b.dead = True
+
 
     def debug(self, img, color):
         for shape in self.shapes:
@@ -459,6 +490,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         for surface in self.surfaces:
             self.barriers[surface.uniqueId] = SurfaceBarriers(self.data, surface, self.vanishing_points)
+            self.barriers[surface.uniqueId].find_barriers()
 
         if im_logging_enabled(self.data):
             log_image(self.data, "potential_barriers.png", self.get_debug_image())

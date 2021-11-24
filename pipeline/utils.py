@@ -2,7 +2,9 @@ import cv2
 import numpy as np
 import random
 from scipy.spatial import distance
+
 from .ade20k import ADE20K
+from cambrian.LineFunctions import LineFunctions
 
 class Point(tuple):
     def __new__(cls, x, y=None):
