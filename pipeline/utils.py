@@ -46,7 +46,7 @@ class RotatedRect(tuple):
     @property
     def points(self):
         if self._points is None:
-            self._points = cv2.boxPoints(self)
+            self._points = np.int0(cv2.boxPoints(self))
         return self._points
 
     def intersection(self, other):

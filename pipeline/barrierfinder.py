@@ -260,9 +260,7 @@ class BarrierGroup():
     def debug(self, img, color):
 
         rect_width = min(self.bounds[1][0], self.bounds[1][1])
-        box = cv2.boxPoints(self.bounds)
-        box = np.int0(box)
-        cv2.drawContours(img, [box], 0, (255,0,0), 1)
+        cv2.drawContours(img, [self.bounds.points], 0, (255,0,0), 1)
             
 
 class SurfaceBarriers():
