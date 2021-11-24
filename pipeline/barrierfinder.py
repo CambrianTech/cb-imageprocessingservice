@@ -8,7 +8,7 @@ import math
 
 from .ade20k import ADE20K
 from .core import PipelineStep, PipelineStepIndex, SurfaceType
-from .utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text, adjust_mask, partition
+from .utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text, adjust_mask, partition, RotatedRect
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import angle_with_vp
@@ -238,9 +238,9 @@ class BarrierGroup():
         return self._points
 
     @property
-    def bounds(self):
+    def bounds(self) -> RotatedRect:
         if self._bounds is None:
-            self._bounds = cv2.minAreaRect(self.points)
+            self._bounds = RotatedRect(cv2.minAreaRect(self.points))
         return self._bounds
 
     def debug(self, img, color):
