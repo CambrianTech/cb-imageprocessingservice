@@ -241,14 +241,12 @@ class BarrierGroup():
     def bounds(self):
         if self._bounds is None:
             self._bounds = cv2.minAreaRect(self.points)
-        return self._points
+        return self._bounds
 
     def debug(self, img, color):
-        
-        rect = cv2.minAreaRect(self.points)
-        rect_width = min(rect[1][0], rect[1][1])
 
-        box = cv2.boxPoints(rect)
+        rect_width = min(self.bounds[1][0], self.bounds[1][1])
+        box = cv2.boxPoints(self.bounds)
         box = np.int0(box)
         cv2.drawContours(img, [box], 0, (255,0,0), 1)
             
