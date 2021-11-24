@@ -176,6 +176,9 @@ class Barrier():
 class BarrierGroup():
     def __init__(self, barrier):
         self.barriers = [barrier]
+        self.dead = False
+        self._points = None
+        self._bounds = None
 
     def add_barrier(self, barrier):
         self.barriers.append(barrier)
@@ -223,17 +226,26 @@ class BarrierGroup():
 
         return None
 
+    @property
+    def points(self):
+        if self._points is None:
+            points = []
+            for barrier in self.barriers:
+                points.append(barrier.line.point_a)
+                points.append(barrier.line.point_b)
+            self._points = np.array(points)
+
+        return self._points
+
+    @property
+    def bounds(self):
+        if self._bounds is None:
+            self._bounds = cv2.minAreaRect(self.points)
+        return self._points
+
     def debug(self, img, color):
-
-        points = []
-        marker_color = random_color()
-        for barrier in self.barriers:
-            points.append(barrier.line.point_a)
-            points.append(barrier.line.point_b)
-
-            #cv2.drawMarker(img, (int(barrier.line.midpoint[0]), int(barrier.line.midpoint[1])), marker_color, thickness=2)
-
-        rect = cv2.minAreaRect(np.array(points))
+        
+        rect = cv2.minAreaRect(self.points)
         rect_width = min(rect[1][0], rect[1][1])
 
         box = cv2.boxPoints(rect)

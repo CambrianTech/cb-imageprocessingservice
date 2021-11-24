@@ -4,6 +4,47 @@ import random
 from scipy.spatial import distance
 from .ade20k import ADE20K
 
+class Point(tuple):
+    def __new__(cls, x, y=None):
+        if y is not None:
+            return Point.__new__(cls, (x, y))
+        return tuple.__new__(cls, x)
+
+    @property
+    def x(self):
+        return self[0]
+
+    @property
+    def y(self):
+        return self[1]
+
+class RotatedRect(tuple):
+
+    def __new__(cls, x):
+        return tuple.__new__(cls, x)
+
+    @property
+    def center(self) -> Point:
+        return Point(self[0])
+
+    @property
+    def width(self) -> float:
+        return self[1][0]
+
+    @property
+    def height(self) -> float:
+        return self[1][1]
+
+    @property
+    def angle(self) -> float:
+        return np.radians(self[2])
+
+    def intersection(self, other):
+        return cv2.rotatedRectangleIntersection(self, other)
+
+    def angle_with(self, other):
+        return LineFunctions.line_angle_difference(self.angle, other.angle)
+
 def partition(pred, iterable):
     trues = []
     falses = []
