@@ -252,6 +252,9 @@ class BarrierGroup():
         if self.surface_neighbor != other.surface_neighbor:
             return False
 
+        # rect_a = self.bounds.extend(2.0)
+        # rect_b = other.bounds.extend(2.0)
+
         intersection, _ = cv2.rotatedRectangleIntersection(self.bounds, other.bounds)
         
         return intersection != 0
