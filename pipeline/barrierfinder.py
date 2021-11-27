@@ -272,6 +272,12 @@ class BarrierGroup():
         self.bounds.line.draw(img, color=(0,0,255))
             
 
+def inside_mask(mask, point):
+    if point[0] < mask.shape[1] and point[1] < mask.shape[0]:
+        return mask[int(point[1]), int(point[0])] > 0
+    return False
+
+
 class SurfaceBarriers():
     def __init__(self, data, surface, vanishing_points):
         self.data = data
@@ -286,14 +292,9 @@ class SurfaceBarriers():
         self.barrier_groups = self.group_barriers()
 
         self.merge_barriers()
+        self.cull_barriers()
 
     def get_barrier_candidates(self, angle_threshold=np.radians(45)):
-
-        def inside_mask(mask, point):
-            if point[0] < mask.shape[1] and point[1] < mask.shape[0]:
-                return mask[int(point[1]), int(point[0])] > 0
-            return False
-
 
         padding = 10
         surface_mask = cv2.copyMakeBorder(self.surface.mask, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0)
@@ -432,6 +433,31 @@ class SurfaceBarriers():
                     group_b.dead = True
 
         self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
+
+    def cull_barriers(self):
+
+        padding = 10
+        surface_mask = cv2.copyMakeBorder(self.surface.mask, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0) 
+        outer_mask = cv2.erode(1 - surface_mask, cv2.getStructuringElement(cv2.MORPH_RECT,(15,15)), iterations=2)
+        inner_mask = cv2.erode(surface_mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
+        # trans = cv2.distanceTransform(outer_mask, cv2.DIST_L2, 5)
+        # _, outer_mask = cv2.threshold(trans, 0.1 * trans.max(), 1, 0)
+        outer_mask = outer_mask[padding:-padding,padding:-padding]
+        inner_mask = inner_mask[padding:-padding,padding:-padding]
+
+        for group in self.barrier_groups:
+            num_inside = 0
+            num_points = len(group.bounds.points)
+            for point in group.bounds.points:
+                #maybe require all to be inside?
+                if inside_mask(outer_mask, point) or inside_mask(inner_mask, point):
+                    num_inside += 1
+
+            if num_inside > 0:
+                group.dead = True
+
+        self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
+
 
     def debug(self, img, color):
         for shape in self.shapes:

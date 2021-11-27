@@ -228,12 +228,12 @@ class Surface():
             padding = 10
             surface_mask = cv2.copyMakeBorder(self.mask, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0) 
             trans = cv2.distanceTransform(1-surface_mask, cv2.DIST_L2, 5)
-            _, outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
+            _, self.outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
 
             trans = cv2.distanceTransform(surface_mask, cv2.DIST_L2, 5)
-            _, inner_mask = cv2.threshold(trans, 0.5 * trans.max(), 1, 0)
+            _, self.inner_mask = cv2.threshold(trans, 0.5 * trans.max(), 1, 0)
 
-            self._mask_edges = 1 - inner_mask - outer_mask
+            self._mask_edges = 1 - self.inner_mask - self.outer_mask
             self._mask_edges[self._mask_edges < 0] = 0
             self._mask_edges = self._mask_edges[padding:-padding,padding:-padding]
 
