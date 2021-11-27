@@ -84,8 +84,8 @@ class RotatedRect(tuple):
             self._line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
         return self._line
 
-    def extend(self, factor):
-        extended_size = (factor * self[1][0], self[1][1]) if self[1][0] > self[1][1] else (self[1][0], factor * self[1][1])
+    def resized(self, length_factor=1.0, length_offset=0.0, width_factor=1.0, width_offset=0.0):
+        extended_size = (length_factor * self[1][0] + length_offset, width_factor * self[1][1] + width_offset) if self[1][0] > self[1][1] else (width_factor * self[1][0] + width_offset, length_factor * self[1][1] + length_offset)
         return RotatedRect((self[0], extended_size, self[2]))
 
 class Line(Sequence):

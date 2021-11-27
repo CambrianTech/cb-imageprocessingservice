@@ -3,6 +3,7 @@ from scipy import ndimage
 import cv2
 import random
 import time
+from enum import IntEnum
 from scipy.spatial import distance
 import math
 
@@ -242,7 +243,7 @@ class BarrierGroup():
             self._bounds = RotatedRect(cv2.minAreaRect(self.points))
         return self._bounds
 
-    def like(self, other, angle_threshold=np.radians(3)):
+    def like(self, other, angle_threshold=np.radians(3), width_offset=0.0):
         
         angle = LineFunctions.line_angle_difference(self.bounds.line.angle, other.bounds.line.angle)
 
@@ -252,10 +253,10 @@ class BarrierGroup():
         if self.surface_neighbor != other.surface_neighbor:
             return False
 
-        # rect_a = self.bounds.extend(2.0)
-        # rect_b = other.bounds.extend(2.0)
+        rect_a = self.bounds.resized(width_offset=width_offset)
+        rect_b = other.bounds.resized(width_offset=width_offset)
 
-        intersection, _ = cv2.rotatedRectangleIntersection(self.bounds, other.bounds)
+        intersection, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
         
         return intersection != 0
 
@@ -415,6 +416,9 @@ class SurfaceBarriers():
 
     def merge_barriers(self):
 
+        width_offset = self.diagonal / 100
+
+        #merge similar barriers into one
         for i in range(len(self.barrier_groups)):
             group_a = self.barrier_groups[i]
 
@@ -423,10 +427,11 @@ class SurfaceBarriers():
             for j in range(i + 1, len(self.barrier_groups)):
                 group_b = self.barrier_groups[j]
 
-                if group_a.like(group_b):
+                if group_a.like(group_b, width_offset=width_offset, angle_threshold=np.radians(5)):
                     group_a.merge(group_b)
                     group_b.dead = True
 
+        self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
 
     def debug(self, img, color):
         for shape in self.shapes:
@@ -439,7 +444,16 @@ class SurfaceBarriers():
 
         for barrier_group in self.barrier_groups:
             barrier_group.debug(img, color=color)
-        
+
+class JunctionType(IntEnum):
+    Extension = 0
+    Vertex = 1
+ 
+class BarrierJunction():
+    def __init__(self, data, barrier_groups:list, junction_type:JunctionType):
+        super().__init__()
+        self.barrier_groups = barrier_groups
+        self.junction_type = junction_type
 
 class BarrierSolver():
     def __init__(self, data, surface_barriers):
@@ -450,15 +464,21 @@ class BarrierSolver():
         self.surface_barriers = surface_barriers
 
 
-    def solve(self, max_iterations=2000, threshold_inlier=math.radians(2), max_time=0.33, measure_area=False):     
+    def solve(self):
+        print("solve")
+        # for sb in self.surface_barriers.values():
+        #     self.extend_barriers(sb)
 
-        max_iterations = min(max_iterations, len(self.surface_barriers) * 40)
-        start_time = time.time() 
+    # def extend_barriers(self, groups):  
+    #     for i in range(len(groups)):
+    #         group_a = groups[i]
+            
+    #         for j in range(i + 1, len(groups)):
+    #             group_b = groups[j]
 
-        num_samples = random.randint(2, len(self.surface_barriers))
-        for ransac_iter in range(max_iterations):
-            if time.time() - start_time > max_time:
-                break
+
+
+        
         
 class PipelineBarrierFinder(PipelineStep):
     @property
