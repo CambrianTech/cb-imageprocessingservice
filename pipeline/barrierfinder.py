@@ -267,8 +267,9 @@ class BarrierGroup():
 
     def debug(self, img, color):
 
-        rect_width = min(self.bounds[1][0], self.bounds[1][1])
-        cv2.drawContours(img, [self.bounds.points], 0, (255,0,0), 1)
+        thickness = min(self.bounds.width, self.bounds.height)
+        bounds = self.bounds if thickness > 1 else self.bounds.resized(width_offset=2)
+        cv2.drawContours(img, [bounds.points], 0, (255,0,0), 1)
         self.bounds.line.draw(img, color=(0,0,255))
             
 
@@ -436,24 +437,17 @@ class SurfaceBarriers():
 
     def cull_barriers(self):
 
-        padding = 10
-        surface_mask = cv2.copyMakeBorder(self.surface.mask, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0) 
-        outer_mask = cv2.erode(1 - surface_mask, cv2.getStructuringElement(cv2.MORPH_RECT,(15,15)), iterations=2)
-        inner_mask = cv2.erode(surface_mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
-        # trans = cv2.distanceTransform(outer_mask, cv2.DIST_L2, 5)
-        # _, outer_mask = cv2.threshold(trans, 0.1 * trans.max(), 1, 0)
-        outer_mask = outer_mask[padding:-padding,padding:-padding]
-        inner_mask = inner_mask[padding:-padding,padding:-padding]
+        inner_mask = cv2.erode(self.surface.mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
 
         for group in self.barrier_groups:
             num_inside = 0
             num_points = len(group.bounds.points)
             for point in group.bounds.points:
                 #maybe require all to be inside?
-                if inside_mask(outer_mask, point) or inside_mask(inner_mask, point):
+                if inside_mask(inner_mask, point):
                     num_inside += 1
 
-            if num_inside > 0:
+            if num_inside > num_points // 2:
                 group.dead = True
 
         self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
@@ -463,7 +457,7 @@ class SurfaceBarriers():
         for shape in self.shapes:
             cv2.drawContours(img, [shape], -1, color=(255,255,255), thickness=1)
 
-        Line.draw_all(img, self.candidates, color=(0,0,0), thickness=1)
+        #Line.draw_all(img, self.candidates, color=(0,0,0), thickness=1)
 
         for barrier in self.barrier_candidates:
             barrier.debug(img, color=color)
