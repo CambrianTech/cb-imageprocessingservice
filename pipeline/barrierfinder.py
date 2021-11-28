@@ -203,19 +203,20 @@ class BarrierGroup():
         
         return self._surfaces
 
-    def like(self, other, angle_threshold=np.radians(3), width_offset=0.0):
+    def like(self, other, angle_threshold=np.radians(3), width_offset=0.0, compare_neighbors=False):
         
         angle = LineFunctions.line_angle_difference(self.bounds.line.angle, other.bounds.line.angle)
 
         if angle > angle_threshold:
             return False
 
-        for surface in self.surfaces:
-            if surface not in other.surfaces:
+        if compare_neighbors:
+            if self.surface_neighbor != other.surface_neighbor:
                 return False
-
-        # if self.surface_neighbor != other.surface_neighbor:
-        #     return False
+        else:
+            for surface in self.surfaces:
+                if surface not in other.surfaces:
+                    return False
 
         rect_a = self.bounds.resized(width_offset=width_offset)
         rect_b = other.bounds.resized(width_offset=width_offset)
@@ -225,7 +226,9 @@ class BarrierGroup():
         return intersection != 0
 
     def merge(self, other):
-        self.barriers.extend(other.barriers)
+        merged = set(self.barriers)
+        merged.update(other.barriers)
+        self.barriers = list(merged)
         self._points = None
         self._bounds = None
 
@@ -396,7 +399,7 @@ class SurfaceBarriers():
             for j in range(i + 1, len(self.barrier_groups)):
                 group_b = self.barrier_groups[j]
 
-                if group_a.like(group_b, width_offset=width_offset, angle_threshold=np.radians(5)):
+                if group_a.like(group_b, width_offset=width_offset, angle_threshold=np.radians(5), compare_neighbors=True):
                     group_a.merge(group_b)
                     group_b.dead = True
 
@@ -472,8 +475,10 @@ class BarrierSolver():
                 match = next(filter(lambda x: x.like(group), self.barrier_groups), None)
                 if match is None:
                     self.barrier_groups.append(group)
+                else:
+                    match.merge(group)
 
-        
+
         #print("got total barriers, matches:", len(self.barrier_groups), total_matches)
 
     # def extend_barriers(self, groups):  
