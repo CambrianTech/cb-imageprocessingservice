@@ -261,8 +261,6 @@ class BarrierGroup():
             cv2.drawContours(img, [bounds.points], 0, (255,0,0), 1)
             self.bounds.line.draw(img, color=(0,0,255))
 
-        self.debug_intersections(img)
-
     def debug_intersections(self, img):
         intersections = []
         if len(self.a_terminations) > 0:
@@ -513,8 +511,13 @@ class BarrierSolver():
 
             for surface in surfaces:
                 color = random_color()
-                for group in get_surface_barriers(surface):
+                groups = get_surface_barriers(surface)
+                
+                for group in groups:
                     group.debug(debug, color=color, show_bounds=False)
+
+                for group in groups:
+                    group.debug_intersections(debug)
                 
             log_image(self.data, name + "_barriers", debug)
 
