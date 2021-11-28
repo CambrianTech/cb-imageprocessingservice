@@ -18,58 +18,6 @@ from cambrian.LineFunctions import LineFunctions
 from .Line import line_angle_difference, Line, line_on_image_edge, RotatedRect
 from .room import Room, Surface
 
-def closest_polygon_side(contour, point, min_length_threshold=None, max_length_threshold=None):
-    #return (distance, point, and indices) of closest line in polygon or contour by midpoints
-
-    num_pts = len(contour)
-    min_dist_sq = np.inf
-    min_index = None
-
-    min_length_threshold_sq = None if min_length_threshold is None else min_length_threshold * min_length_threshold
-    max_length_threshold_sq = None if max_length_threshold is None else max_length_threshold * max_length_threshold
-
-    for i in range(num_pts):
-        point_a = contour[i][0]
-        point_b = contour[(i+1) % num_pts][0]
-
-        if point_a[0] == point_b[0] and point_a[1] == point_b[1]: continue
-
-        if min_length_threshold_sq is not None or max_length_threshold_sq is not None:
-            length_sq = distance.sqeuclidean(point_a, point_b)
-
-            if min_length_threshold_sq is not None and length_sq < min_length_threshold_sq: continue
-            if max_length_threshold_sq is not None and length_sq > max_length_threshold_sq: continue
-
-        midpoint = (point_a[0] + point_b[0]) / 2, (point_a[1] + point_b[1]) / 2
-
-        #midpoints between point a and midpoint
-        point_a = (point_a[0] + midpoint[0]) / 2, (point_a[1] + midpoint[1]) / 2
-        point_b = (point_b[0] + midpoint[0]) / 2, (point_b[1] + midpoint[1]) / 2
-
-        dist_point_a_sq = distance.sqeuclidean(point_a, point)
-        dist_point_b_sq = distance.sqeuclidean(point_b, point)
-        dist_midpoint_sq = distance.sqeuclidean(midpoint, point)
-
-        if dist_point_a_sq < min_dist_sq:
-            min_index = i
-            min_dist_sq = dist_point_a_sq
-
-        if dist_point_b_sq < min_dist_sq:
-            min_index = i
-            min_dist_sq = dist_point_b_sq
-
-        if dist_midpoint_sq < min_dist_sq:
-            min_index = i
-            min_dist_sq = dist_midpoint_sq
-
-    if min_index is None:
-        if min_length_threshold is not None:
-            return closest_polygon_side(contour, point, min_length_threshold=None, max_length_threshold=max_length_threshold)
-        elif max_length_threshold is not None:
-            return closest_polygon_side(contour, point, min_length_threshold=None, max_length_threshold=None)
-        
-    return min_index, np.sqrt(min_dist_sq)
-
 class Barrier():
     def __init__(self, surface_barrier, line, vanishing_point):
         self.surface_barrier = surface_barrier
@@ -180,6 +128,7 @@ class BarrierGroup():
         self.dead = False
         self._points = None
         self._bounds = None
+        self._surfaces = None
 
     def add_barrier(self, barrier):
         self.barriers.append(barrier)
@@ -243,6 +192,17 @@ class BarrierGroup():
             self._bounds = RotatedRect(cv2.minAreaRect(self.points))
         return self._bounds
 
+    @property
+    def surfaces(self):
+        if self._surfaces is None:
+            self._surfaces = [self.barriers[0].surface_barrier.surface]
+
+            for barrier in self.barriers:
+                if barrier.surface_neighbor is not None and barrier.surface_neighbor not in self._surfaces:
+                    self._surfaces.append(barrier.surface_neighbor)
+        
+        return self._surfaces
+
     def like(self, other, angle_threshold=np.radians(3), width_offset=0.0):
         
         angle = LineFunctions.line_angle_difference(self.bounds.line.angle, other.bounds.line.angle)
@@ -250,8 +210,12 @@ class BarrierGroup():
         if angle > angle_threshold:
             return False
 
-        if self.surface_neighbor != other.surface_neighbor:
-            return False
+        for surface in self.surfaces:
+            if surface not in other.surfaces:
+                return False
+
+        # if self.surface_neighbor != other.surface_neighbor:
+        #     return False
 
         rect_a = self.bounds.resized(width_offset=width_offset)
         rect_b = other.bounds.resized(width_offset=width_offset)
@@ -500,8 +464,14 @@ class BarrierSolver():
 
     def solve(self):
         print("solve")
+
+        #flatten groups, so to speak
+        # self.barrier_groups = []
         # for sb in self.surface_barriers.values():
-        #     self.extend_barriers(sb)
+        #     for group in sb.barrier_groups:
+        #         if group.like()
+        #         self.barrier_groups.append(group)
+
 
     # def extend_barriers(self, groups):  
     #     for i in range(len(groups)):
@@ -587,3 +557,55 @@ class PipelineBarrierFinder(PipelineStep):
                 self.barriers[surface.uniqueId].debug(img, color)
 
         return img
+
+def closest_polygon_side(contour, point, min_length_threshold=None, max_length_threshold=None):
+    #return (distance, point, and indices) of closest line in polygon or contour by midpoints
+
+    num_pts = len(contour)
+    min_dist_sq = np.inf
+    min_index = None
+
+    min_length_threshold_sq = None if min_length_threshold is None else min_length_threshold * min_length_threshold
+    max_length_threshold_sq = None if max_length_threshold is None else max_length_threshold * max_length_threshold
+
+    for i in range(num_pts):
+        point_a = contour[i][0]
+        point_b = contour[(i+1) % num_pts][0]
+
+        if point_a[0] == point_b[0] and point_a[1] == point_b[1]: continue
+
+        if min_length_threshold_sq is not None or max_length_threshold_sq is not None:
+            length_sq = distance.sqeuclidean(point_a, point_b)
+
+            if min_length_threshold_sq is not None and length_sq < min_length_threshold_sq: continue
+            if max_length_threshold_sq is not None and length_sq > max_length_threshold_sq: continue
+
+        midpoint = (point_a[0] + point_b[0]) / 2, (point_a[1] + point_b[1]) / 2
+
+        #midpoints between point a and midpoint
+        point_a = (point_a[0] + midpoint[0]) / 2, (point_a[1] + midpoint[1]) / 2
+        point_b = (point_b[0] + midpoint[0]) / 2, (point_b[1] + midpoint[1]) / 2
+
+        dist_point_a_sq = distance.sqeuclidean(point_a, point)
+        dist_point_b_sq = distance.sqeuclidean(point_b, point)
+        dist_midpoint_sq = distance.sqeuclidean(midpoint, point)
+
+        if dist_point_a_sq < min_dist_sq:
+            min_index = i
+            min_dist_sq = dist_point_a_sq
+
+        if dist_point_b_sq < min_dist_sq:
+            min_index = i
+            min_dist_sq = dist_point_b_sq
+
+        if dist_midpoint_sq < min_dist_sq:
+            min_index = i
+            min_dist_sq = dist_midpoint_sq
+
+    if min_index is None:
+        if min_length_threshold is not None:
+            return closest_polygon_side(contour, point, min_length_threshold=None, max_length_threshold=max_length_threshold)
+        elif max_length_threshold is not None:
+            return closest_polygon_side(contour, point, min_length_threshold=None, max_length_threshold=None)
+        
+    return min_index, np.sqrt(min_dist_sq)
