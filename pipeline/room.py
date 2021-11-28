@@ -259,7 +259,7 @@ class Room(Geometry):
     def merge_like_surfaces(self, angle_threshold=np.radians(30), angle_threshold_force=np.radians(20)):
 
         for surfaceType in SurfaceType:
-            
+                
             color = random_color()
             surfaces = self.get_surfaces([surfaceType])
 
@@ -273,6 +273,8 @@ class Room(Geometry):
                 for j in range(i+1, len(surfaces)):
 
                     if surfaces[j].destroyed: continue
+
+                    if surfaces[i].bestLabel != surfaces[j].bestLabel: continue
 
                     dot_product = np.dot(surfaces[i].normal, surfaces[j].normal)
                     angle = np.arccos(dot_product)

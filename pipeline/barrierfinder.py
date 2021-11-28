@@ -238,16 +238,17 @@ class BarrierGroup():
         self._points = None
         self._bounds = None
 
-    def debug(self, img, color):
+    def debug(self, img, color, show_bounds=True):
 
         for barrier in self.barriers:
             barrier.debug(img, color=color)
 
-        #thickness = min(self.bounds.width, self.bounds.height)
-        #bounds = self.bounds if thickness > 1 else self.bounds.resized(width_offset=2)
-        cv2.drawContours(img, [self.bounds.points], 0, (255,0,0), 1)
-        self.bounds.line.draw(img, color=(0,0,255))
-            
+        thickness = min(self.bounds.width, self.bounds.height)
+        bounds = self.bounds if thickness > 1 else self.bounds.resized(width_offset=2)
+
+        if show_bounds:
+            cv2.drawContours(img, [bounds.points], 0, (255,0,0), 1)
+            self.bounds.line.draw(img, color=(0,0,255))
 
 def inside_mask(mask, point):
     if point[0] < mask.shape[1] and point[1] < mask.shape[0]:
@@ -472,30 +473,29 @@ class BarrierSolver():
 
 
     def solve(self):
-        print("solve")
-
-        #flatten groups, so to speak
-        self.barrier_groups = []
-        for sb in self.surface_barriers.values():
-            self.barrier_groups.extend(sb.barrier_groups)
-
+        
         def get_surface_barriers(surface):
             return list(filter(lambda group: surface in group.surfaces, self.barrier_groups))
 
-        def log_barriers(surfaces, name, color=random_color()):
+        def log_barriers(surfaces, name):
             if len(surfaces) == 0:
                 return
 
             debug = self.image.copy()
 
-            barrier_groups = []
             for surface in surfaces:
-                barrier_groups.extend(get_surface_barriers(surface))
-
-            for group in barrier_groups:
-                group.debug(debug, color=color)
-
+                color = random_color()
+                for group in get_surface_barriers(surface):
+                    group.debug(debug, color=color, show_bounds=False)
+                
             log_image(self.data, name + "_barriers", debug)
+
+        #flatten groups
+        self.barrier_groups = []
+        for sb in self.surface_barriers.values():
+            self.barrier_groups.extend(sb.barrier_groups)
+
+
 
         if im_logging_enabled(self.data):
             
