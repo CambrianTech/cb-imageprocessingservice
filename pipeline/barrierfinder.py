@@ -206,20 +206,23 @@ class BarrierGroup():
         
         return self._surfaces
 
-    def like(self, other, angle_threshold=np.radians(3), width_offset=0.0, compare_neighbors=False):
+    def like(self, other, angle_threshold=np.radians(3), width_offset=0.0):
         
         angle = LineFunctions.line_angle_difference(self.bounds.line.angle, other.bounds.line.angle)
 
         if angle > angle_threshold:
             return False
 
-        if compare_neighbors:
-            if self.surface_neighbor != other.surface_neighbor:
-                return False
-        else:
-            for surface in self.surfaces:
-                if surface not in other.surfaces:
-                    return False
+        if self.surface_neighbor != other.surface_neighbor:
+            return False
+
+        # if compare_neighbors:
+        #     if self.surface_neighbor != other.surface_neighbor:
+        #         return False
+        # else:
+        #     for surface in self.surfaces:
+        #         if surface not in other.surfaces:
+        #             return False
 
         rect_a = self.bounds.resized(width_offset=width_offset)
         rect_b = other.bounds.resized(width_offset=width_offset)
@@ -402,7 +405,7 @@ class SurfaceBarriers():
             for j in range(i + 1, len(self.barrier_groups)):
                 group_b = self.barrier_groups[j]
 
-                if group_a.like(group_b, width_offset=width_offset, angle_threshold=np.radians(5), compare_neighbors=True):
+                if group_a.like(group_b, width_offset=width_offset, angle_threshold=np.radians(5)):
                     group_a.merge(group_b)
                     group_b.dead = True
 
@@ -474,12 +477,7 @@ class BarrierSolver():
         #flatten groups, so to speak
         self.barrier_groups = []
         for sb in self.surface_barriers.values():
-            for group in sb.barrier_groups:
-                match = next(filter(lambda x: x.like(group), self.barrier_groups), None)
-                if match is None:
-                    self.barrier_groups.append(group)
-                else:
-                    match.merge(group)
+            self.barrier_groups.extend(sb.barrier_groups)
 
         def get_surface_barriers(surface):
             return list(filter(lambda group: surface in group.surfaces, self.barrier_groups))
@@ -499,7 +497,6 @@ class BarrierSolver():
 
             log_image(self.data, name + "_barriers", debug)
 
-
         if im_logging_enabled(self.data):
             
             log_barriers(self.room.get_surfaces(surfaceTypes=[SurfaceType.WallLike]), "wall_like")
@@ -508,18 +505,6 @@ class BarrierSolver():
 
             log_barriers(self.room.get_surfaces(labels=box_like), "box")
             
-
-        #print("got total barriers, matches:", len(self.barrier_groups), total_matches)
-
-    # def extend_barriers(self, groups):  
-    #     for i in range(len(groups)):
-    #         group_a = groups[i]
-            
-    #         for j in range(i + 1, len(groups)):
-    #             group_b = groups[j]
-
-
-
         
         
 class PipelineBarrierFinder(PipelineStep):
