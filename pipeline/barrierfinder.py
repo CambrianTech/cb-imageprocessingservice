@@ -466,12 +466,15 @@ class BarrierSolver():
         print("solve")
 
         #flatten groups, so to speak
-        # self.barrier_groups = []
-        # for sb in self.surface_barriers.values():
-        #     for group in sb.barrier_groups:
-        #         if group.like()
-        #         self.barrier_groups.append(group)
+        self.barrier_groups = []
+        for sb in self.surface_barriers.values():
+            for group in sb.barrier_groups:
+                match = next(filter(lambda x: x.like(group), self.barrier_groups), None)
+                if match is None:
+                    self.barrier_groups.append(group)
 
+        
+        #print("got total barriers, matches:", len(self.barrier_groups), total_matches)
 
     # def extend_barriers(self, groups):  
     #     for i in range(len(groups)):
