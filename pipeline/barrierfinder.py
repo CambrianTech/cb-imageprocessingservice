@@ -478,6 +478,33 @@ class BarrierSolver():
                 else:
                     match.merge(group)
 
+        def get_surface_barriers(surface):
+            return list(filter(lambda group: surface in group.surfaces, self.barrier_groups))
+
+        def log_barriers(surfaces, name, color=random_color()):
+            if len(surfaces) == 0:
+                return
+
+            debug = self.image.copy()
+
+            barrier_groups = []
+            for surface in surfaces:
+                barrier_groups.extend(get_surface_barriers(surface))
+
+            for group in barrier_groups:
+                group.debug(debug, color=color)
+
+            log_image(self.data, name + "_barriers", debug)
+
+
+        if im_logging_enabled(self.data):
+            
+            log_barriers(self.room.get_surfaces(surfaceTypes=[SurfaceType.WallLike]), "wall_like")
+
+            log_barriers(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall]), "wall")         
+
+            log_barriers(self.room.get_surfaces(labels=box_like), "box")
+            
 
         #print("got total barriers, matches:", len(self.barrier_groups), total_matches)
 
