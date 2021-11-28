@@ -74,6 +74,14 @@ class RotatedRect(tuple):
         result, _ = cv2.rotatedRectangleIntersection(self, other)
         return result != 0
 
+    def get_intersection(self, other):
+        result, vertices = cv2.rotatedRectangleIntersection(self, other)
+        
+        if vertices is None:
+            return None
+
+        return np.mean(vertices, axis=(0,1))
+
     _line = None
     @property
     def line(self):

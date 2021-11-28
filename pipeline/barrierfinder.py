@@ -130,8 +130,19 @@ class BarrierGroup():
         self._bounds = None
         self._surfaces = None
 
+        self.a_terminations = []
+        self.b_terminations = []
+
     def add_barrier(self, barrier):
         self.barriers.append(barrier)
+
+    def add_termination_a(self, barrier_group):
+        if barrier_group not in self.a_terminations:
+            self.a_terminations.append(barrier_group)
+
+    def add_termination_b(self, barrier_group):
+        if barrier_group not in self.b_terminations:
+            self.b_terminations.append(barrier_group)
 
     def match_score(self, test_barrier, min_angle_diff, search_width, length_multiplier):
 
@@ -249,6 +260,18 @@ class BarrierGroup():
         if show_bounds:
             cv2.drawContours(img, [bounds.points], 0, (255,0,0), 1)
             self.bounds.line.draw(img, color=(0,0,255))
+
+        intersections = []
+        if len(self.a_terminations) > 0:
+            intersections.append(self.bounds.line.point_a)
+
+        if len(self.b_terminations) > 0:
+            intersections.append(self.bounds.line.point_b)
+
+        radius = int(max(thickness, 5))
+
+        for intersection in intersections:
+            cv2.circle(img, (int(intersection[0]), int(intersection[1])), radius, [0, 0, 255])
 
 def inside_mask(mask, point):
     if point[0] < mask.shape[1] and point[1] < mask.shape[0]:
@@ -470,6 +493,7 @@ class BarrierSolver():
         self.room = data["room"]
         self.image = self.data["downscaled"]
         self.surface_barriers = surface_barriers
+        self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
 
     def solve(self):
@@ -495,6 +519,35 @@ class BarrierSolver():
         for sb in self.surface_barriers.values():
             self.barrier_groups.extend(sb.barrier_groups)
 
+        min_distance = self.diagonal / 100
+        min_distance_sq = min_distance * min_distance
+
+        intersections = []
+
+        for i in range(len(self.barrier_groups)):
+            barrier_a = self.barrier_groups[i]
+            rect_a = barrier_a.bounds.resized(width_offset=min_distance, length_offset=min_distance)
+
+            for j in range(i+1, len(self.barrier_groups)):
+                 barrier_b = self.barrier_groups[j]
+                 rect_b = barrier_b.bounds.resized(width_offset=min_distance, length_offset=min_distance)
+
+                 intersection = rect_a.get_intersection(rect_b)
+
+                 if intersection is not None:
+                    if distance.sqeuclidean(intersection, rect_a.line.point_a) <= min_distance_sq:
+                        barrier_a.add_termination_a(barrier_b)
+
+                    if distance.sqeuclidean(intersection, rect_a.line.point_b) <= min_distance_sq:
+                        barrier_a.add_termination_b(barrier_b)
+
+                    if distance.sqeuclidean(intersection, rect_b.line.point_a) <= min_distance_sq:
+                        barrier_b.add_termination_a(barrier_a)
+
+                    if distance.sqeuclidean(intersection, rect_b.line.point_b) <= min_distance_sq:
+                        barrier_b.add_termination_b(barrier_a)
+
+                    
 
 
         if im_logging_enabled(self.data):
