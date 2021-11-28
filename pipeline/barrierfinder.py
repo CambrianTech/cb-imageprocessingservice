@@ -267,9 +267,12 @@ class BarrierGroup():
 
     def debug(self, img, color):
 
-        thickness = min(self.bounds.width, self.bounds.height)
-        bounds = self.bounds if thickness > 1 else self.bounds.resized(width_offset=2)
-        cv2.drawContours(img, [bounds.points], 0, (255,0,0), 1)
+        for barrier in self.barriers:
+            barrier.debug(img, color=color)
+
+        #thickness = min(self.bounds.width, self.bounds.height)
+        #bounds = self.bounds if thickness > 1 else self.bounds.resized(width_offset=2)
+        cv2.drawContours(img, [self.bounds.points], 0, (255,0,0), 1)
         self.bounds.line.draw(img, color=(0,0,255))
             
 
@@ -439,6 +442,8 @@ class SurfaceBarriers():
 
         inner_mask = cv2.erode(self.surface.mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
 
+        offset = self.diagonal / 400
+
         for group in self.barrier_groups:
             num_inside = 0
             num_points = len(group.bounds.points)
@@ -450,6 +455,15 @@ class SurfaceBarriers():
             if num_inside > num_points // 2:
                 group.dead = True
 
+                #save ones that intersect others
+                for other in self.barrier_groups:
+                    if other == group: continue
+
+                    if group.bounds.resized(length_offset=offset, width_offset=offset).intersects(other.bounds.resized(length_offset=offset, width_offset=offset)):
+                        group.dead = False
+                        break
+                
+
         self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
 
 
@@ -459,8 +473,8 @@ class SurfaceBarriers():
 
         #Line.draw_all(img, self.candidates, color=(0,0,0), thickness=1)
 
-        for barrier in self.barrier_candidates:
-            barrier.debug(img, color=color)
+        # for barrier in self.barrier_candidates:
+        #     barrier.debug(img, color=color)
 
         for barrier_group in self.barrier_groups:
             barrier_group.debug(img, color=color)

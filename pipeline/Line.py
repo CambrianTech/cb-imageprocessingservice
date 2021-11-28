@@ -70,6 +70,10 @@ class RotatedRect(tuple):
             self._points = np.int0(cv2.boxPoints(self))
         return self._points
 
+    def intersects(self, other):
+        result, _ = cv2.rotatedRectangleIntersection(self, other)
+        return result != 0
+
     _line = None
     @property
     def line(self):
