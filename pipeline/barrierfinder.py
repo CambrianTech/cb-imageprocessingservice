@@ -261,6 +261,7 @@ class BarrierGroup():
             cv2.drawContours(img, [bounds.points], 0, (255,0,0), 1)
             self.bounds.line.draw(img, color=(0,0,255))
 
+    def debug_intersections(self, img):
         intersections = []
         if len(self.a_terminations) > 0:
             intersections.append(self.bounds.line.point_a)
@@ -268,7 +269,8 @@ class BarrierGroup():
         if len(self.b_terminations) > 0:
             intersections.append(self.bounds.line.point_b)
 
-        radius = int(max(thickness, 5))
+        thickness = min(self.bounds.width, self.bounds.height)
+        radius = int(max(thickness/2, 5))
 
         for intersection in intersections:
             cv2.circle(img, (int(intersection[0]), int(intersection[1])), radius, [0, 0, 255])
@@ -475,6 +477,9 @@ class SurfaceBarriers():
 
         for barrier_group in self.barrier_groups:
             barrier_group.debug(img, color=color)
+
+        for barrier_group in self.barrier_groups:
+            barrier_group.debug_intersections(img)
 
 class JunctionType(IntEnum):
     Extension = 0
