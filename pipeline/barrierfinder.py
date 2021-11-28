@@ -200,6 +200,9 @@ class BarrierGroup():
             for barrier in self.barriers:
                 if barrier.surface_neighbor is not None and barrier.surface_neighbor not in self._surfaces:
                     self._surfaces.append(barrier.surface_neighbor)
+
+                # if barrier.surface_barrier.surface not in self._surfaces:
+                #     self._surfaces.append(barrier.surface_barrier.surface)
         
         return self._surfaces
 
