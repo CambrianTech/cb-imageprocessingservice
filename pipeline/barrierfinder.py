@@ -261,6 +261,8 @@ class BarrierGroup():
             cv2.drawContours(img, [bounds.points], 0, (255,0,0), 1)
             self.bounds.line.draw(img, color=(0,0,255))
 
+        self.debug_intersections(img)
+
     def debug_intersections(self, img):
         intersections = []
         if len(self.a_terminations) > 0:
@@ -477,9 +479,6 @@ class SurfaceBarriers():
 
         for barrier_group in self.barrier_groups:
             barrier_group.debug(img, color=color)
-
-        for barrier_group in self.barrier_groups:
-            barrier_group.debug_intersections(img)
 
 class JunctionType(IntEnum):
     Extension = 0
