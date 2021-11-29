@@ -229,7 +229,7 @@ class BarrierGroup():
 
             for termination in self.terminations:
                 surface = termination.barrier_group.origin_barrier.surface_barrier.surface
-                if surface not in self._surfaces:
+                if not surface.surfaceType.is_major and surface not in self._surfaces:
                     self._surfaces.append(surface)
         
         return self._surfaces
@@ -643,7 +643,7 @@ class BarrierSolver():
                         if bb_match and len(barrier_b.b_terminations) == 0:
                             barrier_b.b_termination_candidates.append(BarrierTermination(barrier_a, distances[3], intersection))
 
-
+        #from those found, find the best
         for barrier in self.barrier_groups:
             
             if len(barrier.a_termination_candidates) > 0:
