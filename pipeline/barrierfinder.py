@@ -597,7 +597,7 @@ class BarrierSolver():
             return RotatedRect((self[0], extended_size, self[2]))
 
         #extend to vertices
-        min_angle_diff = np.radians(7)
+        min_angle_diff = np.radians(15)
         for i in range(len(self.barrier_groups)):
             barrier_a = self.barrier_groups[i]
 
