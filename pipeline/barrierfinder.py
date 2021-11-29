@@ -129,6 +129,7 @@ class BarrierGroup():
         self._points = None
         self._bounds = None
         self._surfaces = None
+        self.origin_barrier = barrier
 
         self.a_terminations = []
         self.b_terminations = []
@@ -143,6 +144,10 @@ class BarrierGroup():
     def add_termination_b(self, barrier_group):
         if barrier_group not in self.b_terminations:
             self.b_terminations.append(barrier_group)
+
+    @property
+    def terminations(self):
+        return self.a_terminations + self.b_terminations
 
     def match_score(self, test_barrier, min_angle_diff, search_width, length_multiplier):
 
@@ -206,14 +211,17 @@ class BarrierGroup():
     @property
     def surfaces(self):
         if self._surfaces is None:
-            self._surfaces = [self.barriers[0].surface_barrier.surface]
+            origin_surface = self.origin_barrier.surface_barrier.surface
+            self._surfaces = [origin_surface]
 
             for barrier in self.barriers:
                 if barrier.surface_neighbor is not None and barrier.surface_neighbor not in self._surfaces:
                     self._surfaces.append(barrier.surface_neighbor)
 
-                # if barrier.surface_barrier.surface not in self._surfaces:
-                #     self._surfaces.append(barrier.surface_barrier.surface)
+            for barrier_group in self.terminations:
+                surface = barrier_group.origin_barrier.surface_barrier.surface
+                if surface not in self._surfaces:
+                    self._surfaces.append(surface)
         
         return self._surfaces
 
@@ -526,6 +534,8 @@ class BarrierSolver():
         for sb in self.surface_barriers.values():
             self.barrier_groups.extend(sb.barrier_groups)
 
+
+        #find interlinking
         min_distance = self.diagonal / 100
         min_distance_sq = min_distance * min_distance
 
@@ -554,7 +564,19 @@ class BarrierSolver():
                     if distance.sqeuclidean(intersection, rect_b.line.point_b) <= min_distance_sq:
                         barrier_b.add_termination_b(barrier_a)
 
-                    
+        #add missing links
+        # for sb in self.surface_barriers.values():
+
+        #     barriers = get_surface_barriers(sb.surface)
+        #     taken = barriers.copy()
+        #     new_barriers = []
+
+        #     for barrier in barriers:
+        #         terminations = barrier.a_terminations + barrier.b_terminations
+        #         for termination in terminations:
+        #             if termination not in taken:
+        #                 taken.append(termination)
+        #                 new_barriers.append(termination)
 
 
         if im_logging_enabled(self.data):
