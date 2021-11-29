@@ -541,6 +541,21 @@ class BarrierSolver():
 
         intersections = []
 
+        def get_distances(rect_a, rect_b):
+            intersection = rect_a.get_intersection(rect_b)
+
+            if intersections is None:
+                return None
+
+            values = []
+
+            values.append(distance.sqeuclidean(intersection, rect_a.line.point_a) <= min_distance_sq)
+            values.append(distance.sqeuclidean(intersection, rect_a.line.point_b) <= min_distance_sq)
+            values.append(distance.sqeuclidean(intersection, rect_b.line.point_a) <= min_distance_sq)
+            values.append(distance.sqeuclidean(intersection, rect_b.line.point_b) <= min_distance_sq)
+
+            return values
+
         for i in range(len(self.barrier_groups)):
             barrier_a = self.barrier_groups[i]
             rect_a = barrier_a.bounds.resized(width_offset=min_distance, length_offset=min_distance)
@@ -549,22 +564,51 @@ class BarrierSolver():
                  barrier_b = self.barrier_groups[j]
                  rect_b = barrier_b.bounds.resized(width_offset=min_distance, length_offset=min_distance)
 
-                 intersection = rect_a.get_intersection(rect_b)
+                 matches = get_distances(rect_a, rect_b)
 
-                 if intersection is not None:
-                    if distance.sqeuclidean(intersection, rect_a.line.point_a) <= min_distance_sq:
+                 if matches is not None:
+                    if matches[0]:
                         barrier_a.add_termination_a(barrier_b)
 
-                    if distance.sqeuclidean(intersection, rect_a.line.point_b) <= min_distance_sq:
+                    if matches[1]:
                         barrier_a.add_termination_b(barrier_b)
 
-                    if distance.sqeuclidean(intersection, rect_b.line.point_a) <= min_distance_sq:
+                    if matches[2]:
                         barrier_b.add_termination_a(barrier_a)
 
-                    if distance.sqeuclidean(intersection, rect_b.line.point_b) <= min_distance_sq:
+                    if matches[3]:
                         barrier_b.add_termination_b(barrier_a)
 
-        #add missing links
+        #extend to vertices
+        for i in range(len(self.barrier_groups)):
+            barrier_a = self.barrier_groups[i]
+
+            if len(barrier_a.a_terminations) > 0 and len(barrier_a.b_terminations) > 0: continue
+
+            rect_a = barrier_a.bounds.resized(width_offset=min_distance, width_factor=0.5, length_offset=min_distance, length_factor=2.0)
+
+            for j in range(i+1, len(self.barrier_groups)):
+                 barrier_b = self.barrier_groups[j]
+
+                 if len(barrier_b.a_terminations) > 0 and len(barrier_b.b_terminations) > 0: continue
+
+                 rect_b = barrier_b.bounds.resized(width_offset=min_distance, width_factor=0.5, length_offset=min_distance, length_factor=2.0)
+
+                 matches = get_distances(rect_a, rect_b)
+
+                 if matches is not None:
+                    if matches[0] and len(barrier_a.a_terminations) == 0:
+                        print("a: term a")
+
+                    if matches[1] and len(barrier_a.b_terminations) == 0:
+                        print("a: term b")
+
+                    if matches[2] and len(barrier_b.a_terminations) == 0:
+                        print("b: term a")
+
+                    if matches[3] and len(barrier_b.b_terminations) == 0:
+                        print("b: term b")
+
         # for sb in self.surface_barriers.values():
 
         #     barriers = get_surface_barriers(sb.surface)
