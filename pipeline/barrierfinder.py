@@ -136,6 +136,7 @@ class BarrierGroup():
         self._bounds = None
         self._surfaces = None
         self.origin_barrier = barrier
+        self.origin_surface = barrier.surface_barrier.surface
 
         self.a_terminations = []
         self.a_termination_candidates = []
@@ -220,15 +221,14 @@ class BarrierGroup():
     @property
     def surfaces(self):
         if self._surfaces is None:
-            origin_surface = self.origin_barrier.surface_barrier.surface
-            self._surfaces = [origin_surface]
+            self._surfaces = [self.origin_surface]
 
             for barrier in self.barriers:
                 if barrier.surface_neighbor is not None and barrier.surface_neighbor not in self._surfaces:
                     self._surfaces.append(barrier.surface_neighbor)
 
             # for termination in self.terminations:
-            #     surface = termination.barrier_group.origin_barrier.surface_barrier.surface
+            #     surface = termination.barrier_group.origin_surface
             #     if not surface.surfaceType.is_major and surface not in self._surfaces:
             #         self._surfaces.append(surface)
         
@@ -608,6 +608,8 @@ class BarrierSolver():
             for j in range(i+1, len(self.barrier_groups)):
                 barrier_b = self.barrier_groups[j]
 
+                if barrier_a.origin_surface.bestLabel != barrier_b.origin_surface.bestLabel: continue
+
                 b_can_extend = len(barrier_b.a_terminations) > 0 or len(barrier_b.b_terminations) > 0
 
                 if not a_can_extend and not b_can_extend: continue
@@ -660,6 +662,9 @@ class BarrierSolver():
                     barrier.b_termination_candidates.sort(key=lambda x: x.distance)
 
                 barrier.add_termination_b(barrier.b_termination_candidates[0])
+
+        #strip out content that isn't linked to anything (via termination linking)
+        #start with barriers that are clearly on the object:
 
 
 
