@@ -227,10 +227,10 @@ class BarrierGroup():
                 if barrier.surface_neighbor is not None and barrier.surface_neighbor not in self._surfaces:
                     self._surfaces.append(barrier.surface_neighbor)
 
-            for termination in self.terminations:
-                surface = termination.barrier_group.origin_barrier.surface_barrier.surface
-                if not surface.surfaceType.is_major and surface not in self._surfaces:
-                    self._surfaces.append(surface)
+            # for termination in self.terminations:
+            #     surface = termination.barrier_group.origin_barrier.surface_barrier.surface
+            #     if not surface.surfaceType.is_major and surface not in self._surfaces:
+            #         self._surfaces.append(surface)
         
         return self._surfaces
 
