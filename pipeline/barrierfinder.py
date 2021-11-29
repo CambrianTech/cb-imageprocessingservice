@@ -590,38 +590,58 @@ class BarrierSolver():
                     if distances[3] <= min_distance:
                         barrier_b.add_termination_b(BarrierTermination(barrier_a, distances[3], intersection))
 
+        def enlarge_rect(rect, length_factor=2.0, min_width=min_distance):
+            rect.line.point_a
+
+            extended_size = length_factor * rect[1][0], max(rect[1][1], min_width) if rect[1][0] > rect[1][1] else max(rect[1][0], min_width), length_factor * rect[1][1]
+            return RotatedRect((self[0], extended_size, self[2]))
+
         #extend to vertices
+        min_angle_diff = np.radians(7)
         for i in range(len(self.barrier_groups)):
             barrier_a = self.barrier_groups[i]
 
-            if len(barrier_a.a_terminations) > 0 and len(barrier_a.b_terminations) > 0: continue
+            a_can_extend = len(barrier_a.a_terminations) > 0 or len(barrier_a.b_terminations) > 0
 
             rect_a = barrier_a.bounds.resized(width_offset=min_distance, width_factor=0.5, length_offset=min_distance, length_factor=2.0)
 
-            best_a_term = None
-            best_b_term = None
-
             for j in range(i+1, len(self.barrier_groups)):
-                 barrier_b = self.barrier_groups[j]
+                barrier_b = self.barrier_groups[j]
 
-                 if len(barrier_b.a_terminations) > 0 and len(barrier_b.b_terminations) > 0: continue
+                b_can_extend = len(barrier_b.a_terminations) > 0 or len(barrier_b.b_terminations) > 0
 
-                 rect_b = barrier_b.bounds.resized(width_offset=min_distance, width_factor=0.5, length_offset=min_distance, length_factor=2.0)
+                if not a_can_extend and not b_can_extend: continue
 
-                 distances, intersection = get_distances(rect_a, rect_b)
+                if LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) > min_angle_diff:
+                    continue
 
-                 if distances is not None:
-                    if distances[0] <= min_distance and len(barrier_a.a_terminations) == 0:
-                        barrier_a.a_termination_candidates.append(BarrierTermination(barrier_b, distances[0], intersection))
+                rect_b = barrier_b.bounds.resized(width_offset=min_distance, width_factor=0.5, length_offset=min_distance, length_factor=2.0)
 
-                    if distances[1] <= min_distance and len(barrier_a.b_terminations) == 0:
-                        barrier_a.b_termination_candidates.append(BarrierTermination(barrier_b, distances[1], intersection))
+                distances, intersection = get_distances(rect_a, rect_b)
 
-                    if distances[2] <= min_distance and len(barrier_b.a_terminations) == 0:
-                        barrier_b.a_termination_candidates.append(BarrierTermination(barrier_a, distances[2], intersection))
+                if distances is not None:
+                    aa_match = distances[0] <= min_distance
+                    ab_match = distances[1] <= min_distance
+                    a_match = aa_match or ab_match
 
-                    if distances[3] <= min_distance and len(barrier_b.b_terminations) == 0:
-                        barrier_b.b_termination_candidates.append(BarrierTermination(barrier_a, distances[3], intersection))
+                    ba_match = distances[2] <= min_distance
+                    bb_match = distances[3] <= min_distance
+                    b_match = ba_match or bb_match
+
+                    #must extend to endpoint of other
+                    if b_match:
+                        if aa_match and len(barrier_a.a_terminations) == 0:
+                            barrier_a.a_termination_candidates.append(BarrierTermination(barrier_b, distances[0], intersection))
+
+                        if ab_match and len(barrier_a.b_terminations) == 0:
+                            barrier_a.b_termination_candidates.append(BarrierTermination(barrier_b, distances[1], intersection))
+
+                    if a_match:
+                        if ba_match and len(barrier_b.a_terminations) == 0:
+                            barrier_b.a_termination_candidates.append(BarrierTermination(barrier_a, distances[2], intersection))
+
+                        if bb_match and len(barrier_b.b_terminations) == 0:
+                            barrier_b.b_termination_candidates.append(BarrierTermination(barrier_a, distances[3], intersection))
 
 
         for barrier in self.barrier_groups:
@@ -641,16 +661,6 @@ class BarrierSolver():
 
                 barrier.add_termination_b(barrier.b_termination_candidates[0])
 
-        #     barriers = get_surface_barriers(sb.surface)
-        #     taken = barriers.copy()
-        #     new_barriers = []
-
-        #     for barrier in barriers:
-        #         terminations = barrier.a_terminations + barrier.b_terminations
-        #         for termination in terminations:
-        #             if termination not in taken:
-        #                 taken.append(termination)
-        #                 new_barriers.append(termination)
 
 
         if im_logging_enabled(self.data):
