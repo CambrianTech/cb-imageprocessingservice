@@ -597,18 +597,14 @@ class BarrierSolver():
                     else:
                         barrier_b.add_termination_b(BarrierTermination(barrier_a, distances[3], intersection))                                            
 
-        # def enlarge_rect(rect, length_factor=2.0, min_width=max_distance):
-        #     extended_size = length_factor * rect[1][0], max(rect[1][1], min_width) if rect[1][0] > rect[1][1] else max(rect[1][0], min_width), length_factor * rect[1][1]
-        #     return RotatedRect((self[0], extended_size, self[2]))
-
-        #extend to other lines that are not terminated
+        #extend to other lines that are not terminated to other colinear lines
         min_angle_diff = np.radians(15)
         for i in range(len(self.barrier_groups)):
             barrier_a = self.barrier_groups[i]
 
             a_can_extend = len(barrier_a.a_terminations) > 0 or len(barrier_a.b_terminations) > 0
 
-            rect_a = barrier_a.bounds.resized(width_offset=max_distance, width_factor=0.5, length_offset=max_distance, length_factor=2.0)
+            rect_a = None
 
             for j in range(i+1, len(self.barrier_groups)):
                 barrier_b = self.barrier_groups[j]
@@ -619,36 +615,40 @@ class BarrierSolver():
 
                 if not a_can_extend and not b_can_extend: continue
 
+                #make sure colinear
                 if LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) > min_angle_diff:
                     continue
 
+                if rect_a is None:
+                    rect_a = barrier_a.bounds.resized(width_offset=max_distance, width_factor=0.5, length_offset=max_distance, length_factor=2.0)
                 rect_b = barrier_b.bounds.resized(width_offset=max_distance, width_factor=0.5, length_offset=max_distance, length_factor=2.0)
 
                 distances, intersection = get_distances(rect_a, rect_b)
 
-                if distances is not None:
-                    aa_match = distances[0] <= max_distance
-                    ab_match = distances[1] <= max_distance
-                    a_match = aa_match or ab_match
+                if distances is None: continue
 
-                    ba_match = distances[2] <= max_distance
-                    bb_match = distances[3] <= max_distance
-                    b_match = ba_match or bb_match
+                aa_match = distances[0] <= max_distance
+                ab_match = distances[1] <= max_distance
+                a_match = aa_match or ab_match
 
-                    #must extend to endpoint of other
-                    if b_match:
-                        if aa_match and len(barrier_a.a_terminations) == 0:
-                            barrier_a.a_termination_candidates.append(BarrierTermination(barrier_b, distances[0], intersection))
+                ba_match = distances[2] <= max_distance
+                bb_match = distances[3] <= max_distance
+                b_match = ba_match or bb_match
 
-                        if ab_match and len(barrier_a.b_terminations) == 0:
-                            barrier_a.b_termination_candidates.append(BarrierTermination(barrier_b, distances[1], intersection))
+                #must extend to endpoint of other
+                if b_match:
+                    if aa_match and len(barrier_a.a_terminations) == 0:
+                        barrier_a.a_termination_candidates.append(BarrierTermination(barrier_b, distances[0], intersection))
 
-                    if a_match:
-                        if ba_match and len(barrier_b.a_terminations) == 0:
-                            barrier_b.a_termination_candidates.append(BarrierTermination(barrier_a, distances[2], intersection))
+                    if ab_match and len(barrier_a.b_terminations) == 0:
+                        barrier_a.b_termination_candidates.append(BarrierTermination(barrier_b, distances[1], intersection))
 
-                        if bb_match and len(barrier_b.b_terminations) == 0:
-                            barrier_b.b_termination_candidates.append(BarrierTermination(barrier_a, distances[3], intersection))
+                if a_match:
+                    if ba_match and len(barrier_b.a_terminations) == 0:
+                        barrier_b.a_termination_candidates.append(BarrierTermination(barrier_a, distances[2], intersection))
+
+                    if bb_match and len(barrier_b.b_terminations) == 0:
+                        barrier_b.b_termination_candidates.append(BarrierTermination(barrier_a, distances[3], intersection))
 
         #from those found, find the best
         for barrier in self.barrier_groups:
