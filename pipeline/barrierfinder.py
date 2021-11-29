@@ -538,6 +538,9 @@ class BarrierSolver():
                 for group in groups:
                     group.debug(debug, color=color, show_bounds=False)
 
+            for surface in surfaces:
+                groups = get_surface_barriers(surface)
+                
                 for group in groups:
                     group.debug_intersections(debug)
                 
@@ -553,6 +556,7 @@ class BarrierSolver():
 
         #find interlinking
         max_distance = self.diagonal / 100
+        min_length = self.diagonal / 20
 
         def get_distances(rect_a, rect_b, point):
             values = []
@@ -567,10 +571,15 @@ class BarrierSolver():
         #set termination points
         for i in range(len(self.barrier_groups)):
             barrier_a = self.barrier_groups[i]
+
+            if barrier_a.bounds.line.length < min_length: continue
+
             rect_a = barrier_a.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
 
             for j in range(i+1, len(self.barrier_groups)):
                 barrier_b = self.barrier_groups[j]
+
+                if barrier_b.bounds.line.length < min_length: continue
 
                 #distance_between = distance.euclidean(barrier_a.bounds.line.midpoint, barrier_b.bounds.line.midpoint)
 
