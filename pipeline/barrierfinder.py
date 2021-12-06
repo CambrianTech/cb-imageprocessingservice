@@ -458,6 +458,12 @@ class SurfaceBarriers():
 
         return barrier_groups
 
+    def filter_barriers(self):
+        barrier_groups, dead_barrier_groups = partition(lambda x: not x.dead, self.barrier_groups)
+        for x in dead_barrier_groups: 
+            x.dead = False #reset
+        self.barrier_groups = barrier_groups
+
     def merge_barriers(self):
 
         width_offset = self.diagonal / 100
@@ -475,7 +481,7 @@ class SurfaceBarriers():
                     group_a.merge(group_b)
                     group_b.dead = True
 
-        self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
+        self.filter_barriers()
 
     def set_endpoints(self):
         #find interlinking
@@ -539,38 +545,42 @@ class SurfaceBarriers():
     def cull_barriers(self):
 
         #inner_mask = cv2.erode(self.surface.mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
+        #todo: check against the original semantic labels, within a contour range, not the mask
 
         for group in self.barrier_groups:
-            num_inside = 0
-            num_points = len(group.bounds.points)
-            for point in group.bounds.points:
+            if inside_mask(self.surface.outer_mask, group.bounds.line.midpoint) and \
+                (inside_mask(self.surface.outer_mask, group.bounds.line.point_a) or inside_mask(self.surface.outer_mask, group.bounds.line.point_b)):
+                group.dead = True
+                continue
 
-                if inside_mask(self.surface.outer_mask, point):
-                    group.dead = True
-                    break
+            # num_inside = 0
+            # num_points = len(group.bounds.points)
+            # for point in group.bounds.points:
 
-                # #maybe require all to be inside?
-                # if inside_mask(inner_mask, point):
-                #     num_inside += 1
+            #     #maybe require all to be inside?
+            #     if inside_mask(inner_mask, point):
+            #         num_inside += 1
 
             # if num_inside > num_points // 2:
             #     group.dead = True
 
         # save ones that interlink with others that are not labeled dead
-        to_check = set(filter(lambda x: not x.dead, self.barrier_groups))
-        checked = to_check.copy()
+        # to_check = set(filter(lambda x: not x.dead, self.barrier_groups))
+        # checked = to_check.copy()
         
-        while len(to_check) > 0:
-            element = to_check.pop()
+        # while len(to_check) > 0:
+        #     element = to_check.pop()
 
-            for parent in element.parent_groups:
+        #     for parent in element.parent_groups:
 
-                if parent not in checked:
-                    parent.dead = False
-                    to_check.add(parent)
-                    checked.add(parent)
+        #         if parent not in checked:
+        #             #if (parent not in self.barrier_groups): exit()
+        #             parent.dead = False
+        #             to_check.add(parent)
+        #             checked.add(parent)
 
-        self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
+        self.filter_barriers()
+
 
     def debug(self, img, color):
         for shape in self.shapes:
@@ -616,15 +626,13 @@ class BarrierSolver():
 
             for surface in surfaces:
                 color = random_color()
-                groups = get_surface_barriers(surface)
                 
-                for group in groups:
+                for group in surface.barriers.barrier_groups:
                     group.debug(debug, color=color, show_bounds=False)
 
             for surface in surfaces:
-                groups = get_surface_barriers(surface)
-                
-                for group in groups:
+
+                for group in surface.barriers.barrier_groups:
                     group.debug_intersections(debug)
                 
             log_image(self.data, name + "_barriers", debug)
