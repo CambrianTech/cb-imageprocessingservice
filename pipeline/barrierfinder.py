@@ -143,6 +143,7 @@ class BarrierGroup():
 
         self.b_terminations = []
         self.b_termination_candidates = []
+        self.parent_groups = []
 
     def add_barrier(self, barrier):
         self.barriers.append(barrier)
@@ -150,10 +151,15 @@ class BarrierGroup():
     def add_termination_a(self, termination:BarrierTermination):
         if termination not in self.a_terminations:
             self.a_terminations.append(termination)
+            termination.barrier_group.add_parent(self)
 
     def add_termination_b(self, termination:BarrierTermination):
         if termination not in self.b_terminations:
             self.b_terminations.append(termination)
+            termination.barrier_group.add_parent(self)
+
+    def add_parent(self, parent):
+        self.parent_groups.append(parent)
 
     @property
     def terminations(self):
@@ -327,8 +333,8 @@ class SurfaceBarriers():
         self.barrier_groups = self.group_barriers()
 
         self.merge_barriers()
-        self.cull_barriers()
         self.set_endpoints()
+        self.cull_barriers()
 
     def get_barrier_candidates(self, angle_threshold=np.radians(45)):
 
@@ -470,34 +476,6 @@ class SurfaceBarriers():
 
         self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
 
-    def cull_barriers(self):
-
-        inner_mask = cv2.erode(self.surface.mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
-
-        offset = self.diagonal / 400
-
-        for group in self.barrier_groups:
-            num_inside = 0
-            num_points = len(group.bounds.points)
-            for point in group.bounds.points:
-                #maybe require all to be inside?
-                if inside_mask(inner_mask, point):
-                    num_inside += 1
-
-            if num_inside > num_points // 2:
-                group.dead = True
-
-                #save ones that intersect others
-                for other in self.barrier_groups:
-                    if other == group: continue
-
-                    if group.bounds.resized(length_offset=offset, width_offset=offset).intersects(other.bounds.resized(length_offset=offset, width_offset=offset)):
-                        group.dead = False
-                        break
-                
-
-        self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
-
     def set_endpoints(self):
         #find interlinking
         max_distance = self.diagonal / 50
@@ -545,6 +523,43 @@ class SurfaceBarriers():
                 else:
                     barrier_b.add_termination_b(BarrierTermination(barrier_a, barrier_b.bounds.line.point_b))   
 
+
+    def cull_barriers(self):
+
+        inner_mask = cv2.erode(self.surface.mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
+
+        offset = self.diagonal / 400
+
+        for group in self.barrier_groups:
+            num_inside = 0
+            num_points = len(group.bounds.points)
+            for point in group.bounds.points:
+
+                if inside_mask(self.surface.outer_mask, point):
+                    group.dead = True
+                    break
+
+                #maybe require all to be inside?
+                if inside_mask(inner_mask, point):
+                    num_inside += 1
+
+            if num_inside > num_points // 2:
+                group.dead = True
+
+        # save ones that interlink with others that are not labeled dead
+        to_check = set(filter(lambda x: not x.dead, self.barrier_groups))
+        checked = to_check.copy()
+        
+        while len(to_check) > 0:
+            element = to_check.pop()
+
+            for parent in element.parent_groups:
+                if parent not in checked:
+                    parent.dead = False
+                    to_check.add(parent)
+                    checked.add(parent)
+
+        self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
 
     def debug(self, img, color):
         for shape in self.shapes:
