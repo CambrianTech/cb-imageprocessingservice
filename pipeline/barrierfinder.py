@@ -323,16 +323,17 @@ class SurfaceBarriers():
     def __init__(self, data, surface, vanishing_points):
         self.data = data
         self.surface = surface
+        self.surface.barriers = self
         self.vanishing_points = vanishing_points
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
         self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
-
-    def find_barriers(self):
+        
         self.barrier_candidates = self.get_barrier_candidates()
         self.barrier_groups = self.group_barriers()
-
         self.merge_barriers()
+        
+    def refine(self):
         self.set_endpoints()
         self.cull_barriers()
 
@@ -482,6 +483,12 @@ class SurfaceBarriers():
         min_length = self.diagonal / 20
         max_angle_parallel = np.radians(15)
 
+        #start from barrier groups, but also add sibling barriers to end
+        candidates = self.barrier_groups.copy()
+        for neighbor in self.surface.neighbors:
+            if neighbor.barriers is not None:
+                candidates.extend(neighbor.barriers.barrier_groups)
+
         #set termination points
         for i in range(len(self.barrier_groups)):
             barrier_a = self.barrier_groups[i]
@@ -490,8 +497,8 @@ class SurfaceBarriers():
 
             rect_a = barrier_a.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
 
-            for j in range(i+1, len(self.barrier_groups)):
-                barrier_b = self.barrier_groups[j]
+            for j in range(i+1, len(candidates)):
+                barrier_b = candidates[j]
 
                 if barrier_b.bounds.line.length < min_length: continue
 
@@ -526,9 +533,7 @@ class SurfaceBarriers():
 
     def cull_barriers(self):
 
-        inner_mask = cv2.erode(self.surface.mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
-
-        offset = self.diagonal / 400
+        #inner_mask = cv2.erode(self.surface.mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
 
         for group in self.barrier_groups:
             num_inside = 0
@@ -539,12 +544,12 @@ class SurfaceBarriers():
                     group.dead = True
                     break
 
-                #maybe require all to be inside?
-                if inside_mask(inner_mask, point):
-                    num_inside += 1
+                # #maybe require all to be inside?
+                # if inside_mask(inner_mask, point):
+                #     num_inside += 1
 
-            if num_inside > num_points // 2:
-                group.dead = True
+            # if num_inside > num_points // 2:
+            #     group.dead = True
 
         # save ones that interlink with others that are not labeled dead
         to_check = set(filter(lambda x: not x.dead, self.barrier_groups))
@@ -554,6 +559,7 @@ class SurfaceBarriers():
             element = to_check.pop()
 
             for parent in element.parent_groups:
+
                 if parent not in checked:
                     parent.dead = False
                     to_check.add(parent)
@@ -756,7 +762,7 @@ class PipelineBarrierFinder(PipelineStep):
         self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
         self.surfaces = []
-        self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike]))
+        self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike, SurfaceType.Ceiling, SurfaceType.Floor]))
         self.surfaces.extend(self.room.get_surfaces(labels=box_like))
 
         self.vanishing_points = []
@@ -771,7 +777,9 @@ class PipelineBarrierFinder(PipelineStep):
 
         for surface in self.surfaces:
             self.barriers[surface.uniqueId] = SurfaceBarriers(self.data, surface, self.vanishing_points)
-            self.barriers[surface.uniqueId].find_barriers()
+
+        for surface in self.surfaces:
+            self.barriers[surface.uniqueId].refine()
 
         if im_logging_enabled(self.data):
             log_image(self.data, "potential_barriers.png", self.get_debug_image())
