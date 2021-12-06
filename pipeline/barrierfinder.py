@@ -502,7 +502,7 @@ class SurfaceBarriers():
 
                 if barrier_b.bounds.line.length < min_length: continue
 
-                if barrier_b in self.barrier_candidates: continue
+                if barrier_b in self.barrier_groups: continue
 
                 colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
 
