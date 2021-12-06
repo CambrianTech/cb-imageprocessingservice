@@ -262,6 +262,7 @@ class BarrierGroup():
     def merge(self, other):
         merged = set(self.barriers)
         merged.update(other.barriers)
+
         self.barriers = list(merged)
         self._points = None
         self._bounds = None
@@ -302,6 +303,15 @@ def inside_mask(mask, point):
         return mask[int(point[1]), int(point[0])] > 0
     return False
 
+def get_distances(rect_a, rect_b, point):
+    values = []
+
+    values.append(distance.euclidean(point, rect_a.line.point_a))
+    values.append(distance.euclidean(point, rect_a.line.point_b))
+    values.append(distance.euclidean(point, rect_b.line.point_a))
+    values.append(distance.euclidean(point, rect_b.line.point_b))
+
+    return np.array(values)
 
 class SurfaceBarriers():
     def __init__(self, data, surface, vanishing_points):
@@ -318,6 +328,7 @@ class SurfaceBarriers():
 
         self.merge_barriers()
         self.cull_barriers()
+        self.set_endpoints()
 
     def get_barrier_candidates(self, angle_threshold=np.radians(45)):
 
@@ -487,6 +498,53 @@ class SurfaceBarriers():
 
         self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
 
+    def set_endpoints(self):
+        #find interlinking
+        max_distance = self.diagonal / 50
+        min_length = self.diagonal / 20
+        max_angle_parallel = np.radians(15)
+
+        #set termination points
+        for i in range(len(self.barrier_groups)):
+            barrier_a = self.barrier_groups[i]
+
+            if barrier_a.bounds.line.length < min_length: continue
+
+            rect_a = barrier_a.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
+
+            for j in range(i+1, len(self.barrier_groups)):
+                barrier_b = self.barrier_groups[j]
+
+                if barrier_b.bounds.line.length < min_length: continue
+
+                colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
+
+                rect_b = barrier_b.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
+
+                # intersection = rect_a.get_intersection(rect_b)
+                # if intersection is None: continue
+                # distances = get_distances(rect_a, rect_b, intersection)
+
+                result, vertices = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+                if vertices is None: continue
+                intersection = np.mean(vertices, axis=(0,1))
+
+                #weird overlap
+                if np.std(vertices, axis=(0,1)).max() > max_distance:
+                    continue
+
+                distances = get_distances(rect_a, rect_b, intersection)
+
+                if distances[0] < distances[1]:
+                    barrier_a.add_termination_a(BarrierTermination(barrier_b, barrier_a.bounds.line.point_a))
+                else:
+                    barrier_a.add_termination_b(BarrierTermination(barrier_b, barrier_a.bounds.line.point_b))
+
+                if distances[2] < distances[3]:
+                    barrier_b.add_termination_a(BarrierTermination(barrier_a, barrier_b.bounds.line.point_a))
+                else:
+                    barrier_b.add_termination_b(BarrierTermination(barrier_a, barrier_b.bounds.line.point_b))   
+
 
     def debug(self, img, color):
         for shape in self.shapes:
@@ -519,7 +577,6 @@ class BarrierSolver():
         self.surface_barriers = surface_barriers
         self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
-
     def solve(self):
         
         def get_surface_barriers(surface):
@@ -551,80 +608,14 @@ class BarrierSolver():
         for sb in self.surface_barriers.values():
             self.barrier_groups.extend(sb.barrier_groups)
 
-        #remove redundant
-
-
-        #find interlinking
-        max_distance = self.diagonal / 100
-        min_length = self.diagonal / 20
-
-        def get_distances(rect_a, rect_b, point):
-            values = []
-
-            values.append(distance.euclidean(point, rect_a.line.point_a))
-            values.append(distance.euclidean(point, rect_a.line.point_b))
-            values.append(distance.euclidean(point, rect_b.line.point_a))
-            values.append(distance.euclidean(point, rect_b.line.point_b))
-
-            return np.array(values)
-
-        #set termination points
-        for i in range(len(self.barrier_groups)):
-            barrier_a = self.barrier_groups[i]
-
-            if barrier_a.bounds.line.length < min_length: continue
-
-            rect_a = barrier_a.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
-
-            for j in range(i+1, len(self.barrier_groups)):
-                barrier_b = self.barrier_groups[j]
-
-                if barrier_b.bounds.line.length < min_length: continue
-
-                #distance_between = distance.euclidean(barrier_a.bounds.line.midpoint, barrier_b.bounds.line.midpoint)
-
-                rect_b = barrier_b.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
-
-                intersection = rect_a.get_intersection(rect_b)
-                if intersection is None: continue
-                distances = get_distances(rect_a, rect_b, intersection)
-
-                aa_term = distances[0] <= max_distance
-                ab_term = distances[1] <= max_distance
-                if aa_term and ab_term:
-                    aa_term = distances[0] < distances[1]
-                    ab_term = not ab_term
-
-                ba_term = distances[2] <= max_distance
-                bb_term = distances[3] <= max_distance
-                if ba_term and bb_term:
-                    ba_term = distances[2] < distances[3]
-                    bb_term = not bb_term
-
-                if aa_term:
-                    barrier_a.add_termination_a(BarrierTermination(barrier_b, intersection))
-                elif ab_term:
-                    barrier_a.add_termination_b(BarrierTermination(barrier_b, intersection))
-
-                if ba_term:
-                    barrier_b.add_termination_a(BarrierTermination(barrier_a, intersection))
-                elif bb_term:
-                    barrier_b.add_termination_b(BarrierTermination(barrier_a, intersection))
-
-                # if distances[1] <= max_distance:
-                #     barrier_a.add_termination_b(BarrierTermination(barrier_b, distances[2] < distances[3]))
-
-                # if distances[2] <= max_distance:
-                #     barrier_b.add_termination_a(BarrierTermination(barrier_a, distances[0] < distances[1]))
-                # if distances[3] <= max_distance:
-                #     barrier_b.add_termination_b(BarrierTermination(barrier_a, distances[0] < distances[1]))
-                
-                # if distances[2] <= max_distance or distances[3] <= max_distance:
-                #     barrier_a.add_termination_b(BarrierTermination(barrier_b, distances[2] < distances[3]))                                           
+        #remove redundant                                       
 
         #extend to other lines that are not terminated to other colinear lines
+
+        
         max_angle_parallel = np.radians(15)
         max_angle_orth = np.radians(30)
+
         for i in range(len(self.barrier_groups)):
             barrier_a = self.barrier_groups[i]
 
@@ -634,6 +625,8 @@ class BarrierSolver():
             a_may_extend = aa_may_extend or ab_may_extend
 
             rect_a = None
+
+            continue
 
             for j in range(i+1, len(self.barrier_groups)):
                 barrier_b = self.barrier_groups[j]
