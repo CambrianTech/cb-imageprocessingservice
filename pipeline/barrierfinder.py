@@ -544,7 +544,7 @@ class SurfaceBarriers():
                 else:
                     barrier_b.add_termination_b(BarrierTermination(barrier_a, barrier_b.bounds.line.point_b))   
 
-    def cull_barriers(self, inside_padding=3):
+    def cull_barriers(self):
 
         #inner_mask = cv2.erode(self.surface.mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
         #todo: check against the original semantic labels, within a contour range, not the mask
@@ -565,23 +565,24 @@ class SurfaceBarriers():
             closest_outside = 100000
             closest_outside_index = None
 
+            inside_padding = 3 + min(group.bounds.width, group.bounds.height) / 2
+
             for i in range(len(contours)):
                 contour = contours[i]
 
                 #positive (inside), negative (outside), or zero (on an edge)
-                for point in group.bounds.points:
-                    dist = cv2.pointPolygonTest(contour, (int(point[0]), int(point[1])), True)
-                    is_outside = dist < -inside_padding
-                    dist = abs(dist)
+                dist = cv2.pointPolygonTest(contour, group.bounds.line.midpoint, True)
+                is_outside = dist < -inside_padding
+                dist = abs(dist)
 
-                    if is_outside: #outside
-                        if dist < closest_outside:
-                            closest_outside = dist
-                            closest_outside_index = i
-                    else:
-                        if dist < closest_inside:
-                            closest_inside = dist
-                            closest_inside_index = i
+                if is_outside: #outside
+                    if dist < closest_outside:
+                        closest_outside = dist
+                        closest_outside_index = i
+                else:
+                    if dist < closest_inside:
+                        closest_inside = dist
+                        closest_inside_index = i
 
             if closest_outside < closest_inside: #aka if group is outside
                 #if outside and beyond threshold distance
