@@ -163,6 +163,10 @@ class BarrierGroup():
         self.parent_groups.append(parent)
 
     @property
+    def linkage(self):
+        return self.parent_groups + list(map(lambda x: x.barrier_group, self.terminations))
+
+    @property
     def terminations(self):
         return self.a_terminations + self.b_terminations
 
@@ -540,7 +544,7 @@ class SurfaceBarriers():
                 else:
                     barrier_b.add_termination_b(BarrierTermination(barrier_a, barrier_b.bounds.line.point_b))   
 
-    def cull_barriers(self):
+    def cull_barriers(self, inside_padding=5):
 
         #inner_mask = cv2.erode(self.surface.mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
         #todo: check against the original semantic labels, within a contour range, not the mask
@@ -565,18 +569,19 @@ class SurfaceBarriers():
                 contour = contours[i]
 
                 #positive (inside), negative (outside), or zero (on an edge)
-                dist = cv2.pointPolygonTest(contour, group.bounds.line.midpoint, True)
-                is_outside = dist < 0
-                dist = abs(dist)
+                for point in group.bounds.points:
+                    dist = cv2.pointPolygonTest(contour, (int(point[0]), int(point[1])), True)
+                    is_outside = dist < -inside_padding
+                    dist = abs(dist)
 
-                if is_outside: #outside
-                    if dist < closest_outside:
-                        closest_outside = dist
-                        closest_outside_index = i
-                else:
-                    if dist < closest_inside:
-                        closest_inside = dist
-                        closest_inside_index = i
+                    if is_outside: #outside
+                        if dist < closest_outside:
+                            closest_outside = dist
+                            closest_outside_index = i
+                    else:
+                        if dist < closest_inside:
+                            closest_inside = dist
+                            closest_inside_index = i
 
             if closest_outside < closest_inside: #aka if group is outside
                 #if outside and beyond threshold distance
@@ -592,33 +597,37 @@ class SurfaceBarriers():
                     good.append(group)
 
         if len(good) > 0:
-            seeds = good
+            seeds = set(good)
         elif len(bad) > 0:
-            seeds = bad
+            seeds = set(bad)
         else: #do nothing, do not trust culling result
             return
         
+        #get rid of really bad:
         for group in ugly:
             group.dead = True
 
         self.filter_barriers()
 
-        #flood fill from seeds using barrier linkage
-
-        # # save ones that interlink with others that are not labeled dead
-        # to_check = set(filter(lambda x: not x.dead, self.barrier_groups))
-        # checked = to_check.copy()
+        valid = self.barrier_groups.copy()
         
-        # while len(to_check) > 0:
-        #     element = to_check.pop()
+        #return
 
-        #     for parent in element.parent_groups:
+        #flood fill from seeds set into valid set using barrier linkage
+        checked = seeds.copy()
+        keep = seeds.copy()
 
-        #         if parent not in checked and parent.vanishing_point in self.surface.vanishing_points:
-        #             #if (parent not in self.barrier_groups): exit()
-        #             parent.dead = False
-        #             to_check.add(parent)
-        #             checked.add(parent)
+        while len(seeds) > 0:
+            element = seeds.pop()
+
+            for candidate in element.linkage:
+                if candidate not in checked and candidate in valid:
+                    seeds.add(candidate)
+                    keep.add(candidate)
+
+                checked.add(candidate)
+
+        self.barrier_groups = list(keep)
 
 
     def debug(self, img, color):

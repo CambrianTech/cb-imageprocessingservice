@@ -114,14 +114,20 @@ class Room(Geometry):
 
         #get contours for all isolated masks
         self.contours = {}
+        border_size=3
         for surfaceType in SurfaceType:
             mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
             mask[self.isolated_labels == surfaceType] = 1
+            mask = cv2.copyMakeBorder(mask, border_size, border_size, border_size, border_size, cv2.BORDER_CONSTANT, value=0)
 
-            contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            _contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
             contour_lengths = []
-            for contour in contours:
+            #remove border offset, get lengths:
+            contours = []
+            for contour in _contours:
+                contour = (contour.flatten() - border_size).reshape(contour.shape) #remove offset
+                contours.append(contour)
                 contour_lengths.append(cv2.arcLength(contour, True))
 
             self.contours[surfaceType] = contours, contour_lengths
