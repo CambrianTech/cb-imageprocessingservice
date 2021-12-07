@@ -551,8 +551,8 @@ class SurfaceBarriers():
 
         contours, contour_lengths = self.room.contours[self.surface.surfaceType]
 
-        outside_threshold = 0.03
-        inside_threshold = 0.03
+        outside_threshold = 0.05
+        inside_threshold = 0.05
 
         good = [] #inside and within good distance given thresholds above
         bad = [] #inside and beyond distance deemed "good" by being under threshold
@@ -565,18 +565,18 @@ class SurfaceBarriers():
             closest_outside = 100000
             closest_outside_index = None
 
-            midpoint_a = (group.bounds.line.point_a[0] + group.bounds.line.midpoint[0]) // 2, (group.bounds.line.point_a[1] + group.bounds.line.midpoint[1]) // 2
-            midpoint_b = (group.bounds.line.point_b[0] + group.bounds.line.midpoint[0]) // 2, (group.bounds.line.point_b[1] + group.bounds.line.midpoint[1]) // 2
+            #midpoint_a = (group.bounds.line.point_a[0] + group.bounds.line.midpoint[0]) // 2, (group.bounds.line.point_a[1] + group.bounds.line.midpoint[1]) // 2
+            #midpoint_b = (group.bounds.line.point_b[0] + group.bounds.line.midpoint[0]) // 2, (group.bounds.line.point_b[1] + group.bounds.line.midpoint[1]) // 2
 
-            inside_padding = 5 + min(group.bounds.width, group.bounds.height) / 2
+            inside_padding = 2 + min(group.bounds.width, group.bounds.height) / 2
 
             for i in range(len(contours)):
                 contour = contours[i]
 
                 #positive (inside), negative (outside), or zero (on an edge)
                 dist_midpoint = cv2.pointPolygonTest(contour, group.bounds.line.midpoint, True)
-                dist_a = cv2.pointPolygonTest(contour, midpoint_a, True)
-                dist_b = cv2.pointPolygonTest(contour, midpoint_b, True)
+                dist_a = cv2.pointPolygonTest(contour, group.bounds.line.point_a, True)
+                dist_b = cv2.pointPolygonTest(contour, group.bounds.line.point_b, True)
 
                 #get absolute max between midpoint, point_a, and point_b
                 dist = dist_midpoint
