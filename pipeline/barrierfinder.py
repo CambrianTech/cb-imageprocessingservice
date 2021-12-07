@@ -430,7 +430,7 @@ class SurfaceBarriers():
 
             return best_match
 
-        search_width=self.diagonal/40
+        search_width=self.diagonal/100
         length_multiplier=0.7
 
         #group width-wise
@@ -551,8 +551,8 @@ class SurfaceBarriers():
 
         contours, contour_lengths = self.room.contours[self.surface.surfaceType]
 
-        outside_threshold = 0.05
-        inside_threshold = 0.05
+        outside_threshold = 0.03
+        inside_threshold = 0.03
 
         good = [] #inside and within good distance given thresholds above
         bad = [] #inside and beyond distance deemed "good" by being under threshold
@@ -616,6 +616,10 @@ class SurfaceBarriers():
             seeds = set(bad)
         else: #do nothing, do not trust culling result
             return
+
+        # # uncomment to see seeds:
+        # self.barrier_groups = list(seeds)
+        # return
         
         #get rid of really bad:
         for group in ugly:
