@@ -558,6 +558,10 @@ class SurfaceBarriers():
         bad = [] #inside and beyond distance deemed "good" by being under threshold
         ugly = [] #outside and too far away
 
+        #numerator/denominator distance to either point_a and point_b instead of those points, e.g. 3/4ths of the way to point_a instead of using point_a
+        numerator = 3
+        denominator = numerator + 1
+
         for group in self.barrier_groups:
             
             closest_inside = 100000
@@ -565,10 +569,10 @@ class SurfaceBarriers():
             closest_outside = 100000
             closest_outside_index = None
 
-            point_a = (5 * group.bounds.line.point_a[0] + group.bounds.line.midpoint[0]) // 6, (5 * group.bounds.line.point_a[1] + group.bounds.line.midpoint[1]) // 6
-            point_b = (5 * group.bounds.line.point_b[0] + group.bounds.line.midpoint[0]) // 6, (5 * group.bounds.line.point_b[1] + group.bounds.line.midpoint[1]) // 6
+            point_a = (numerator * group.bounds.line.point_a[0] + group.bounds.line.midpoint[0]) // denominator, (numerator * group.bounds.line.point_a[1] + group.bounds.line.midpoint[1]) // denominator
+            point_b = (numerator * group.bounds.line.point_b[0] + group.bounds.line.midpoint[0]) // denominator, (numerator * group.bounds.line.point_b[1] + group.bounds.line.midpoint[1]) // denominator
 
-            inside_padding = 2 + min(group.bounds.width, group.bounds.height) / 2
+            inside_padding = 5 + min(group.bounds.width, group.bounds.height) / 2
 
             for i in range(len(contours)):
                 contour = contours[i]
