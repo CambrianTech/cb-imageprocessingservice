@@ -137,6 +137,7 @@ class BarrierGroup():
         self._surfaces = None
         self.origin_barrier = barrier
         self.origin_surface = barrier.surface_barrier.surface
+        self.vanishing_point = barrier.vanishing_point
 
         self.a_terminations = []
         self.a_termination_candidates = []
@@ -493,7 +494,7 @@ class SurfaceBarriers():
         candidates = self.barrier_groups.copy()
         for neighbor in self.surface.neighbors:
             if neighbor.barriers is not None:
-                candidates.extend(neighbor.barriers.barrier_groups)
+                candidates.extend(filter(lambda x: x.vanishing_point in self.surface.vanishing_points, neighbor.barriers.barrier_groups))
 
         #set termination points
         for i in range(len(self.barrier_groups)):
@@ -528,7 +529,7 @@ class SurfaceBarriers():
 
                 distances = get_distances(rect_a, rect_b, intersection)
 
-                if barrier_b not in self.barrier_groups:
+                if barrier_b not in self.barrier_groups and barrier_b.vanishing_point in self.surface.vanishing_points:
                     self.barrier_groups.append(barrier_b)
 
                 if distances[0] < distances[1]:
