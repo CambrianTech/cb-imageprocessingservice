@@ -119,8 +119,12 @@ class Room(Geometry):
             mask[self.isolated_labels == surfaceType] = 1
 
             contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            self.contours[surfaceType] = contours
 
+            contour_lengths = []
+            for contour in contours:
+                contour_lengths.append(cv2.arcLength(contour, True))
+
+            self.contours[surfaceType] = contours, contour_lengths
         
 
     def find_best_surface(self, surfaceType, mask, mask_center):

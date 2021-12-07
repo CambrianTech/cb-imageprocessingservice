@@ -546,36 +546,33 @@ class SurfaceBarriers():
         #inner_mask = cv2.erode(self.surface.mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
         #todo: check against the original semantic labels, within a contour range, not the mask
 
-        contours = self.room.contours[self.surface.surfaceType]
+        contours, contour_lengths = self.room.contours[self.surface.surfaceType]
 
         for group in self.barrier_groups:
-            # if inside_mask(self.surface.outer_mask, group.bounds.line.midpoint) and \
-            #     (inside_mask(self.surface.outer_mask, group.bounds.line.point_a) or inside_mask(self.surface.outer_mask, group.bounds.line.point_b)):
-            #     group.dead = True
-            #     continue
-
-            # continue
-
+            
             closest_pos = 100000
-            closest_pos_contour = None
-            closest_neg = -closest_pos
-            closest_neg_contour = None
+            closest_pos_length = 100000
+            closest_neg = -100000
+            closest_neg_length = 100000
 
-            for contour in contours:
+            for i in range(len(contours)):
+                contour = contours[i]
 
                 #positive (inside), negative (outside), or zero (on an edge)
                 dist = cv2.pointPolygonTest(contour, group.bounds.line.midpoint, True)
 
                 if dist < 0:
                     closest_neg = max(closest_neg, dist)
-                    closest_neg_contour = contour
+                    closest_neg_length = contour_lengths[i] if closest_neg == dist else closest_neg_length
                 else:
                     closest_pos = min(closest_pos, dist)
-                    closest_pos_contour = contour
+                    closest_pos_length = contour_lengths[i] if closest_pos == dist else closest_pos_length
 
-            if abs(closest_neg) < abs(closest_pos):
-                min_dist = cv2.arcLength(closest_neg_contour, False)
-                if (closest_neg < min(-0.03 * min_dist, -3)): group.dead = True
+            is_outside = abs(closest_neg) < abs(closest_pos)
+
+            if (is_outside and (closest_neg < min(-0.05 * closest_neg_length, -3))) or ((not is_outside) and closest_pos > max(0.05 * closest_pos_length, 3)): 
+                group.dead = True
+                break
 
             # else:
             #     if (closest_neg < -100):
