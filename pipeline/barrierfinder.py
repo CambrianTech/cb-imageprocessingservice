@@ -511,6 +511,8 @@ class SurfaceBarriers():
 
                 if barrier_b in self.barrier_groups: continue
 
+                if barrier_b.vanishing_point not in self.surface.vanishing_points: continue
+
                 colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
 
                 rect_b = barrier_b.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
@@ -529,7 +531,7 @@ class SurfaceBarriers():
 
                 distances = get_distances(rect_a, rect_b, intersection)
 
-                if barrier_b not in self.barrier_groups and barrier_b.vanishing_point in self.surface.vanishing_points:
+                if barrier_b not in self.barrier_groups:
                     self.barrier_groups.append(barrier_b)
 
                 if distances[0] < distances[1]:
