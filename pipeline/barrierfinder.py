@@ -517,10 +517,6 @@ class SurfaceBarriers():
 
                 rect_b = barrier_b.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
 
-                # intersection = rect_a.get_intersection(rect_b)
-                # if intersection is None: continue
-                # distances = get_distances(rect_a, rect_b, intersection)
-
                 result, vertices = cv2.rotatedRectangleIntersection(rect_a, rect_b)
                 if vertices is None: continue
                 intersection = np.mean(vertices, axis=(0,1))
@@ -551,48 +547,65 @@ class SurfaceBarriers():
 
         contours, contour_lengths = self.room.contours[self.surface.surfaceType]
 
+        outside_threshold = 0.05
+        inside_threshold = 0.05
+
+        good = [] #inside and within good distance given thresholds above
+        bad = [] #inside and beyond distance deemed "good" by being under threshold
+        ugly = [] #outside and too far away
+
         for group in self.barrier_groups:
             
-            closest_pos = 100000
-            closest_pos_length = 100000
-            closest_neg = -100000
-            closest_neg_length = 100000
+            closest_inside = 100000
+            closest_inside_index = None
+            closest_outside = 100000
+            closest_outside_index = None
 
             for i in range(len(contours)):
                 contour = contours[i]
 
                 #positive (inside), negative (outside), or zero (on an edge)
                 dist = cv2.pointPolygonTest(contour, group.bounds.line.midpoint, True)
+                is_outside = dist < 0
+                dist = abs(dist)
 
-                if dist < 0:
-                    closest_neg = max(closest_neg, dist)
-                    closest_neg_length = contour_lengths[i] if closest_neg == dist else closest_neg_length
+                if is_outside: #outside
+                    if dist < closest_outside:
+                        closest_outside = dist
+                        closest_outside_index = i
                 else:
-                    closest_pos = min(closest_pos, dist)
-                    closest_pos_length = contour_lengths[i] if closest_pos == dist else closest_pos_length
+                    if dist < closest_inside:
+                        closest_inside = dist
+                        closest_inside_index = i
 
-            is_outside = abs(closest_neg) < abs(closest_pos)
+            if closest_outside < closest_inside: #aka if group is outside
+                #if outside and beyond threshold distance
+                if closest_outside > max(outside_threshold * contour_lengths[closest_outside_index], 3):
+                    ugly.append(group)
+                else:
+                    bad.append(group)
+            else: #group is inside:
+                #if inside but beyond threshold distance
+                if closest_inside > max(inside_threshold * contour_lengths[closest_inside_index], 3):
+                    ugly.append(group)
+                else:
+                    good.append(group)
 
-            if (is_outside and (closest_neg < min(-0.05 * closest_neg_length, -3))) or ((not is_outside) and closest_pos > max(0.05 * closest_pos_length, 3)): 
-                group.dead = True
-                break
+        if len(good) > 0:
+            seeds = good
+        elif len(bad) > 0:
+            seeds = bad
+        else: #do nothing, do not trust culling result
+            return
+        
+        for group in ugly:
+            group.dead = True
 
-            # else:
-            #     if (closest_neg < -100):
-            #         group.dead = True
+        self.filter_barriers()
 
-            # num_inside = 0
-            # num_points = len(group.bounds.points)
-            # for point in group.bounds.points:
+        #flood fill from seeds using barrier linkage
 
-            #     #maybe require all to be inside?
-            #     if inside_mask(inner_mask, point):
-            #         num_inside += 1
-
-            # if num_inside > num_points // 2:
-            #     group.dead = True
-
-        # save ones that interlink with others that are not labeled dead
+        # # save ones that interlink with others that are not labeled dead
         # to_check = set(filter(lambda x: not x.dead, self.barrier_groups))
         # checked = to_check.copy()
         
@@ -601,13 +614,11 @@ class SurfaceBarriers():
 
         #     for parent in element.parent_groups:
 
-        #         if parent not in checked:
+        #         if parent not in checked and parent.vanishing_point in self.surface.vanishing_points:
         #             #if (parent not in self.barrier_groups): exit()
         #             parent.dead = False
         #             to_check.add(parent)
         #             checked.add(parent)
-
-        self.filter_barriers()
 
 
     def debug(self, img, color):
