@@ -112,6 +112,17 @@ class Room(Geometry):
         for surface in self.surfaces:
             surface.analyze()
 
+        #get contours for all isolated masks
+        self.contours = {}
+        for surfaceType in SurfaceType:
+            mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+            mask[self.isolated_labels == surfaceType] = 1
+
+            contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            self.contours[surfaceType] = contours
+
+        
+
     def find_best_surface(self, surfaceType, mask, mask_center):
 
         candidates = self.get_surfaces([surfaceType])

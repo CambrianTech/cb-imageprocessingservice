@@ -541,17 +541,45 @@ class SurfaceBarriers():
                 else:
                     barrier_b.add_termination_b(BarrierTermination(barrier_a, barrier_b.bounds.line.point_b))   
 
-
     def cull_barriers(self):
 
         #inner_mask = cv2.erode(self.surface.mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
         #todo: check against the original semantic labels, within a contour range, not the mask
 
+        contours = self.room.contours[self.surface.surfaceType]
+
         for group in self.barrier_groups:
-            if inside_mask(self.surface.outer_mask, group.bounds.line.midpoint) and \
-                (inside_mask(self.surface.outer_mask, group.bounds.line.point_a) or inside_mask(self.surface.outer_mask, group.bounds.line.point_b)):
-                group.dead = True
-                continue
+            # if inside_mask(self.surface.outer_mask, group.bounds.line.midpoint) and \
+            #     (inside_mask(self.surface.outer_mask, group.bounds.line.point_a) or inside_mask(self.surface.outer_mask, group.bounds.line.point_b)):
+            #     group.dead = True
+            #     continue
+
+            # continue
+
+            closest_pos = 100000
+            closest_pos_contour = None
+            closest_neg = -closest_pos
+            closest_neg_contour = None
+
+            for contour in contours:
+
+                #positive (inside), negative (outside), or zero (on an edge)
+                dist = cv2.pointPolygonTest(contour, group.bounds.line.midpoint, True)
+
+                if dist < 0:
+                    closest_neg = max(closest_neg, dist)
+                    closest_neg_contour = contour
+                else:
+                    closest_pos = min(closest_pos, dist)
+                    closest_pos_contour = contour
+
+            if abs(closest_neg) < abs(closest_pos):
+                min_dist = cv2.arcLength(closest_neg_contour, False)
+                if (closest_neg < min(-0.03 * min_dist, -3)): group.dead = True
+
+            # else:
+            #     if (closest_neg < -100):
+            #         group.dead = True
 
             # num_inside = 0
             # num_points = len(group.bounds.points)
