@@ -256,12 +256,14 @@ class Surface():
         if self._contours is None:
             #make a 1 pixel border so that edge contours aren't zero area
             mask_bordered = cv2.copyMakeBorder(self.mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0) 
-            self._contours, self.hierarchy = cv2.findContours(mask_bordered, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            _contours, self.hierarchy = cv2.findContours(mask_bordered, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
             #remove border offset:
-            for contour in self._contours:
+            self._contours = []
+            for contour in _contours:
                 shape = contour.shape
                 contour = (contour.flatten() - 1).reshape(shape)
+                self._contours.append(contour)
 
             self.moments = cv2.moments(self.mask)
             

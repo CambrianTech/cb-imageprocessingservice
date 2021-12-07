@@ -544,7 +544,7 @@ class SurfaceBarriers():
                 else:
                     barrier_b.add_termination_b(BarrierTermination(barrier_a, barrier_b.bounds.line.point_b))   
 
-    def cull_barriers(self, inside_padding=5):
+    def cull_barriers(self, inside_padding=3):
 
         #inner_mask = cv2.erode(self.surface.mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
         #todo: check against the original semantic labels, within a contour range, not the mask
@@ -621,7 +621,7 @@ class SurfaceBarriers():
             element = seeds.pop()
 
             for candidate in element.linkage:
-                if candidate not in checked and candidate in valid:
+                if candidate not in checked and candidate in valid and candidate.vanishing_point in self.surface.vanishing_points:
                     seeds.add(candidate)
                     keep.add(candidate)
 
