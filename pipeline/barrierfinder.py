@@ -565,13 +565,26 @@ class SurfaceBarriers():
             closest_outside = 100000
             closest_outside_index = None
 
-            inside_padding = 3 + min(group.bounds.width, group.bounds.height) / 2
+            midpoint_a = (group.bounds.line.point_a[0] + group.bounds.line.midpoint[0]) // 2, (group.bounds.line.point_a[1] + group.bounds.line.midpoint[1]) // 2
+            midpoint_b = (group.bounds.line.point_b[0] + group.bounds.line.midpoint[0]) // 2, (group.bounds.line.point_b[1] + group.bounds.line.midpoint[1]) // 2
+
+            inside_padding = 5 + min(group.bounds.width, group.bounds.height) / 2
 
             for i in range(len(contours)):
                 contour = contours[i]
 
                 #positive (inside), negative (outside), or zero (on an edge)
-                dist = cv2.pointPolygonTest(contour, group.bounds.line.midpoint, True)
+                dist_midpoint = cv2.pointPolygonTest(contour, group.bounds.line.midpoint, True)
+                dist_a = cv2.pointPolygonTest(contour, midpoint_a, True)
+                dist_b = cv2.pointPolygonTest(contour, midpoint_b, True)
+
+                #get absolute max between midpoint, point_a, and point_b
+                dist = dist_midpoint
+                if abs(dist_a) > abs(dist):
+                    dist = dist_a
+                if abs(dist_b) > abs(dist):
+                    dist = dist_b
+
                 is_outside = dist < -inside_padding
                 dist = abs(dist)
 
@@ -612,8 +625,6 @@ class SurfaceBarriers():
 
         valid = self.barrier_groups.copy()
         
-        #return
-
         #flood fill from seeds set into valid set using barrier linkage
         checked = seeds.copy()
         keep = seeds.copy()
@@ -797,7 +808,11 @@ class BarrierSolver():
             
             log_barriers(self.room.get_surfaces(surfaceTypes=[SurfaceType.WallLike]), "wall_like")
 
-            log_barriers(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall]), "wall")         
+            log_barriers(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall]), "wall") 
+
+            # log_barriers(self.room.get_surfaces(surfaceTypes=[SurfaceType.Floor]), "floor")
+
+            # log_barriers(self.room.get_surfaces(surfaceTypes=[SurfaceType.Ceiling]), "ceiling")         
 
             log_barriers(self.room.get_surfaces(labels=box_like), "box")
             
