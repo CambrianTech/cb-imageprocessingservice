@@ -339,7 +339,6 @@ class SurfaceBarriers():
         self.merge_barriers()
         
     def refine(self):
-        self.set_endpoints()
         self.cull_barriers()
 
     def get_barrier_candidates(self, angle_threshold=np.radians(45)):
@@ -488,21 +487,21 @@ class SurfaceBarriers():
 
         self.filter_barriers()
 
-    def set_endpoints(self):
+    def set_endpoints(self, elements):
         #find interlinking
         max_distance = self.diagonal / 50
         min_length = self.diagonal / 20
         max_angle_parallel = np.radians(15)
 
         #start from barrier groups, but also add sibling barriers to end
-        candidates = self.barrier_groups.copy()
+        candidates = elements.copy()
         for neighbor in self.surface.neighbors:
             if neighbor.barriers is not None:
                 candidates.extend(filter(lambda x: x.vanishing_point in self.surface.vanishing_points, neighbor.barriers.barrier_groups))
 
         #set termination points
-        for i in range(len(self.barrier_groups)):
-            barrier_a = self.barrier_groups[i]
+        for i in range(len(elements)):
+            barrier_a = elements[i]
 
             if barrier_a.bounds.line.length < min_length: continue
 
@@ -513,7 +512,7 @@ class SurfaceBarriers():
 
                 if barrier_b.bounds.line.length < min_length: continue
 
-                if barrier_b in self.barrier_groups: continue
+                if barrier_b in elements: continue
 
                 if barrier_b.vanishing_point not in self.surface.vanishing_points: continue
 
@@ -531,8 +530,8 @@ class SurfaceBarriers():
 
                 distances = get_distances(rect_a, rect_b, intersection)
 
-                if barrier_b not in self.barrier_groups:
-                    self.barrier_groups.append(barrier_b)
+                # if barrier_b not in elements:
+                #     elements.append(barrier_b)
 
                 if distances[0] < distances[1]:
                     barrier_a.add_termination_a(BarrierTermination(barrier_b, barrier_a.bounds.line.point_a))
@@ -543,6 +542,7 @@ class SurfaceBarriers():
                     barrier_b.add_termination_a(BarrierTermination(barrier_a, barrier_b.bounds.line.point_a))
                 else:
                     barrier_b.add_termination_b(BarrierTermination(barrier_a, barrier_b.bounds.line.point_b))   
+
 
     def cull_barriers(self):
 
@@ -572,9 +572,8 @@ class SurfaceBarriers():
                 dist_b = cv2.pointPolygonTest(contour, point_b, True)
 
                 #get absolute max between midpoint, point_a, and point_b
-                dist = min(dist_midpoint, min(dist_a, dist_b))
-                is_outside = dist < -inside_padding
-                dist = abs(dist)
+                dist = min(abs(dist_midpoint), min(abs(dist_a), abs(dist_b)))
+                is_outside = dist_midpoint < -inside_padding
 
                 if is_outside: #outside
                     if dist < closest_outside:
@@ -616,28 +615,20 @@ class SurfaceBarriers():
                     ugly.append(group)
                 else:
                     bad.append(group)
-            
 
         if len(good) > 0:
-            seeds = set(good)
+            seeds = good
         elif len(bad) > 0:
-            seeds = set(bad)
+            seeds = bad
         else: #do nothing, do not trust culling result
             return
 
-        # # uncomment to see seeds:
-        # self.barrier_groups = list(seeds)
-        # return
-        
-        #get rid of really bad:
-        for group in ugly:
-            group.dead = True
-
-        self.filter_barriers()
+        self.set_endpoints(seeds)
 
         valid = self.barrier_groups.copy()
-        
+
         #flood fill from seeds set into valid set using barrier linkage
+        seeds = set(seeds)
         checked = seeds.copy()
         keep = seeds.copy()
 
