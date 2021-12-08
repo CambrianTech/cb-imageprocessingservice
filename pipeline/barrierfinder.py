@@ -559,7 +559,7 @@ class SurfaceBarriers():
         ugly = [] #outside and too far away
 
         #numerator/denominator distance to either point_a and point_b instead of those points, e.g. 3/4ths of the way to point_a instead of using point_a
-        numerator = 3
+        numerator = 7
         denominator = numerator + 1
 
         for group in self.barrier_groups:
@@ -583,12 +583,7 @@ class SurfaceBarriers():
                 dist_b = cv2.pointPolygonTest(contour, point_b, True)
 
                 #get absolute max between midpoint, point_a, and point_b
-                dist = dist_midpoint
-                if abs(dist_a) > abs(dist):
-                    dist = dist_a
-                if abs(dist_b) > abs(dist):
-                    dist = dist_b
-
+                dist = min(dist_midpoint, min(dist_a, dist_b))
                 is_outside = dist < -inside_padding
                 dist = abs(dist)
 
