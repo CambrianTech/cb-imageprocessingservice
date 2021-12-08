@@ -546,24 +546,13 @@ class SurfaceBarriers():
 
     def cull_barriers(self):
 
-        #inner_mask = cv2.erode(self.surface.mask, cv2.getStructuringElement(cv2.MORPH_RECT,(5,5)), iterations=2)
-        #todo: check against the original semantic labels, within a contour range, not the mask
-
         contours, contour_lengths = self.room.contours[self.surface.surfaceType]
 
-        outside_threshold = 0.05
-        inside_threshold = 0.05
+        def closest_contour():
+            #numerator/denominator distance to either point_a and point_b instead of those points, e.g. 3/4ths of the way to point_a instead of using point_a
+            numerator = 7
+            denominator = numerator + 1
 
-        good = [] #inside and within good distance given thresholds above
-        bad = [] #inside and beyond distance deemed "good" by being under threshold
-        ugly = [] #outside and too far away
-
-        #numerator/denominator distance to either point_a and point_b instead of those points, e.g. 3/4ths of the way to point_a instead of using point_a
-        numerator = 7
-        denominator = numerator + 1
-
-        for group in self.barrier_groups:
-            
             closest_inside = 100000
             closest_inside_index = None
             closest_outside = 100000
@@ -597,17 +586,37 @@ class SurfaceBarriers():
                         closest_inside_index = i
 
             if closest_outside < closest_inside: #aka if group is outside
-                #if outside and beyond threshold distance
-                if closest_outside > max(outside_threshold * contour_lengths[closest_outside_index], 3):
-                    ugly.append(group)
-                else:
-                    bad.append(group)
-            else: #group is inside:
+                #not inside, distance outside, contour index
+                return False, closest_outside, closest_outside_index
+            else:
+                #is inside, distance outside, contour index
+                return True, closest_inside, closest_inside_index
+            
+
+        good = [] #inside and within good distance given thresholds above
+        bad = [] #inside and beyond distance deemed "good" by being under threshold
+        ugly = [] #outside and too far away
+
+        outside_threshold = 0.05
+        inside_threshold = 0.1
+
+        for group in self.barrier_groups:
+
+            is_inside, dist, index = closest_contour()
+
+            if is_inside: #aka if group is outside
                 #if inside but beyond threshold distance
-                if closest_inside > max(inside_threshold * contour_lengths[closest_inside_index], 3):
+                if dist > max(inside_threshold * contour_lengths[index], 3):
                     ugly.append(group)
                 else:
                     good.append(group)
+            else:
+                #if outside and beyond threshold distance
+                if dist > max(outside_threshold * contour_lengths[index], 3):
+                    ugly.append(group)
+                else:
+                    bad.append(group)
+            
 
         if len(good) > 0:
             seeds = set(good)
