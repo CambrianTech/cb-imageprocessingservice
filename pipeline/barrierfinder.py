@@ -623,9 +623,8 @@ class SurfaceBarriers():
         else: #do nothing, do not trust culling result
             return
 
-        self.set_endpoints(seeds)
-
         valid = self.barrier_groups.copy()
+        self.set_endpoints(valid)
 
         #flood fill from seeds set into valid set using barrier linkage
         seeds = set(seeds)
