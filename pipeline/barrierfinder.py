@@ -489,7 +489,7 @@ class SurfaceBarriers():
 
     def set_endpoints(self, elements):
         #find interlinking
-        max_distance = self.diagonal / 100
+        max_distance = self.diagonal / 200
         min_length = self.diagonal / 20
         max_angle_parallel = np.radians(15)
 
