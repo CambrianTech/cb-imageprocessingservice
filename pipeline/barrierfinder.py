@@ -637,7 +637,8 @@ class SurfaceBarriers():
             if candidate in checked or candidate.vanishing_point not in self.surface.vanishing_points:
                 return False
 
-            links_back = next(filter(lambda t: t.barrier_group in valid and t.barrier_group != element, candidate.terminations), None)
+            #links back into the series of valid elements, but not just back to element
+            links_back = next(filter(lambda barrier_group: barrier_group in valid and barrier_group != element, candidate.linkage), None)
 
             if links_back is None: return False
 
