@@ -626,18 +626,18 @@ class SurfaceBarriers():
             return
 
         valid = self.barrier_groups.copy()
-        valid += self.set_endpoints(valid)
+        self.set_endpoints(valid)
 
         #flood fill from seeds set into valid set using barrier linkage
         seeds = set(seeds)
         checked = seeds.copy()
         keep = seeds.copy()
 
-        def matches(candidate):
+        def matches(element, candidate):
             if candidate in checked or candidate.vanishing_point not in self.surface.vanishing_points:
                 return False
 
-            links_back = next(filter(lambda t: t.barrier_group in valid, candidate.terminations), None)
+            links_back = next(filter(lambda t: t.barrier_group in valid and t.barrier_group != element, candidate.terminations), None)
 
             if links_back is None: return False
 
@@ -647,7 +647,7 @@ class SurfaceBarriers():
             element = seeds.pop()
 
             for candidate in element.linkage:
-                if matches(candidate):
+                if matches(element, candidate):
                     if candidate in valid:
                         seeds.add(candidate)
                     keep.add(candidate)
