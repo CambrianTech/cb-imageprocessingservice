@@ -631,12 +631,21 @@ class SurfaceBarriers():
         checked = seeds.copy()
         keep = seeds.copy()
 
+        def matches(candidate):
+            if candidate in checked or candidate.vanishing_point not in self.surface.vanishing_points:
+                return False
+
+            links_back = next(filter(lambda t: t.barrier_group in valid, candidate.terminations), None)
+
+            return links_back != None
+
         while len(seeds) > 0:
             element = seeds.pop()
 
             for candidate in element.linkage:
-                if candidate not in checked and candidate in valid and candidate.vanishing_point in self.surface.vanishing_points:
-                    seeds.add(candidate)
+                if matches(candidate):
+                    if candidate in valid:
+                        seeds.add(candidate)
                     keep.add(candidate)
 
                 checked.add(candidate)
