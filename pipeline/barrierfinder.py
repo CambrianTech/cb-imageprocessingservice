@@ -489,7 +489,7 @@ class SurfaceBarriers():
 
     def set_endpoints(self, elements):
         #find interlinking
-        max_distance = self.diagonal / 50
+        max_distance = self.diagonal / 100
         min_length = self.diagonal / 20
         max_angle_parallel = np.radians(15)
 
@@ -500,6 +500,7 @@ class SurfaceBarriers():
                 candidates.extend(filter(lambda x: x.vanishing_point in self.surface.vanishing_points, neighbor.barriers.barrier_groups))
 
         #set termination points
+        new_elements = []
         for i in range(len(elements)):
             barrier_a = elements[i]
 
@@ -530,8 +531,9 @@ class SurfaceBarriers():
 
                 distances = get_distances(rect_a, rect_b, intersection)
 
-                # if barrier_b not in elements:
-                #     elements.append(barrier_b)
+                if barrier_b not in elements:
+                    elements.append(barrier_b)
+                    new_elements.append(barrier_b)
 
                 if distances[0] < distances[1]:
                     barrier_a.add_termination_a(BarrierTermination(barrier_b, barrier_a.bounds.line.point_a))
@@ -542,7 +544,7 @@ class SurfaceBarriers():
                     barrier_b.add_termination_a(BarrierTermination(barrier_a, barrier_b.bounds.line.point_a))
                 else:
                     barrier_b.add_termination_b(BarrierTermination(barrier_a, barrier_b.bounds.line.point_b))   
-
+        return new_elements
 
     def cull_barriers(self):
 
@@ -624,7 +626,7 @@ class SurfaceBarriers():
             return
 
         valid = self.barrier_groups.copy()
-        self.set_endpoints(valid)
+        valid += self.set_endpoints(valid)
 
         #flood fill from seeds set into valid set using barrier linkage
         seeds = set(seeds)
