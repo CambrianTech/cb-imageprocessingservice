@@ -637,7 +637,9 @@ class SurfaceBarriers():
 
             links_back = next(filter(lambda t: t.barrier_group in valid, candidate.terminations), None)
 
-            return links_back != None
+            if links_back is None: return False
+
+            return True
 
         while len(seeds) > 0:
             element = seeds.pop()
