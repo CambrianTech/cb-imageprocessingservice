@@ -341,6 +341,34 @@ class SurfaceBarriers():
     def refine(self):
         self.cull_barriers()
 
+        max_angle_parallel = np.radians(15)
+        max_distance = self.diagonal / 200
+        min_length = self.diagonal / 20
+
+        #now extend and link all:
+        for i in range(len(self.barrier_groups)):
+            barrier_a = self.barrier_groups[i]
+
+            if barrier_a.bounds.line.length < min_length: continue
+
+            rect_a = barrier_a.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
+
+            for j in range(i+1, len(self.barrier_groups)):
+                barrier_b = self.barrier_groups[j]
+
+                if barrier_b.bounds.line.length < min_length: continue
+
+                colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
+
+                rect_b = barrier_b.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
+
+                result, vertices = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+                
+                if vertices is None: continue
+
+                intersection = np.mean(vertices, axis=(0,1))
+
+
     def get_barrier_candidates(self, angle_threshold=np.radians(45)):
 
         padding = 10
@@ -487,7 +515,7 @@ class SurfaceBarriers():
 
         self.filter_barriers()
 
-    def set_endpoints(self, elements):
+    def set_initial_endpoints(self, elements):
         #find interlinking
         max_distance = self.diagonal / 200
         min_length = self.diagonal / 20
@@ -626,7 +654,7 @@ class SurfaceBarriers():
             return
 
         valid = self.barrier_groups.copy()
-        self.set_endpoints(valid)
+        self.set_initial_endpoints(valid)
 
         #flood fill from seeds set into valid set using barrier linkage
         seeds = set(seeds)
