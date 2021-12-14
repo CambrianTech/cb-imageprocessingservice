@@ -284,10 +284,9 @@ class BarrierGroup():
             barrier.debug(img, color=color)
 
         thickness = min(self.bounds.width, self.bounds.height)
-        bounds = self.bounds if thickness > 1 else self.bounds.resized(width_offset=2)
 
-        if show_bounds:
-            cv2.drawContours(img, [bounds.points], 0, (255,0,0), 1)
+        if show_bounds and thickness > 3:
+            cv2.drawContours(img, [self.bounds.points], 0, (255,0,0), 1)
             self.bounds.line.draw(img, color=(0,0,255))
         
 
@@ -363,7 +362,7 @@ class SurfaceBarriers():
 
                 if not colinear: continue
 
-                intersection = barrier_a.bounds.line.get_intersection(barrier_b.bounds.line)
+                intersection = barrier_a.bounds.line.extended(3.0).get_intersection(barrier_b.bounds.line.extended(3.0))
                 
                 if intersection:
                     barrier_a.merge(barrier_b)
@@ -904,8 +903,8 @@ class PipelineBarrierFinder(PipelineStep):
         for surface in self.surfaces:
             self.barriers[surface.uniqueId] = SurfaceBarriers(self.data, surface, self.vanishing_points)
 
-        # for surface in self.surfaces:
-        #     self.barriers[surface.uniqueId].refine()
+        for surface in self.surfaces:
+            self.barriers[surface.uniqueId].refine()
 
         if im_logging_enabled(self.data):
             log_image(self.data, "potential_barriers.png", self.get_debug_image())

@@ -97,6 +97,22 @@ class Line(Sequence):
     # def bounding_box_points(self, width, length_multiplier=1.0):
     #     return rotated_rects_points(self.midpoint, (self.length * length_multiplier, width), self.angle)
 
+    def extended(self, by_ratio=1.1, from_a=True, from_b=True):
+
+        data = self.data.copy()
+        amount = self.length * by_ratio
+        direction = self.direction
+
+        if from_a:
+            data[0] *= direction[0] * amount
+            data[1] *= direction[1] * amount
+        if from_b:
+            data[2] *= direction[0] * amount
+            data[3] *= direction[1] * amount
+
+        return Line(data)
+        
+
     def in_range(self, lines, angle_threshold):
         return list(filter(lambda line: not line.dead and LineFunctions.line_angle_difference(self.angle, line.angle) <= angle_threshold, lines)) 
 
