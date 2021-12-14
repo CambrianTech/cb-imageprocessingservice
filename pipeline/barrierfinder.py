@@ -15,7 +15,8 @@ from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import angle_with_vp
 from .logging import log_image, log_segmentation_image, im_logging_enabled
 from cambrian.LineFunctions import LineFunctions
-from .Line import line_angle_difference, Line, line_on_image_edge, RotatedRect
+from .Line import line_angle_difference, Line, line_on_image_edge
+from .rotated_rect import RotatedRect
 from .room import Room, Surface
 
 class Barrier():
@@ -271,10 +272,7 @@ class BarrierGroup():
         return intersection != 0
 
     def merge(self, other):
-        merged = set(self.barriers)
-        merged.update(other.barriers)
-
-        self.barriers = list(merged)
+        self.barriers = list(set(self.barriers) | set(other.barriers))
         self._points = None
         self._bounds = None
 
@@ -341,32 +339,37 @@ class SurfaceBarriers():
     def refine(self):
         self.cull_barriers()
 
-        max_angle_parallel = np.radians(15)
+        max_angle_parallel = np.radians(7)
+        max_angle_orth = np.radians(30)
         max_distance = self.diagonal / 200
-        min_length = self.diagonal / 20
 
         #now extend and link all:
         for i in range(len(self.barrier_groups)):
             barrier_a = self.barrier_groups[i]
 
-            if barrier_a.bounds.line.length < min_length: continue
+            if barrier_a.dead: continue
 
-            rect_a = barrier_a.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
+            rect_a = barrier_a.bounds.resized(width_factor=0, width_offset=max_distance, length_factor=2.0)
 
             for j in range(i+1, len(self.barrier_groups)):
                 barrier_b = self.barrier_groups[j]
 
-                if barrier_b.bounds.line.length < min_length: continue
+                if barrier_b.dead: continue
 
                 colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
+                orthagonal = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle + 0.5 * np.pi) <= max_angle_orth
 
-                rect_b = barrier_b.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
+                if not colinear: continue
 
-                result, vertices = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+                intersection = barrier_a.bounds.line.get_intersection(barrier_b.bounds.line)
                 
-                if vertices is None: continue
+                if intersection:
+                    barrier_a.merge(barrier_b)
+                    barrier_b.dead = True
+                    print("MERGE", barrier_a.surfaces[0].name, barrier_b.surfaces[0].name)
 
-                intersection = np.mean(vertices, axis=(0,1))
+
+        self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
 
 
     def get_barrier_candidates(self, angle_threshold=np.radians(45)):
@@ -732,7 +735,7 @@ class BarrierSolver():
                 color = random_color()
                 
                 for group in surface.barriers.barrier_groups:
-                    group.debug(debug, color=color, show_bounds=False)
+                    group.debug(debug, color=color, show_bounds=True)
 
             for surface in surfaces:
 
@@ -899,8 +902,8 @@ class PipelineBarrierFinder(PipelineStep):
         for surface in self.surfaces:
             self.barriers[surface.uniqueId] = SurfaceBarriers(self.data, surface, self.vanishing_points)
 
-        for surface in self.surfaces:
-            self.barriers[surface.uniqueId].refine()
+        # for surface in self.surfaces:
+        #     self.barriers[surface.uniqueId].refine()
 
         if im_logging_enabled(self.data):
             log_image(self.data, "potential_barriers.png", self.get_debug_image())
