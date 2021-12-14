@@ -15,7 +15,8 @@ from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import angle_with_vp
 from .logging import log_image, log_segmentation_image, im_logging_enabled
 from cambrian.LineFunctions import LineFunctions
-from .Line import line_angle_difference, Line, line_on_image_edge, RotatedRect
+from .Line import line_angle_difference, Line, line_on_image_edge
+from .rotated_rect import RotatedRect
 from .room import Room, Surface
 
 class Barrier():
@@ -359,7 +360,7 @@ class SurfaceBarriers():
                 orthagonal = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle + 0.5 * np.pi) <= max_angle_orth
 
                 if not colinear: continue
-                
+
                 intersection = barrier_a.bounds.line.get_intersection(barrier_b.bounds.line)
                 
                 if intersection:
@@ -901,8 +902,8 @@ class PipelineBarrierFinder(PipelineStep):
         for surface in self.surfaces:
             self.barriers[surface.uniqueId] = SurfaceBarriers(self.data, surface, self.vanishing_points)
 
-        for surface in self.surfaces:
-            self.barriers[surface.uniqueId].refine()
+        # for surface in self.surfaces:
+        #     self.barriers[surface.uniqueId].refine()
 
         if im_logging_enabled(self.data):
             log_image(self.data, "potential_barriers.png", self.get_debug_image())
