@@ -133,6 +133,10 @@ class Line(Sequence):
     def point_b(self):
         return (int(self.data[2]), int(self.data[3]))
 
+    def get_intersection(self, other):
+        return get_line_intersection(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], \
+            other.point_a[0], other.point_a[1], other.point_b[0], other.point_b[1])
+
     def get_points(self, width, height, num_points=None):
         if num_points is None:
             num_points = int(math.ceil(self.length))
@@ -436,4 +440,24 @@ def verts_inside(pts1, pts2, vec1):
 
     return False
 
+@nb.jit(nopython=True)
+def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
+
+    s1_x = p1_x - p0_x;     s1_y = p1_y - p0_y;
+    s2_x = p3_x - p2_x;     s2_y = p3_y - p2_y;
+
+    det = (-s2_x * s1_y + s1_x * s2_y)
+
+    if det == 0: return None
+
+    s = (-s1_y * (p0_x - p2_x) + s1_x * (p0_y - p2_y)) / det;
+    t = ( s2_x * (p0_y - p2_y) - s2_y * (p0_x - p2_x)) / det;
+
+    if (s < 0 or s > 1 or t < 0 or t > 1): return None
+
+    #Collision detected
+    i_x = p0_x + (t * s1_x);
+    i_y = p0_y + (t * s1_y);
+
+    return i_x, i_y
 
