@@ -16,7 +16,7 @@ from termcolor import colored
 
 from pipeline.core import ask_exit
 from pipeline.pipeline import Pipeline, PipelineMode
-from pipeline.logging import LogLevel
+from pipeline.data.logging import LogLevel
 
 def get_file_paths(input_dir, pattern=None):
     files = []

@@ -5,30 +5,30 @@ from enum import IntEnum
 from termcolor import colored
 
 from .core import schedule_and_wait, PipelineStep, PipelineStepIndex
-from .logging import get_unique_id, set_logging_dir, set_logging_step, log_data, LogLevel, set_logging_level
+from .data.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, LogLevel, set_logging_level
 
-from .s3input import PipelineS3Input
-from .fileinput import PipelineFileInput
-from .s3output import PipelineS3Output
-from .fileoutput import PipelineFileOutput
+from .stages.fileinput import PipelineFileInput
+from .stages.fileoutput import PipelineFileOutput
 
-from .fov import PipelineCalculateFov
-from .primaryangle import PipelineDeterminePrimaryAngles
-from .runmodels import PipelineRunModels
-from .superpixels import PipelineSuperpixels
-from .planegeometry import PipelinePlaneGeometry
-from .refineplanemasks import PipelineRefinePlaneMasks
-from .linefinder import PipelineLineFinder
-from .combineplanemasks import PipelineCombinePlaneMasks
-from .remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
-from .poseestimator import PipelinePoseEstimator
-from .extractsurfaces import PipelineExtractSurfaces
-from .surfacerefinement import PipelineSurfaceRefinement
-from .roomsolver import PipelineRoomSolver
-from .vanishingpointfinder import PipelineVanishingPointFinder
-from .barrierfinder import PipelineBarrierFinder
-from .trimfinder import PipelineTrimFinder
-from .legfinder import PipelineLegFinder
+from .stages.fov import PipelineCalculateFov
+from .stages.primaryangle import PipelineDeterminePrimaryAngles
+from .stages.runmodels import PipelineRunModels
+from .stages.superpixels import PipelineSuperpixels
+from .stages.planegeometry import PipelinePlaneGeometry
+from .stages.refineplanemasks import PipelineRefinePlaneMasks
+from .stages.linefinder import PipelineLineFinder
+from .stages.combineplanemasks import PipelineCombinePlaneMasks
+from .stages.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
+from .stages.poseestimator import PipelinePoseEstimator
+from .stages.extractsurfaces import PipelineExtractSurfaces
+from .stages.surfacerefinement import PipelineSurfaceRefinement
+from .stages.roomsolver import PipelineRoomSolver
+from .stages.vanishingpointfinder import PipelineVanishingPointFinder
+from .stages.barrierfinder import PipelineBarrierFinder
+from .stages.trimfinder import PipelineTrimFinder
+from .stages.legfinder import PipelineLegFinder
+from .stages.aws.s3input import PipelineS3Input
+from .stages.aws.s3output import PipelineS3Output
 
 class PipelineNoOp(PipelineStep):
 
