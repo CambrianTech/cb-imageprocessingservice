@@ -105,10 +105,33 @@ class Room(Geometry):
 
         timer.log_elapsed("merge_like_surfaces")
 
+        self.assign_parents()
+
     def analyze_surfaces(self):
         #perform initial analysis
         for surface in self.surfaces:
             surface.analyze()
+
+        #get contours for all isolated masks
+        self.contours = {}
+        border_size=3
+        for surfaceType in SurfaceType:
+            mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+            mask[self.isolated_labels == surfaceType] = 1
+            mask = cv2.copyMakeBorder(mask, border_size, border_size, border_size, border_size, cv2.BORDER_CONSTANT, value=0)
+
+            _contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            contour_lengths = []
+            #remove border offset, get lengths:
+            contours = []
+            for contour in _contours:
+                contour = (contour.flatten() - border_size).reshape(contour.shape) #remove offset
+                contours.append(contour)
+                contour_lengths.append(cv2.arcLength(contour, True))
+
+            self.contours[surfaceType] = contours, contour_lengths
+        
 
     def find_best_surface(self, surfaceType, mask, mask_center):
 
@@ -231,8 +254,8 @@ class Room(Geometry):
                         new_surface.set_mask(contour_mask)
                         #print("Reference_surface", reference_surface.name, indexes, counts)
                     elif surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling:
-                        complimentary_type = SurfaceType.Floor if surfaceType == SurfaceType.Ceiling else SurfaceType.Ceiling
-                        reference_surface = self.find_best_surface(complimentary_type, contour_mask, (cX, cY))
+                        complementary_type = SurfaceType.Floor if surfaceType == SurfaceType.Ceiling else SurfaceType.Ceiling
+                        reference_surface = self.find_best_surface(complementary_type, contour_mask, (cX, cY))
 
                         if reference_surface is not None:
                             print("Generate %s using %s as opposing surface" % (surfaceType.name, reference_surface.name))
@@ -257,7 +280,7 @@ class Room(Geometry):
     def merge_like_surfaces(self, angle_threshold=np.radians(30), angle_threshold_force=np.radians(20)):
 
         for surfaceType in SurfaceType:
-            
+                
             color = random_color()
             surfaces = self.get_surfaces([surfaceType])
 
@@ -271,6 +294,8 @@ class Room(Geometry):
                 for j in range(i+1, len(surfaces)):
 
                     if surfaces[j].destroyed: continue
+
+                    if surfaces[i].bestLabel != surfaces[j].bestLabel: continue
 
                     dot_product = np.dot(surfaces[i].normal, surfaces[j].normal)
                     angle = np.arccos(dot_product)
@@ -423,6 +448,26 @@ class Room(Geometry):
             self.refresh_surfaces()
 
         return invalid_mask
+
+    def assign_parents(self):
+
+        child_surfaces = self.get_surfaces(surfaceTypes=[SurfaceType.WallLike, SurfaceType.FloorLike, SurfaceType.CeilingLike, SurfaceType.Other])
+
+        for child_surface in child_surfaces:
+
+            candidates = child_surface.neighbors.copy() if child_surface.surfaceType.complement is None else list(filter(lambda x: x.surfaceType == child_surface.surfaceType.complement, child_surface.neighbors))
+            candidates = list(filter(lambda x: x.parent is None, candidates))
+
+            if len(candidates) == 0:
+                continue
+            elif len(candidates) == 1:
+                child_surface.parent = candidates[0]
+                continue
+
+            #sort by most interior. May want to look at vanishing points or just lines clustering in angle.
+            candidates.sort(key=lambda x:distance.sqeuclidean(child_surface.center, x.center))
+
+            child_surface.parent = candidates[0]
         
     def get_debug_image(self):
 

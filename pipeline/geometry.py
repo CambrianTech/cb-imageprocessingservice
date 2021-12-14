@@ -4,6 +4,7 @@ import cv2
 import uuid
 from termcolor import colored
 
+from .core import SurfaceType
 from .utils import resize_array, multi_filter
 
 indexed_fields = ["plane_parameters", "plane_normals", "plane_offsets", "plane_clusters"]
@@ -44,7 +45,6 @@ class Geometry():
         ade_seg_c = np.dstack((tuple(self.data["output"])))
         self.semantic_labels = np.int32(np.argmax(ade_seg_c, -1))
         self.planar_groups = []
-
 
     def add_surface(self, surface):
 
@@ -120,7 +120,16 @@ class Geometry():
             print(colored("Surfaces reduced from %d to %d" % (num_before, num_after), 'red'))
             #cleanup:
 
-    def get_surfaces(self, surfaceTypes=None, labels=None, dimension=None):
+    def surface_at_point(self, point):
+
+        for surface in self.surfaces:
+            if point[0] < surface.mask.shape[1] and point[1] < surface.mask.shape[0]:
+                if surface.mask[int(point[1]), int(point[0])] > 0:
+                    return surface
+
+        return None
+
+    def get_surfaces(self, surfaceTypes=None, labels=None, dimension=None, point=None):
 
         self.refresh_surfaces()
 
@@ -135,4 +144,4 @@ class Geometry():
         if dimension is not None:
             filters.append(lambda surface: surface.dimension == dimension)
 
-        return self._surfaces.values() if len(filters) is None else list(multi_filter(filters, self._surfaces.values()))
+        return self._surfaces.values() if len(filters) is None else list(multi_filter(filters, self._surfaces.values()))        

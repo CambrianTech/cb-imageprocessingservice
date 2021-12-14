@@ -19,6 +19,87 @@ from .utils import normalize
 #             ("midpoint", nb.types.UniTuple(nb.types.float32, 2)),
 #             ])
 
+def out_of_range(x, y, width, height):
+    return x < 0 or y < 0 or x >= width or y >= height
+
+class Point(tuple):
+    def __new__(cls, x, y=None):
+        if y is not None:
+            return Point.__new__(cls, (x, y))
+        return tuple.__new__(cls, x)
+
+    @property
+    def x(self):
+        return self[0]
+
+    @property
+    def y(self):
+        return self[1]
+
+class RotatedRect(tuple):
+
+    def __new__(cls, x):
+        return tuple.__new__(cls, x)
+
+    @property
+    def center(self) -> Point:
+        return Point(self[0])
+
+    @property
+    def width(self) -> float:
+        return self[1][0]
+
+    @property
+    def height(self) -> float:
+        return self[1][1]
+
+    @property
+    def angle(self) -> float:
+        return self.line.angle
+
+    @property
+    def points(self):
+        if self._points is None:
+            self._points = np.int0(cv2.boxPoints(self))
+        return self._points
+
+    _points = None
+    @property
+    def points(self):
+        if self._points is None:
+            self._points = np.int0(cv2.boxPoints(self))
+        return self._points
+
+    def intersects(self, other):
+        result, _ = cv2.rotatedRectangleIntersection(self, other)
+        return result != 0
+
+    def get_intersection(self, other):
+        result, vertices = cv2.rotatedRectangleIntersection(self, other)
+        
+        if vertices is None:
+            return None
+
+        return np.mean(vertices, axis=(0,1))
+
+    _line = None
+    @property
+    def line(self):
+        if self._line is None:
+            if self.width > self.height:
+                point_a = (self.points[0][0] + self.points[1][0]) / 2, (self.points[0][1] + self.points[1][1]) / 2
+                point_b = (self.points[2][0] + self.points[3][0]) / 2, (self.points[2][1] + self.points[3][1]) / 2 
+            else:
+                point_a = (self.points[1][0] + self.points[2][0]) / 2, (self.points[1][1] + self.points[2][1]) / 2
+                point_b = (self.points[3][0] + self.points[0][0]) / 2, (self.points[3][1] + self.points[0][1]) / 2 
+
+            self._line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
+        return self._line
+
+    def resized(self, length_factor=1.0, length_offset=0.0, width_factor=1.0, width_offset=0.0):
+        extended_size = (length_factor * self[1][0] + length_offset, width_factor * self[1][1] + width_offset) if self[1][0] > self[1][1] else (width_factor * self[1][0] + width_offset, length_factor * self[1][1] + length_offset)
+        return RotatedRect((self[0], extended_size, self[2]))
+
 class Line(Sequence):
     def __init__(self, data, sx=1, sy=1, group=None, id=uuid.uuid4()):
         super().__init__()
@@ -52,13 +133,26 @@ class Line(Sequence):
     def point_b(self):
         return (int(self.data[2]), int(self.data[3]))
 
+    def get_points(self, width, height, num_points=None):
+        if num_points is None:
+            num_points = int(math.ceil(self.length))
+
+        return list(filter(lambda p: not out_of_range(p[0], p[1], width, height), np.linspace(self.point_b, self.point_a, num_points)))
+
     @property #todo: should this be normalized (be sure to convert to float)?
     def direction(self):
         return normalize(np.array([self.data[2]-self.data[0], self.data[3] - self.data[1]], dtype=float))
 
     @property
-    def normal(self):
+    def normal_a(self):
         return np.array([-self.direction[1], self.direction[0]], dtype=float)
+
+    @property
+    def normal_b(self):
+        return np.array([self.direction[1], -self.direction[0]], dtype=float)
+
+    def closest_point(self, point):
+        return closest_line_point(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], point[0], point[1])
 
     def draw(self, img, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
         cv2.line(img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
@@ -144,6 +238,13 @@ def line_angle_difference(x, y): #minimum angle between lines segments cannot di
 def line_angle(x0, y0, x1, y1):
     #return np.arctan2(y1 - y0, x1 - x0)
     return math.atan2(float(y1 - y0), float(x1 - x0))
+
+@nb.jit(nopython=True)
+def closest_line_point(x0, y0, x1, y1, px, py): #minimum angle between lines segments cannot differ by more than 90 degrees
+    dx, dy = x1-x0, y1-y0
+    det = dx*dx + dy*dy
+    a = (dy*(py-y0)+dx*(px-x0))/det
+    return (x0+a*dx), (y0+a*dy)
 
 @nb.jit(nopython=True)
 def bounding_box(line, width, length_multiplier=1.0):
