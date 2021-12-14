@@ -99,16 +99,18 @@ class Line(Sequence):
 
     def extended(self, by_ratio=1.1, from_a=True, from_b=True):
 
-        data = self.data.copy()
         amount = self.length * by_ratio
         direction = self.direction
 
+        data = self.data.copy()
+
         if from_a:
-            data[0] *= direction[0] * amount
-            data[1] *= direction[1] * amount
+            data[0] = self.midpoint[0] + direction[0] * amount
+            data[1] = self.midpoint[1] + direction[1] * amount
+            
         if from_b:
-            data[2] *= direction[0] * amount
-            data[3] *= direction[1] * amount
+            data[2] = self.midpoint[0] - direction[0] * amount
+            data[3] = self.midpoint[1] - direction[1] * amount
 
         return Line(data)
         
