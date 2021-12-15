@@ -355,7 +355,9 @@ class SurfaceBarriers():
 
         max_angle_parallel = np.radians(20)
         max_angle_orth = np.radians(30)
-        #max_distance = self.diagonal / 200
+
+        min_distance = self.diagonal / 200
+        min_distance_sq = min_distance * min_distance
 
         #now extend and link all:
         def get_best_termination(terminations):
@@ -377,17 +379,19 @@ class SurfaceBarriers():
 
             if barrier_a.dead: continue
 
-            line_a = barrier_a.bounds.line.extended(1.5, from_a=len(barrier_a.a_terminations)==0, from_b=len(barrier_a.b_terminations)==0)
+            line_a = barrier_a.bounds.line.extended(5.0, from_a=len(barrier_a.a_terminations)==0, from_b=len(barrier_a.b_terminations)==0)
 
             a_terminations = []
             b_terminations = []
 
-            for j in range(i+1, len(self.barrier_groups)):
+            for j in range(len(self.barrier_groups)):
+                if i == j: continue
+
                 barrier_b = self.barrier_groups[j]
 
                 if barrier_b.dead: continue
 
-                line_b = barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.b_terminations)==0)
+                line_b = barrier_b.bounds.line.extended(5.0, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.b_terminations)==0)
 
                 intersection = line_a.get_intersection(line_b)
 
@@ -398,10 +402,10 @@ class SurfaceBarriers():
                     dist_b = distance.sqeuclidean(intersection, line_a.point_b)
 
                     if dist_a < dist_b:
-                        if len(barrier_a.a_terminations) == 0:
+                        if len(barrier_a.a_terminations) == 0 and dist_a >= min_distance_sq:
                             a_terminations.append((dist_a, intersection, barrier_b))
                     else:
-                        if len(barrier_a.b_terminations) == 0:
+                        if len(barrier_a.b_terminations) == 0 and dist_b >= min_distance_sq:
                             b_terminations.append((dist_b, intersection, barrier_b))
 
                     # barrier_a.merge(barrier_b)
