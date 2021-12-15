@@ -353,11 +353,9 @@ class SurfaceBarriers():
     def refine(self):
         self.cull_barriers()
 
-        max_angle_parallel = np.radians(20)
-        max_angle_orth = np.radians(30)
-
-        min_distance = self.diagonal / 200
-        min_distance_sq = min_distance * min_distance
+        #max_angle_parallel = np.radians(20)
+        #max_angle_orth = np.radians(30)
+        #min_distance = self.diagonal / 200
 
         #now extend and link all:
         def get_best_termination(terminations):
@@ -391,7 +389,7 @@ class SurfaceBarriers():
 
                 if barrier_b.dead: continue
 
-                line_b = barrier_b.bounds.line.extended(5.0, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.b_terminations)==0)
+                line_b = barrier_b.bounds.line.extended(1.1)
 
                 intersection = line_a.get_intersection(line_b)
 
@@ -402,10 +400,10 @@ class SurfaceBarriers():
                     dist_b = distance.sqeuclidean(intersection, line_a.point_b)
 
                     if dist_a < dist_b:
-                        if len(barrier_a.a_terminations) == 0 and dist_a >= min_distance_sq:
+                        if len(barrier_a.a_terminations) == 0:
                             a_terminations.append((dist_a, intersection, barrier_b))
                     else:
-                        if len(barrier_a.b_terminations) == 0 and dist_b >= min_distance_sq:
+                        if len(barrier_a.b_terminations) == 0:
                             b_terminations.append((dist_b, intersection, barrier_b))
 
                     # barrier_a.merge(barrier_b)
