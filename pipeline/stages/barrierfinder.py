@@ -144,9 +144,12 @@ class BarrierGroup():
 
         self.a_terminations = []
         self.a_termination_candidates = []
+        self.term_a = None
 
         self.b_terminations = []
         self.b_termination_candidates = []
+        self.term_b = None
+
         self.parent_groups = []
 
     def add_barrier(self, barrier):
@@ -290,6 +293,12 @@ class BarrierGroup():
 
         self.bounds.line.draw(img, color=color)
 
+        if not self.term_a is None:
+            cv2.line(img, self.bounds.line.point_a, (int(self.term_a[0]),int(self.term_a[1])), color, 1)
+
+        if not self.term_b is None:
+            cv2.line(img, self.bounds.line.point_b, (int(self.term_b[0]),int(self.term_b[1])), color, 1)
+
     def debug_intersections(self, img):
         intersections = []
         if len(self.a_terminations) > 0:
@@ -340,39 +349,64 @@ class SurfaceBarriers():
     def refine(self):
         self.cull_barriers()
 
-        max_angle_parallel = np.radians(13)
+        max_angle_parallel = np.radians(20)
         max_angle_orth = np.radians(30)
         #max_distance = self.diagonal / 200
 
         #now extend and link all:
+        def get_best_termination(terminations):
+            length = len(terminations)
+            if length == 0:
+                return None
+            if length == 1:
+                best_match = terminations[0]
+            else:
+                best_match = next(filter(lambda term: term[0], terminations), None)
+
+            #colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
+            #orthagonal = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle + 0.5 * np.pi) <= max_angle_orth
+
+            return best_match[1]    
+
         for i in range(len(self.barrier_groups)):
             barrier_a = self.barrier_groups[i]
 
             if barrier_a.dead: continue
 
-            line_a = barrier_a.bounds.line.extended(3.0, from_a=len(barrier_a.a_terminations)==0, from_b=len(barrier_a.b_terminations)==0)
+            line_a = barrier_a.bounds.line.extended(1.5, from_a=len(barrier_a.a_terminations)==0, from_b=len(barrier_a.b_terminations)==0)
+
+            a_terminations = []
+            b_terminations = []
 
             for j in range(i+1, len(self.barrier_groups)):
                 barrier_b = self.barrier_groups[j]
 
                 if barrier_b.dead: continue
 
-                colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
-                orthagonal = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle + 0.5 * np.pi) <= max_angle_orth
-
-                if not colinear: continue
-
-                line_b = barrier_b.bounds.line.extended(3.0, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.b_terminations)==0)
+                line_b = barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.b_terminations)==0)
 
                 intersection = line_a.get_intersection(line_b)
 
                 #TODO: find closest, either orthagonal or colinear and at the end, that's the one used, others ignored, 
                 #and this across all elements, so they must all have met each other before picking the shortest
                 if intersection:
-                    barrier_a.merge(barrier_b)
-                    barrier_b.dead = True
-                    #check which endpoints to add terminations to (use shortest??)
-                    print("MERGE", barrier_a.surfaces[0].name, barrier_b.surfaces[0].name)
+                    dist_a = distance.sqeuclidean(intersection, line_a.point_a)
+                    dist_b = distance.sqeuclidean(intersection, line_a.point_b)
+
+                    if dist_a < dist_b:
+                        if len(barrier_a.a_terminations) == 0:
+                            a_terminations.append((dist_a, intersection, barrier_b))
+                    else:
+                        if len(barrier_a.b_terminations) == 0:
+                            b_terminations.append((dist_b, intersection, barrier_b))
+
+                    # barrier_a.merge(barrier_b)
+                    # barrier_b.dead = True
+                    # #check which endpoints to add terminations to (use shortest??)
+                    # print("MERGE", barrier_a.surfaces[0].name, barrier_b.surfaces[0].name)
+
+                barrier_a.term_a = get_best_termination(a_terminations)
+                barrier_a.term_b = get_best_termination(b_terminations)
 
 
         self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
