@@ -365,7 +365,17 @@ class SurfaceBarriers():
             terminations.sort(key=lambda x: x[0])
             best_match = terminations[0]
 
+            # if len(terminations) > 1:
+            #     print(terminations[0][0], terminations[1][0])
+
             return best_match[1]
+
+
+        candidates = self.barrier_groups.copy()
+
+        for neighbor in self.surface.neighbors:
+            if neighbor.barriers is not None:
+                candidates.extend(filter(lambda x: x.vanishing_point in self.surface.vanishing_points, neighbor.barriers.barrier_groups))
 
         for i in range(len(self.barrier_groups)):
             barrier_a = self.barrier_groups[i]
@@ -382,19 +392,20 @@ class SurfaceBarriers():
             a_terminations = []
             b_terminations = []
 
-            for j in range(len(self.barrier_groups)):
-                if i == j: continue
+            for j in range(len(candidates)):
+                barrier_b = candidates[j]
 
-                barrier_b = self.barrier_groups[j]
+                if barrier_a == barrier_b: continue
 
                 colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
                 orthagonal = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle + 0.5 * np.pi) <= max_angle_orth
 
                 if not colinear and not orthagonal: continue
 
-                intersection = line_a.get_intersection(barrier_b.bounds.line.extended(1.01))
+                line_b = barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations) == 0, from_b=len(barrier_b.b_terminations) == 0)
+                intersection = line_a.get_intersection(line_b)
 
-                if intersection:
+                if intersection is not None:
                     dist_a = distance.sqeuclidean(intersection, line_a.point_a)
                     dist_b = distance.sqeuclidean(intersection, line_a.point_b)
 

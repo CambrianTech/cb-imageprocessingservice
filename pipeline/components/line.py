@@ -56,6 +56,8 @@ class Line(Sequence):
         return (int(self.data[2]), int(self.data[3]))
 
     def get_intersection(self, other):
+        #return LineFunctions.get_intersection(self.point_a, self.point_b, other.point_a, other.point_b)
+
         return get_line_intersection(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], \
             other.point_a[0], other.point_a[1], other.point_b[0], other.point_b[1])
 
