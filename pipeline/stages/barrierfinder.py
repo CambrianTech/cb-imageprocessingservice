@@ -340,7 +340,7 @@ class SurfaceBarriers():
     def refine(self):
         self.cull_barriers()
 
-        max_angle_parallel = np.radians(9)
+        max_angle_parallel = np.radians(13)
         max_angle_orth = np.radians(30)
         #max_distance = self.diagonal / 200
 
