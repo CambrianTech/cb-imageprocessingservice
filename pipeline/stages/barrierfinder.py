@@ -294,10 +294,14 @@ class BarrierGroup():
         self.bounds.line.draw(img, color=color)
 
         if not self.term_a is None:
-            cv2.line(img, self.bounds.line.point_a, (int(self.term_a[0]),int(self.term_a[1])), color, 1)
+            term_a = (int(self.term_a[0]),int(self.term_a[1]))
+            cv2.line(img, self.bounds.line.point_a, term_a, color, 1)
+            cv2.drawMarker(img, term_a, color)
 
         if not self.term_b is None:
-            cv2.line(img, self.bounds.line.point_b, (int(self.term_b[0]),int(self.term_b[1])), color, 1)
+            term_b = (int(self.term_b[0]),int(self.term_b[1]))
+            cv2.line(img, self.bounds.line.point_b, term_b, color, 1)
+            cv2.drawMarker(img, term_b, color)
 
     def debug_intersections(self, img):
         intersections = []
