@@ -276,7 +276,7 @@ class BarrierGroup():
     def merge(self, other):
         self.barriers = list(set(self.barriers) | set(other.barriers))
         self._points = None
-        self._bounds = None
+        self._bounds = None #trigger recalculation
 
     def debug(self, img, color, show_bounds=True):
 
@@ -287,8 +287,8 @@ class BarrierGroup():
 
         if show_bounds and thickness > 3:
             cv2.drawContours(img, [self.bounds.points], 0, (255,0,0), 1)
-            self.bounds.line.draw(img, color=(0,0,255))
-        
+
+        self.bounds.line.draw(img, color=color)
 
     def debug_intersections(self, img):
         intersections = []
@@ -340,9 +340,9 @@ class SurfaceBarriers():
     def refine(self):
         self.cull_barriers()
 
-        max_angle_parallel = np.radians(7)
+        max_angle_parallel = np.radians(9)
         max_angle_orth = np.radians(30)
-        max_distance = self.diagonal / 200
+        #max_distance = self.diagonal / 200
 
         #now extend and link all:
         for i in range(len(self.barrier_groups)):
@@ -350,7 +350,7 @@ class SurfaceBarriers():
 
             if barrier_a.dead: continue
 
-            rect_a = barrier_a.bounds.resized(width_factor=0, width_offset=max_distance, length_factor=2.0)
+            line_a = barrier_a.bounds.line.extended(3.0, from_a=len(barrier_a.a_terminations)==0, from_b=len(barrier_a.b_terminations)==0)
 
             for j in range(i+1, len(self.barrier_groups)):
                 barrier_b = self.barrier_groups[j]
@@ -362,11 +362,16 @@ class SurfaceBarriers():
 
                 if not colinear: continue
 
-                intersection = barrier_a.bounds.line.extended(3.0).get_intersection(barrier_b.bounds.line.extended(3.0))
-                
+                line_b = barrier_b.bounds.line.extended(3.0, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.b_terminations)==0)
+
+                intersection = line_a.get_intersection(line_b)
+
+                #TODO: find closest, either orthagonal or colinear and at the end, that's the one used, others ignored, 
+                #and this across all elements, so they must all have met each other before picking the shortest
                 if intersection:
                     barrier_a.merge(barrier_b)
                     barrier_b.dead = True
+                    #check which endpoints to add terminations to (use shortest??)
                     print("MERGE", barrier_a.surfaces[0].name, barrier_b.surfaces[0].name)
 
 

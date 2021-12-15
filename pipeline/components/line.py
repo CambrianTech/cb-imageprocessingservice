@@ -97,9 +97,9 @@ class Line(Sequence):
     # def bounding_box_points(self, width, length_multiplier=1.0):
     #     return rotated_rects_points(self.midpoint, (self.length * length_multiplier, width), self.angle)
 
-    def extended(self, by_ratio=1.1, from_a=True, from_b=True):
+    def extended(self, ratio=1.1, from_a=True, from_b=True):
 
-        amount = self.length * by_ratio
+        amount = self.length * ratio
         direction = self.direction
 
         data = self.data.copy()
@@ -107,7 +107,7 @@ class Line(Sequence):
         if from_a:
             data[0] = self.midpoint[0] + direction[0] * amount
             data[1] = self.midpoint[1] + direction[1] * amount
-            
+
         if from_b:
             data[2] = self.midpoint[0] - direction[0] * amount
             data[3] = self.midpoint[1] - direction[1] * amount
