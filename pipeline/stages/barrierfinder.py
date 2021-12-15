@@ -371,14 +371,16 @@ class SurfaceBarriers():
             return best_match[1]
 
 
-        candidates = self.barrier_groups.copy()
+        candidates = []
 
-        for neighbor in self.surface.neighbors:
-            if neighbor.barriers is not None:
-                candidates.extend(filter(lambda x: x.vanishing_point in self.surface.vanishing_points, neighbor.barriers.barrier_groups))
+        for surface in self.room.surfaces:
+            if surface.barriers is not None:
+                candidates.extend(surface.barriers.barrier_groups)
 
-        for i in range(len(self.barrier_groups)):
-            barrier_a = self.barrier_groups[i]
+            # if neighbor.barriers is not None:
+            #     candidates.extend(filter(lambda x: x.vanishing_point in self.surface.vanishing_points, neighbor.barriers.barrier_groups))
+
+        for barrier_a in self.barrier_groups:
 
             a_open = len(barrier_a.a_terminations) == 0
             b_open = len(barrier_a.b_terminations) == 0
@@ -392,15 +394,13 @@ class SurfaceBarriers():
             a_terminations = []
             b_terminations = []
 
-            for j in range(len(candidates)):
-                barrier_b = candidates[j]
-
+            for barrier_b in candidates:
                 if barrier_a == barrier_b: continue
 
                 colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
                 orthagonal = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle + 0.5 * np.pi) <= max_angle_orth
 
-                if not colinear and not orthagonal: continue
+                #if not colinear and not orthagonal: continue
 
                 line_b = barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations) == 0, from_b=len(barrier_b.b_terminations) == 0)
                 intersection = line_a.get_intersection(line_b)

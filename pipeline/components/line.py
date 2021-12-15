@@ -382,6 +382,10 @@ def verts_inside(pts1, pts2, vec1):
 
     return False
 
+
+EPSILON = np.finfo(float).eps
+
+#https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
 @nb.jit(nopython=True)
 def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
 
@@ -390,16 +394,14 @@ def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
 
     det = (-s2_x * s1_y + s1_x * s2_y)
 
-    if det == 0: return None
+    if abs(det) < EPSILON: return None #sufficiently parallel
 
     s = (-s1_y * (p0_x - p2_x) + s1_x * (p0_y - p2_y)) / det;
-    t = ( s2_x * (p0_y - p2_y) - s2_y * (p0_x - p2_x)) / det;
+    if (s < 0 or s > 1): return None # No collision
 
-    if (s < 0 or s > 1 or t < 0 or t > 1): return None
+    t = ( s2_x * (p0_y - p2_y) - s2_y * (p0_x - p2_x)) / det;
+    if (t < 0 or t > 1): return None # No collision
 
     #Collision detected
-    i_x = p0_x + (t * s1_x);
-    i_y = p0_y + (t * s1_y);
-
-    return i_x, i_y
+    return p0_x + (t * s1_x), p0_y + (t * s1_y)
 
