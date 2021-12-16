@@ -56,8 +56,20 @@ class Line(Sequence):
         return (int(self.data[2]), int(self.data[3]))
 
     def get_intersection(self, other):
+        #return LineFunctions.get_intersection(self.point_a, self.point_b, other.point_a, other.point_b)
+
         return get_line_intersection(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], \
             other.point_a[0], other.point_a[1], other.point_b[0], other.point_b[1])
+
+    def intersects(self, other):
+        return self.get_intersection(other) is not None
+
+    def equals(self, other, epsilon=0):
+        if epsilon == 0:
+            return np.array_equal(self.data, other.data)
+        else:
+            result = np.linalg.norm(self.data - other.data)
+            return result < epsilon
 
     def get_points(self, width, height, num_points=None):
         if num_points is None:
@@ -97,18 +109,20 @@ class Line(Sequence):
     # def bounding_box_points(self, width, length_multiplier=1.0):
     #     return rotated_rects_points(self.midpoint, (self.length * length_multiplier, width), self.angle)
 
-    def extended(self, by_ratio=1.1, from_a=True, from_b=True):
+    def extended(self, ratio=1.1, from_a=True, from_b=True):
 
-        data = self.data.copy()
-        amount = self.length * by_ratio
+        amount = self.length * ratio
         direction = self.direction
 
+        data = self.data.copy()
+
         if from_a:
-            data[0] *= direction[0] * amount
-            data[1] *= direction[1] * amount
+            data[0] = self.midpoint[0] + direction[0] * amount
+            data[1] = self.midpoint[1] + direction[1] * amount
+
         if from_b:
-            data[2] *= direction[0] * amount
-            data[3] *= direction[1] * amount
+            data[2] = self.midpoint[0] - direction[0] * amount
+            data[3] = self.midpoint[1] - direction[1] * amount
 
         return Line(data)
         
@@ -378,6 +392,10 @@ def verts_inside(pts1, pts2, vec1):
 
     return False
 
+
+EPSILON = np.finfo(float).eps
+
+#https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
 @nb.jit(nopython=True)
 def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
 
@@ -386,16 +404,14 @@ def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
 
     det = (-s2_x * s1_y + s1_x * s2_y)
 
-    if det == 0: return None
+    if abs(det) < EPSILON: return None #sufficiently parallel
 
     s = (-s1_y * (p0_x - p2_x) + s1_x * (p0_y - p2_y)) / det;
-    t = ( s2_x * (p0_y - p2_y) - s2_y * (p0_x - p2_x)) / det;
+    if (s < 0 or s > 1): return None # No collision
 
-    if (s < 0 or s > 1 or t < 0 or t > 1): return None
+    t = ( s2_x * (p0_y - p2_y) - s2_y * (p0_x - p2_x)) / det;
+    if (t < 0 or t > 1): return None # No collision
 
     #Collision detected
-    i_x = p0_x + (t * s1_x);
-    i_y = p0_y + (t * s1_y);
-
-    return i_x, i_y
+    return p0_x + (t * s1_x), p0_y + (t * s1_y)
 
