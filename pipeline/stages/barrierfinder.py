@@ -354,7 +354,7 @@ class SurfaceBarriers():
         
     def refine(self, all_barriers):
 
-        #self.set_initial_endpoints(self.barrier_groups, all_barriers)
+        self.set_initial_endpoints(self.barrier_groups, all_barriers)
 
         max_angle_parallel = np.radians(13)
         max_angle_orth = np.radians(30)
@@ -619,9 +619,9 @@ class SurfaceBarriers():
                 if barrier_a == barrier_b or barrier_b.bounds.line.length < min_length: continue
 
                 if barrier_a.bounds.line.equals(barrier_b.bounds.line, epsilon):
-                    if barrier_a in self.barrier_groups and barrier_b in self.barrier_groups:
+                    #if barrier_a in self.barrier_groups and barrier_b in self.barrier_groups:
                         #there can be only one
-                        barrier_b.dead = True
+                        #barrier_b.dead = barrier_a.bounds.line.equals(barrier_b.bounds.line, 0.01)
                     continue
 
                 if barrier_b.vanishing_point not in self.surface.vanishing_points: continue
@@ -653,10 +653,10 @@ class SurfaceBarriers():
 
                 is_mine = termination.barrier_group in self.barrier_groups
 
-                if is_colinear:
-                    barrier_a.merge(termination.barrier_group)
-                    termination.barrier_group.dead = is_mine
-                    return
+                # if is_colinear:
+                #     barrier_a.merge(termination.barrier_group)
+                #     termination.barrier_group.dead = is_mine
+                #     return
 
                 if distance > max_distance:
                     return
