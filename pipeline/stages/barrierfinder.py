@@ -353,11 +353,12 @@ class SurfaceBarriers():
         self.merge_barriers()
         
     def refine(self, all_barriers):
-        self.cull_barriers(all_barriers)
+
+        #self.set_initial_endpoints(self.barrier_groups, all_barriers)
 
         max_angle_parallel = np.radians(13)
         max_angle_orth = np.radians(30)
-        min_distance = self.diagonal / 100
+        min_distance = self.diagonal / 200
         min_distance_sq = min_distance * min_distance
         epsilon = min_distance
 
@@ -373,7 +374,6 @@ class SurfaceBarriers():
             #print("match")
 
             return best_match
-
 
         candidates = []
 
@@ -438,7 +438,7 @@ class SurfaceBarriers():
                 else:
                     barrier_a.term_b = term_b[1]
 
-
+        #self.cull_barriers(all_barriers)
         self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
 
 
@@ -590,10 +590,10 @@ class SurfaceBarriers():
 
     def set_initial_endpoints(self, elements, all_barriers):
         #find interlinking
-        max_distance = self.diagonal / 100
+        max_distance = self.diagonal / 200
         min_length = self.diagonal / 20
         max_angle_parallel = np.radians(15)
-        epsilon = 0.0001
+        epsilon = max_distance
 
         #start from barrier groups, but also add sibling barriers to end
         candidates = []
@@ -754,7 +754,6 @@ class SurfaceBarriers():
         else: #do nothing, do not trust culling result
             return
 
-        self.set_initial_endpoints(self.barrier_groups, all_barriers)
         self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
 
         valid = self.barrier_groups.copy()
