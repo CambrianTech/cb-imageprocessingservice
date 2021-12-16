@@ -295,12 +295,14 @@ class BarrierGroup():
 
         if not self.term_a is None:
             term_a = (int(self.term_a[0]),int(self.term_a[1]))
-            cv2.line(img, self.bounds.line.point_a, term_a, color, 1)
+            cv2.line(img, self.bounds.line.point_a, term_a, (0,255,255), 3)
+            #print("draw a", self.bounds.line.point_a, term_a)
             #cv2.drawMarker(img, term_a, color, cv2.MARKER_DIAMOND)
 
         if not self.term_b is None:
             term_b = (int(self.term_b[0]),int(self.term_b[1]))
-            cv2.line(img, self.bounds.line.point_b, term_b, color, 1)
+            cv2.line(img, self.bounds.line.point_b, term_b, (255,255,0), 3)
+            #print("draw b", self.bounds.line.point_b, term_b)
             #cv2.drawMarker(img, term_b, color, cv2.MARKER_DIAMOND)
 
     def debug_intersections(self, img):
@@ -366,7 +368,7 @@ class SurfaceBarriers():
             terminations.sort(key=lambda x: x[0])
             best_match = terminations[0]
 
-            print("match")
+            #print("match")
 
             return best_match[1]
 
@@ -413,9 +415,11 @@ class SurfaceBarriers():
 
                     if dist_a < dist_b:
                         if a_open:
+                            #print("dist_a", dist_a)
                             a_terminations.append((dist_a, intersection, barrier_b))
                     else:
                         if b_open:
+                            #print("dist_b", dist_b)
                             b_terminations.append((dist_b, intersection, barrier_b))
 
             #use best:
@@ -966,15 +970,15 @@ class PipelineBarrierFinder(PipelineStep):
         for surface in self.surfaces:
             self.barriers[surface.uniqueId] = SurfaceBarriers(self.data, surface, self.vanishing_points)
 
+        if im_logging_enabled(self.data):
+            log_image(self.data, "potential_barriers.png", self.get_debug_image())
+
         all_barriers = []
         for surface in self.surfaces:
             all_barriers.extend(surface.barriers.barrier_groups)
 
         for surface in self.surfaces:
             self.barriers[surface.uniqueId].refine(all_barriers)
-
-        if im_logging_enabled(self.data):
-            log_image(self.data, "potential_barriers.png", self.get_debug_image())
 
         bs = BarrierSolver(self.data, self.barriers)
         bs.solve()
