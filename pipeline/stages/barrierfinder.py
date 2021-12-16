@@ -438,7 +438,7 @@ class SurfaceBarriers():
                 else:
                     barrier_a.term_b = term_b[1]
 
-        #self.cull_barriers(all_barriers)
+        self.cull_barriers(all_barriers)
         self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
 
 
