@@ -350,8 +350,8 @@ class SurfaceBarriers():
         self.barrier_groups = self.group_barriers()
         self.merge_barriers()
         
-    def refine(self):
-        self.cull_barriers()
+    def refine(self, all_barriers):
+        self.cull_barriers(all_barriers)
 
         max_angle_parallel = np.radians(20)
         max_angle_orth = np.radians(30)
@@ -362,11 +362,11 @@ class SurfaceBarriers():
             if len(terminations) == 0:
                 return None
 
+            #get closest distance
             terminations.sort(key=lambda x: x[0])
             best_match = terminations[0]
 
-            # if len(terminations) > 1:
-            #     print(terminations[0][0], terminations[1][0])
+            print("match")
 
             return best_match[1]
 
@@ -387,7 +387,8 @@ class SurfaceBarriers():
 
             if not a_open and not b_open: continue
 
-            line_a = barrier_a.bounds.line.extended(2.0, from_a=a_open, from_b=b_open)
+            #line_a = barrier_a.bounds.line.extended(2.0, from_a=a_open, from_b=b_open)
+            line_a = barrier_a.bounds.line
 
             #find closest, either orthagonal or colinear and at the end, that's the one used, others ignored, 
             #This is across all elements
@@ -397,12 +398,13 @@ class SurfaceBarriers():
             for barrier_b in candidates:
                 if barrier_a == barrier_b: continue
 
-                colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
-                orthagonal = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle + 0.5 * np.pi) <= max_angle_orth
+                #colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
+                #orthagonal = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle + 0.5 * np.pi) <= max_angle_orth
 
                 #if not colinear and not orthagonal: continue
 
-                line_b = barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations) == 0, from_b=len(barrier_b.b_terminations) == 0)
+                #line_b = barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations) == 0, from_b=len(barrier_b.b_terminations) == 0)
+                line_b = barrier_b.bounds.line
                 intersection = line_a.get_intersection(line_b)
 
                 if intersection is not None:
@@ -411,10 +413,10 @@ class SurfaceBarriers():
 
                     if dist_a < dist_b:
                         if a_open:
-                            a_terminations.append((dist_a, intersection, barrier_b, colinear, orthagonal))
+                            a_terminations.append((dist_a, intersection, barrier_b))
                     else:
                         if b_open:
-                            b_terminations.append((dist_b, intersection, barrier_b, colinear, orthagonal))
+                            b_terminations.append((dist_b, intersection, barrier_b))
 
             #use best:
             barrier_a.term_a = get_best_termination(a_terminations)
@@ -570,14 +572,14 @@ class SurfaceBarriers():
 
         self.filter_barriers()
 
-    def set_initial_endpoints(self, elements):
+    def set_initial_endpoints(self, elements, all_barriers):
         #find interlinking
         max_distance = self.diagonal / 200
         min_length = self.diagonal / 20
         max_angle_parallel = np.radians(15)
 
         #start from barrier groups, but also add sibling barriers to end
-        candidates = elements.copy()
+        candidates = []
         for neighbor in self.surface.neighbors:
             if neighbor.barriers is not None:
                 candidates.extend(filter(lambda x: x.vanishing_point in self.surface.vanishing_points, neighbor.barriers.barrier_groups))
@@ -591,12 +593,13 @@ class SurfaceBarriers():
 
             rect_a = barrier_a.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
 
-            for j in range(i+1, len(candidates)):
+            a_terms = []
+            b_terms = []
+
+            for j in range(len(candidates)):
                 barrier_b = candidates[j]
 
-                if barrier_b.bounds.line.length < min_length: continue
-
-                if barrier_b in elements: continue
+                if barrier_a == barrier_b or barrier_b.bounds.line.length < min_length: continue
 
                 if barrier_b.vanishing_point not in self.surface.vanishing_points: continue
 
@@ -614,22 +617,31 @@ class SurfaceBarriers():
 
                 distances = get_distances(rect_a, rect_b, intersection)
 
-                if barrier_b not in elements:
-                    elements.append(barrier_b)
-                    new_elements.append(barrier_b)
-
                 if distances[0] < distances[1]:
-                    barrier_a.add_termination_a(BarrierTermination(barrier_b, barrier_a.bounds.line.point_a))
+                    a_terms.append((distances[0], BarrierTermination(barrier_b, barrier_a.bounds.line.point_a)))
                 else:
-                    barrier_a.add_termination_b(BarrierTermination(barrier_b, barrier_a.bounds.line.point_b))
+                    b_terms.append((distances[1], BarrierTermination(barrier_b, barrier_a.bounds.line.point_b)))
 
-                if distances[2] < distances[3]:
-                    barrier_b.add_termination_a(BarrierTermination(barrier_a, barrier_b.bounds.line.point_a))
+            def add_termination(terminations, is_b:bool):
+                if len(terminations) == 0:
+                    return
+                term = sorted(terminations, key=lambda x: x[0])[0][1]
+
+                if is_b:
+                    barrier_a.add_termination_b(term)
                 else:
-                    barrier_b.add_termination_b(BarrierTermination(barrier_a, barrier_b.bounds.line.point_b))   
+                    barrier_a.add_termination_a(term)
+
+                if term.barrier_group not in elements:
+                    elements.append(term.barrier_group)
+                    new_elements.append(term.barrier_group)
+
+            add_termination(a_terms, is_b=False)
+            add_termination(b_terms, is_b=True)
+
         return new_elements
 
-    def cull_barriers(self):
+    def cull_barriers(self, all_barriers):
 
         contours, contour_lengths = self.room.contours[self.surface.surfaceType]
 
@@ -709,7 +721,7 @@ class SurfaceBarriers():
             return
 
         valid = self.barrier_groups.copy()
-        self.set_initial_endpoints(valid)
+        self.set_initial_endpoints(valid, all_barriers)
 
         #flood fill from seeds set into valid set using barrier linkage
         seeds = set(seeds)
@@ -954,8 +966,12 @@ class PipelineBarrierFinder(PipelineStep):
         for surface in self.surfaces:
             self.barriers[surface.uniqueId] = SurfaceBarriers(self.data, surface, self.vanishing_points)
 
+        all_barriers = []
         for surface in self.surfaces:
-            self.barriers[surface.uniqueId].refine()
+            all_barriers.extend(surface.barriers.barrier_groups)
+
+        for surface in self.surfaces:
+            self.barriers[surface.uniqueId].refine(all_barriers)
 
         if im_logging_enabled(self.data):
             log_image(self.data, "potential_barriers.png", self.get_debug_image())
