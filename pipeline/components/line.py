@@ -61,6 +61,16 @@ class Line(Sequence):
         return get_line_intersection(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], \
             other.point_a[0], other.point_a[1], other.point_b[0], other.point_b[1])
 
+    def intersects(self, other):
+        return self.get_intersection(other) is not None
+
+    def equals(self, other, epsilon=0):
+        if epsilon == 0:
+            return np.array_equal(self.data, other.data)
+        else:
+            result = np.linalg.norm(self.data - other.data)
+            return result < epsilon
+
     def get_points(self, width, height, num_points=None):
         if num_points is None:
             num_points = int(math.ceil(self.length))

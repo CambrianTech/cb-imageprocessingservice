@@ -295,13 +295,13 @@ class BarrierGroup():
 
         if not self.term_a is None:
             term_a = (int(self.term_a[0]),int(self.term_a[1]))
-            cv2.line(img, self.bounds.line.point_a, term_a, (0,255,255), 3)
+            cv2.line(img, self.bounds.line.point_a, term_a, (0,0,0), 1)
             #print("draw a", self.bounds.line.point_a, term_a)
             #cv2.drawMarker(img, term_a, color, cv2.MARKER_DIAMOND)
 
         if not self.term_b is None:
             term_b = (int(self.term_b[0]),int(self.term_b[1]))
-            cv2.line(img, self.bounds.line.point_b, term_b, (255,255,0), 3)
+            cv2.line(img, self.bounds.line.point_b, term_b, (255,255,255), 1)
             #print("draw b", self.bounds.line.point_b, term_b)
             #cv2.drawMarker(img, term_b, color, cv2.MARKER_DIAMOND)
 
@@ -355,10 +355,11 @@ class SurfaceBarriers():
     def refine(self, all_barriers):
         self.cull_barriers(all_barriers)
 
-        max_angle_parallel = np.radians(20)
+        max_angle_parallel = np.radians(13)
         max_angle_orth = np.radians(30)
         min_distance = self.diagonal / 100
         min_distance_sq = min_distance * min_distance
+        epsilon = min_distance
 
         #now extend and link all:
         def get_best_termination(terminations):            
@@ -396,9 +397,9 @@ class SurfaceBarriers():
             b_terminations = []
 
             for barrier_b in all_barriers:
-                if barrier_a == barrier_b: continue
+                if barrier_a == barrier_b or barrier_a.bounds.line.equals(barrier_b.bounds.line, epsilon): continue
 
-                colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
+                is_colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
                 #orthagonal = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle + 0.5 * np.pi) <= max_angle_orth
 
                 #if not colinear and not orthagonal: continue
@@ -414,11 +415,11 @@ class SurfaceBarriers():
                     if dist_a < dist_b:
                         if a_open:
                             #print("dist_a", dist_a)
-                            a_terminations.append((dist_a, intersection, barrier_b, colinear))
+                            a_terminations.append((dist_a, intersection, barrier_b, is_colinear))
                     else:
                         if b_open:
                             #print("dist_b", dist_b)
-                            b_terminations.append((dist_b, intersection, barrier_b, colinear))
+                            b_terminations.append((dist_b, intersection, barrier_b, is_colinear))
 
             #use best:
             term_a = get_best_termination(a_terminations)
@@ -589,9 +590,10 @@ class SurfaceBarriers():
 
     def set_initial_endpoints(self, elements, all_barriers):
         #find interlinking
-        max_distance = self.diagonal / 200
+        max_distance = self.diagonal / 100
         min_length = self.diagonal / 20
         max_angle_parallel = np.radians(15)
+        epsilon = 0.0001
 
         #start from barrier groups, but also add sibling barriers to end
         candidates = []
@@ -616,6 +618,12 @@ class SurfaceBarriers():
 
                 if barrier_a == barrier_b or barrier_b.bounds.line.length < min_length: continue
 
+                if barrier_a.bounds.line.equals(barrier_b.bounds.line, epsilon):
+                    if barrier_a in self.barrier_groups and barrier_b in self.barrier_groups:
+                        #there can be only one
+                        barrier_b.dead = True
+                    continue
+
                 if barrier_b.vanishing_point not in self.surface.vanishing_points: continue
 
                 rect_b = barrier_b.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
@@ -625,12 +633,15 @@ class SurfaceBarriers():
 
                 intersection = np.mean(vertices, axis=(0,1))
                 distances = get_distances(rect_a, rect_b, intersection)
-                colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
+
+                is_colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
+                if is_colinear:
+                    is_colinear = barrier_a.bounds.line.intersects(barrier_b.bounds.line)
 
                 if distances[0] < distances[1]:
-                    a_terms.append((distances[0], BarrierTermination(barrier_b, barrier_a.bounds.line.point_a), colinear))
+                    a_terms.append((distances[0], BarrierTermination(barrier_b, barrier_a.bounds.line.point_a), is_colinear))
                 else:
-                    b_terms.append((distances[1], BarrierTermination(barrier_b, barrier_a.bounds.line.point_b), colinear))
+                    b_terms.append((distances[1], BarrierTermination(barrier_b, barrier_a.bounds.line.point_b), is_colinear))
 
             def add_termination(terminations, is_b:bool):
                 if len(terminations) == 0:
@@ -638,25 +649,26 @@ class SurfaceBarriers():
                 term = sorted(terminations, key=lambda x: x[0])[0]
                 distance = term[0]
                 termination = term[1]
-                colinear = term[2]
+                is_colinear = term[2]
 
-                is_existing = termination.barrier_group in self.barrier_groups
+                is_mine = termination.barrier_group in self.barrier_groups
 
-                if distance > max_distance and not (is_existing and colinear):
+                if is_colinear:
+                    barrier_a.merge(termination.barrier_group)
+                    termination.barrier_group.dead = is_mine
                     return
 
-                if not is_existing:
+                if distance > max_distance:
+                    return
+
+                if not is_mine:
                     elements.append(termination.barrier_group)
                     new_elements.append(termination.barrier_group)
                 
-                if is_existing and colinear:
-                    barrier_a.merge(termination.barrier_group)
-                    termination.barrier_group.dead = True
+                if is_b:
+                    barrier_a.add_termination_b(termination)
                 else:
-                    if is_b:
-                        barrier_a.add_termination_b(termination)
-                    else:
-                        barrier_a.add_termination_a(termination)
+                    barrier_a.add_termination_a(termination)
 
             add_termination(a_terms, is_b=False)
             add_termination(b_terms, is_b=True)
