@@ -375,11 +375,11 @@ class SurfaceBarriers():
 
             return best_match
 
-        candidates = []
+        # candidates = self.barrier_groups.copy()
 
-        for neighbor in self.surface.neighbors:
-            if neighbor.barriers is not None:
-                candidates.extend(filter(lambda x: x.vanishing_point in self.surface.vanishing_points, neighbor.barriers.barrier_groups))
+        # for neighbor in self.surface.neighbors:
+        #     if neighbor.barriers is not None:
+        #         candidates.extend(filter(lambda x: x.vanishing_point in self.surface.vanishing_points, neighbor.barriers.barrier_groups))
 
         for barrier_a in self.barrier_groups:
 
@@ -388,38 +388,32 @@ class SurfaceBarriers():
 
             if not a_open and not b_open: continue
 
-            #line_a = barrier_a.bounds.line.extended(2.0, from_a=a_open, from_b=b_open)
-            line_a = barrier_a.bounds.line
+            line_a = barrier_a.bounds.line.extended(2.0, from_a=a_open, from_b=b_open)
 
             #find closest, either orthagonal or colinear and at the end, that's the one used, others ignored, 
             #This is across all elements
             a_terminations = []
             b_terminations = []
 
-            for barrier_b in all_barriers:
+            for barrier_b in self.barrier_groups:
                 if barrier_a == barrier_b or barrier_a.bounds.line.equals(barrier_b.bounds.line, epsilon): continue
 
-                is_colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
-                #orthagonal = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle + 0.5 * np.pi) <= max_angle_orth
-
-                #if not colinear and not orthagonal: continue
-
-                #line_b = barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations) == 0, from_b=len(barrier_b.b_terminations) == 0)
-                line_b = barrier_b.bounds.line
+                line_b = barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.a_terminations)==0)
                 intersection = line_a.get_intersection(line_b)
 
-                if intersection is not None:
-                    dist_a = distance.sqeuclidean(intersection, line_a.point_a)
-                    dist_b = distance.sqeuclidean(intersection, line_a.point_b)
+                if intersection is None: continue
 
-                    if dist_a < dist_b:
-                        if a_open:
-                            #print("dist_a", dist_a)
-                            a_terminations.append((dist_a, intersection, barrier_b, is_colinear))
-                    else:
-                        if b_open:
-                            #print("dist_b", dist_b)
-                            b_terminations.append((dist_b, intersection, barrier_b, is_colinear))
+                is_colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
+
+                dist_a = distance.sqeuclidean(intersection, barrier_a.bounds.line.point_a)
+                dist_b = distance.sqeuclidean(intersection, barrier_a.bounds.line.point_b)
+
+                if dist_a < dist_b:
+                    if a_open:
+                        a_terminations.append((dist_a, intersection, barrier_b, is_colinear))
+                else:
+                    if b_open:
+                        b_terminations.append((dist_b, intersection, barrier_b, is_colinear))
 
             #use best:
             term_a = get_best_termination(a_terminations)
@@ -608,7 +602,7 @@ class SurfaceBarriers():
 
             if barrier_a.bounds.line.length < min_length: continue
 
-            rect_a = barrier_a.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
+            line_a = barrier_a.bounds.line.extended(1.05)
 
             a_terms = []
             b_terms = []
@@ -624,24 +618,25 @@ class SurfaceBarriers():
                         #barrier_b.dead = barrier_a.bounds.line.equals(barrier_b.bounds.line, 0.01)
                     continue
 
-                if barrier_b.vanishing_point not in self.surface.vanishing_points: continue
+                #if barrier_b.vanishing_point not in self.surface.vanishing_points: continue
 
-                rect_b = barrier_b.bounds.resized(width_factor=0, width_offset=max_distance, length_offset=max_distance)
-                result, vertices = cv2.rotatedRectangleIntersection(rect_a, rect_b)
-                
-                if vertices is None: continue
+                line_b = barrier_b.bounds.line.extended(1.05)
+                intersection = line_a.get_intersection(line_b)
 
-                intersection = np.mean(vertices, axis=(0,1))
-                distances = get_distances(rect_a, rect_b, intersection)
+                if intersection is None: 
+                    continue
 
                 is_colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
                 if is_colinear:
                     is_colinear = barrier_a.bounds.line.intersects(barrier_b.bounds.line)
 
-                if distances[0] < distances[1]:
-                    a_terms.append((distances[0], BarrierTermination(barrier_b, barrier_a.bounds.line.point_a), is_colinear))
+                dist_a = distance.sqeuclidean(intersection, barrier_a.bounds.line.point_a)
+                dist_b = distance.sqeuclidean(intersection, barrier_a.bounds.line.point_b)
+
+                if dist_a < dist_b:
+                    a_terms.append((dist_a, BarrierTermination(barrier_b, intersection, distance=math.sqrt(dist_a)), is_colinear))
                 else:
-                    b_terms.append((distances[1], BarrierTermination(barrier_b, barrier_a.bounds.line.point_b), is_colinear))
+                    b_terms.append((dist_b, BarrierTermination(barrier_b, intersection, distance=math.sqrt(dist_b)), is_colinear))
 
             def add_termination(terminations, is_b:bool):
                 if len(terminations) == 0:
