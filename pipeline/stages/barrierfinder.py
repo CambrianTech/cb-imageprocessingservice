@@ -295,13 +295,13 @@ class BarrierGroup():
 
         if not self.term_a is None:
             term_a = (int(self.term_a[0]),int(self.term_a[1]))
-            cv2.line(img, self.bounds.line.point_a, term_a, (0,0,0), 1)
+            cv2.line(img, self.bounds.line.point_a, term_a, color, 1)
             #print("draw a", self.bounds.line.point_a, term_a)
             #cv2.drawMarker(img, term_a, color, cv2.MARKER_DIAMOND)
 
         if not self.term_b is None:
             term_b = (int(self.term_b[0]),int(self.term_b[1]))
-            cv2.line(img, self.bounds.line.point_b, term_b, (255,255,255), 1)
+            cv2.line(img, self.bounds.line.point_b, term_b, color, 1)
             #print("draw b", self.bounds.line.point_b, term_b)
             #cv2.drawMarker(img, term_b, color, cv2.MARKER_DIAMOND)
 
@@ -754,7 +754,7 @@ class SurfaceBarriers():
 
             is_inside, dist, index = closest_contour()
 
-            if is_inside: #aka if group is outside
+            if is_inside: #aka if group is inside
                 #if inside but beyond threshold distance
                 if dist > max(inside_threshold * contour_lengths[index], 3):
                     ugly.append(group)
