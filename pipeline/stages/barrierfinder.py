@@ -379,7 +379,7 @@ class SurfaceBarriers():
             if term is None:
                 return False
 
-            #(dist_a, intersection, barrier_b, is_colinear)
+            #(dist_a, intersection, barrier_b, is_colinear, is_virtual)
             intersection = (int(term[1][0]), int(term[1][1]))
             num_points = int(max(term[0] // 5, 7))
             start_point = barrier.bounds.line.point_b if is_b else barrier.bounds.line.point_a
@@ -423,8 +423,14 @@ class SurfaceBarriers():
             for barrier_b in self.barrier_groups:
                 if barrier_a == barrier_b or barrier_a.bounds.line.equals(barrier_b.bounds.line, epsilon): continue
 
-                line_b = barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.a_terminations)==0)
-                intersection = line_a.get_intersection(line_b)
+                intersection = line_a.get_intersection(barrier_b.bounds.line)
+
+                is_virtual = False
+
+                if intersection is None:
+                    line_b = barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.a_terminations)==0)
+                    intersection = line_a.get_intersection(line_b)
+                    is_virtual = True
 
                 if intersection is None: continue
 
@@ -435,10 +441,10 @@ class SurfaceBarriers():
 
                 if dist_a < dist_b:
                     if a_open:
-                        a_terminations.append((dist_a, intersection, barrier_b, is_colinear))
+                        a_terminations.append((dist_a, intersection, barrier_b, is_colinear, is_virtual))
                 else:
                     if b_open:
-                        b_terminations.append((dist_b, intersection, barrier_b, is_colinear))
+                        b_terminations.append((dist_b, intersection, barrier_b, is_colinear, is_virtual))
 
             #use best:
             term_a = get_best_termination(a_terminations)
