@@ -375,11 +375,30 @@ class SurfaceBarriers():
 
             return best_match
 
-        def is_valid_terimation(termination):
-            if termination is None:
+        def is_valid_terimation(term, barrier, is_b):
+            if term is None:
                 return False
-                
-            return True
+
+            #(dist_a, intersection, barrier_b, is_colinear)
+            intersection = (int(term[1][0]), int(term[1][1]))
+            num_points = int(max(term[0] // 5, 7))
+            start_point = barrier.bounds.line.point_b if is_b else barrier.bounds.line.point_a
+
+            samples = LineFunctions.get_line_samples(start_point, intersection, self.room.semantic_labels, num_points)
+            avg = np.mean(samples, axis=0)
+
+            if np.isnan(avg):
+                return False
+
+            value = int(round(avg))
+            remainder = value - avg
+
+            if value > ADE20K.max_index() or abs(remainder) > 0.2:
+                return False
+
+            label = ADE20K(value + 1)
+
+            return label == self.surface.bestLabel
 
         # candidates = self.barrier_groups.copy()
 
@@ -394,7 +413,7 @@ class SurfaceBarriers():
 
             if not a_open and not b_open: continue
 
-            line_a = barrier_a.bounds.line.extended(2.0, from_a=a_open, from_b=b_open)
+            line_a = barrier_a.bounds.line.extended(5.0, from_a=a_open, from_b=b_open)
 
             #find closest, either orthagonal or colinear and at the end, that's the one used, others ignored, 
             #This is across all elements
@@ -411,8 +430,8 @@ class SurfaceBarriers():
 
                 is_colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
 
-                dist_a = distance.sqeuclidean(intersection, barrier_a.bounds.line.point_a)
-                dist_b = distance.sqeuclidean(intersection, barrier_a.bounds.line.point_b)
+                dist_a = distance.euclidean(intersection, barrier_a.bounds.line.point_a)
+                dist_b = distance.euclidean(intersection, barrier_a.bounds.line.point_b)
 
                 if dist_a < dist_b:
                     if a_open:
@@ -424,17 +443,17 @@ class SurfaceBarriers():
             #use best:
             term_a = get_best_termination(a_terminations)
 
-            if is_valid_terimation(term_a):
+            if is_valid_terimation(term_a, barrier_a, False):
                 if term_a[0] <= min_distance_sq:
-                    barrier_a.add_termination_a(BarrierTermination(term_a[2], term_a[1], distance=math.sqrt(term_a[0])))
+                    barrier_a.add_termination_a(BarrierTermination(term_a[2], term_a[1], distance=term_a[0]))
                 else:
                     barrier_a.term_a = term_a[1]
 
             term_b = get_best_termination(b_terminations)
 
-            if is_valid_terimation(term_b):
+            if is_valid_terimation(term_b, barrier_a, True):
                 if term_b[0] <= min_distance_sq:
-                    barrier_a.add_termination_b(BarrierTermination(term_b[2], term_b[1], distance=math.sqrt(term_b[0])))
+                    barrier_a.add_termination_b(BarrierTermination(term_b[2], term_b[1], distance=term_b[0]))
                 else:
                     barrier_a.term_b = term_b[1]
 
