@@ -375,6 +375,12 @@ class SurfaceBarriers():
 
             return best_match
 
+        def is_valid_terimation(termination):
+            if termination is None:
+                return False
+                
+            return True
+
         # candidates = self.barrier_groups.copy()
 
         # for neighbor in self.surface.neighbors:
@@ -418,7 +424,7 @@ class SurfaceBarriers():
             #use best:
             term_a = get_best_termination(a_terminations)
 
-            if term_a is not None:
+            if is_valid_terimation(term_a):
                 if term_a[0] <= min_distance_sq:
                     barrier_a.add_termination_a(BarrierTermination(term_a[2], term_a[1], distance=math.sqrt(term_a[0])))
                 else:
@@ -426,7 +432,7 @@ class SurfaceBarriers():
 
             term_b = get_best_termination(b_terminations)
 
-            if term_b is not None:
+            if is_valid_terimation(term_b):
                 if term_b[0] <= min_distance_sq:
                     barrier_a.add_termination_b(BarrierTermination(term_b[2], term_b[1], distance=math.sqrt(term_b[0])))
                 else:
