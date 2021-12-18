@@ -126,12 +126,20 @@ class Barrier():
         # cv2.line(img, (int(self.shape_line.point_a[0]), int(self.shape_line.point_a[1])),(int(self.shape_line.point_b[0]), int(self.shape_line.point_b[1])), color, 1)
 
 class BarrierTermination():
-    def __init__(self, barrier_group, endpoint, from_a, distance, is_virtual=False):
-        self.barrier_group = barrier_group
-        self.endpoint = endpoint
+    def __init__(self, source, destination, intersection, from_a, distance, is_virtual=False):
+        self.source = source
+        self.destination = destination
+        self.intersection = int(intersection[0]), int(intersection[1])
         self.from_a = from_a
         self.distance = distance
         self.is_virtual = is_virtual
+
+    @property
+    def origin(self):
+        return self.source.bounds.line.point_a if self.from_a else self.source.bounds.line.point_b
+
+    def debug(self, img, color):
+        cv2.line(img, self.origin, self.intersection, color, 1)
 
 class BarrierGroup():
     def __init__(self, barrier):
@@ -160,19 +168,19 @@ class BarrierGroup():
     def add_termination_a(self, termination:BarrierTermination):
         if termination not in self.a_terminations:
             self.a_terminations.append(termination)
-            termination.barrier_group.add_parent(self)
+            termination.destination.add_parent(self)
 
     def add_termination_b(self, termination:BarrierTermination):
         if termination not in self.b_terminations:
             self.b_terminations.append(termination)
-            termination.barrier_group.add_parent(self)
+            termination.destination.add_parent(self)
 
     def add_parent(self, parent):
         self.parent_groups.append(parent)
 
     @property
     def linkage(self):
-        return self.parent_groups + list(map(lambda x: x.barrier_group, self.terminations))
+        return self.parent_groups + list(map(lambda x: x.destination, self.terminations))
 
     @property
     def terminations(self):
@@ -296,28 +304,18 @@ class BarrierGroup():
         self.bounds.line.draw(img, color=color)
 
         if not self.term_a is None:
-            term_a = (int(self.term_a[0]),int(self.term_a[1]))
-            cv2.line(img, self.bounds.line.point_a, term_a, color, 1)
-            #print("draw a", self.bounds.line.point_a, term_a)
-            #cv2.drawMarker(img, term_a, color, cv2.MARKER_DIAMOND)
+            self.term_a.debug(img, color)
 
         if not self.term_b is None:
-            term_b = (int(self.term_b[0]),int(self.term_b[1]))
-            cv2.line(img, self.bounds.line.point_b, term_b, color, 1)
-            #print("draw b", self.bounds.line.point_b, term_b)
-            #cv2.drawMarker(img, term_b, color, cv2.MARKER_DIAMOND)
+            self.term_b.debug(img, color)
 
     def debug_intersections(self, img):
         intersections = []
         if len(self.a_terminations) > 0:
-            intersection = int(self.a_terminations[0].endpoint[0]), int(self.a_terminations[0].endpoint[1])
-            cv2.line(img, self.bounds.line.point_a, intersection, (0,255,0), 1)
-            intersections.append(intersection)
+            intersections.append(self.a_terminations[0].intersection)
 
         if len(self.b_terminations) > 0:
-            intersection = int(self.b_terminations[0].endpoint[0]), int(self.b_terminations[0].endpoint[1])
-            cv2.line(img, self.bounds.line.point_b, intersection, (0,255,0), 1)
-            intersections.append(intersection)
+            intersections.append(self.b_terminations[0].intersection)
 
         thickness = min(self.bounds.width, self.bounds.height)
         radius = int(max(thickness/2, 5))
@@ -370,23 +368,21 @@ class SurfaceBarriers():
                 return None
 
             #get closest distance
-            terminations.sort(key=lambda x: x[0])
+            terminations.sort(key=lambda x: x.distance)
             best_match = terminations[0]
 
             #print("match")
 
             return best_match
 
-        def is_valid_terimation(term, barrier, is_b):
+        def is_valid_terimation(term):
             if term is None:
                 return False
 
             #(dist_a, intersection, barrier_b, is_colinear, is_virtual)
-            intersection = (int(term[1][0]), int(term[1][1]))
-            num_points = int(max(term[0] // 5, 7))
-            start_point = barrier.bounds.line.point_b if is_b else barrier.bounds.line.point_a
+            num_points = int(max(term.distance // 5, 7))
 
-            samples = LineFunctions.get_line_samples(start_point, intersection, self.room.semantic_labels, num_points)
+            samples = LineFunctions.get_line_samples(term.origin, term.intersection, self.room.semantic_labels, num_points)
             avg = np.mean(samples, axis=0)
 
             if np.isnan(avg):
@@ -443,27 +439,27 @@ class SurfaceBarriers():
 
                 if dist_a < dist_b:
                     if a_open:
-                        a_terminations.append((dist_a, intersection, barrier_b, is_virtual))
+                        a_terminations.append(BarrierTermination(barrier_a, barrier_b, intersection, from_a=True, distance=dist_a, is_virtual=is_virtual))
                 else:
                     if b_open:
-                        b_terminations.append((dist_b, intersection, barrier_b, is_virtual))
+                        b_terminations.append(BarrierTermination(barrier_a, barrier_b, intersection, from_a=False, distance=dist_b, is_virtual=is_virtual))
 
             #use best:
             term_a = get_best_termination(a_terminations)
 
-            if is_valid_terimation(term_a, barrier_a, False):
-                if term_a[0] <= min_distance_sq:
-                    barrier_a.add_termination_a(BarrierTermination(term_a[2], term_a[1], from_a=True, distance=term_a[0], is_virtual=term_a[3]))
+            if is_valid_terimation(term_a):
+                if term_a.distance < min_distance:
+                    barrier_a.add_termination_a(term_a)
                 else:
-                    barrier_a.term_a = term_a[1]
+                    barrier_a.term_a = term_a
 
             term_b = get_best_termination(b_terminations)
 
-            if is_valid_terimation(term_b, barrier_a, True):
-                if term_b[0] <= min_distance_sq:
-                    barrier_a.add_termination_b(BarrierTermination(term_b[2], term_b[1], from_a=False, distance=term_b[0], is_virtual=term_b[3]))
+            if is_valid_terimation(term_b):
+                if term_b.distance < min_distance:
+                    barrier_a.add_termination_b(term_b)
                 else:
-                    barrier_a.term_b = term_b[1]
+                    barrier_a.term_b = term_b
 
         self.cull_barriers(all_barriers)
         self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
@@ -667,38 +663,35 @@ class SurfaceBarriers():
                 dist_b = distance.euclidean(intersection, barrier_a.bounds.line.point_b)
 
                 if dist_a < dist_b:
-                    a_terms.append((dist_a, BarrierTermination(barrier_b, intersection, from_a=True, distance=dist_a)))
+                    a_terms.append(BarrierTermination(barrier_a, barrier_b, intersection, from_a=True, distance=dist_a))
                 else:
-                    b_terms.append((dist_b, BarrierTermination(barrier_b, intersection, from_a=False, distance=dist_b)))
+                    b_terms.append(BarrierTermination(barrier_a, barrier_b, intersection, from_a=False, distance=dist_b))
 
-            def add_termination(terminations, is_b:bool):
+            def add_termination(terminations):
                 if len(terminations) == 0:
                     return
-                term = sorted(terminations, key=lambda x: x[0])[0]
-                distance = term[0]
-                termination = term[1]
-
-                is_mine = termination.barrier_group in self.barrier_groups
+                termination = sorted(terminations, key=lambda x: x.distance)[0]
+                is_mine = termination.destination in self.barrier_groups
 
                 # if is_colinear:
                 #     barrier_a.merge(termination.barrier_group)
                 #     termination.barrier_group.dead = is_mine
                 #     return
 
-                if distance > max_distance:
+                if termination.distance > max_distance:
                     return
 
                 if not is_mine:
-                    elements.append(termination.barrier_group)
-                    new_elements.append(termination.barrier_group)
+                    elements.append(termination.destination)
+                    new_elements.append(termination.destination)
                 
-                if is_b:
-                    barrier_a.add_termination_b(termination)
+                if termination.from_a:
+                    termination.source.add_termination_a(termination)
                 else:
-                    barrier_a.add_termination_a(termination)
+                    termination.source.add_termination_b(termination)
 
-            add_termination(a_terms, is_b=False)
-            add_termination(b_terms, is_b=True)
+            add_termination(a_terms)
+            add_termination(b_terms)
 
         return new_elements
 
