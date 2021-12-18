@@ -160,7 +160,7 @@ class BarrierGroup():
         self.b_termination_candidates = []
         self.term_b = None
 
-        self.parent_groups = []
+        self._linkage = None
 
     def add_barrier(self, barrier):
         self.barriers.append(barrier)
@@ -168,19 +168,20 @@ class BarrierGroup():
     def add_termination_a(self, termination:BarrierTermination):
         if termination not in self.a_terminations:
             self.a_terminations.append(termination)
-            termination.destination.add_parent(self)
 
     def add_termination_b(self, termination:BarrierTermination):
         if termination not in self.b_terminations:
             self.b_terminations.append(termination)
-            termination.destination.add_parent(self)
-
-    def add_parent(self, parent):
-        self.parent_groups.append(parent)
 
     @property
     def linkage(self):
-        return self.parent_groups + list(map(lambda x: x.destination, self.terminations))
+        if self._linkage is None:
+            self._linkage = set()
+            for term in self.terminations:
+                self._linkage.add(term.source)
+                self._linkage.add(term.destination)
+
+        return self._linkage
 
     @property
     def terminations(self):
