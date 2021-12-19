@@ -311,12 +311,7 @@ class BarrierGroup():
             self.term_b.debug(img, color)
 
     def debug_intersections(self, img):
-        intersections = []
-        if len(self.a_terminations) > 0:
-            intersections.append(self.a_terminations[0].intersection)
-
-        if len(self.b_terminations) > 0:
-            intersections.append(self.b_terminations[0].intersection)
+        intersections = list(map(lambda x:x.intersection, self.terminations))
 
         thickness = min(self.bounds.width, self.bounds.height)
         radius = int(max(thickness/2, 5))
