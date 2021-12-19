@@ -319,12 +319,12 @@ class BarrierGroup():
             self.term_b.debug(img, color)
 
     def debug_intersections(self, img):
-        #intersections = list(map(lambda x:x.intersection, self.terminations))
+        intersections = list(map(lambda x:x.intersection, self.terminations))
 
-        if self.b_index == 237:
-            intersections = [self.bounds.line.point_b]
-        else:
-            intersections = []
+        # if self.b_index == 242:
+        #     intersections = [self.bounds.line.point_b]
+        # else:
+        #     intersections = []
 
         thickness = min(self.bounds.width, self.bounds.height)
         radius = int(max(thickness/2, 5))
@@ -346,6 +346,9 @@ def get_distances(rect_a, rect_b, point):
     values.append(distance.euclidean(point, rect_b.line.point_b))
 
     return np.array(values)
+
+debug_index_left_a = 242
+debug_index_right_b = 237
 
 class SurfaceBarriers():
     def __init__(self, data, surface, vanishing_points):
@@ -433,6 +436,17 @@ class SurfaceBarriers():
                 intersection = line_a.get_intersection(barrier_b.bounds.line)
 
                 is_virtual = False
+
+                if barrier_a.b_index == debug_index_left_a and barrier_b.b_index == debug_index_right_b:
+                    rect_a = RotatedRect(line_a.bounding_box(5, length_multiplier=3.0))
+                    rect_b = RotatedRect(barrier_b.bounds.line.bounding_box(5))
+                    intersection = rect_a.get_intersection(rect_b)
+
+                    print("a)#line_a", barrier_a.bounds.line.point_a)
+                    print("   line_b", barrier_a.bounds.line.point_b)
+                    print("b) line_a", barrier_b.bounds.line.point_a)
+                    print("  #line_b", barrier_b.bounds.line.point_b)
+                    print("intersection", intersection)
 
                 if intersection is None:
                     line_b = barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.a_terminations)==0)
