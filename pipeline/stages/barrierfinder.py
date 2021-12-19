@@ -134,12 +134,16 @@ class BarrierTermination():
         self.distance = distance
         self.is_virtual = is_virtual
 
+
+
     @property
     def origin(self):
         return self.source.bounds.line.point_a if self.from_a else self.source.bounds.line.point_b
 
     def debug(self, img, color):
         cv2.line(img, self.origin, self.intersection, color, 1)
+
+b_index = 0
 
 class BarrierGroup():
     def __init__(self, barrier):
@@ -161,6 +165,10 @@ class BarrierGroup():
         self.term_b = None
 
         self._linkage = None
+
+        global b_index
+        self.b_index = b_index
+        b_index += 1
 
     def add_barrier(self, barrier):
         self.barriers.append(barrier)
@@ -311,7 +319,12 @@ class BarrierGroup():
             self.term_b.debug(img, color)
 
     def debug_intersections(self, img):
-        intersections = list(map(lambda x:x.intersection, self.terminations))
+        #intersections = list(map(lambda x:x.intersection, self.terminations))
+
+        if self.b_index == 237:
+            intersections = [self.bounds.line.point_b]
+        else:
+            intersections = []
 
         thickness = min(self.bounds.width, self.bounds.height)
         radius = int(max(thickness/2, 5))
