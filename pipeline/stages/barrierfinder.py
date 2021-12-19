@@ -21,6 +21,10 @@ from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.room import Room
 from pipeline.components.surface import Surface
 
+debug_index_left_a = 242
+debug_index_right_b = 237
+debug_objects = []
+
 class Barrier():
     def __init__(self, surface_barrier, line, vanishing_point):
         self.surface_barrier = surface_barrier
@@ -167,7 +171,7 @@ class BarrierGroup():
         self._linkage = None
 
         global b_index
-        self.b_index = b_index
+        self.index = b_index
         b_index += 1
 
     def add_barrier(self, barrier):
@@ -321,7 +325,7 @@ class BarrierGroup():
     def debug_intersections(self, img):
         intersections = list(map(lambda x:x.intersection, self.terminations))
 
-        # if self.b_index == 242:
+        # if self.index == 242:
         #     intersections = [self.bounds.line.point_b]
         # else:
         #     intersections = []
@@ -347,8 +351,23 @@ def get_distances(rect_a, rect_b, point):
 
     return np.array(values)
 
-debug_index_left_a = 242
-debug_index_right_b = 237
+#order matters for mean, grab two closest to bounds_a midpoint
+def get_bounds_intersection(bounds_a, bounds_b, debug=False):
+    result, vertices = cv2.rotatedRectangleIntersection(bounds_a, bounds_b)
+
+    if debug:
+        print("vertices", vertices)
+
+    if vertices is None:
+        return None
+
+    #average of the closest two:
+    #get_loc = np.mean(vertices, axis=(0,1))
+    vertices = list(vertices)
+    vertices.sort(key=lambda x:distance.sqeuclidean(bounds_a.line.midpoint, x))
+    vertices = np.array(vertices)
+
+    return np.mean(vertices[:2], axis=(0,1))
 
 class SurfaceBarriers():
     def __init__(self, data, surface, vanishing_points):
@@ -365,6 +384,7 @@ class SurfaceBarriers():
         self.merge_barriers()
         
     def refine(self, all_barriers):
+        global debug_objects
 
         self.set_initial_endpoints(self.barrier_groups, all_barriers)
 
@@ -424,34 +444,42 @@ class SurfaceBarriers():
             if not a_open and not b_open: continue
 
             line_a = barrier_a.bounds.line.extended(5.0, from_a=a_open, from_b=b_open)
+            rect_a = RotatedRect(line_a.bounding_box(min_distance))
 
             #find closest, either orthagonal or colinear and at the end, that's the one used, others ignored, 
             #This is across all elements
             a_terminations = []
             b_terminations = []
 
+            if barrier_a.index == debug_index_left_a:
+                debug_objects.append(rect_a)
+                if a_open:
+                    debug_objects.append(barrier_a.bounds.line.point_a)
+                elif b_open:
+                    debug_objects.append(barrier_a.bounds.line.point_b)
+
             for barrier_b in self.barrier_groups:
                 if barrier_a == barrier_b or barrier_a.bounds.line.equals(barrier_b.bounds.line, epsilon): continue
 
-                intersection = line_a.get_intersection(barrier_b.bounds.line)
+                rect_b = RotatedRect(barrier_b.bounds.line.bounding_box(min_distance))
+
+                debug = barrier_a.index == debug_index_left_a and barrier_b.index == debug_index_right_b
+
+                if debug:
+                    debug_objects.append(rect_b)
+
+                intersection = get_bounds_intersection(rect_a, rect_b, debug=debug)
 
                 is_virtual = False
 
-                if barrier_a.b_index == debug_index_left_a and barrier_b.b_index == debug_index_right_b:
-                    rect_a = RotatedRect(line_a.bounding_box(5, length_multiplier=3.0))
-                    rect_b = RotatedRect(barrier_b.bounds.line.bounding_box(5))
-                    intersection = rect_a.get_intersection(rect_b)
-
-                    print("a)#line_a", barrier_a.bounds.line.point_a)
-                    print("   line_b", barrier_a.bounds.line.point_b)
-                    print("b) line_a", barrier_b.bounds.line.point_a)
-                    print("  #line_b", barrier_b.bounds.line.point_b)
-                    print("intersection", intersection)
-
                 if intersection is None:
-                    line_b = barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.a_terminations)==0)
-                    intersection = line_a.get_intersection(line_b)
+                    rect_b = RotatedRect(barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.a_terminations)==0).bounding_box(min_distance))
+                    intersection = get_bounds_intersection(rect_a, rect_b, debug=debug)
                     is_virtual = True
+
+                if debug:
+                    # debug_objects.append(rect_b)
+                    print("intersection", intersection)
 
                 if intersection is None: continue
 
@@ -868,6 +896,7 @@ class BarrierSolver():
             return list(filter(lambda group: surface in group.surfaces, self.barrier_groups))
 
         def log_barriers(surfaces, name):
+
             if len(surfaces) == 0:
                 return
 
@@ -883,6 +912,15 @@ class BarrierSolver():
 
                 for group in surface.barriers.barrier_groups:
                     group.debug_intersections(debug)
+
+            for obj in debug_objects:
+                color =  random_color()
+                if isinstance(obj, RotatedRect):
+                    cv2.drawContours(debug, [obj.points], 0, color, 2)
+                elif isinstance(obj, Line):
+                    line.draw(debug, color)
+                elif isinstance(obj, tuple):
+                    cv2.circle(debug, (int(obj[0]), int(obj[1])), 10, color) 
                 
             log_image(self.data, name + "_barriers", debug)
 
