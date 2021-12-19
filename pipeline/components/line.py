@@ -116,6 +116,9 @@ class Line(Sequence):
 
         data = self.data.copy()
 
+        if np.sign(direction[0]) != np.sign(direction[1]):
+            amount *= -1.0
+
         if from_a:
             data[0] = self.midpoint[0] + direction[0] * amount
             data[1] = self.midpoint[1] + direction[1] * amount
