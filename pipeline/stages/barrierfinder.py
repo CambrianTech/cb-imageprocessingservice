@@ -138,8 +138,6 @@ class BarrierTermination():
         self.distance = distance
         self.is_virtual = is_virtual
 
-
-
     @property
     def origin(self):
         return self.source.bounds.line.point_a if self.from_a else self.source.bounds.line.point_b
@@ -404,7 +402,7 @@ class SurfaceBarriers():
 
             return best_match
 
-        def is_valid_terimation(term):
+        def is_valid_terimation(term, debug=False):
             if term is None:
                 return False
 
@@ -412,20 +410,19 @@ class SurfaceBarriers():
             num_points = int(max(term.distance // 5, 7))
 
             samples = LineFunctions.get_line_samples(term.origin, term.intersection, self.room.semantic_labels, num_points)
-            avg = np.mean(samples, axis=0)
+            vals, counts = np.unique(samples, return_counts=True)
+            index = np.argmax(counts)
+            value = vals[index] + ADE20K.value_offset()
 
-            if np.isnan(avg):
-                return False
+            if value == self.surface.bestLabel.value:
+                return True
 
-            value = int(round(avg))
-            remainder = value - avg
+            # if debug: print("vals, counts, index:", vals, counts, index)
+            # if debug: print("label match:", self.surface.bestLabel, self.surface.bestLabel.value, value)
 
-            if value > ADE20K.max_index() or abs(remainder) > 0.2:
-                return False
+            #can check second highest count value:
 
-            label = ADE20K(value + 1)
-
-            return label == self.surface.bestLabel
+            return False
 
         # candidates = self.barrier_groups.copy()
 
@@ -448,19 +445,21 @@ class SurfaceBarriers():
             a_terminations = []
             b_terminations = []
 
-            if barrier_a.index == debug_index_left_a:
-                debug_objects.append(rect_a)
-                # if a_open:
-                #     debug_objects.append(barrier_a.bounds.line.point_a)
-                # elif b_open:
-                #     debug_objects.append(barrier_a.bounds.line.point_b)
+            debug_a = (barrier_a.index == debug_index_left_a)
+
+            # if barrier_a.index == debug_index_left_a:
+            #     debug_objects.append(rect_a)
+            #     # if a_open:
+            #     #     debug_objects.append(barrier_a.bounds.line.point_a)
+            #     # elif b_open:
+            #     #     debug_objects.append(barrier_a.bounds.line.point_b)
 
             for barrier_b in self.barrier_groups:
                 if barrier_a == barrier_b or barrier_a.bounds.line.equals(barrier_b.bounds.line, epsilon): continue
 
                 rect_b = RotatedRect(barrier_b.bounds.line.bounding_box(min_distance))
 
-                debug = barrier_a.index == debug_index_left_a and barrier_b.index == debug_index_right_b
+                debug_b = barrier_b.index == debug_index_right_b
 
                 intersection = get_bounds_intersection(rect_a, rect_b)
 
@@ -471,10 +470,10 @@ class SurfaceBarriers():
                     intersection = get_bounds_intersection(rect_a, rect_b)
                     is_virtual = True
 
-                if debug:
-                    #rect_b = RotatedRect(barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.a_terminations)==0).bounding_box(min_distance))
+                if debug_a and intersection is not None:
                     debug_objects.append(intersection)
-                    print("intersection", intersection)
+                    #debug_objects.append(barrier_a.bounds.line.point_a)
+                    print("intersection", barrier_b.index, intersection)
 
                 if intersection is None: continue
 
@@ -485,13 +484,20 @@ class SurfaceBarriers():
 
                 if dist_a < dist_b:
                     if a_open:
-                        a_terminations.append(BarrierTermination(barrier_a, barrier_b, intersection, from_a=True, distance=dist_a, is_virtual=is_virtual))
+                        a_terminations.append(BarrierTermination(barrier_a, barrier_b, intersection=intersection, from_a=True, distance=dist_a, is_virtual=is_virtual))
                 else:
                     if b_open:
-                        b_terminations.append(BarrierTermination(barrier_a, barrier_b, intersection, from_a=False, distance=dist_b, is_virtual=is_virtual))
+                        b_terminations.append(BarrierTermination(barrier_a, barrier_b, intersection=intersection, from_a=False, distance=dist_b, is_virtual=is_virtual))
 
             #use best:
             term_a = get_best_termination(a_terminations)
+
+            # if term_a is not None and barrier_a.index == debug_index_left_a:
+            #     debug_objects.append(term_a)
+            #     debug_objects.append(term_a.intersection)
+            #     #debug_objects.append(barrier_a.bounds.line.point_a)
+            #     print("num terms", len(a_terminations))
+
 
             if is_valid_terimation(term_a):
                 if term_a.distance < min_distance:
@@ -916,6 +922,8 @@ class BarrierSolver():
                     cv2.drawContours(debug, [obj.points], 0, color, 2)
                 elif isinstance(obj, Line):
                     obj.draw(debug, color)
+                elif isinstance(obj, BarrierTermination):
+                    obj.debug(debug, color)
                 elif len(obj) == 2:
                     cv2.circle(debug, (int(obj[0]), int(obj[1])), 10, color) 
                 else:
