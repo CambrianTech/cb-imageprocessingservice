@@ -410,6 +410,9 @@ class SurfaceBarriers():
             num_points = int(max(term.distance // 5, 7))
 
             samples = LineFunctions.get_line_samples(term.origin, term.intersection, self.room.semantic_labels, num_points)
+            if len(samples) == 0:
+                return None
+
             vals, counts = np.unique(samples, return_counts=True)
             index = np.argmax(counts)
             value = vals[index] + ADE20K.value_offset()
@@ -437,7 +440,7 @@ class SurfaceBarriers():
 
             if not a_open and not b_open: continue
 
-            line_a = barrier_a.bounds.line.extended(3.0, from_a=a_open, from_b=b_open)
+            line_a = barrier_a.bounds.line.extended(0.5).extended(3.0, from_a=a_open, from_b=b_open)
             rect_a = RotatedRect(line_a.bounding_box(min_distance))
 
             #find closest, either orthagonal or colinear and at the end, that's the one used, others ignored, 
@@ -471,6 +474,7 @@ class SurfaceBarriers():
                     is_virtual = True
 
                 if debug_a and intersection is not None:
+                    debug_objects.append(barrier_b.bounds.line)
                     debug_objects.append(intersection)
                     #debug_objects.append(barrier_a.bounds.line.point_a)
                     print("intersection", barrier_b.index, intersection)
@@ -802,8 +806,16 @@ class SurfaceBarriers():
         outside_threshold = 0.05
         inside_threshold = 0.1
 
-        for group in self.barrier_groups:
+        for i in range(len(self.barrier_groups)):
+            group = self.barrier_groups[i]
 
+            for j in range(i+1, len(self.barrier_groups)):
+                group_b = self.barrier_groups[j]
+                if group.bounds.line.equals(group_b.bounds.line, 3):
+                    group.dead = True
+                    break
+
+            if group.dead: continue
             is_inside, dist, index = closest_contour()
 
             if is_inside: #aka if group is inside
@@ -921,6 +933,7 @@ class BarrierSolver():
                 if isinstance(obj, RotatedRect):
                     cv2.drawContours(debug, [obj.points], 0, color, 2)
                 elif isinstance(obj, Line):
+                    #print(obj.point_a, obj.point_b)
                     obj.draw(debug, color)
                 elif isinstance(obj, BarrierTermination):
                     obj.debug(debug, color)
