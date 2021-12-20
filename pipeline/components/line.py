@@ -116,19 +116,21 @@ class Line(Sequence):
 
         direction = self.direction
         amount = self.length * ratio
-
-        if direction[0] < 0 or direction[1] < 0:
-            amount *= -1
-
         data = self.data.copy()
 
         if from_a:
-            data[0] = self.midpoint[0] + direction[0] * amount
-            data[1] = self.midpoint[1] + direction[1] * amount
+            data[0] = self.midpoint[0] - direction[0] * amount
+            data[1] = self.midpoint[1] - direction[1] * amount
 
         if from_b:
-            data[2] = self.midpoint[0] - direction[0] * amount
-            data[3] = self.midpoint[1] - direction[1] * amount
+            data[2] = self.midpoint[0] + direction[0] * amount
+            data[3] = self.midpoint[1] + direction[1] * amount
+
+        # new_line = Line(data)
+        # if from_b and not from_a and ratio > 1:
+        #     print(ratio, new_line.length, self.length)
+        #     print(self.point_a, self.point_b)
+        #     print(new_line.point_a, new_line.point_b)
 
         return Line(data)
         

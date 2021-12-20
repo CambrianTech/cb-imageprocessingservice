@@ -381,13 +381,14 @@ class SurfaceBarriers():
     def refine(self, all_barriers):
         global debug_objects
 
-        self.set_initial_endpoints(self.barrier_groups, all_barriers)
-
         max_angle_parallel = np.radians(13)
         max_angle_orth = np.radians(30)
         min_distance = self.diagonal / 200
         min_distance_sq = min_distance * min_distance
         epsilon = min_distance
+
+        self.set_initial_endpoints(self.barrier_groups, all_barriers)
+        self.cull_barriers(all_barriers)
 
         #now extend and link all:
         def get_best_termination(terminations):            
@@ -440,7 +441,9 @@ class SurfaceBarriers():
 
             if not a_open and not b_open: continue
 
-            line_a = barrier_a.bounds.line.extended(0.5).extended(3.0, from_a=a_open, from_b=b_open)
+            bounds_a = RotatedRect(barrier_a.bounds.line.extended(1.05).bounding_box(min_distance))
+
+            line_a = barrier_a.bounds.line.extended(3.0, from_a=a_open, from_b=b_open)
             rect_a = RotatedRect(line_a.bounding_box(min_distance))
 
             #find closest, either orthagonal or colinear and at the end, that's the one used, others ignored, 
@@ -460,6 +463,10 @@ class SurfaceBarriers():
             for barrier_b in self.barrier_groups:
                 if barrier_a == barrier_b or barrier_a.bounds.line.equals(barrier_b.bounds.line, epsilon): continue
 
+                bounds_b = RotatedRect(barrier_b.bounds.line.extended(1.1).bounding_box(min_distance))
+
+                if bounds_a.intersects(bounds_b): continue
+
                 rect_b = RotatedRect(barrier_b.bounds.line.bounding_box(min_distance))
 
                 debug_b = barrier_b.index == debug_index_right_b
@@ -473,11 +480,11 @@ class SurfaceBarriers():
                     intersection = get_bounds_intersection(rect_a, rect_b)
                     is_virtual = True
 
-                if debug_a and intersection is not None:
-                    debug_objects.append(barrier_b.bounds.line)
-                    debug_objects.append(intersection)
-                    #debug_objects.append(barrier_a.bounds.line.point_a)
-                    print("intersection", barrier_b.index, intersection)
+                # if debug_a and intersection is not None:
+                #     debug_objects.append(barrier_b.bounds.line)
+                #     debug_objects.append(intersection)
+                #     #debug_objects.append(barrier_a.bounds.line.point_a)
+                #     print("intersection", barrier_b.index, intersection)
 
                 if intersection is None: continue
 
@@ -496,11 +503,12 @@ class SurfaceBarriers():
             #use best:
             term_a = get_best_termination(a_terminations)
 
-            # if term_a is not None and barrier_a.index == debug_index_left_a:
-            #     debug_objects.append(term_a)
-            #     debug_objects.append(term_a.intersection)
-            #     #debug_objects.append(barrier_a.bounds.line.point_a)
-            #     print("num terms", len(a_terminations))
+            if term_a is not None and barrier_a.index == debug_index_left_a:
+                #debug_objects.append(term_a)
+                debug_objects.append(term_a.intersection)
+                debug_objects.append(term_a.origin)
+                #debug_objects.append(barrier_a.bounds.line.point_a)
+                #print("num terms", len(a_terminations))
 
 
             if is_valid_terimation(term_a):
@@ -517,7 +525,7 @@ class SurfaceBarriers():
                 else:
                     barrier_a.term_b = term_b
 
-        self.cull_barriers(all_barriers)
+        
         self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
 
 
@@ -669,10 +677,10 @@ class SurfaceBarriers():
 
     def set_initial_endpoints(self, elements, all_barriers):
         #find interlinking
-        max_distance = self.diagonal / 200
+        min_distance = self.diagonal / 200
         min_length = self.diagonal / 20
         max_angle_parallel = np.radians(15)
-        epsilon = max_distance
+        epsilon = min_distance
 
         #start from barrier groups, but also add sibling barriers to end
         candidates = []
@@ -687,7 +695,7 @@ class SurfaceBarriers():
 
             if barrier_a.bounds.line.length < min_length: continue
 
-            line_a = barrier_a.bounds.line.extended(1.05)
+            rect_a = RotatedRect(barrier_a.bounds.line.bounding_box(min_distance))
 
             a_terms = []
             b_terms = []
@@ -695,18 +703,12 @@ class SurfaceBarriers():
             for j in range(len(candidates)):
                 barrier_b = candidates[j]
 
-                if barrier_a == barrier_b or barrier_b.bounds.line.length < min_length: continue
-
-                if barrier_a.bounds.line.equals(barrier_b.bounds.line, epsilon):
-                    #if barrier_a in self.barrier_groups and barrier_b in self.barrier_groups:
-                        #there can be only one
-                        #barrier_b.dead = barrier_a.bounds.line.equals(barrier_b.bounds.line, 0.01)
-                    continue
-
+                if barrier_a == barrier_b: continue
                 #if barrier_b.vanishing_point not in self.surface.vanishing_points: continue
 
-                line_b = barrier_b.bounds.line.extended(1.05)
-                intersection = line_a.get_intersection(line_b)
+                rect_b = RotatedRect(barrier_b.bounds.line.bounding_box(min_distance))
+
+                intersection = get_bounds_intersection(rect_a, rect_b)
 
                 if intersection is None: 
                     continue
@@ -719,35 +721,9 @@ class SurfaceBarriers():
                 dist_b = distance.euclidean(intersection, barrier_a.bounds.line.point_b)
 
                 if dist_a < dist_b:
-                    a_terms.append(BarrierTermination(barrier_a, barrier_b, intersection, from_a=True, distance=dist_a))
+                    barrier_a.add_termination_a(BarrierTermination(barrier_a, barrier_b, intersection, from_a=True, distance=dist_a))
                 else:
-                    b_terms.append(BarrierTermination(barrier_a, barrier_b, intersection, from_a=False, distance=dist_b))
-
-            def add_termination(terminations):
-                if len(terminations) == 0:
-                    return
-                termination = sorted(terminations, key=lambda x: x.distance)[0]
-                is_mine = termination.destination in self.barrier_groups
-
-                # if is_colinear:
-                #     barrier_a.merge(termination.barrier_group)
-                #     termination.barrier_group.dead = is_mine
-                #     return
-
-                if termination.distance > max_distance:
-                    return
-
-                if not is_mine:
-                    elements.append(termination.destination)
-                    new_elements.append(termination.destination)
-                
-                if termination.from_a:
-                    termination.source.add_termination_a(termination)
-                else:
-                    termination.source.add_termination_b(termination)
-
-            add_termination(a_terms)
-            add_termination(b_terms)
+                    barrier_a.add_termination_b(BarrierTermination(barrier_a, barrier_b, intersection, from_a=False, distance=dist_b))
 
         return new_elements
 
