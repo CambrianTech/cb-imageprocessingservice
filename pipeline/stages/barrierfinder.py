@@ -658,7 +658,7 @@ class SurfaceBarriers():
 
     def merge_barriers(self):
 
-        width_offset = self.diagonal / 200
+        width_offset = self.diagonal / 80
         #angle_threshold = np.radians(13)
 
         #merge similar barriers into one
