@@ -272,7 +272,7 @@ class BarrierGroup():
         
         return self._surfaces
 
-    def like(self, other, angle_threshold=np.radians(3), width_offset=0.0):
+    def like(self, other, angle_threshold=np.radians(7), width_offset=0.0):
         
         angle = LineFunctions.line_angle_difference(self.bounds.line.angle, other.bounds.line.angle)
 
@@ -659,17 +659,30 @@ class SurfaceBarriers():
     def merge_barriers(self):
 
         width_offset = self.diagonal / 100
+        #angle_threshold = np.radians(13)
 
         #merge similar barriers into one
         for i in range(len(self.barrier_groups)):
             group_a = self.barrier_groups[i]
 
             if group_a.dead: continue
+
+            rect_a = RotatedRect(group_a.bounds.line.bounding_box(width_offset))
+            angle_threshold_a = np.arctan(width_offset / group_a.bounds.line.length)
             
             for j in range(i + 1, len(self.barrier_groups)):
                 group_b = self.barrier_groups[j]
 
-                if group_a.like(group_b, width_offset=width_offset, angle_threshold=np.radians(5)):
+                angle_threshold_b = np.arctan(width_offset / group_b.bounds.line.length)
+
+                angle_threshold = max(max(angle_threshold_a, angle_threshold_b), np.radians(13))
+
+                if line_angle_difference(group_a.bounds.line.angle, group_b.bounds.line.angle) > angle_threshold:
+                    continue
+
+                rect_b = RotatedRect(group_b.bounds.line.bounding_box(width_offset))
+                
+                if rect_a.intersects(rect_b):
                     group_a.merge(group_b)
                     group_b.dead = True
 
