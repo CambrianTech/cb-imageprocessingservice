@@ -332,7 +332,13 @@ class BarrierGroup():
         radius = int(max(thickness/2, 5))
 
         for intersection in intersections:
-            cv2.circle(img, intersection, radius, [0, 0, 255])            
+            cv2.circle(img, intersection, radius, [0, 0, 255])  
+
+        if len(self.a_terminations) == 0:
+            cv2.circle(img, self.bounds.line.point_a, int(radius * 1.5), [0, 255, 0])  
+
+        if len(self.b_terminations) == 0:
+            cv2.circle(img, self.bounds.line.point_b, int(radius * 1.5), [0, 255, 0])  
 
 def inside_mask(mask, point):
     if point[0] < mask.shape[1] and point[1] < mask.shape[0]:
@@ -453,12 +459,8 @@ class SurfaceBarriers():
 
             debug_a = (barrier_a.index == debug_index_left_a)
 
-            # if barrier_a.index == debug_index_left_a:
+            # if debug_a:
             #     debug_objects.append(rect_a)
-            #     # if a_open:
-            #     #     debug_objects.append(barrier_a.bounds.line.point_a)
-            #     # elif b_open:
-            #     #     debug_objects.append(barrier_a.bounds.line.point_b)
 
             for barrier_b in self.barrier_groups:
                 if barrier_a == barrier_b or barrier_a.bounds.line.equals(barrier_b.bounds.line, epsilon): continue
@@ -480,11 +482,20 @@ class SurfaceBarriers():
                     intersection = get_bounds_intersection(rect_a, rect_b)
                     is_virtual = True
 
+
                 # if debug_a and intersection is not None:
-                #     debug_objects.append(barrier_b.bounds.line)
-                #     debug_objects.append(intersection)
-                #     #debug_objects.append(barrier_a.bounds.line.point_a)
-                #     print("intersection", barrier_b.index, intersection)
+                #     debug_objects.append(rect_b)
+                #     print("intersection %d" % barrier_b.index, intersection)
+
+                # if debug_a and intersection is not None:
+                    # debug_objects.append(barrier_b.bounds.line)
+                    # debug_objects.append(intersection)
+                    #debug_objects.append(barrier_a.bounds.line.point_a)
+                    # line = barrier_b.bounds.line
+
+                    # debug_objects.append(Line(np.array([line.point_a[0] + 20 * line.normal_a[0], line.point_a[1] + 20 * line.normal_a[1], \
+                    #                                     line.point_a[0] + 20 * line.normal_b[0], line.point_a[1] + 10 * line.normal_b[1]])))
+                    # print("intersection", barrier_b.index, intersection)
 
                 if intersection is None: continue
 
@@ -503,12 +514,12 @@ class SurfaceBarriers():
             #use best:
             term_a = get_best_termination(a_terminations)
 
-            if term_a is not None and barrier_a.index == debug_index_left_a:
-                #debug_objects.append(term_a)
-                debug_objects.append(term_a.intersection)
-                debug_objects.append(term_a.origin)
-                #debug_objects.append(barrier_a.bounds.line.point_a)
-                #print("num terms", len(a_terminations))
+            # if term_a is not None and barrier_a.index == debug_index_left_a:
+            #     #debug_objects.append(term_a)
+            #     debug_objects.append(term_a.intersection)
+            #     debug_objects.append(term_a.origin)
+            #     # debug_objects.append(barrier_a.bounds.line.point_a)
+            #     print("num terms", len(a_terminations))
 
 
             if is_valid_terimation(term_a):
