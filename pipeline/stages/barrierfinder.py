@@ -323,22 +323,24 @@ class BarrierGroup():
     def debug_intersections(self, img):
         intersections = list(map(lambda x:x.intersection, self.terminations))
 
-        # if self.index == 242:
-        #     intersections = [self.bounds.line.point_b]
-        # else:
-        #     intersections = []
-
         thickness = min(self.bounds.width, self.bounds.height)
         radius = int(max(thickness/2, 5))
 
+        #connected points are small and blue
         for intersection in intersections:
             cv2.circle(img, intersection, radius, [0, 0, 255])  
 
-        if len(self.a_terminations) == 0:
-            cv2.circle(img, self.bounds.line.point_a, int(radius * 1.5), [0, 255, 0])  
+        #open endpoints are larger and green
+        #while closed are smaller and red
+        if len(self.a_terminations) == 0: #open
+            cv2.circle(img, self.bounds.line.point_a, int(radius * 2.0), [0, 255, 0]) 
+        else: #closed
+            cv2.circle(img, self.bounds.line.point_a, int(radius * 1.5), [255, 0, 0]) 
 
-        if len(self.b_terminations) == 0:
-            cv2.circle(img, self.bounds.line.point_b, int(radius * 1.5), [0, 255, 0])  
+        if len(self.b_terminations) == 0: #open
+            cv2.circle(img, self.bounds.line.point_b, int(radius * 2.0), [0, 255, 0])  
+        else: #closed
+            cv2.circle(img, self.bounds.line.point_b, int(radius * 1.5), [255, 0, 0]) 
 
 def inside_mask(mask, point):
     if point[0] < mask.shape[1] and point[1] < mask.shape[0]:
@@ -393,7 +395,7 @@ class SurfaceBarriers():
         min_distance_sq = min_distance * min_distance
         epsilon = min_distance
 
-        self.set_initial_endpoints(self.barrier_groups, all_barriers)
+        self.set_initial_endpoints()
         self.cull_barriers(all_barriers)
 
         #now extend and link all:
@@ -699,7 +701,7 @@ class SurfaceBarriers():
 
         self.filter_barriers()
 
-    def set_initial_endpoints(self, elements, all_barriers):
+    def set_initial_endpoints(self):
         #find interlinking
         min_distance = self.diagonal / 200
         min_length = self.diagonal / 20
@@ -707,15 +709,14 @@ class SurfaceBarriers():
         epsilon = min_distance
 
         #start from barrier groups, but also add sibling barriers to end
-        candidates = []
-        for neighbor in self.surface.neighbors:
-            if neighbor.barriers is not None:
-                candidates.extend(filter(lambda x: x.vanishing_point in self.surface.vanishing_points, neighbor.barriers.barrier_groups))
+        candidates = self.barrier_groups.copy()
+        # for neighbor in self.surface.neighbors:
+        #     if neighbor.barriers is not None:
+        #         candidates.extend(filter(lambda x: x.vanishing_point in self.surface.vanishing_points, neighbor.barriers.barrier_groups))
 
         #set termination points
-        new_elements = []
-        for i in range(len(elements)):
-            barrier_a = elements[i]
+        for i in range(len(self.barrier_groups)):
+            barrier_a = self.barrier_groups[i]
 
             if barrier_a.bounds.line.length < min_length: continue
 
@@ -730,16 +731,17 @@ class SurfaceBarriers():
                 if barrier_a == barrier_b: continue
                 #if barrier_b.vanishing_point not in self.surface.vanishing_points: continue
 
-                rect_b = RotatedRect(barrier_b.bounds.line.bounding_box(min_distance))
+                is_colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
+
+                if is_colinear:
+                    rect_b = RotatedRect(barrier_b.bounds.line.extended(1.2).bounding_box(min_distance))
+                else:
+                    rect_b = RotatedRect(barrier_b.bounds.line.bounding_box(min_distance))
 
                 intersection = get_bounds_intersection(rect_a, rect_b)
 
                 if intersection is None: 
                     continue
-
-                # is_colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
-                # if is_colinear:
-                #     is_colinear = barrier_a.bounds.line.intersects(barrier_b.bounds.line)
 
                 dist_a = distance.euclidean(intersection, barrier_a.bounds.line.point_a)
                 dist_b = distance.euclidean(intersection, barrier_a.bounds.line.point_b)
@@ -748,8 +750,6 @@ class SurfaceBarriers():
                     barrier_a.add_termination_a(BarrierTermination(barrier_a, barrier_b, intersection, from_a=True, distance=dist_a))
                 else:
                     barrier_a.add_termination_b(BarrierTermination(barrier_a, barrier_b, intersection, from_a=False, distance=dist_b))
-
-        return new_elements
 
     def cull_barriers(self, all_barriers):
 
