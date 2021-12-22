@@ -301,6 +301,8 @@ class BarrierGroup():
         self.barriers = list(set(self.barriers) | set(other.barriers))
         self._points = None
         self._bounds = None #trigger recalculation
+        self.a_terminations = []
+        self.b_terminations = []
 
     def debug(self, img, color, show_bounds=True):
 
@@ -341,6 +343,8 @@ class BarrierGroup():
             cv2.circle(img, self.bounds.line.point_b, int(radius * 2.0), [0, 255, 0])  
         else: #closed
             cv2.circle(img, self.bounds.line.point_b, int(radius * 1.5), [255, 0, 0]) 
+
+        put_text(img, str(self.index), self.bounds.line.midpoint, (0,0, 255), size=0.5, shadow=True)
 
 def inside_mask(mask, point):
     if point[0] < mask.shape[1] and point[1] < mask.shape[0]:
@@ -385,6 +389,9 @@ class SurfaceBarriers():
         self.barrier_candidates = self.get_barrier_candidates()
         self.barrier_groups = self.group_barriers()
         self.merge_barriers()
+
+    def getBarrier(self, index, elements=None):
+        return next(filter(lambda barrier: barrier.index == index, self.barrier_groups if elements is None else elements), None)
         
     def refine(self, all_barriers):
         global debug_objects
@@ -718,17 +725,18 @@ class SurfaceBarriers():
         for i in range(len(self.barrier_groups)):
             barrier_a = self.barrier_groups[i]
 
-            if barrier_a.bounds.line.length < min_length: continue
+            if barrier_a.dead or barrier_a.bounds.line.length < min_length: continue
 
             rect_a = RotatedRect(barrier_a.bounds.line.bounding_box(min_distance))
 
             a_terms = []
             b_terms = []
+            merged = False
 
             for j in range(len(candidates)):
                 barrier_b = candidates[j]
 
-                if barrier_a == barrier_b: continue
+                if barrier_a == barrier_b or barrier_b.dead: continue
                 #if barrier_b.vanishing_point not in self.surface.vanishing_points: continue
 
                 is_colinear = LineFunctions.line_angle_difference(barrier_a.bounds.line.angle, barrier_b.bounds.line.angle) <= max_angle_parallel
@@ -745,15 +753,29 @@ class SurfaceBarriers():
 
                 dist_a = distance.euclidean(intersection, barrier_a.bounds.line.point_a)
                 dist_b = distance.euclidean(intersection, barrier_a.bounds.line.point_b)
-
-                if dist_a < dist_b:
-                    barrier_a.add_termination_a(BarrierTermination(barrier_a, barrier_b, intersection, from_a=True, distance=dist_a))
+                    
+                if is_colinear:
+                    barrier_a.merge(barrier_b)
+                    barrier_b.dead = True
+                    merged = True
+                    break
                 else:
-                    barrier_a.add_termination_b(BarrierTermination(barrier_a, barrier_b, intersection, from_a=False, distance=dist_b))
+                    if dist_a < dist_b:
+                        barrier_a.add_termination_a(BarrierTermination(barrier_a, barrier_b, intersection, from_a=True, distance=dist_a))
+                    else:
+                        barrier_a.add_termination_b(BarrierTermination(barrier_a, barrier_b, intersection, from_a=False, distance=dist_b))
+
+            if merged: i -= 1 #recheck
+
+        self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
+
 
     def cull_barriers(self, all_barriers):
 
         contours, contour_lengths = self.room.contours[self.surface.surfaceType]
+
+        elementA = self.getBarrier(242)
+        padding = self.diagonal / 100
 
         def closest_contour():
             #numerator/denominator distance to either point_a and point_b instead of those points, e.g. 3/4ths of the way to point_a instead of using point_a
@@ -817,6 +839,11 @@ class SurfaceBarriers():
 
             if group.dead: continue
             is_inside, dist, index = closest_contour()
+            if dist < padding:
+                is_inside = True
+
+            # if group.index == 242:
+            #     print(is_inside, dist)
 
             if is_inside: #aka if group is inside
                 #if inside but beyond threshold distance
@@ -869,7 +896,12 @@ class SurfaceBarriers():
 
                 checked.add(candidate)
 
+        
         self.barrier_groups = list(keep)
+        elementB = self.getBarrier(242)
+
+        if elementA is not None and elementB is None:
+            print("Deleted element", elementA.index, elementA.bounds.line.point_a, elementA.bounds.line.point_b)
 
 
     def debug(self, img, color):
