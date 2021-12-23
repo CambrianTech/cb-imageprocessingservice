@@ -148,7 +148,7 @@ def overlay_mask(img, mask, hue=None, saturation=255, darkest_value=80):
     if hue is None:
         hue = random.randint(0,360)
 
-    img_hsv[:, :, 0][overlay>0] = int(hue) / 2.0
+    img_hsv[:, :, 0][overlay>0] = hue
     img_hsv[:, :, 1][overlay>0] = saturation
     img_hsv[:, :, 2][overlay>0] = grey[overlay>0] 
 

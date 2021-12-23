@@ -13,6 +13,7 @@ from .geometry import Geometry
 from pipeline.misc.utils import convert_color, put_text, sample_at_point
 from .line import line_angle_difference, Line
 from pipeline.data.ade20k import ADE20K
+from pipeline.components.rotated_rect import RotatedRect
 
 class Surface():
 
@@ -198,11 +199,25 @@ class Surface():
         return self._neighbors
 
     #line intersection with other surface/plane, if any
-    def intersection(self, surface):
+    def intersection(self, surface) -> RotatedRect:
         if surface not in self.neighbors:
             return None
 
         masks_intersection = self.geometry.surface_surface_intersection(self, surface)
+
+        return masks_intersection
+
+        contours, hierarchy = cv2.findContours(masks_intersection, 1, 2)
+
+        if len(contours) == 0:
+            return None
+
+        cnt = contours[0]
+
+        rect = RotatedRect(cv2.minAreaRect(cnt))
+
+        if not rect.empty: 
+            return rect
 
         return None
 
