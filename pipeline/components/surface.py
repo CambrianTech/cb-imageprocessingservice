@@ -24,6 +24,7 @@ class Surface():
         self.geometry = None
         self._mask = None
         self._mask_edges = None
+        self._mask_expanded = None
         self._alteration = None
         self.destroyed = False
         self._cloned_from = -1
@@ -182,19 +183,28 @@ class Surface():
             self._neighbors = []
 
             #probably many ways this can be optimized: downsized mask, countNonZero, etc.
-            min_distance = 3
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(min_distance, min_distance))
-            mask_expanded = cv2.dilate(self.mask, kernel, iterations=1)
 
             for candidate in self.geometry.surfaces:
                 if candidate == self: continue
-
+        
                 #check for self in candidate to save time, or check for overlap
-                if (candidate._neighbors is not None and self in candidate._neighbors) \
-                    or cv2.countNonZero(np.bitwise_and(candidate.mask, mask_expanded)) > 0: 
+                if (candidate._neighbors is not None and self in candidate._neighbors):
                     self._neighbors.append(candidate)
+                else:
+                    intersection = self.geometry.surface_surface_intersection(self, candidate)
+                    if cv2.countNonZero(intersection) > 10: 
+                        self._neighbors.append(candidate)
 
         return self._neighbors
+
+    #line intersection with other surface/plane, if any
+    def intersection(self, surface):
+        if surface not in self.neighbors:
+            return None
+
+        masks_intersection = self.geometry.surface_surface_intersection(self, surface)
+
+        return None
 
     @property
     def min_area(self) -> float:
@@ -224,6 +234,16 @@ class Surface():
         self.mask_changed()
 
     @property
+    def mask_expanded(self):
+
+        if self._mask_expanded is None:
+            min_distance = 3
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(min_distance, min_distance))
+            self._mask_expanded = cv2.dilate(self.mask, kernel, iterations=1)
+
+        return self._mask_expanded
+
+    @property
     def mask_edges(self):
         if self._mask_edges is None:
             padding = 10
@@ -248,6 +268,7 @@ class Surface():
         self._normals_color = None
         self._neighbors = None
         self._mask_edges = None
+        self._mask_expanded = None
 
         self.geometry.invalidate()
 
