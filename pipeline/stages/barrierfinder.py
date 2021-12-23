@@ -24,6 +24,7 @@ from pipeline.components.surface import Surface
 debug_index_left_a = 242
 debug_index_right_b = 237
 debug_objects = []
+debug_show_indices = False
 
 class Barrier():
     def __init__(self, surface_barrier, line, vanishing_point):
@@ -344,7 +345,8 @@ class BarrierGroup():
         else: #closed
             cv2.circle(img, self.bounds.line.point_b, int(radius * 1.5), [255, 0, 0]) 
 
-        put_text(img, str(self.index), self.bounds.line.midpoint, (0,0, 255), size=0.5, shadow=True)
+        if debug_show_indices:
+            put_text(img, str(self.index), self.bounds.line.midpoint, (0,0, 255), size=0.5, shadow=True)
 
 def inside_mask(mask, point):
     if point[0] < mask.shape[1] and point[1] < mask.shape[0]:
