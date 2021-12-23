@@ -122,6 +122,7 @@ class Geometry():
 
     def surface_at_point(self, point):
 
+        #todo:just use index_mask
         for surface in self.surfaces:
             if point[0] < surface.mask.shape[1] and point[1] < surface.mask.shape[0]:
                 if surface.mask[int(point[1]), int(point[0])] > 0:
