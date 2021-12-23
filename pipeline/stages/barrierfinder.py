@@ -974,7 +974,8 @@ class BarrierSolver():
             log_image(self.data, name + "_barriers", debug)
 
 
-            debug = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV_FULL)
+            # debug = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV_FULL)
+            debug = self.image.copy()
             debug_intersections = {}
 
             for surface in surfaces:
@@ -988,12 +989,15 @@ class BarrierSolver():
                         debug_intersections[key] = surface.intersection(neighbor)
 
             for value in debug_intersections.values():
-                hue = random.randint(0,360)
                 if value is not None:
-                    debug[:, :, 0][value > 0] = hue
-                    debug[:, :, 1][value > 0] = 255
+                    cv2.drawContours(debug, [value], 0, random_color(), 2)
 
-            debug = cv2.cvtColor(debug, cv2.COLOR_HSV2BGR_FULL)
+                # hue = random.randint(0,360)
+                # if value is not None:
+                #     debug[:, :, 0][value > 0] = hue
+                #     debug[:, :, 1][value > 0] = 255
+
+            # debug = cv2.cvtColor(debug, cv2.COLOR_HSV2BGR_FULL)
             log_image(self.data, name + "_intersections", debug)
 
         #flatten groups

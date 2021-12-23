@@ -205,21 +205,19 @@ class Surface():
 
         masks_intersection = self.geometry.surface_surface_intersection(self, surface)
 
-        return masks_intersection
-
         contours, hierarchy = cv2.findContours(masks_intersection, 1, 2)
 
         if len(contours) == 0:
             return None
 
-        cnt = contours[0]
+        return contours[0]
 
-        rect = RotatedRect(cv2.minAreaRect(cnt))
+        # rect = RotatedRect(cv2.minAreaRect(cnt))
 
-        if not rect.empty: 
-            return rect
+        # if not rect.empty: 
+        #     return rect
 
-        return None
+        # return None
 
     @property
     def min_area(self) -> float:
