@@ -990,7 +990,7 @@ class BarrierSolver():
 
             for value in debug_intersections.values():
                 if value is not None:
-                    cv2.drawContours(debug, [value], 0, random_color(), 2)
+                    cv2.drawContours(debug, value, -1, random_color(), 2)
 
                 # hue = random.randint(0,360)
                 # if value is not None:

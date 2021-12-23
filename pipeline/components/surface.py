@@ -205,12 +205,12 @@ class Surface():
 
         masks_intersection = self.geometry.surface_surface_intersection(self, surface)
 
-        contours, hierarchy = cv2.findContours(masks_intersection, 1, 2)
+        contours, hierarchy = cv2.findContours(masks_intersection, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         if len(contours) == 0:
             return None
 
-        return contours[0]
+        return contours
 
         # rect = RotatedRect(cv2.minAreaRect(cnt))
 
