@@ -157,6 +157,6 @@ class Geometry():
         key = self.surface_surface_key(surface_a, surface_b)
 
         if key not in self._mask_intersections:
-            self._mask_intersections[key] = np.bitwise_and(surface_a.mask_expanded, surface_b.mask_expanded)
+            self._mask_intersections[key] = np.bitwise_and(surface_a.outer_mask, surface_b.outer_mask)
 
         return self._mask_intersections[key]
