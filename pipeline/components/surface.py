@@ -249,11 +249,11 @@ class Surface():
         self.mask_changed()
 
     @property
-    def mask_expanded(self, min_distance=5):
+    def mask_expanded(self, min_distance=9):
 
         if self._mask_expanded is None:
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(min_distance, min_distance))
-            self._mask_expanded = cv2.dilate(self.mask, kernel, iterations=1)
+            self._mask_expanded = cv2.dilate(self.mask, kernel, iterations=2)
 
         return self._mask_expanded
 

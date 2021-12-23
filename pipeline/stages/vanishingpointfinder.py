@@ -288,9 +288,10 @@ class PipelineVanishingPointFinder(PipelineStep):
             if len(self.room.vertical_vp) == 0:
                 self.room.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
 
-        for surface in self.surfaces:
-            if surface.vertical_vp is None:
-                surface.vertical_vp = self.room.vertical_vp
+        if self.room.vertical_vp is not None:
+            for surface in self.surfaces:
+                if surface.vertical_vp is None:
+                    surface.vertical_vp = self.room.vertical_vp
 
         if im_logging_enabled(data):
             log_image(data, "vanishing_points", self.get_debug_image(data))
