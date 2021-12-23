@@ -111,18 +111,26 @@ class Line(Sequence):
 
     def extended(self, ratio=1.1, from_a=True, from_b=True):
 
-        amount = self.length * ratio
-        direction = self.direction
+        if not from_a and not from_b:
+            return self
 
+        direction = self.direction
+        amount = self.length * ratio
         data = self.data.copy()
 
         if from_a:
-            data[0] = self.midpoint[0] + direction[0] * amount
-            data[1] = self.midpoint[1] + direction[1] * amount
+            data[0] = self.midpoint[0] - direction[0] * amount
+            data[1] = self.midpoint[1] - direction[1] * amount
 
         if from_b:
-            data[2] = self.midpoint[0] - direction[0] * amount
-            data[3] = self.midpoint[1] - direction[1] * amount
+            data[2] = self.midpoint[0] + direction[0] * amount
+            data[3] = self.midpoint[1] + direction[1] * amount
+
+        # new_line = Line(data)
+        # if from_b and not from_a and ratio > 1:
+        #     print(ratio, new_line.length, self.length)
+        #     print(self.point_a, self.point_b)
+        #     print(new_line.point_a, new_line.point_b)
 
         return Line(data)
         

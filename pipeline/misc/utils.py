@@ -20,7 +20,7 @@ def multi_filter(fs, l):
 
 def random_color():
     random.seed()
-    haystack = np.arange(80, 255, 30)
+    haystack = np.arange(80, 255, 10)
     random.shuffle(haystack)
     return (int(haystack[0]), int(haystack[1]), int(haystack[2]))
 

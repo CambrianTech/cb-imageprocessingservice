@@ -288,7 +288,7 @@ class Surface():
         if self._semantic_labels is None:
             segments, counts = np.unique(self.geometry.semantic_labels[self.mask > 0], return_counts=True)
             segmentList = zip(segments.tolist(), counts.tolist())
-            self._semantic_labels = sorted(segmentList, key=lambda x:-x[1])
+            self._semantic_labels = sorted(segmentList, key=lambda x:x[1], reverse=True)
 
         return self._semantic_labels
 
