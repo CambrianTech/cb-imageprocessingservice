@@ -15,7 +15,7 @@ from pipeline.misc.utils import resize_array, random_color, overlay_mask, normal
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import angle_with_vp
-from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled
+from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers
 from cambrian.LineFunctions import LineFunctions
 from pipeline.components.line import line_angle_difference, Line, line_on_image_edge
 from pipeline.components.rotated_rect import RotatedRect
@@ -1102,22 +1102,32 @@ class PipelineBarrierFinder(PipelineStep):
 
         self.refine_masks()
 
-
     def refine_masks(self):
 
-        print("refining")
+        total_mask = []
+        markers = np.zeros((self.image.shape[0], self.image.shape[1]), dtype=np.int32)
 
-        watershed_image = self.image.copy()
+        num_surfaces = len(self.room.surfaces)
+        for index in range(num_surfaces):
+            surface = self.room.surfaces[index]
+            markers[surface.mask > 0] = index + 1
 
-        markers = np.zeros(self.image.shape, dtype=np.int32)
-        watershed_mask = np.zeros(self.image.shape, dtype=np.int32)
+        log_markers(self.data, "room_markers", markers)
 
-        for surface in self.surfaces:
-            mask = surface.mask
-            markers[mask > 0] = index + 1
+        markers = cv2.watershed(self.image, markers)
+        markers[markers<0] = 0
 
-        markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
+        log_markers(self.data, "room_markers_result", markers)
 
+        #set masks:
+        for index in range(num_surfaces):
+            surface = self.room.surfaces[index]
+            mask = np.zeros_like(surface.mask)
+            mask[markers == (index + 1)] = 1
+            # kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
+            # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+            surface.set_mask(mask)
 
 
     def get_debug_image(self):
