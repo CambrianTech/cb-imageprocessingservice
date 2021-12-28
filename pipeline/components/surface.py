@@ -29,7 +29,7 @@ class Surface():
         self._mask = None
 
         self._mask_edges = None
-        
+        self._mask_expanded = None
         self._surface_mask = None
         self._outer_mask = None
         self._inner_mask = None
@@ -255,6 +255,14 @@ class Surface():
         self.mask_changed()
 
     @property
+    def mask_expanded(self):
+
+        if self._mask_expanded is None:
+            self._mask_expanded = adjust_mask(cv2.dilate, self.inner_mask + self.mask_edges, iterations=2)
+
+        return self._mask_expanded
+
+    @property
     def surface_mask(self):
         if self._surface_mask is None:
             self._surface_mask = cv2.copyMakeBorder(self.mask, mask_padding, mask_padding, mask_padding, mask_padding, cv2.BORDER_CONSTANT, value=0)
@@ -294,6 +302,7 @@ class Surface():
         self._normals_color = None
         self._neighbors = None
         self._mask_edges = None
+        self._mask_expanded = None
 
         self._surface_mask = None
         self._outer_mask = None
