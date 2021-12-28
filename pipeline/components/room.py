@@ -101,7 +101,7 @@ class Room(Geometry):
 
         self.merge_like_surfaces()
 
-        # self.finalize_masks(invalid_mask)
+        self.finalize_masks(invalid_mask)
 
         log_image(self.data, "room", self.get_debug_image())
 

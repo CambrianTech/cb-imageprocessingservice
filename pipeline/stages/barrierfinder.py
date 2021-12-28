@@ -121,10 +121,6 @@ class Barrier():
         if test_surface_a is not None or test_surface_b is not None:
             self.surface_neighbor = test_surface_a if test_surface_a is not None else test_surface_b
 
-    def draw_markers(self, markers, mask, color):
-        self.line.draw(markers, color= -1, thickness=1, lineType=cv2.LINE_4)
-        self.line.draw(mask, color=0, thickness=1, lineType=cv2.LINE_4)
-
     def debug(self, img, color):
 
         if self.surface_neighbor is not None:
@@ -180,6 +176,8 @@ class BarrierGroup():
         global b_index
         self.index = b_index
         b_index += 1
+
+        self._line = None
 
     def add_barrier(self, barrier):
         self.barriers.append(barrier)
@@ -313,23 +311,31 @@ class BarrierGroup():
         self.a_terminations = []
         self.b_terminations = []
 
+    @property
+    def line(self):
+        if self._line is None:
+            #lazy, get it done approach:
+            lines = list(map(lambda x:x.line, self.barriers))
+            lines.sort(key=lambda x: x.length)
+
+            if self.bounds.width > 50:
+                self._line = self.bounds.line
+            else:
+                data = None
+
+                for line in lines:
+                    if data is None:
+                        data = (line.point_a, line.point_b)
+                    else:
+                        data = LineFunctions.merge_lines(data, (line.point_a, line.point_b))
+
+                self._line = Line(np.array([data[0][0], data[0][1], data[1][0], data[1][1]], dtype=np.int))
+
+        return self._line
+
     def draw_markers(self, markers, mask, color):
-
-        # padding = sb.diagonal / 50
-        # rect = self.bounds.resized(width_offset=padding, length_offset=padding)
-        # cv2.drawContours(markers, [rect.points], 0, (0,0,0), cv2.FILLED)
-
-        for barrier in self.barriers:
-            barrier.draw_markers(markers, mask, color)
-
-        # self.bounds.line.draw(markers, color=-1)
-        # self.bounds.line.draw(mask, color=0)
-
-        # if not self.term_a is None:
-        #     self.term_a.debug(img, color)
-
-        # if not self.term_b is None:
-        #     self.term_b.debug(img, color)
+        self.line.draw(markers, color= -1, thickness=1, lineType=cv2.LINE_4)
+        self.line.draw(mask, color=0, thickness=1, lineType=cv2.LINE_4)
 
     def debug(self, img, color, show_bounds=True):
 
@@ -1203,7 +1209,7 @@ class PipelineBarrierFinder(PipelineStep):
             color = index + 1
             mask = np.zeros_like(surface.mask)
             mask[markers == color] = 1
-            kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(2,2))
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
             mask = cv2.dilate(mask, kernel)
             #mask[watershed_mask == 0] = 0
 
