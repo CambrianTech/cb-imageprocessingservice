@@ -101,6 +101,8 @@ class Room(Geometry):
 
         self.merge_like_surfaces()
 
+        # self.finalize_masks(invalid_mask)
+
         log_image(self.data, "room", self.get_debug_image())
 
         timer.log_elapsed("merge_like_surfaces")
@@ -321,6 +323,8 @@ class Room(Geometry):
         
     def refine_surfaces(self, min_confidence=None, use_lines=True, debug_suffix=""):
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
+
+        final_masks = {}
         
         def expand_into_type(surfaceType:SurfaceType):
             surfaces = self.get_surfaces([surfaceType])
@@ -370,11 +374,13 @@ class Room(Geometry):
 
                 surface.set_mask(mask)
 
-
         #expand all surfaces as far as they can go within their segmentation (watershed)
         #and resolve disputes between planes as they intersect by probability (confidence):
+
         for surfaceType in SurfaceType: 
             expand_into_type(surfaceType)
+
+        
 
     def remove_invalid_surfaces(self, min_area_threshold=1/1000, max_area_threshold=1/50, scale=1.2):
 
@@ -448,6 +454,32 @@ class Room(Geometry):
             self.refresh_surfaces()
 
         return invalid_mask
+
+    def finalize_masks(self, invalid_mask=None):
+
+        total_mask = []
+        markers = np.zeros((self.image.shape[0], self.image.shape[1]), dtype=np.int32)
+        if invalid_mask is not None:
+            markers[invalid_mask > 0] = -1
+
+        num_surfaces = len(self.surfaces)
+        for index in range(num_surfaces):
+            surface = self.surfaces[index]
+            markers[surface.mask > 0] = index + 1
+
+        markers = cv2.watershed(self.image, markers)
+        markers[markers<0] = 0
+
+        for index in range(num_surfaces):
+            surface = self.surfaces[index]
+            mask = np.zeros_like(surface.mask)
+            mask[markers == (index + 1)] = 1
+            # kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
+            # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+            surface.set_mask(mask)
+
+        log_markers(self.data, "room_final_markers", markers)
 
     def assign_parents(self):
 

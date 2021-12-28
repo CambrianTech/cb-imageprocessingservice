@@ -6,6 +6,9 @@ import time
 from enum import IntEnum
 from scipy.spatial import distance
 import math
+from skimage.segmentation import watershed
+from skimage.morphology import disk
+from skimage.filters import rank
 
 from pipeline.data.ade20k import ADE20K
 from pipeline.data.surface_type import SurfaceType
@@ -14,15 +17,16 @@ from pipeline.misc.utils import resize_array, random_color, overlay_mask, normal
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import angle_with_vp
-from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled
+from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers
 from cambrian.LineFunctions import LineFunctions
 from pipeline.components.line import line_angle_difference, Line, line_on_image_edge
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.room import Room
+from pipeline.components.geometry import Geometry
 from pipeline.components.surface import Surface
 
 debug_indices = [147]
-debug_show_indices = True
+debug_show_indices = False
 
 debug_objects = []
 
@@ -116,6 +120,10 @@ class Barrier():
 
         if test_surface_a is not None or test_surface_b is not None:
             self.surface_neighbor = test_surface_a if test_surface_a is not None else test_surface_b
+
+    def draw_markers(self, markers, mask, color):
+        self.line.draw(markers, color= -1, thickness=1, lineType=cv2.LINE_4)
+        self.line.draw(mask, color=0, thickness=1, lineType=cv2.LINE_4)
 
     def debug(self, img, color):
 
@@ -304,6 +312,24 @@ class BarrierGroup():
         self._bounds = None #trigger recalculation
         self.a_terminations = []
         self.b_terminations = []
+
+    def draw_markers(self, markers, mask, color):
+
+        # padding = sb.diagonal / 50
+        # rect = self.bounds.resized(width_offset=padding, length_offset=padding)
+        # cv2.drawContours(markers, [rect.points], 0, (0,0,0), cv2.FILLED)
+
+        for barrier in self.barriers:
+            barrier.draw_markers(markers, mask, color)
+
+        # self.bounds.line.draw(markers, color=-1)
+        # self.bounds.line.draw(mask, color=0)
+
+        # if not self.term_a is None:
+        #     self.term_a.debug(img, color)
+
+        # if not self.term_b is None:
+        #     self.term_b.debug(img, color)
 
     def debug(self, img, color, show_bounds=True):
 
@@ -953,11 +979,7 @@ class BarrierSolver():
                 for group in surface.barriers.barrier_groups:
                     group.debug(debug, color=color, show_bounds=True)
 
-            for surface in surfaces:
-
-                for group in surface.barriers.barrier_groups:
-                    group.debug_intersections(debug)
-
+            
             for obj in debug_objects:
                 if obj is None: continue
 
@@ -975,6 +997,33 @@ class BarrierSolver():
                     print("Skipping", obj)
                 
             log_image(self.data, name + "_barriers", debug)
+
+
+            # debug = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV_FULL)
+            debug = self.image.copy()
+            debug_intersections = {}
+
+            for surface in surfaces:
+
+                for neighbor in surface.neighbors:
+                    # if surface.surfaceType != SurfaceType.Wall or neighbor.surfaceType != SurfaceType.Wall:
+                    #     continue
+
+                    key = Geometry.surface_surface_key(surface, neighbor)
+                    if key not in debug_intersections:
+                        debug_intersections[key] = surface.intersection(neighbor)
+
+            for value in debug_intersections.values():
+                if value is not None:
+                    cv2.drawContours(debug, value, -1, random_color(), 2)
+
+                # hue = random.randint(0,360)
+                # if value is not None:
+                #     debug[:, :, 0][value > 0] = hue
+                #     debug[:, :, 1][value > 0] = 255
+
+            # debug = cv2.cvtColor(debug, cv2.COLOR_HSV2BGR_FULL)
+            log_image(self.data, name + "_intersections", debug)
 
         #flatten groups
         self.barrier_groups = []
@@ -1096,8 +1145,71 @@ class PipelineBarrierFinder(PipelineStep):
         for surface in self.surfaces:
             self.barriers[surface.uniqueId].refine(all_barriers)
 
-        bs = BarrierSolver(self.data, self.barriers)
-        bs.solve()
+        # bs = BarrierSolver(self.data, self.barriers)
+        # bs.solve()
+
+        self.refine_masks()
+
+    def refine_masks(self):
+        total_mask = np.sum(np.dstack([s.mask for s in self.room.surfaces]), axis=-1)
+        disputed_areas = np.zeros(total_mask.shape, dtype=np.uint8)
+        disputed_areas[total_mask > 1] = 1
+
+        #watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
+        denoised = rank.median(self.image[:,:,1], disk(2))
+        watershed_image = rank.gradient(denoised, disk(2))
+
+        watershed_mask = np.ones(watershed_image.shape, dtype=np.int32)
+        markers = np.zeros(watershed_image.shape, dtype=np.int32)
+
+        def draw_barrier_markers(color, freedom=0.15, barrier_groups=[]):
+            dist_transform = cv2.distanceTransform(surface.mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
+            markers[dist_transform > freedom * dist_transform.max()] = color
+
+            for group in barrier_groups:
+                group.draw_markers(markers, watershed_mask, color)
+                
+
+        num_surfaces = len(self.room.surfaces)
+        for index in range(num_surfaces):
+            surface = self.room.surfaces[index]
+            color = index + 1
+
+            if surface.surfaceType == SurfaceType.FloorLike:
+                watershed_mask[surface.mask > 0] = 0
+
+            barrier_groups = []
+            if surface.uniqueId in self.barriers:
+                barrier_groups = self.barriers[surface.uniqueId].barrier_groups
+            
+            draw_barrier_markers(color, barrier_groups=barrier_groups)
+
+        markers[disputed_areas > 0] = 0
+
+        log_markers(self.data, "room_markers", markers)
+
+        markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
+        markers[markers<0] = 0
+
+        log_markers(self.data, "room_markers_result", markers)
+
+        #set masks:
+        for index in range(num_surfaces):
+            surface = self.room.surfaces[index]
+
+            if surface.surfaceType == SurfaceType.FloorLike: 
+                continue
+
+            color = index + 1
+            mask = np.zeros_like(surface.mask)
+            mask[markers == color] = 1
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(2,2))
+            mask = cv2.dilate(mask, kernel)
+            #mask[watershed_mask == 0] = 0
+
+            surface.set_mask(mask)
+
+        log_image(self.data, "room_final", self.room.get_debug_image())
 
 
     def get_debug_image(self):
