@@ -6,6 +6,7 @@ import time
 from enum import IntEnum
 from scipy.spatial import distance
 import math
+from skimage.segmentation import watershed
 
 from pipeline.data.ade20k import ADE20K
 from pipeline.data.surface_type import SurfaceType
@@ -1096,8 +1097,27 @@ class PipelineBarrierFinder(PipelineStep):
         for surface in self.surfaces:
             self.barriers[surface.uniqueId].refine(all_barriers)
 
-        bs = BarrierSolver(self.data, self.barriers)
-        bs.solve()
+        # bs = BarrierSolver(self.data, self.barriers)
+        # bs.solve()
+
+        self.refine_masks()
+
+
+    def refine_masks(self):
+
+        print("refining")
+
+        watershed_image = self.image.copy()
+
+        markers = np.zeros(self.image.shape, dtype=np.int32)
+        watershed_mask = np.zeros(self.image.shape, dtype=np.int32)
+
+        for surface in self.surfaces:
+            mask = surface.mask
+            markers[mask > 0] = index + 1
+
+        markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
+
 
 
     def get_debug_image(self):
