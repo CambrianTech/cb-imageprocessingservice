@@ -7,6 +7,8 @@ from enum import IntEnum
 from scipy.spatial import distance
 import math
 from skimage.segmentation import watershed
+from skimage.morphology import disk
+from skimage.filters import rank
 
 from pipeline.data.ade20k import ADE20K
 from pipeline.data.surface_type import SurfaceType
@@ -310,7 +312,7 @@ class BarrierGroup():
         self.a_terminations = []
         self.b_terminations = []
 
-    def draw_markers(self, sb, markers, mask, color):
+    def draw_markers(self, markers, mask, color):
 
         # padding = sb.diagonal / 50
         # rect = self.bounds.resized(width_offset=padding, length_offset=padding)
@@ -1129,32 +1131,38 @@ class PipelineBarrierFinder(PipelineStep):
         disputed_areas = np.zeros(total_mask.shape, dtype=np.uint8)
         disputed_areas[total_mask > 1] = 1
 
-        watershed_mask = np.ones(total_mask.shape, dtype=np.int32)
-        markers = np.zeros(total_mask.shape, dtype=np.int32)
+        #watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
+        denoised = rank.median(self.image[:,:,1], disk(2))
+        watershed_image = rank.gradient(denoised, disk(2))
 
-        def draw_barrier_markers(sb, color):
+        watershed_mask = np.ones(watershed_image.shape, dtype=np.int32)
+        markers = np.zeros(watershed_image.shape, dtype=np.int32)
+
+        def draw_barrier_markers(color, freedom=0.15, barrier_groups=[]):
             dist_transform = cv2.distanceTransform(surface.mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
-            markers[dist_transform > 0.15 * dist_transform.max()] = color
+            markers[dist_transform > freedom * dist_transform.max()] = color
 
-            for group in sb.barrier_groups:
-                group.draw_markers(sb, markers, watershed_mask, color)
+            for group in barrier_groups:
+                group.draw_markers(markers, watershed_mask, color)
+                
 
         num_surfaces = len(self.room.surfaces)
         for index in range(num_surfaces):
             surface = self.room.surfaces[index]
             color = index + 1
 
+            barrier_groups = []
             if surface.uniqueId in self.barriers:
-                sb = self.barriers[surface.uniqueId]
-                draw_barrier_markers(sb, color)
-            else:
-                markers[surface.mask > 0] = color
+                barrier_groups = self.barriers[surface.uniqueId].barrier_groups
+            
+            draw_barrier_markers(color, barrier_groups=barrier_groups)
+
+                #markers[surface.mask > 0] = color
 
         markers[disputed_areas > 0] = 0
 
         log_markers(self.data, "room_markers", markers)
 
-        watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
 
@@ -1163,10 +1171,12 @@ class PipelineBarrierFinder(PipelineStep):
         #set masks:
         for index in range(num_surfaces):
             surface = self.room.surfaces[index]
+
             mask = np.zeros_like(surface.mask)
             mask[markers == (index + 1)] = 1
             # kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
             # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+            mask[watershed_mask == 0] = 0
 
             surface.set_mask(mask)
 
