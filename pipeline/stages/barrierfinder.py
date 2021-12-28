@@ -1195,9 +1195,9 @@ class PipelineBarrierFinder(PipelineStep):
         #set masks:
         for index in range(num_surfaces):
             surface = self.room.surfaces[index]
-
+            color = index + 1
             mask = np.zeros_like(surface.mask)
-            mask[markers == (index + 1)] = 1
+            mask[markers == color] = 1
             # kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
             # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
             mask[watershed_mask == 0] = 0

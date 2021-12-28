@@ -101,7 +101,7 @@ class Room(Geometry):
 
         self.merge_like_surfaces()
 
-        self.finalize_masks(invalid_mask)
+        # self.finalize_masks(invalid_mask)
 
         log_image(self.data, "room", self.get_debug_image())
 
@@ -455,11 +455,12 @@ class Room(Geometry):
 
         return invalid_mask
 
-    def finalize_masks(self, invalid_mask):
+    def finalize_masks(self, invalid_mask=None):
 
         total_mask = []
         markers = np.zeros((self.image.shape[0], self.image.shape[1]), dtype=np.int32)
-        markers[invalid_mask > 0] = -1
+        if invalid_mask is not None:
+            markers[invalid_mask > 0] = -1
 
         num_surfaces = len(self.surfaces)
         for index in range(num_surfaces):
