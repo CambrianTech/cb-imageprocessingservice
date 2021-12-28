@@ -319,11 +319,11 @@ class BarrierGroup():
         # rect = self.bounds.resized(width_offset=padding, length_offset=padding)
         # cv2.drawContours(markers, [rect.points], 0, (0,0,0), cv2.FILLED)
 
-        # for barrier in self.barriers:
-        #     barrier.draw_markers(markers, mask, color)
+        for barrier in self.barriers:
+            barrier.draw_markers(markers, mask, color)
 
-        self.bounds.line.draw(markers, color=-1)
-        self.bounds.line.draw(mask, color=0)
+        # self.bounds.line.draw(markers, color=-1)
+        # self.bounds.line.draw(mask, color=0)
 
         # if not self.term_a is None:
         #     self.term_a.debug(img, color)
@@ -1198,9 +1198,9 @@ class PipelineBarrierFinder(PipelineStep):
             color = index + 1
             mask = np.zeros_like(surface.mask)
             mask[markers == color] = 1
-            # kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
-            # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-            mask[watershed_mask == 0] = 0
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
+            mask = cv2.dilate(mask, kernel)
+            #mask[watershed_mask == 0] = 0
 
             surface.set_mask(mask)
 
