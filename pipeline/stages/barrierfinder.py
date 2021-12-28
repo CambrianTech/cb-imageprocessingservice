@@ -1175,13 +1175,14 @@ class PipelineBarrierFinder(PipelineStep):
             surface = self.room.surfaces[index]
             color = index + 1
 
+            if surface.surfaceType == SurfaceType.FloorLike:
+                watershed_mask[surface.mask > 0] = 0
+
             barrier_groups = []
             if surface.uniqueId in self.barriers:
                 barrier_groups = self.barriers[surface.uniqueId].barrier_groups
             
             draw_barrier_markers(color, barrier_groups=barrier_groups)
-
-                #markers[surface.mask > 0] = color
 
         markers[disputed_areas > 0] = 0
 
@@ -1195,6 +1196,10 @@ class PipelineBarrierFinder(PipelineStep):
         #set masks:
         for index in range(num_surfaces):
             surface = self.room.surfaces[index]
+
+            if surface.surfaceType == SurfaceType.FloorLike: 
+                continue
+
             color = index + 1
             mask = np.zeros_like(surface.mask)
             mask[markers == color] = 1
