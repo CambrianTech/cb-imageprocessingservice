@@ -138,6 +138,8 @@ def log_markers(data:dict, name, markers, mask=None, num_labels=None):
         if mask is not None:
             debug[mask == 0] = 255
 
+        debug[markers == -1] = 128
+
         _log_image(data, name, debug)
 
 def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", labelset=ADE20K,  opacity=0.5, get_image=False, min_matches=100):

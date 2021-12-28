@@ -118,6 +118,10 @@ class Barrier():
         if test_surface_a is not None or test_surface_b is not None:
             self.surface_neighbor = test_surface_a if test_surface_a is not None else test_surface_b
 
+    def draw_markers(self, markers, mask, color):
+        self.line.draw(markers, color= -1, thickness=1, lineType=cv2.LINE_4)
+        self.line.draw(mask, color=0, thickness=1, lineType=cv2.LINE_4)
+
     def debug(self, img, color):
 
         if self.surface_neighbor is not None:
@@ -305,6 +309,24 @@ class BarrierGroup():
         self._bounds = None #trigger recalculation
         self.a_terminations = []
         self.b_terminations = []
+
+    def draw_markers(self, sb, markers, mask, color):
+
+        # padding = sb.diagonal / 50
+        # rect = self.bounds.resized(width_offset=padding, length_offset=padding)
+        # cv2.drawContours(markers, [rect.points], 0, (0,0,0), cv2.FILLED)
+
+        # for barrier in self.barriers:
+        #     barrier.draw_markers(markers, mask, color)
+
+        self.bounds.line.draw(markers, color=-1)
+        self.bounds.line.draw(mask, color=0)
+
+        # if not self.term_a is None:
+        #     self.term_a.debug(img, color)
+
+        # if not self.term_b is None:
+        #     self.term_b.debug(img, color)
 
     def debug(self, img, color, show_bounds=True):
 
@@ -1103,18 +1125,37 @@ class PipelineBarrierFinder(PipelineStep):
         self.refine_masks()
 
     def refine_masks(self):
+        total_mask = np.sum(np.dstack([s.mask for s in self.room.surfaces]), axis=-1)
+        disputed_areas = np.zeros(total_mask.shape, dtype=np.uint8)
+        disputed_areas[total_mask > 1] = 1
 
-        total_mask = []
-        markers = np.zeros((self.image.shape[0], self.image.shape[1]), dtype=np.int32)
+        watershed_mask = np.ones(total_mask.shape, dtype=np.int32)
+        markers = np.zeros(total_mask.shape, dtype=np.int32)
+
+        def draw_barrier_markers(sb, color):
+            dist_transform = cv2.distanceTransform(surface.mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
+            markers[dist_transform > 0.15 * dist_transform.max()] = color
+
+            for group in sb.barrier_groups:
+                group.draw_markers(sb, markers, watershed_mask, color)
 
         num_surfaces = len(self.room.surfaces)
         for index in range(num_surfaces):
             surface = self.room.surfaces[index]
-            markers[surface.mask > 0] = index + 1
+            color = index + 1
+
+            if surface.uniqueId in self.barriers:
+                sb = self.barriers[surface.uniqueId]
+                draw_barrier_markers(sb, color)
+            else:
+                markers[surface.mask > 0] = color
+
+        markers[disputed_areas > 0] = 0
 
         log_markers(self.data, "room_markers", markers)
 
-        markers = cv2.watershed(self.image, markers)
+        watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
+        markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
 
         log_markers(self.data, "room_markers_result", markers)
