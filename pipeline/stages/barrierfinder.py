@@ -1203,7 +1203,7 @@ class PipelineBarrierFinder(PipelineStep):
             color = index + 1
             mask = np.zeros_like(surface.mask)
             mask[markers == color] = 1
-            kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(2,2))
             mask = cv2.dilate(mask, kernel)
             #mask[watershed_mask == 0] = 0
 
