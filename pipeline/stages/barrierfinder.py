@@ -1170,6 +1170,8 @@ class PipelineBarrierFinder(PipelineStep):
 
             surface.set_mask(mask)
 
+        log_image(self.data, "room_final", self.room.get_debug_image())
+
 
     def get_debug_image(self):
 
