@@ -13,6 +13,10 @@ from .geometry import Geometry
 from pipeline.misc.utils import convert_color, put_text, sample_at_point
 from .line import line_angle_difference, Line
 from pipeline.data.ade20k import ADE20K
+from pipeline.components.rotated_rect import RotatedRect
+from pipeline.misc.utils import adjust_mask
+
+mask_padding = 10
 
 class Surface():
 
@@ -23,8 +27,13 @@ class Surface():
         self.surfaceType = surfaceType
         self.geometry = None
         self._mask = None
+
         self._mask_edges = None
         self._mask_expanded = None
+        self._surface_mask = None
+        self._outer_mask = None
+        self._inner_mask = None
+
         self._alteration = None
         self.destroyed = False
         self._cloned_from = -1
@@ -198,13 +207,25 @@ class Surface():
         return self._neighbors
 
     #line intersection with other surface/plane, if any
-    def intersection(self, surface):
+    def intersection(self, surface) -> RotatedRect:
         if surface not in self.neighbors:
             return None
 
         masks_intersection = self.geometry.surface_surface_intersection(self, surface)
 
-        return None
+        contours, hierarchy = cv2.findContours(masks_intersection, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        if len(contours) == 0:
+            return None
+
+        return contours
+
+        # rect = RotatedRect(cv2.minAreaRect(cnt))
+
+        # if not rect.empty: 
+        #     return rect
+
+        # return None
 
     @property
     def min_area(self) -> float:
@@ -237,26 +258,39 @@ class Surface():
     def mask_expanded(self):
 
         if self._mask_expanded is None:
-            min_distance = 3
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(min_distance, min_distance))
-            self._mask_expanded = cv2.dilate(self.mask, kernel, iterations=1)
+            self._mask_expanded = adjust_mask(cv2.dilate, self.inner_mask + self.mask_edges, iterations=2)
 
         return self._mask_expanded
 
     @property
+    def surface_mask(self):
+        if self._surface_mask is None:
+            self._surface_mask = cv2.copyMakeBorder(self.mask, mask_padding, mask_padding, mask_padding, mask_padding, cv2.BORDER_CONSTANT, value=0)
+        return self._surface_mask
+
+    @property
+    def outer_mask(self):
+        if self._outer_mask is None:
+            trans = cv2.distanceTransform(1 - self.surface_mask, cv2.DIST_L2, 5)
+            _, self._outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
+            self._outer_mask = self._outer_mask[mask_padding:-mask_padding,mask_padding:-mask_padding].astype(np.uint8)
+
+        return self._outer_mask
+
+    @property
+    def inner_mask(self):
+        if self._inner_mask is None:
+            trans = cv2.distanceTransform(self.surface_mask, cv2.DIST_L2, 5)
+            _, self._inner_mask = cv2.threshold(trans, 0.5 * trans.max(), 1, 0)
+            self._inner_mask = self._inner_mask[mask_padding:-mask_padding,mask_padding:-mask_padding].astype(np.uint8)
+
+        return self._inner_mask
+
+    @property
     def mask_edges(self):
         if self._mask_edges is None:
-            padding = 10
-            surface_mask = cv2.copyMakeBorder(self.mask, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0)
-            trans = cv2.distanceTransform(1-surface_mask, cv2.DIST_L2, 5)
-            _, self.outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
-
-            trans = cv2.distanceTransform(surface_mask, cv2.DIST_L2, 5)
-            _, self.inner_mask = cv2.threshold(trans, 0.5 * trans.max(), 1, 0)
-
             self._mask_edges = 1 - self.inner_mask - self.outer_mask
             self._mask_edges[self._mask_edges < 0] = 0
-            self._mask_edges = self._mask_edges[padding:-padding,padding:-padding]
 
         return self._mask_edges
 
@@ -269,6 +303,10 @@ class Surface():
         self._neighbors = None
         self._mask_edges = None
         self._mask_expanded = None
+
+        self._surface_mask = None
+        self._outer_mask = None
+        self._inner_mask = None
 
         self.geometry.invalidate()
 

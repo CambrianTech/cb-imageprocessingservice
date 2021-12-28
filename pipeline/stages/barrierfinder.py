@@ -22,10 +22,11 @@ from cambrian.LineFunctions import LineFunctions
 from pipeline.components.line import line_angle_difference, Line, line_on_image_edge
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.room import Room
+from pipeline.components.geometry import Geometry
 from pipeline.components.surface import Surface
 
 debug_indices = [147]
-debug_show_indices = True
+debug_show_indices = False
 
 debug_objects = []
 
@@ -978,11 +979,7 @@ class BarrierSolver():
                 for group in surface.barriers.barrier_groups:
                     group.debug(debug, color=color, show_bounds=True)
 
-            for surface in surfaces:
-
-                for group in surface.barriers.barrier_groups:
-                    group.debug_intersections(debug)
-
+            
             for obj in debug_objects:
                 if obj is None: continue
 
@@ -1000,6 +997,33 @@ class BarrierSolver():
                     print("Skipping", obj)
                 
             log_image(self.data, name + "_barriers", debug)
+
+
+            # debug = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV_FULL)
+            debug = self.image.copy()
+            debug_intersections = {}
+
+            for surface in surfaces:
+
+                for neighbor in surface.neighbors:
+                    # if surface.surfaceType != SurfaceType.Wall or neighbor.surfaceType != SurfaceType.Wall:
+                    #     continue
+
+                    key = Geometry.surface_surface_key(surface, neighbor)
+                    if key not in debug_intersections:
+                        debug_intersections[key] = surface.intersection(neighbor)
+
+            for value in debug_intersections.values():
+                if value is not None:
+                    cv2.drawContours(debug, value, -1, random_color(), 2)
+
+                # hue = random.randint(0,360)
+                # if value is not None:
+                #     debug[:, :, 0][value > 0] = hue
+                #     debug[:, :, 1][value > 0] = 255
+
+            # debug = cv2.cvtColor(debug, cv2.COLOR_HSV2BGR_FULL)
+            log_image(self.data, name + "_intersections", debug)
 
         #flatten groups
         self.barrier_groups = []

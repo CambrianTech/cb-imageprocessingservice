@@ -24,6 +24,14 @@ class RotatedRect(tuple):
         return self[1][1]
 
     @property
+    def area(self) -> float:
+        return self.width * self.height
+
+    @property
+    def empty(self) -> bool:
+        return max(self.width, self.height) == 0
+
+    @property
     def angle(self) -> float:
         return self.line.angle
 
