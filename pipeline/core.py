@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractmethod, abstractproperty
+from abc import ABCMeta, abstractmethod
 from time import time
 import asyncio
 import typing
@@ -40,21 +40,24 @@ class PipelineStep(metaclass=ABCMeta):
     def run(self, data: dict):
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def required_keys(self) -> list:
         return {}
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def output_keys(self) -> list:
         return {}
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def index(self) -> PipelineStepIndex:
         return None
 
     @property
     def description(self) -> str:
-        return "%d) %s" % (int(self.index), self.index.name) 
+        return "%d) %s" % (int(self.index), self.index.name) if self.index else "PipelineStep"
 
     @property
     def is_batched(self) -> bool:
