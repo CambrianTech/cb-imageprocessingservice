@@ -331,11 +331,7 @@ class BarrierGroup():
 
                 self._line = Line(np.array([data[0][0], data[0][1], data[1][0], data[1][1]], dtype=np.int))
 
-        return self._line
-
-    def draw_markers(self, markers, mask, color):
-        self.line.draw(markers, color= -1, thickness=1, lineType=cv2.LINE_4)
-        self.line.draw(mask, color=0, thickness=1, lineType=cv2.LINE_4)
+        return self._line        
 
     def debug(self, img, color, show_bounds=True):
 
@@ -1168,28 +1164,25 @@ class PipelineBarrierFinder(PipelineStep):
         watershed_mask = np.ones(watershed_image.shape, dtype=np.int32)
         markers = np.zeros(watershed_image.shape, dtype=np.int32)
 
-        def draw_barrier_markers(color, freedom=0.15, barrier_groups=[]):
+        def draw_surface_markers(surface, color, freedom=0.15):
+            if surface.surfaceType == SurfaceType.FloorLike:
+                watershed_mask[surface.mask > 0] = 0
             dist_transform = cv2.distanceTransform(surface.mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
             markers[dist_transform > freedom * dist_transform.max()] = color
 
-            for group in barrier_groups:
-                group.draw_markers(markers, watershed_mask, color)
-                
+        def draw_barrier_markers(barrier_groups):
+            for barrier in barrier_groups:
+                barrier.line.draw(markers, color= -1, thickness=1, lineType=cv2.LINE_4)
+                barrier.line.draw(watershed_mask, color=0, thickness=1, lineType=cv2.LINE_4)
 
         num_surfaces = len(self.room.surfaces)
         for index in range(num_surfaces):
             surface = self.room.surfaces[index]
-            color = index + 1
+            draw_surface_markers(surface, color=index+1)
 
-            if surface.surfaceType == SurfaceType.FloorLike:
-                watershed_mask[surface.mask > 0] = 0
-
-            barrier_groups = []
-            if surface.uniqueId in self.barriers:
-                barrier_groups = self.barriers[surface.uniqueId].barrier_groups
+        for sb in self.barriers.values():
+            draw_barrier_markers(sb.barrier_groups)
             
-            draw_barrier_markers(color, barrier_groups=barrier_groups)
-
         markers[disputed_areas > 0] = 0
 
         log_markers(self.data, "room_markers", markers)
