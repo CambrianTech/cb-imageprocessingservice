@@ -321,17 +321,14 @@ class BarrierGroup():
             if self.bounds.width > 50:
                 self._line = self.bounds.line
             else:
-                data = None
+                data = (lines[0].point_a, lines[0].point_b)
 
-                for line in lines:
-                    if data is None:
-                        data = (line.point_a, line.point_b)
-                    else:
-                        data = LineFunctions.merge_lines(data, (line.point_a, line.point_b))
+                for line in lines[1:]:
+                    data = LineFunctions.merge_lines(data, (line.point_a, line.point_b))
 
                 self._line = Line(np.array([data[0][0], data[0][1], data[1][0], data[1][1]], dtype=np.int))
 
-        return self._line        
+        return self._line
 
     def debug(self, img, color, show_bounds=True):
 
