@@ -112,6 +112,13 @@ class PipelineOutput(PipelineStep):
                 planes_alpha_mask_url = self.make_url(filename)
                 self.save_image(data["planes_alpha_mask"], filename, planes_alpha_mask_url)
 
+                #tempoary:
+                surfaces = data["room"].surfaces
+                for i in range(len(surfaces)):
+                    surface = surfaces[i]
+                    mask_url = self.make_plane_mask_url(i)
+                    self.save_image(surface.mask * 255, filename, mask_url)
+
                 results = self.make_data_v4_dict(data, image_url, lighting_url, planes_index_mask_url, planes_alpha_mask_url)
 
         results["data_url"] = data["data_url"]
