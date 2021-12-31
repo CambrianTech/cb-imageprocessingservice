@@ -230,6 +230,43 @@ class PipelineOutput(PipelineStep):
             }
         }
 
+    def encode_plane_surface_v4(self, plane_index, surface, mask_url):
+        # https://github.com/NVlabs/planercnn#plane-representation
+        # In this project, plane parameters are of absolute scale (in terms of meters).
+        # Each plane has three parameters, which equal to plane_normal * plane_offset.
+        # Suppose plane_normal is (a, b, c) and plane_offset is d, every point (X, Y, Z)
+        # on the plane satisfies, aX + bY + cZ = d.
+        # Then plane parameters are (a, b, c)*d. Since plane normal is a unit vector,
+        # we can extract plane_normal and plane_offset from their multiplication.
+
+        # plane_parameters = np.array(plane_data[6:9], dtype=np.float32)
+        # plane_offset = np.maximum(1e-4, np.linalg.norm(plane_parameters))
+        # plane_normal = (plane_parameters / plane_offset).tolist()
+
+        # plane_rotation = 0
+        # plane_type = 0
+
+        # if len(plane_data) > 9:
+        #     plane_rotation = plane_data[10]
+        #     plane_type = np.uint8(plane_data[9])
+
+        plane_rotation = 0 #todo: figure this out
+        plane_normal = surface.normal.astype(float)
+        plane_normal = [-plane_normal[0], -plane_normal[2], plane_normal[1]] if self.y_up else list(plane_normal)
+        plane_offset = float(surface.offset)
+
+        return {
+            "id": str(surface.uniqueId),
+            "type": surface.surfaceType.name,
+            "name": surface.name,
+            "normal": plane_normal,
+            "offset": plane_offset,
+            "rotation": plane_rotation,
+            "images": {
+                "mask": mask_url
+            }
+        }
+
 
     def make_data_v3_dict(self, data, image_url, lighting_url, superpixels_url):
         all_plane_data = data["planes"]["detection"].tolist(
@@ -259,11 +296,18 @@ class PipelineOutput(PipelineStep):
         }
 
     def make_data_v4_dict(self, data, image_url, lighting_url, planes_index_mask_url, planes_alpha_mask_url):
-        all_plane_data = data["planes"]["detection"].tolist(
-        ) if "planes" in data else []
 
+        # surfaces_json = self.encode_plane_surface_v4(0, data["room"].surfaces[0], self.make_plane_mask_url(0))
+        # print("surfaces_json 4:\n", surfaces_json)
+
+        # all_plane_data = data["planes"]["detection"].tolist() if "planes" in data else []
+        # surfaces_json = self.encode_plane_surface_v3(0, all_plane_data[0], self.make_plane_mask_url(0))
+        # print("surfaces_json 3:\n", surfaces_json)
+
+        # exit()
+        
         return {
-            "formatVersion": 3,
+            "formatVersion": 4,
             "name": "Room %s" % self.unique_id,
             "id": self.unique_id,
             "images": {
@@ -281,7 +325,7 @@ class PipelineOutput(PipelineStep):
             },
             "geometry": {
                 "surfaces": [
-                   self.encode_plane_surface_v3(i, plane_data, self.make_plane_mask_url(i)) for i, (plane_data) in enumerate(all_plane_data)
+                    self.encode_plane_surface_v4(i, surface, self.make_plane_mask_url(i)) for i, (surface) in enumerate(data["room"].surfaces)
                 ]
             },
             "assets": []
