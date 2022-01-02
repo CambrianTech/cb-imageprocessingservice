@@ -4,13 +4,13 @@ from .semanticlabel import SemanticLabel
 #Perhaps write class method
 class SurfaceType(SemanticLabel):
     Floor=0
-    FloorLike=1
+    OnFloor=1
 
     Wall=2
-    WallLike=3
+    OnWall=3
 
     Ceiling=4
-    CeilingLike=5
+    OnCeiling=5
 
     Other=6
 

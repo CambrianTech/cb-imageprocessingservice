@@ -1085,7 +1085,7 @@ class BarrierSolver():
                
         if im_logging_enabled(self.data):
             
-            log_barriers(self.room.get_surfaces(surfaceTypes=[SurfaceType.WallLike]), "wall_like")
+            log_barriers(self.room.get_surfaces(surfaceTypes=[SurfaceType.OnWall]), "on_wall")
 
             log_barriers(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall]), "wall") 
 
@@ -1118,7 +1118,7 @@ class PipelineBarrierFinder(PipelineStep):
         self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
         self.surfaces = []
-        self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.WallLike, SurfaceType.Ceiling, SurfaceType.Floor]))
+        self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.OnWall, SurfaceType.Ceiling, SurfaceType.Floor]))
         self.surfaces.extend(self.room.get_surfaces(labels=box_like))
 
         self.vanishing_points = []
@@ -1162,7 +1162,7 @@ class PipelineBarrierFinder(PipelineStep):
         markers = np.zeros(watershed_image.shape, dtype=np.int32)
 
         def draw_surface_markers(surface, color, freedom=0.15):
-            if surface.surfaceType == SurfaceType.FloorLike:
+            if surface.surfaceType == SurfaceType.OnFloor:
                 watershed_mask[surface.mask > 0] = 0
             dist_transform = cv2.distanceTransform(surface.mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
             markers[dist_transform > freedom * dist_transform.max()] = color
@@ -1193,7 +1193,7 @@ class PipelineBarrierFinder(PipelineStep):
         for index in range(num_surfaces):
             surface = self.room.surfaces[index]
 
-            if surface.surfaceType == SurfaceType.FloorLike: 
+            if surface.surfaceType == SurfaceType.OnFloor: 
                 continue
 
             color = index + 1

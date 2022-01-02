@@ -18,7 +18,7 @@ class PipelineOutput(PipelineStep):
         self.outfile_name = outfile_name
         self.preview_size = preview_size
         self.thumbnail_size = thumbnail_size
-        self.y_up = self.pipeline.api_level > 3
+        self.y_up = False #self.pipeline.api_level > 3
 
     @property
     def index(self) -> PipelineStepIndex:

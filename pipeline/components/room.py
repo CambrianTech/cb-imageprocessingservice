@@ -483,7 +483,7 @@ class Room(Geometry):
 
     def assign_parents(self):
 
-        child_surfaces = self.get_surfaces(surfaceTypes=[SurfaceType.WallLike, SurfaceType.FloorLike, SurfaceType.CeilingLike, SurfaceType.Other])
+        child_surfaces = self.get_surfaces(surfaceTypes=[SurfaceType.OnWall, SurfaceType.OnFloor, SurfaceType.OnCeiling, SurfaceType.Other])
 
         for child_surface in child_surfaces:
 

@@ -434,20 +434,20 @@ class Surface():
         #check the angle versus the floor normal. Walls are generally orthagonal to the floor or ceiling    
         if self.surfaceType != SurfaceType.Other:
             was_ceiling = self.surfaceType == SurfaceType.Ceiling
-            if angle_with_wall < angle_threshold and self.surfaceType != SurfaceType.Wall and self.surfaceType != SurfaceType.WallLike:
-                self.surfaceType = SurfaceType.Wall if self.surfaceType.is_major else SurfaceType.WallLike
+            if angle_with_wall < angle_threshold and self.surfaceType != SurfaceType.Wall and self.surfaceType != SurfaceType.OnWall:
+                self.surfaceType = SurfaceType.Wall if self.surfaceType.is_major else SurfaceType.OnWall
                 self._alteration = "%d deg from wall" % int(math.degrees(angle_with_wall))
-            elif angle_with_ceiling < angle_threshold and self.surfaceType != SurfaceType.Ceiling and self.surfaceType != SurfaceType.CeilingLike:
-                self.surfaceType = SurfaceType.Ceiling if self.surfaceType.is_major else SurfaceType.CeilingLike
+            elif angle_with_ceiling < angle_threshold and self.surfaceType != SurfaceType.Ceiling and self.surfaceType != SurfaceType.OnCeiling:
+                self.surfaceType = SurfaceType.Ceiling if self.surfaceType.is_major else SurfaceType.OnCeiling
                 self._alteration = "%d deg from ceil" % int(math.degrees(angle_with_ceiling))
-            elif angle_with_floor < angle_threshold and self.surfaceType != SurfaceType.Floor and self.surfaceType != SurfaceType.FloorLike:
-                self.surfaceType = SurfaceType.Floor if self.surfaceType.is_major else SurfaceType.FloorLike
+            elif angle_with_floor < angle_threshold and self.surfaceType != SurfaceType.Floor and self.surfaceType != SurfaceType.OnFloor:
+                self.surfaceType = SurfaceType.Floor if self.surfaceType.is_major else SurfaceType.OnFloor
                 self._alteration = "%d deg from floor" % int(math.degrees(angle_with_floor))
 
             if was_ceiling and self.surfaceType != SurfaceType.Ceiling:
                 self.destroy() #too problematic
 
-        #If it is minor type, e.g. walllike or floorlike, it may need to become a major type such as wall or floor:
+        #If it is minor type, e.g. on wall or on floor, it may need to become a major type such as wall or floor:
         if not self.surfaceType.is_major:
             minor_counts = self.category_counts[self.surfaceType.index]
 

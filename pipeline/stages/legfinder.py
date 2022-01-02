@@ -46,7 +46,7 @@ class PipelineLegFinder(PipelineStep):
         self.room = self.data["room"]
 
         self.surfaces = []
-        self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.FloorLike]))
+        self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.OnFloor]))
 
         if im_logging_enabled(self.data):
             log_image(self.data, "legs.png", self.get_debug_image())

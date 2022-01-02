@@ -291,7 +291,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         vl_image[sure_walls == 0] = 0
 
         ade_seg_c = np.dstack(
-            (.95 * np.ones_like(isolated[SurfaceType.Other]), isolated[SurfaceType.Other], isolated[SurfaceType.Floor], isolated[SurfaceType.Wall], isolated[SurfaceType.Ceiling], isolated[SurfaceType.WallLike]))
+            (.95 * np.ones_like(isolated[SurfaceType.Other]), isolated[SurfaceType.Other], isolated[SurfaceType.Floor], isolated[SurfaceType.Wall], isolated[SurfaceType.Ceiling], isolated[SurfaceType.OnWall]))
         ade_seg = np.argmax(ade_seg_c, -1)
 
         if im_logging_enabled(data, LogLevel.Segmentation):

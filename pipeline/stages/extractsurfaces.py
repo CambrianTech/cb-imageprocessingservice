@@ -8,9 +8,9 @@ from pipeline.data.logging import im_logging_enabled, log_image, LogLevel, log_s
 from pipeline.data.ade20k import ADE20K
 from pipeline.data.semanticlabel import SemanticLabel
 
-floor_like = [ADE20K.earth, ADE20K.grass, ADE20K.rug]
-wall_like = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.mirror, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen]
-ceiling_like = [ADE20K.light]
+on_floor = [ADE20K.earth, ADE20K.grass, ADE20K.rug]
+on_wall = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.mirror, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen]
+on_ceiling = [ADE20K.light]
 box_like = [ADE20K.cabinet, ADE20K.dishwasher, ADE20K.oven, ADE20K.fireplace, ADE20K.kitchen]
 legged_objects = [ADE20K.table, ADE20K.chair, ADE20K.bed, ADE20K.cabinet, ADE20K.chest, ADE20K.coffee_table, ADE20K.stool, ADE20K.bench, ADE20K.ottoman, ADE20K.armchair, ADE20K.chest]
 
@@ -28,9 +28,9 @@ def isolate_masks(data, output):
             isolated[grouping] += output[label.index]
 
     #group wall like, floor like, ceiling like
-    combine_outputs(SurfaceType.FloorLike, floor_like)
-    combine_outputs(SurfaceType.WallLike, wall_like)
-    combine_outputs(SurfaceType.CeilingLike, ceiling_like)
+    combine_outputs(SurfaceType.OnFloor, on_floor)
+    combine_outputs(SurfaceType.OnWall, on_wall)
+    combine_outputs(SurfaceType.OnCeiling, on_ceiling)
 
     #label everything else as other
     isolated[SurfaceType.Other] = 1.0 - sum(isolated[:-1])
