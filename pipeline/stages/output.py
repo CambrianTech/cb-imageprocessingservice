@@ -117,7 +117,8 @@ class PipelineOutput(PipelineStep):
                 for i in range(len(surfaces)):
                     surface = surfaces[i]
                     mask_url = self.make_plane_mask_url(i)
-                    mask = surface.mask * 255
+                    mask = surface.mask if surface.final_mask is None else surface.final_mask
+                    mask = mask * 255
                     scale = 1500 / min(mask.shape[0], mask.shape[1])
                     if scale > 1:
                         mask = cv2.resize(mask, (int(scale * surface.mask.shape[1]), int(scale * surface.mask.shape[0])))

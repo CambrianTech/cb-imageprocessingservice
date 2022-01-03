@@ -27,6 +27,7 @@ class Surface():
         self.surfaceType = surfaceType
         self.geometry = None
         self._mask = None
+        self.final_mask = None
 
         self._mask_edges = None
         self._mask_expanded = None
