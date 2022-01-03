@@ -28,7 +28,7 @@ class SurfaceRefinement():
         self.data["lighting"] = cv2.edgePreservingFilter(np.uint8(self.data["lighting"]), flags=1, sigma_s=10, sigma_r=1.0)
         log_image(self.data, 'lighting_smooth', self.data["lighting"])
 
-        masks = [cv2.resize(s.mask, (self.image.shape[1], self.image.shape[0])) for s in self.room.surfaces]
+        masks = [cv2.resize(s.mask, (self.image.shape[1], self.image.shape[0]), interpolation=cv2.INTER_NEAREST) for s in self.room.surfaces]
         total_mask = np.sum(np.dstack(masks), axis=-1, dtype=np.uint8)
         disputed_areas = np.zeros(total_mask.shape, dtype=np.uint8)
         disputed_areas[total_mask > 1] = 1
@@ -39,8 +39,6 @@ class SurfaceRefinement():
 
         watershed_mask = np.ones(watershed_image.shape, dtype=np.int32)
         markers = np.zeros(watershed_image.shape, dtype=np.int32)
-
-        # print("Markers, image:", markers.shape, self.image.shape)
 
         def draw_surface_markers(surface, mask, color, freedom=0.15):
             if surface.surfaceType == SurfaceType.OnFloor:

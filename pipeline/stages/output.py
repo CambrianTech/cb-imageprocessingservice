@@ -121,7 +121,7 @@ class PipelineOutput(PipelineStep):
                     mask = mask * 255
                     scale = 1500 / min(mask.shape[0], mask.shape[1])
                     if scale > 1:
-                        mask = cv2.resize(mask, (int(scale * surface.mask.shape[1]), int(scale * surface.mask.shape[0])))
+                        mask = cv2.resize(mask, (int(scale * mask.shape[1]), int(scale * mask.shape[0])))
                     self.save_image(mask, filename, mask_url)
 
                 results = self.make_data_v4_dict(data, image_url, lighting_url, planes_index_mask_url, planes_alpha_mask_url)
