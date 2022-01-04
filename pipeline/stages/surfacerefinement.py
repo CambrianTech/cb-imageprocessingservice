@@ -22,9 +22,9 @@ class SurfaceRefinement():
         self.data = data
         self.room = self.data["room"]
         self.image = self.data["image"]
-        self.barriers = self.data["barriers"]
+        self.barriers = None #self.data["barriers"]
         
-    def refine(self):
+    def refine(self, use_HED=True):
         self.data["lighting"] = cv2.edgePreservingFilter(np.uint8(self.data["lighting"]), flags=1, sigma_s=10, sigma_r=1.0)
         log_image(self.data, 'lighting_smooth', self.data["lighting"])
 
@@ -33,9 +33,11 @@ class SurfaceRefinement():
         disputed_areas = np.zeros(total_mask.shape, dtype=np.uint8)
         disputed_areas[total_mask > 1] = 1
 
-        #watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
-        denoised = rank.median(self.image[:,:,1], disk(2))
-        watershed_image = rank.gradient(denoised, disk(2))
+        if use_HED:
+            watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
+        else:
+            denoised = rank.median(self.image[:,:,1], disk(2))
+            watershed_image = rank.gradient(denoised, disk(2))
 
         watershed_mask = np.ones(watershed_image.shape, dtype=np.int32)
         markers = np.zeros(watershed_image.shape, dtype=np.int32)
@@ -59,8 +61,14 @@ class SurfaceRefinement():
             surface = self.room.surfaces[index]
             draw_surface_markers(surface, mask=masks[index], color=index+1)
 
-        for sb in self.barriers.values():
-            draw_barrier_markers(sb.barrier_groups)
+        if self.barriers is not None:
+            lines_mask = None
+            for sb in self.barriers.values():
+                draw_barrier_markers(sb.barrier_groups)
+        else:
+            lines_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+            Line.draw_all(watershed_image, self.data["lines"], color=(255,255,255), thickness=1, lineType=cv2.LINE_4, sx=sx, sy=sy)
+            #watershed_mask[lines_mask > 0] = 0
             
         markers[disputed_areas > 0] = 0
 
@@ -81,6 +89,8 @@ class SurfaceRefinement():
             color = index + 1
             mask = np.zeros_like(total_mask)
             mask[markers == color] = 1
+            if lines_mask is not None:
+                mask[lines_mask > 0] = 0
             kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
             mask = cv2.dilate(mask, kernel)
             #mask[watershed_mask == 0] = 0
@@ -97,7 +107,7 @@ class PipelineSurfaceRefinement(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["barriers"]
+        return ["room"]
 
     @property
     def output_keys(self) -> list:
