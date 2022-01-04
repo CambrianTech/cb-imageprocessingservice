@@ -96,7 +96,7 @@ class SurfaceRefinement():
 
 
         hed = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
-        run_watershed(self.data["hed"], freedom=0.03)
+        run_watershed(hed, freedom=0.03)
 
         #denoised = rank.median(self.image[:,:,1], disk(5))
         #denoised = cv2.bilateralFilter(self.image[:,:,1], 9, 20, 20)
