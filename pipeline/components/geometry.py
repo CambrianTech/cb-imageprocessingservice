@@ -68,8 +68,6 @@ class Geometry():
 
         self._surfaces[surface.index] = surface
 
-        surface.on_added()
-
     def remove_surface(self, surface):
         surface.destroyed = True
         #remove other stuff?

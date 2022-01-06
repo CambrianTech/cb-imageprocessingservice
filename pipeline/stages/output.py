@@ -255,7 +255,6 @@ class PipelineOutput(PipelineStep):
         #     plane_rotation = plane_data[10]
         #     plane_type = np.uint8(plane_data[9])
 
-        plane_rotation = 0 #todo: figure this out
         plane_normal = surface.normal.astype(float)
         plane_normal = [-plane_normal[0], -plane_normal[2], plane_normal[1]] if self.y_up else list(plane_normal)
         plane_offset = float(surface.offset)
@@ -266,7 +265,7 @@ class PipelineOutput(PipelineStep):
             "name": surface.name,
             "normal": plane_normal,
             "offset": plane_offset,
-            "rotation": plane_rotation,
+            "axisRotation": surface.rotation,
             "images": {
                 "mask": mask_url
             }

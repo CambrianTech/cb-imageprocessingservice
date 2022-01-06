@@ -8,6 +8,8 @@ import uuid
 from copy import copy, deepcopy
 from termcolor import colored
 
+import random
+
 from pipeline.data.surface_type import SurfaceType
 from .geometry import Geometry
 from pipeline.misc.utils import convert_color, put_text, sample_at_point
@@ -50,8 +52,11 @@ class Surface():
 
         self._semantic_labels = None
 
+        self._plane_data = None
+        self._plane_parameters = None
         self._normal = None
         self._offset = None
+        self.rotation = random.uniform(0, np.pi)
 
         self.horizontal_vp = None
         self.vertical_vp = None
@@ -78,15 +83,6 @@ class Surface():
     def was_added(self) -> bool:
         return self._index is not None
 
-    def on_added(self):
-        if self._normal is not None:
-            self.normal = self._normal
-            self._normal = None
-
-        if self._offset is not None:
-            self.offset = self._offset
-            self._offset = None
-
     @property
     def probs(self) -> Geometry:
         return self.geometry.probs[self.index]
@@ -99,26 +95,36 @@ class Surface():
         return self._plane_mask
 
     @property
-    def normal(self) -> tuple:
-        return self.data["plane_normals"][self.index]
+    def plane_data(self) -> np.ndarray:
+        if self._plane_data is None:
+            self._plane_data = self.data["planes"]["detection"][self.index]
+        return self._plane_data
+
+    @property
+    def plane_parameters(self) -> tuple:
+        if self._plane_parameters is None:
+            self._plane_parameters = np.array(self.plane_data[6:9], dtype=np.float32)
+        return self._plane_parameters
+
+    @property
+    def normal(self) -> np.ndarray:
+        if self._normal is None:
+            self._normal = self.plane_parameters / np.maximum(self.offset, 1e-4)
+        return self._normal
 
     @normal.setter
-    def normal(self, value:tuple):
-        if self.was_added:
-            self.data["plane_normals"][self.index] = value
-        else:
-            self._normal = value
+    def normal(self, value:np.ndarray):
+        self._normal = value
 
     @property
     def offset(self) -> float:
-        return self.data["plane_offsets"][self.index]
+        if self._offset is None:
+            self._offset = np.linalg.norm(self.plane_parameters, axis=-1, keepdims=True)
+        return self._offset
 
     @offset.setter
     def offset(self, value:float):
-        if self.was_added:
-            self.data["plane_offsets"][self.index] = value
-        else:
-            self._offset = value
+        self._offset = value
 
     @property
     def normals_color(self) -> tuple:
