@@ -18,7 +18,7 @@ class PipelineOutput(PipelineStep):
         self.outfile_name = outfile_name
         self.preview_size = preview_size
         self.thumbnail_size = thumbnail_size
-        self.y_up = False #self.pipeline.api_level > 3
+        self.y_up = self.pipeline.api_level > 3
 
     @property
     def index(self) -> PipelineStepIndex:
@@ -127,6 +127,7 @@ class PipelineOutput(PipelineStep):
                 results = self.make_data_v4_dict(data, image_url, lighting_url, planes_index_mask_url, planes_alpha_mask_url)
 
         results["data_url"] = data["data_url"]
+
         self.save_data(results, self.outfile_name, data["data_url"])
 
     @abstractmethod
@@ -244,17 +245,6 @@ class PipelineOutput(PipelineStep):
         # Then plane parameters are (a, b, c)*d. Since plane normal is a unit vector,
         # we can extract plane_normal and plane_offset from their multiplication.
 
-        # plane_parameters = np.array(plane_data[6:9], dtype=np.float32)
-        # plane_offset = np.maximum(1e-4, np.linalg.norm(plane_parameters))
-        # plane_normal = (plane_parameters / plane_offset).tolist()
-
-        # plane_rotation = 0
-        # plane_type = 0
-
-        # if len(plane_data) > 9:
-        #     plane_rotation = plane_data[10]
-        #     plane_type = np.uint8(plane_data[9])
-
         plane_normal = surface.normal.astype(float)
         plane_normal = [-plane_normal[0], -plane_normal[2], plane_normal[1]] if self.y_up else list(plane_normal)
         plane_offset = float(surface.offset)
@@ -265,7 +255,7 @@ class PipelineOutput(PipelineStep):
             "name": surface.name,
             "normal": plane_normal,
             "offset": plane_offset,
-            "axisRotation": surface.rotation,
+            "axisRotation": -surface.axisRotation if self.y_up else surface.axisRotation,
             "images": {
                 "mask": mask_url
             }
@@ -308,12 +298,11 @@ class PipelineOutput(PipelineStep):
         # surfaces_json = self.encode_plane_surface_v3(0, all_plane_data[0], self.make_plane_mask_url(0))
         # print("surfaces_json 3:\n", surfaces_json)
 
-        # exit()
-        
         return {
             "formatVersion": 4,
             "name": "Room %s" % self.unique_id,
             "id": self.unique_id,
+            "floorRotation": -data["floor_rotation"] if self.y_up else data["floor_rotation"],
             "images": {
                 "main": image_url,
                 "lighting": lighting_url,
@@ -328,6 +317,7 @@ class PipelineOutput(PipelineStep):
                 "rotation": [0, 0, 0]  # camera is all zeros.
             },
             "geometry": {
+                "verticalAxis": "y" if self.y_up else "z",
                 "surfaces": [
                     self.encode_plane_surface_v4(i, surface, self.make_plane_mask_url(i)) for i, (surface) in enumerate(data["room"].surfaces)
                 ]

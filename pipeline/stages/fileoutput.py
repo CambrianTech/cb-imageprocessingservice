@@ -33,3 +33,4 @@ class PipelineFileOutput(PipelineOutput):
 
         with open(str(path), "w", encoding="utf-8") as out_file:
             json.dump(data, out_file, indent=4)
+

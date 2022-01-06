@@ -200,7 +200,7 @@ class PoseEstimator:
 
         self.vps = vps
 
-        print("fov", self.fov, self.floor_normal)
+        print("fov: %.2f, floor rotation: %.2f degrees" % (self.fov, np.degrees(self.floor_rotation)))
 
         # M = np.eye(3)
         # from cambrian import utils

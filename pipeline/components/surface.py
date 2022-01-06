@@ -56,7 +56,9 @@ class Surface():
         self._plane_parameters = None
         self._normal = None
         self._offset = None
-        self.rotation = random.uniform(0, np.pi)
+        self._axisRotation = None
+
+        self._rotation = None
 
         self.horizontal_vp = None
         self.vertical_vp = None
@@ -125,6 +127,23 @@ class Surface():
     @offset.setter
     def offset(self, value:float):
         self._offset = value
+
+    @property
+    def axisRotation(self) -> float:
+        if self._axisRotation is None:
+            #todo: this should be set directly instead
+            if self.surfaceType in [SurfaceType.Floor, SurfaceType.OnFloor]:
+                self._axisRotation = self.data["floor_rotation"]
+            elif self.surfaceType in [SurfaceType.Ceiling, SurfaceType.OnCeiling]:
+                self._axisRotation = -1 * self.data["floor_rotation"]
+            else:
+                self._axisRotation = 0
+
+        return self._axisRotation
+
+    @axisRotation.setter
+    def axisRotation(self, value:float):
+        self._axisRotation = value
 
     @property
     def normals_color(self) -> tuple:
