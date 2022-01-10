@@ -49,7 +49,7 @@ def _get_instance_metadata():
 @click.argument("user_uploads_bucket", type=click.STRING)
 @click.argument("results_bucket", type=click.STRING)
 @click.argument("plane_url", type=click.STRING)
-@click.option('--api', type=int, default=3, help='api level: 1-4')
+@click.option('--api', type=int, default=4, help='api level: 1-4')
 @click.option("--image-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--results-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--logging_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
