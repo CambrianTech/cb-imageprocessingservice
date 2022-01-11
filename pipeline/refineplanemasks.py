@@ -601,8 +601,7 @@ def ransac_vanishing_point(edgelets, lines, num_ransac_iter=2000, threshold_inli
     t = time()
 
     for ransac_iter in range(num_ransac_iter):
-        if time() - t > max_time or  len(first_index_space)==0 or len(second_index_space)==0:
-            return best_models, best_votes, model_inliers
+
         # print(len(first_index_space), first_index_space)
         ind1 = np.random.choice(first_index_space)
         ind2 = np.random.choice(second_index_space)
@@ -1425,8 +1424,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         vertical_line_inliers = inliers[0]
         locations, directions, strengths = edgelets
 
-        edgelets = (
-            locations[vertical_line_inliers], directions[vertical_line_inliers], strengths[vertical_line_inliers])
+        edgelets = (locations[vertical_line_inliers], directions[vertical_line_inliers], strengths[vertical_line_inliers])
 
         locations, directions, strengths = edgelets
 
