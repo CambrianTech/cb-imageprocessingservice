@@ -50,10 +50,10 @@ class PipelineStep(metaclass=ABCMeta):
     def output_keys(self) -> list:
         return {}
 
-    # @property
-    # @abstractmethod
-    # def index(self) -> PipelineStepIndex:
-    #     return None
+    @property
+    @abstractmethod
+    def index(self) -> PipelineStepIndex:
+        return None
 
     @property
     def description(self) -> str:
