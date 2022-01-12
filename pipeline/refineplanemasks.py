@@ -602,6 +602,12 @@ def ransac_vanishing_point(edgelets, lines, num_ransac_iter=2000, threshold_inli
 
     for ransac_iter in range(num_ransac_iter):
 
+        if time() - t > max_time or  len(first_index_space)==0 or len(second_index_space)==0:
+            inlier_indices = np.nonzero(model_inliers)[0]
+            if inlier_indices is None:
+                return None, best_votes, model_inliers
+            return best_models, best_votes, line_indices[inlier_indices]
+
         # print(len(first_index_space), first_index_space)
         ind1 = np.random.choice(first_index_space)
         ind2 = np.random.choice(second_index_space)
