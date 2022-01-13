@@ -223,6 +223,7 @@ class PipelineUploadResults(PipelineStep):
         return ["semantic_url", "lighting_url", "data_url" "superpixels_url"]
 
     def run(self, data):
+        
         key_semantic = "%s/mask.png" % data["image_s3_key"]
         key_lighting = "%s/lighting.png" % data["image_s3_key"]
         key_data = "%s/data.json" % data["image_s3_key"]
@@ -272,8 +273,7 @@ class PipelineUploadResults(PipelineStep):
             #                    self.bucket_name, key_data)
             # _upload_json_to_s3(self.s3_client, data_v2_dict,
             #                    self.bucket_name, key_data_v2)
-            _upload_json_to_s3(self.s3_client, data_v3_dict,
-                               self.bucket_name, key_data_v3)
+            
             _upload_image_to_s3(self.s3_client, superpixels_image,
                                 self.bucket_name, key_superpixels)
 
@@ -292,6 +292,9 @@ class PipelineUploadResults(PipelineStep):
                 for i, plane_mask in enumerate(data["planes"]["masks"]):
                     _upload_image_to_s3(self.s3_client, plane_mask, self.bucket_name,
                                         "%s/plane_masks/mask_%d.png" % (data["image_s3_key"], i))
+
+            _upload_json_to_s3(self.s3_client, data_v3_dict, self.bucket_name, key_data_v3)
+
         else:
             def _make_local_url(path):
                 return os.path.join(data["results_local_dir"], self.bucket_name, path)
