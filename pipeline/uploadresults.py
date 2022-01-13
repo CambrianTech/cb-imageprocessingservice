@@ -3,7 +3,7 @@ try:
     from imageio import imsave
 except:
     from scipy.misc import imsave
-import boto3
+import boto3.session
 import numpy as np
 import os
 import json
@@ -212,7 +212,6 @@ class PipelineUploadResults(PipelineStep):
     def __init__(self, bucket_name):
         super().__init__()
         self.bucket_name = bucket_name
-        self.s3_client = boto3.client("s3")
 
     @property
     def required_keys(self) -> list:
@@ -223,7 +222,7 @@ class PipelineUploadResults(PipelineStep):
         return ["semantic_url", "lighting_url", "data_url" "superpixels_url"]
 
     def run(self, data):
-        
+
         key_semantic = "%s/mask.png" % data["image_s3_key"]
         key_lighting = "%s/lighting.png" % data["image_s3_key"]
         key_data = "%s/data.json" % data["image_s3_key"]
@@ -264,36 +263,40 @@ class PipelineUploadResults(PipelineStep):
                                           _make_plane_mask_url)
 
         # Upload to S3 or write to local folder if local dir is set.
+        session = boto3.session.Session()
+        s3_client = session.client('s3')
+
+
         if "results_local_dir" not in data:
-            _upload_image_to_s3(self.s3_client, mask_image,
+            _upload_image_to_s3(s3_client, mask_image,
                                 self.bucket_name, key_semantic)
-            _upload_image_to_s3(self.s3_client, lighting_image,
+            _upload_image_to_s3(s3_client, lighting_image,
                                 self.bucket_name, key_lighting)
-            # _upload_json_to_s3(self.s3_client, json_dict,
+            # _upload_json_to_s3(s3_client, json_dict,
             #                    self.bucket_name, key_data)
-            # _upload_json_to_s3(self.s3_client, data_v2_dict,
+            # _upload_json_to_s3(s3_client, data_v2_dict,
             #                    self.bucket_name, key_data_v2)
             
-            _upload_image_to_s3(self.s3_client, superpixels_image,
+            _upload_image_to_s3(s3_client, superpixels_image,
                                 self.bucket_name, key_superpixels)
 
             if "planes_alpha_mask" in data:
-                _upload_image_to_s3(self.s3_client, data["planes_alpha_mask"],
+                _upload_image_to_s3(s3_client, data["planes_alpha_mask"],
                                     self.bucket_name, key_planes_alpha_mask)
 
             if "planes_index_mask" in data:
                 compressed_index_mask = get_compressed_index_mask(
                     data["planes_index_mask"])
 
-                _upload_bytes_to_s3(self.s3_client, compressed_index_mask,
+                _upload_bytes_to_s3(s3_client, compressed_index_mask,
                                     self.bucket_name, key_planes_index_mask)
 
             if "planes" in data:
                 for i, plane_mask in enumerate(data["planes"]["masks"]):
-                    _upload_image_to_s3(self.s3_client, plane_mask, self.bucket_name,
+                    _upload_image_to_s3(s3_client, plane_mask, self.bucket_name,
                                         "%s/plane_masks/mask_%d.png" % (data["image_s3_key"], i))
 
-            _upload_json_to_s3(self.s3_client, data_v3_dict, self.bucket_name, key_data_v3)
+            _upload_json_to_s3(s3_client, data_v3_dict, self.bucket_name, key_data_v3)
 
         else:
             def _make_local_url(path):

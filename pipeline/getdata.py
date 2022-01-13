@@ -1,5 +1,5 @@
 from io import BytesIO
-import boto3
+import boto3.session
 import numpy as np
 from pipeline.core import PipelineStep
 import os
@@ -20,7 +20,6 @@ class PipelineGetData(PipelineStep):
     def __init__(self, bucket_name):
         super().__init__()
         self.bucket_name = bucket_name
-        self.s3_client = boto3.client("s3")
 
     @property
     def required_keys(self) -> list:
@@ -31,10 +30,13 @@ class PipelineGetData(PipelineStep):
         return ["image"]
 
     def run(self, data):
+        session = boto3.session.Session()
+        s3_client = session.client('s3')
+
         # Get image from S3 or local folder if local dir is set.
         if "image_local_dir" not in data:
             data["image"] = _get_image_from_s3(
-                self.s3_client, self.bucket_name, data["image_s3_key"])
+                s3_client, self.bucket_name, data["image_s3_key"])
         else:
             local_path = os.path.join(
                 data["image_local_dir"], self.bucket_name, data["image_s3_key"])
