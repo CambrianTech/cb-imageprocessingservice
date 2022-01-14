@@ -258,7 +258,7 @@ def find_lines(img, gradient, normals):
     sx = edges.shape[1] / normals.shape[1]
     fld = cv2.ximgproc.createFastLineDetector(64, _canny_aperture_size=7, _do_merge=False)
     lines4 = fld.detect(cv2.cvtColor(np.uint8(normals), cv2.COLOR_BGR2GRAY))
-    if len(lines4):
+    if len(lines4) > 0:
         lines4 = lines4 * [[sx, sy, sx, sy]]
         extend_lines(lines4)
 
