@@ -953,41 +953,44 @@ def compute_normal_from_vps(edgelets,img, fov, floor_normal, floor_offset, floor
     inliers = []
 
     vertical_edgelet_indices = get_edgelets_close_to_dir(edgelets,[0,1],.03)
-    vp_vertical, votes, inliers_vertical = ransac_vanishing_point(edgelets, e_lines, 2000, threshold_inlier=1, max_time=1.0, line_indices=vertical_edgelet_indices)
 
-    if vp_vertical is not None:
-        vps.append(vp_vertical)
-        inliers.append(inliers_vertical)
+    if vertical_edgelet_indices is not None:
+        vp_vertical, votes, inliers_vertical = ransac_vanishing_point(edgelets, e_lines, 2000, threshold_inlier=1, max_time=1.0, line_indices=vertical_edgelet_indices)
+
+        if vp_vertical is not None:
+            vps.append(vp_vertical)
+            inliers.append(inliers_vertical)
 
     horizontal1_edgelet_indices = get_edgelets_close_to_dir(edgelets, [1, 0], .5)
 
-    vp_horizontal1, votes, inliers_horizontal1 = ransac_vanishing_point(edgelets, e_lines, 2000, threshold_inlier=1, max_time=1.0, line_indices=horizontal1_edgelet_indices)
+    if horizontal1_edgelet_indices is not None:
+        vp_horizontal1, votes, inliers_horizontal1 = ransac_vanishing_point(edgelets, e_lines, 2000, threshold_inlier=1, max_time=1.0, line_indices=horizontal1_edgelet_indices)
 
-    if vp_horizontal1 is not None:
-        vps.append(vp_horizontal1)
-        inliers.append(inliers_horizontal1)
+        if vp_horizontal1 is not None:
+            vps.append(vp_horizontal1)
+            inliers.append(inliers_horizontal1)
 
-    horizontal2_edgelet_indices = get_edgelets_close_to_dir(edgelets, [1, 0], .95)
-    horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices, np.nonzero(compute_votes(edgelets,vp_horizontal1,10))[0])
-    horizontal2_edgelet_indices = np.setdiff1d( horizontal2_edgelet_indices, np.nonzero(compute_votes(edgelets,vp_vertical,10))[0])
+        horizontal2_edgelet_indices = get_edgelets_close_to_dir(edgelets, [1, 0], .95)
 
-    vp_horizontal2, votes, inliers_horizontal2 = ransac_vanishing_point(edgelets, e_lines, 2000, threshold_inlier=2,
-                                                                      max_time=1.0,
-                                                                      line_indices=horizontal2_edgelet_indices)
+        if horizontal2_edgelet_indices is not None:
+            horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices, np.nonzero(compute_votes(edgelets,vp_horizontal1,10))[0])
+            horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices, np.nonzero(compute_votes(edgelets,vp_vertical,10))[0])
 
-    if vp_horizontal2 is not None:
-        vps.append(vp_horizontal2)
-        inliers.append(inliers_horizontal2)
+            vp_horizontal2, votes, inliers_horizontal2 = ransac_vanishing_point(edgelets, e_lines, 2000, threshold_inlier=2,
+                                                                                max_time=1.0,
+                                                                                line_indices=horizontal2_edgelet_indices)
+            if vp_horizontal2 is not None:
+                vps.append(vp_horizontal2)
+                inliers.append(inliers_horizontal2)
 
-    horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices,
-                                               np.nonzero(compute_votes(edgelets, vp_horizontal2,5))[0])
+                horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices, np.nonzero(compute_votes(edgelets, vp_horizontal2,5))[0])
 
-    vp_horizontal3, votes, inliers_horizontal3 = ransac_vanishing_point(edgelets, e_lines, 2000, threshold_inlier=1,
-                                                                        max_time=1.0,
-                                                                        line_indices=horizontal2_edgelet_indices)
-    if vp_horizontal3 is not None:
-        vps.append(vp_horizontal3)
-        inliers.append(inliers_horizontal3)
+            vp_horizontal3, votes, inliers_horizontal3 = ransac_vanishing_point(edgelets, e_lines, 2000, threshold_inlier=1,
+                                                                                max_time=1.0,
+                                                                                line_indices=horizontal2_edgelet_indices)
+            if vp_horizontal3 is not None:
+                vps.append(vp_horizontal3)
+                inliers.append(inliers_horizontal3)
 
     vps = np.float32(vps)
 
