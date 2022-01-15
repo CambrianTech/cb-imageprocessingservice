@@ -235,26 +235,23 @@ def find_lines(img, gradient, normals):
     # find all liens in the edge image
     def extend_lines(lines, new_lines):
         if new_lines is None or len(new_lines) == 0: 
-            return
-        if lines is None:
-            lines = new_lines
+            return lines
+        elif lines is None:
+            return new_lines
         else:
-            lines = np.concatenate((lines, new_lines))
-        return lines
-
+            return np.concatenate((lines, new_lines))
 
     lines = None
-
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)
-    extend_lines(lines, fld.detect(edges))
+    lines = extend_lines(lines, fld.detect(edges))
 
     aperture = 5
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 30.0), 1.41, 200, 220, aperture, False)
-    extend_lines(lines, fld.detect(bw - (clean_edges * 5.0).astype("uint8")))
+    lines = extend_lines(lines, fld.detect(bw - (clean_edges * 5.0).astype("uint8")))
 
     aperture = 5
     fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 15.0), 1.41,_canny_aperture_size=aperture, _do_merge=False)
-    extend_lines(lines, fld.detect(edges))
+    lines = extend_lines(lines, fld.detect(edges))
 
     sy = edges.shape[0] / normals.shape[0]
     sx = edges.shape[1] / normals.shape[1]
@@ -262,7 +259,7 @@ def find_lines(img, gradient, normals):
     lines4 = fld.detect(cv2.cvtColor(np.uint8(normals), cv2.COLOR_BGR2GRAY))
     if len(lines4) > 0:
         lines4 = lines4 * [[sx, sy, sx, sy]]
-        extend_lines(lines, lines4)
+        lines = extend_lines(lines, lines4)
 
     confs = []
 
