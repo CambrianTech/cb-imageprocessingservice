@@ -2,8 +2,9 @@ import cv2
 import numpy as np
 import math
 from scipy.spatial import distance
-
 from time import time
+
+from .core import PipelineStep
 from .line import Line
 
 def gabor(bw, theta, lambd, gamma = 0.0, psi = 0.0):
@@ -60,10 +61,12 @@ class PipelineLineFinder(PipelineStep):
 
         #find lines in BW image
         bw_lines_a = find_lines(bw, min_length)
-        lines.extend(bw_lines_a)
+        if len(bw_lines_a) > 0:
+            lines.extend(bw_lines_a)
 
         bw_lines_b = find_lines(bw, min_length, True, ang_th=17) #ang_th=22.5 was getting false positives
-        lines.extend(bw_lines_b)
+        if len(bw_lines_b) > 0:
+            lines.extend(bw_lines_b)
 
         lines = Line.merge(lines, search_length=1.0, search_width=diagonal/800, angle_threshold=math.radians(3))
 
@@ -75,9 +78,8 @@ class PipelineLineFinder(PipelineStep):
         hed = cv2.bilateralFilter(hed, 13, 40, 9) #todo: apply non-maxima-suppression (NMS) to image instead
         hed_lines = find_lines(hed, min_length, use_lsd=True, ang_th=12) #ang_th=22.5 was getting false positives
 
-        hed_lines = Line.merge(hed_lines, search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(3))
-
         if len(hed_lines) > 0: 
+            hed_lines = Line.merge(hed_lines, search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(3))
             lines.extend(hed_lines)
 
         #find lines in normals
@@ -87,7 +89,9 @@ class PipelineLineFinder(PipelineStep):
         normals = cv2.split(normals)
         normals_lines = []
         for i in range(0, 3):
-            normals_lines.extend(find_lines(normals[i], min_length))
+            new_lines = find_lines(normals[i], min_length)
+            if len(new_lines) > 0:
+                normals_lines.extend(new_lines)
         
         if len(normals_lines) > 0:
             #cleanup normals
@@ -96,6 +100,8 @@ class PipelineLineFinder(PipelineStep):
 
         #merge all
         lines = Line.merge(lines, search_width=min(diagonal/400, 8))
+
+        print("PipelineLineFinder found %d lines" % len(lines))
 
         data["lines"] = lines
 
