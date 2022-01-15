@@ -6,9 +6,7 @@ import uuid
 from numba.experimental import jitclass
 from collections.abc import Sequence
 from scipy.spatial import distance
-from bisect import bisect_left, bisect_right
 from cambrian.LineFunctions import LineFunctions
-from pipeline.misc.utils import normalize
 
 # @jitclass(spec=[
 #             ("x0", nb.types.float32), ("y0", nb.types.float32), ("x1", nb.types.float32), ("y1", nb.types.float32), 
@@ -18,6 +16,12 @@ from pipeline.misc.utils import normalize
 #             ("angle", nb.types.float32),
 #             ("midpoint", nb.types.UniTuple(nb.types.float32, 2)),
 #             ])
+
+def normalize(v):
+    norm = np.linalg.norm(v)
+    if norm == 0: 
+       return v
+    return v / norm
 
 def out_of_range(x, y, width, height):
     return x < 0 or y < 0 or x >= width or y >= height
@@ -56,8 +60,6 @@ class Line(Sequence):
         return (int(self.data[2]), int(self.data[3]))
 
     def get_intersection(self, other):
-        #return LineFunctions.get_intersection(self.point_a, self.point_b, other.point_a, other.point_b)
-
         return get_line_intersection(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], \
             other.point_a[0], other.point_a[1], other.point_b[0], other.point_b[1])
 
@@ -106,9 +108,6 @@ class Line(Sequence):
     def bounding_box(self, width, length_multiplier=1.0):
         return (self.midpoint, (self.length * length_multiplier, width), np.degrees(self.angle))
 
-    # def bounding_box_points(self, width, length_multiplier=1.0):
-    #     return rotated_rects_points(self.midpoint, (self.length * length_multiplier, width), self.angle)
-
     def extended(self, ratio=1.1, from_a=True, from_b=True):
 
         if not from_a and not from_b:
@@ -125,12 +124,6 @@ class Line(Sequence):
         if from_b:
             data[2] = self.midpoint[0] + direction[0] * amount
             data[3] = self.midpoint[1] + direction[1] * amount
-
-        # new_line = Line(data)
-        # if from_b and not from_a and ratio > 1:
-        #     print(ratio, new_line.length, self.length)
-        #     print(self.point_a, self.point_b)
-        #     print(new_line.point_a, new_line.point_b)
 
         return Line(data)
         
