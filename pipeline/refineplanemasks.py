@@ -1086,56 +1086,6 @@ def compute_normal_from_vps(edgelets,img, fov, floor_normal, floor_offset, floor
         basis_forward[0] - axes[1,0])*basis_forward)
 
     img_dir = img.copy()
-    # M = np.eye(3)
-    # from cambrian import utils
-    #
-    # M = utils.axisAngleToRotationMatrix(floor_normal,floor_rotation)
-    #
-    # basis_right = np.dot(M, basis_right)
-    # basis_forward = np.dot(M, basis_forward)
-    #
-    # uv_center = np.int32(xyz_to_uv(plane_center, width=img.shape[1], height=img.shape[0], camera=new_cam))
-    # pre_pos = np.int32(xyz_to_uv(plane_center, width=img.shape[1], height=img.shape[0], camera=new_cam))
-    # color = np.int32(np.random.randint([127, 127, 127], [254, 254, 235]))
-    # color = (int(color[0]), int(color[1]), int(color[2]))
-    # mask = np.zeros_like(img_dir)
-    # a = 50
-    # scale = 4.
-    #
-    #
-    # # plane_center = plane_center +.33 * basis_right-.68*basis_forward
-    # print(plane_center)
-    # for l in range(-a, a):
-    #     for k in range(-a, a):
-    #
-    #         pos = plane_center + l / scale * basis_right + k / scale * basis_forward
-    #         pos2 = plane_center + (l + 1) / scale * basis_right + (k - 1) / scale * basis_forward
-    #
-    #         uv_pos = np.int32(xyz_to_uv(pos, width=img.shape[1], height=img.shape[0], camera=new_cam))
-    #         uv_pos2 = np.int32(xyz_to_uv(pos2,width=img.shape[1], height=img.shape[0], camera=new_cam))
-    #
-    #         if np.isnan(uv_pos[0]) or np.isnan(uv_pos[1]) or np.isnan(uv_pos2[1]) or np.isnan(uv_pos2[0]): continue
-    #         if k < a - 1 and k >= -a + 1 and l < a - 1 and l >= -a + 1:
-    #             cv2.circle(mask, (int(plane_center[0]), int(plane_center[1])), 3, color, thickness=-1)
-    #             cv2.circle(mask, (uv_pos[0], uv_pos[1]), 3, color, thickness=-1)
-    #             cv2.line(mask, (pre_pos[0], pre_pos[1]), (uv_pos[0], uv_pos[1]), color=(255, 0, 255), thickness=2)
-    #             cv2.line(mask, (pre_pos[0], pre_pos[1]), (uv_pos2[0], uv_pos2[1]), color=(0, 255, 255),
-    #                      thickness=2)
-    #         pre_pos = uv_pos
-    # img_dir[np.logical_and(mask[:, :, 2] > 0, fm>.5)] = mask[np.logical_and(mask[:, :, 2] > 0, fm>.5)]
-    #
-    # color_index = 0
-    # for i in axes_indices:
-    #     uv_center = pp
-    #     vp =vps[i]/vps[i, 2]
-    #     color = [0,0,0]
-    #     color[color_index] = 255
-    #     color_index += 1
-    #     cv2.polylines(img_dir, pts=np.array([[[uv_center[0], uv_center[1]], [vp[0], vp[1]]]], np.int32),
-    #                   isClosed=False, color=color, thickness=2)
-
-    # save_dir = '/Users/derrickhart/cb-base/client-visualizers/cambrianar-sites/divinefloor/scenes/bedroom/2-bedroom/'
-    # cv2.imwrite(save_dir + "image.jpg", img_dir)
 
     return vps, inliers, floor_normal, floor_offset, floor_rotation, fov, img_dir
 

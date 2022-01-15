@@ -34,8 +34,8 @@ mock==3.0.5
 multidict==4.5.2
 networkx==2.3
 numpy==1.17.4
-numba=0.54.0
-opencv-python-headless==4.1.0.25
+numba==0.53.0
+opencv-python-headless==4.5.5.62
 Pillow==6.0.0
 protobuf==3.8.0
 pyasn1==0.4.5

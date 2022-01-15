@@ -19,7 +19,7 @@ from pipeline.core import schedule_and_wait, merge_future_dicts, num_waiting_ite
 from pipeline.fov import PipelineCalculateFov
 from pipeline.getdata import PipelineGetData
 from pipeline.primaryangle import PipelineDeterminePrimaryAngles
-# from pipeline.refine import PipelineRefineResults
+from pipeline.linefinder import PipelineLineFinder
 from pipeline.runmodels import PipelineRunModels
 from pipeline.superpixels import PipelineSuperpixels
 from pipeline.refineplanemasks import PipelineRefinePlaneMasks
@@ -84,6 +84,7 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
             hed_path=join("hed_model", "HED_pretrained_bsds.npz")
         ),
         PipelineDeterminePrimaryAngles(),
+        PipelineLineFinder(),
         PipelineSuperpixels(),
         PipelineRefinePlaneMasks(results_bucket),
         PipelineCombinePlaneMasks(),
