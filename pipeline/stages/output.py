@@ -300,6 +300,7 @@ class PipelineOutput(PipelineStep):
 
         return {
             "formatVersion": 4,
+            "version": "4.0.1",
             "name": "Room %s" % self.unique_id,
             "id": self.unique_id,
             "floorRotation": -data["floor_rotation"] if self.y_up else data["floor_rotation"],
