@@ -36,6 +36,8 @@ class PipelineLineFinder(PipelineStep):
 
         start = time()
 
+        print("lines exit early")
+
         operating_scale = 1500.0 / diagonal
         if operating_scale < 1.0:
             bw = cv2.resize(bw, (int(self.width * operating_scale), int(self.height * operating_scale)), cv2.INTER_CUBIC)

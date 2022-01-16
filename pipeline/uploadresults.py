@@ -166,7 +166,7 @@ def _make_data_v3_dict(data, lighting_url, superpixels_url, semantic_url, planes
 
     return {
         "formatVersion": 3,
-        "version": "3.0.1",
+        "version": "3.0.2",
         "name": "Room %s" % data["image_s3_key"],
         "id": "room-%s" % data["image_s3_key"],
         "floorRotation": data["floor_rotation"],

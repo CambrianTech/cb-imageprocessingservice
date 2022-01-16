@@ -6,7 +6,6 @@ import uuid
 from numba.experimental import jitclass
 from collections.abc import Sequence
 from scipy.spatial import distance
-from cambrian.LineFunctions import LineFunctions
 
 # @jitclass(spec=[
 #             ("x0", nb.types.float32), ("y0", nb.types.float32), ("x1", nb.types.float32), ("y1", nb.types.float32), 
@@ -103,7 +102,7 @@ class Line(Sequence):
     def recalculate(self):
         self.midpoint = ((self.point_a[0] + self.point_b[0]) / 2, (self.point_a[1] + self.point_b[1]) / 2)
         self.length = distance.euclidean(self.point_a, self.point_b)
-        self.angle = LineFunctions.line_angle(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
+        self.angle = line_angle(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
 
     def bounding_box(self, width, length_multiplier=1.0):
         return (self.midpoint, (self.length * length_multiplier, width), np.degrees(self.angle))
@@ -129,7 +128,7 @@ class Line(Sequence):
         
 
     def in_range(self, lines, angle_threshold):
-        return list(filter(lambda line: not line.dead and LineFunctions.line_angle_difference(self.angle, line.angle) <= angle_threshold, lines)) 
+        return list(filter(lambda line: not line.dead and line_angle_difference(self.angle, line.angle) <= angle_threshold, lines)) 
 
     def copy(self):
         return Line(self.data)
@@ -169,7 +168,7 @@ class Line(Sequence):
                     line_a.dead = True
                     line_b.dead = True
 
-                    data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
+                    data = merge_lines(data, (line_b.point_a, line_b.point_b))
 
             if line_a.dead:
                 lines[i] = Line(np.array([data[0][0], data[0][1], data[1][0], data[1][1]], dtype=np.int), group=line_a.group, id=line_a.id)
@@ -231,7 +230,7 @@ def line_on_image_edge(point_a, point_b, image, min_distance=3):
     return point_on_image_edge(point_a, image, min_distance) and point_on_image_edge(point_a, image, min_distance) & point_on_image_edge(point_b, image, min_distance) > 0
 
 @nb.jit(nopython=True)
-def merge_line_pair(line_a, line_b):
+def merge_lines(line_a, line_b):
 
     ax = line_a[0][0]
     ay = line_a[0][1]
