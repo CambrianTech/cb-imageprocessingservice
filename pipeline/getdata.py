@@ -43,3 +43,10 @@ class PipelineGetData(PipelineStep):
             data["image"] = imread(local_path)
 
         data["image"] = data["image"][:, :, :3]
+
+        
+
+        if data["image"].shape[0] > shape[0] or data["image"].shape[1] > shape[1]:
+            data["downscaled"] = cv2.resize(data["image"], shape)
+        else:
+            data["downscaled"] = data["image"]
