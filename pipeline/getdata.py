@@ -43,13 +43,3 @@ class PipelineGetData(PipelineStep):
             data["image"] = imread(local_path)
 
         data["image"] = data["image"][:, :, :3]
-
-        output = np.float32(data["semantic_probs"])
-        data["output"] = output
-
-        height, width = output[0].shape
-        
-        if data["image"].shape[0] > height or data["image"].shape[1] > width:
-            data["downscaled"] = cv2.resize(data["image"], (width, height))
-        else:
-            data["downscaled"] = data["image"]

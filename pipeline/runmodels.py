@@ -255,6 +255,17 @@ class PipelineRunModels(PipelineStep):
             datum["semantic"] = result
             datum["semantic_probs"] = softmax(result[0], axis=0)
 
+            #create convenient structures:
+            output = np.float32(datum["semantic_probs"])
+            datum["output"] = output
+
+            height, width = output[0].shape
+            
+            if datum["image"].shape[0] > height or datum["image"].shape[1] > width:
+                datum["downscaled"] = cv2.resize(datum["image"], (width, height))
+            else:
+                datum["downscaled"] = datum["image"]
+
         print("Semantic model took %.2f seconds" % (time() - t))
 
         t = time()

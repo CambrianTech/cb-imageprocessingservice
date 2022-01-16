@@ -166,7 +166,7 @@ def _make_data_v3_dict(data, lighting_url, superpixels_url, semantic_url, planes
 
     return {
         "formatVersion": 3,
-        "version": "3.0.2",
+        "version": "3.0.%s" % self.build_version,
         "name": "Room %s" % data["image_s3_key"],
         "id": "room-%s" % data["image_s3_key"],
         "floorRotation": data["floor_rotation"],
@@ -210,10 +210,11 @@ def get_compressed_index_mask(index_mask):
 
 
 class PipelineUploadResults(PipelineStep):
-    def __init__(self, bucket_name):
+    def __init__(self, bucket_name, build_version="x"):
         super().__init__()
         self.bucket_name = bucket_name
-
+        self.build_version = build_version
+        
     @property
     def required_keys(self) -> list:
         return ["semantic", "lighting", "superpixels"]

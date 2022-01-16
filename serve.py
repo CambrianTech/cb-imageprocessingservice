@@ -71,7 +71,8 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
     subprocess.Popen(["python3", "runcpunetworks.py",
                       model_path, str(cpu_networks_port)])
 
-    print("Creating pipeline")
+    build_version = "001"
+    print("Creating pipeline, build %s" % build_version)
 
     # Create the steps we want to use in the pipelines
     steps = [
@@ -88,7 +89,7 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
         PipelineSuperpixels(),
         PipelineRefinePlaneMasks(results_bucket),
         PipelineCombinePlaneMasks(),
-        PipelineUploadResults(results_bucket)
+        PipelineUploadResults(results_bucket, build_version)
     ]
 
     # Start the processing workers for all steps
