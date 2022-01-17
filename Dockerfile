@@ -9,6 +9,7 @@ FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}-base-ubuntu${UBUNTU_VERSION} as base
 ARG ARCH
 ARG CUDA
 ARG CUDNN=7.4.1.5-1
+ARG DEBIAN_FRONTEND=noninteractive
 
 # Needed for string substitution 
 SHELL ["/bin/bash", "-c"]
@@ -21,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         cuda-curand-${CUDA/./-} \
         cuda-cusolver-${CUDA/./-} \
         cuda-cusparse-${CUDA/./-} \
-	cuda-nvrtc-${CUDA/./-} \
+	   cuda-nvrtc-${CUDA/./-} \
         curl \
         libcudnn7=${CUDNN}+cuda${CUDA} \
         libfreetype6-dev \
@@ -32,7 +33,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         unzip \
         libsm6 \
         libxext6 \
-        libxrender-dev
+        libxrender-dev \
+        python3-opencv
 
 RUN [ "${ARCH}" = ppc64le ] || (apt-get update && \
         apt-get install nvinfer-runtime-trt-repo-ubuntu1804-5.0.2-ga-cuda${CUDA} \
@@ -40,6 +42,8 @@ RUN [ "${ARCH}" = ppc64le ] || (apt-get update && \
         && apt-get install -y --no-install-recommends libnvinfer5=5.0.2-1+cuda${CUDA} \
         && apt-get clean \
         && rm -rf /var/lib/apt/lists/*)
+
+#RUN apt-get update && apt-get install -y python3-opencv
 
 # For CUDA profiling, TensorFlow requires CUPTI.
 ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH

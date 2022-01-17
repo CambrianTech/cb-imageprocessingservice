@@ -27,6 +27,8 @@ from pipeline.combineplanemasks import PipelineCombinePlaneMasks
 from pipeline.uploadresults import PipelineUploadResults
 from pipeline.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
 
+build_version = "002"
+cpu_networks_port = 8082
 
 def _get_instance_metadata():
     metadata = {}
@@ -67,11 +69,9 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
     print("Starting CPU networks process")
-    cpu_networks_port = 8082
     subprocess.Popen(["python3", "runcpunetworks.py",
                       model_path, str(cpu_networks_port)])
 
-    build_version = "001"
     print("Creating pipeline, build %s" % build_version)
 
     # Create the steps we want to use in the pipelines
