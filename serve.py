@@ -94,13 +94,19 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
     for step in steps:
         step.start()
 
+    total_pipeline_time_avg = 0
+    pipeline_finished = False
+
     # Pipeline for finding planes, generating lighting and predicting fov.
     async def planes_pipeline(input_dict: typing.Dict):
+        nonlocal total_pipeline_time_avg, pipeline_finished
         total_start_time = time()
         for step in steps:
             input_dict = await schedule_and_wait(step.schedule, input_dict)
-        print("Planes total pipeline time: %.2fs" %
-              (time() - total_start_time))
+        total_pipeline_time = time() - total_start_time
+        print("Planes total pipeline time: %.2fs" % total_pipeline_time)
+        total_pipeline_time_avg = 0.5 * total_pipeline_time_avg + 0.5 * total_pipeline_time
+        pipeline_finished = True
         return input_dict
 
     # Setup http server
@@ -191,23 +197,45 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
         print("Instance metadata:", metadata)
 
     async def push_metrics_loop():
+        nonlocal pipeline_finished, total_pipeline_time_avg
+        
         loop = asyncio.get_event_loop()
 
         if metadata is not None:
             cw = boto3.client("cloudwatch", region_name=metadata["region"])
 
         def push_metrics(avg_waiting_items):
-            cw.put_metric_data(Namespace="ImageProcessingService",
-                               MetricData=[{
-                                   "MetricName": "PipelineWaitingItems",
-                                   "Dimensions": [{
-                                       "Name": "ClusterName",
-                                       "Value": metadata["cluster"]
-                                   }],
-                                   "Timestamp": datetime.datetime.now(
-                                       dateutil.tz.tzlocal()),
-                                   "Value": avg_waiting_items
-                               }])
+            nonlocal pipeline_finished, total_pipeline_time_avg
+
+            if not pipeline_finished:
+                total_pipeline_time_avg = 0
+            pipeline_finished = False
+
+            cw.put_metric_data(
+                Namespace="ImageProcessingService",
+                MetricData=[
+                    {
+                        "MetricName": "PipelineWaitingItems",
+                        "Dimensions": [{
+                            "Name": "ClusterName",
+                            "Value": metadata["cluster"]
+                        }],
+                        "Timestamp": datetime.datetime.now(
+                            dateutil.tz.tzlocal()),
+                        "Value": avg_waiting_items
+                    },
+                    {
+                        "MetricName": "PipelineTotalTime",
+                        "Dimensions": [{
+                            "Name": "ClusterName",
+                            "Value": metadata["cluster"]
+                        }],
+                        "Timestamp": datetime.datetime.now(
+                            dateutil.tz.tzlocal()),
+                        "Value": total_pipeline_time_avg
+                    },
+                ]
+            )
 
         avg_waiting_items = 0
 
