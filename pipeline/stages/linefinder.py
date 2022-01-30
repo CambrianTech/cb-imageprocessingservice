@@ -6,7 +6,7 @@ from scipy.spatial import distance
 from cambrian.frei_chen import frei_chen
 from time import time
 
-from pipeline.components.line import Line
+from pipeline.components.line import Line, merge_lines, draw_lines
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.logging import log_image, im_logging_enabled, LogLevel
 
@@ -51,7 +51,7 @@ class PipelineLineFinder(PipelineStep):
             if im_logging_enabled(data, LogLevel.Lines):
                 debug = data["downscaled"].copy()
                 thickness = max(int(math.hypot(debug.shape[0], debug.shape[1]) / 600), 1)
-                Line.draw_all(debug, lines, thickness=thickness)
+                draw_lines(debug, lines, thickness=thickness)
                 log_image(data, name, debug)
 
         def find_lines(image, min_length, use_lsd=False, refine=cv2.LSD_REFINE_NONE, scale=1.0, sigma_scale=1.0, quant=2.0, ang_th=22.5, log_eps=0, density_th=0.7, n_bins=1024):
@@ -83,7 +83,7 @@ class PipelineLineFinder(PipelineStep):
         lines.extend(bw_lines_b)
         #log_lines(bw_lines_b, "bw_lines_lsd")
 
-        lines = Line.merge(lines, search_length=1.0, search_width=diagonal/800, angle_threshold=math.radians(3))
+        lines = merge_lines(lines, search_length=1.0, search_width=diagonal/800, angle_threshold=math.radians(3))
 
         #log_lines(lines, "bw_lines")
 
@@ -96,7 +96,7 @@ class PipelineLineFinder(PipelineStep):
         hed_lines = find_lines(hed, min_length, use_lsd=True, ang_th=12) #ang_th=22.5 was getting false positives
         #log_lines(hed_lines, "hed_lines_initial")
 
-        hed_lines = Line.merge(hed_lines, search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(3))
+        hed_lines = merge_lines(hed_lines, search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(3))
 
         if len(hed_lines) > 0: 
             #log_lines(hed_lines, "hed_lines")
@@ -113,7 +113,7 @@ class PipelineLineFinder(PipelineStep):
         
         if len(normals_lines) > 0:
             #cleanup normals
-            normals_lines = Line.merge(normals_lines, search_width=diagonal/300)
+            normals_lines = merge_lines(normals_lines, search_width=diagonal/300)
             #log_lines(normals_lines, "normals_lines")
             lines.extend(normals_lines)
 
@@ -127,7 +127,7 @@ class PipelineLineFinder(PipelineStep):
 
         # gabor_lines = find_lines(edges, min_length, use_lsd=True)
         # if len(gabor_lines) > 0: 
-        #     gabor_lines = Line.merge(gabor_lines, search_length=0.5, search_width=diagonal/100, angle_threshold=math.radians(5))
+        #     gabor_lines = merge_lines(gabor_lines, search_length=0.5, search_width=diagonal/100, angle_threshold=math.radians(5))
         #     log_lines(gabor_lines, "gabor_lines")
         #     lines.extend(gabor_lines)
 
@@ -142,12 +142,12 @@ class PipelineLineFinder(PipelineStep):
         # log_image(data, "frei_chen", clean_edges)
         # frei_lines = find_lines(clean_edges.astype(np.uint8), min_length, use_lsd=True)
         # if len(frei_lines) > 0: 
-        #     frei_lines = Line.merge(frei_lines, search_width=diagonal/200, search_length=1.1, angle_threshold=math.radians(7))
+        #     frei_lines = merge_lines(frei_lines, search_width=diagonal/200, search_length=1.1, angle_threshold=math.radians(7))
         #     log_lines(frei_lines, "frei_lines")
         #     lines.extend(frei_lines)
 
         #merge all
-        lines = Line.merge(lines, search_width=min(diagonal/400, 8))
+        lines = merge_lines(lines, search_width=min(diagonal/400, 8))
 
         # print("8. elapsed %.2f" % (time() - start)); start = time()
 

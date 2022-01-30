@@ -18,7 +18,7 @@ from pipeline.data.surface_type import SurfaceType
 from .surface import Surface
 from pipeline.misc.utils import convert_color, put_text, overlay_mask, random_color, sample_at_point, scale_contour
 from pipeline.data.logging import im_logging_enabled, log_image, log_segmentation_image, log_markers, Timer
-from .line import line_angle_difference, Line
+from .line import line_angle_difference, Line, draw_lines
 from pipeline.data.ade20k import ADE20K
 
 from termcolor import colored
@@ -64,7 +64,7 @@ class Room(Geometry):
 
         #prepare
         self.lines_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
-        Line.draw_all(self.lines_mask, self.data["lines"], color=(255,255,255), thickness=1, lineType=cv2.LINE_4)
+        draw_lines(self.lines_mask, self.data["lines"], color=(255,255,255), thickness=1, lineType=cv2.LINE_4)
 
         log_segmentation_image(self.data, "semantic_labels", self.semantic_labels, self.image, labelset=ADE20K)
 

@@ -93,7 +93,7 @@ class Line(Sequence):
         return closest_line_point(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], point[0], point[1])
 
     def draw(self, img, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
-        cv2.line(img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
+        draw_line(line, img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
 
     def reshape(self, *args):
         return self.data.reshape(*args)
@@ -141,55 +141,10 @@ class Line(Sequence):
     def copy(self):
         return Line(self.data)
 
-    @classmethod
-    def draw_all(cls, img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
-        [line.draw(img, color=color, thickness=thickness, sx=sx, sy=sy, lineType=lineType) for line in lines]
-
-    @classmethod
-    def merge(cls, lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
-
-        lines = [line.copy() for line in lines]
-    
-        min_dist_sq = search_width * search_width
-
-        for i in range(len(lines)):
-            
-            line_a = lines[i]
-            if line_a.dead: continue
-
-            rect_a = line_a.bounding_box(search_width, length_multiplier=search_length)
-            data = (line_a.point_a, line_a.point_b)
-
-            candidates = line_a.in_range(lines[:i] + lines[i+1:], angle_threshold)
-
-            for line_b in candidates:
-
-                dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
-
-                if dist_sq <= min_dist_sq:
-                    result = 1
-                else:
-                    rect_b = line_b.bounding_box(search_width, length_multiplier=search_length)
-                    result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
-
-                if result != 0:
-                    line_a.dead = True
-                    line_b.dead = True
-
-                    data = LineFunctions.merge_lines(data, (line_b.point_a, line_b.point_b))
-
-            if line_a.dead:
-                lines[i] = Line(np.array([data[0][0], data[0][1], data[1][0], data[1][1]], dtype=np.int), group=line_a.group, id=line_a.id)
-
-        return list(filter(lambda x: not x.dead, lines))
-
 #jit functions, unused:
 @nb.jit(nopython=True)
 def line_angle(x0, y0, x1, y1):
     return math.atan2(float(y1 - y0), float(x1 - x0))
-
-def draw_line(line, img, color=(255,50,255,255), thickness=2):
-    cv2.line(img, (int(line.point_a[0]), int(line.point_a[1])), (int(line.point_b[0]), int(line.point_b[1])), color, thickness)
 
 @nb.jit(nopython=True)
 def line_angle_difference(x, y): #minimum angle between lines segments cannot differ by more than 90 degrees
@@ -422,4 +377,49 @@ def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
 
     #Collision detected
     return p0_x + (t * s1_x), p0_y + (t * s1_y)
+
+@nb.jit(nopython=False)
+def draw_line(line, img, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
+    cv2.line(img, (int(line.point_a[0] * sx), int(line.point_a[1] * sy)), (int(line.point_b[0] * sx), int(line.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
+
+@nb.jit(nopython=False)
+def draw_lines(img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
+    [draw_line(line, img, color=color, thickness=thickness, sx=sx, sy=sy, lineType=lineType) for line in lines]
+
+def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
+
+    lines = [line.copy() for line in lines]
+
+    min_dist_sq = search_width * search_width
+
+    for i in range(len(lines)):
+        
+        line_a = lines[i]
+        if line_a.dead: continue
+
+        rect_a = line_a.bounding_box(search_width, length_multiplier=search_length)
+        data = (line_a.point_a, line_a.point_b)
+
+        candidates = line_a.in_range(lines[:i] + lines[i+1:], angle_threshold)
+
+        for line_b in candidates:
+
+            dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
+
+            if dist_sq <= min_dist_sq:
+                result = 1
+            else:
+                rect_b = line_b.bounding_box(search_width, length_multiplier=search_length)
+                result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+
+            if result != 0:
+                line_a.dead = True
+                line_b.dead = True
+
+                data = merge_line_pair(data, (line_b.point_a, line_b.point_b))
+
+        if line_a.dead:
+            lines[i] = Line(np.array([data[0][0], data[0][1], data[1][0], data[1][1]], dtype=np.int), group=line_a.group, id=line_a.id)
+
+    return list(filter(lambda x: not x.dead, lines))
 
