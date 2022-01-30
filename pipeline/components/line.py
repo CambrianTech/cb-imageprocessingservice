@@ -23,19 +23,22 @@ def out_of_range(x, y, width, height):
     return x < 0 or y < 0 or x >= width or y >= height
 
 class Line(Sequence):
-    def __init__(self, data, sx=1, sy=1, group=None, id=uuid.uuid4()):
-        super().__init__()
+    def __init__(self, data:np.array, sx=1.0, sy=1.0):
         self.data = data
         self.data[0] *= sx
         self.data[2] *= sx
         self.data[1] *= sy
         self.data[3] *= sy
-        self.recalculate()
+        
+        self.dy = self.data[2] - self.data[0]
+        self.dx = self.data[3] - self.data[1]
+        self.length = euclidean(self.point_a, self.point_b)
+
+        self.midpoint = ((self.point_a[0] + self.point_b[0]) / 2, (self.point_a[1] + self.point_b[1]) / 2)
+        self.angle = line_angle(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
+        self.direction = np.array((self.dy, self.dx)) / self.length
 
         #for tracking
-        self.group = group
-        self.id = id
-
         self.dead = False
 
     def __getitem__(self, i):
@@ -77,10 +80,6 @@ class Line(Sequence):
 
         return list(filter(lambda p: not out_of_range(p[0], p[1], width, height), np.linspace(self.point_b, self.point_a, num_points)))
 
-    @property #todo: should this be normalized (be sure to convert to float)?
-    def direction(self):
-        return normalize(np.array([self.data[2]-self.data[0], self.data[3] - self.data[1]], dtype=float))
-
     @property
     def normal_a(self):
         return np.array([-self.direction[1], self.direction[0]], dtype=float)
@@ -95,19 +94,8 @@ class Line(Sequence):
     def draw(self, img, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
         draw_line(line, img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
 
-    def reshape(self, *args):
-        return self.data.reshape(*args)
-
-    def recalculate(self):
-        self.midpoint = ((self.point_a[0] + self.point_b[0]) / 2, (self.point_a[1] + self.point_b[1]) / 2)
-        self.length = distance.euclidean(self.point_a, self.point_b)
-        self.angle = LineFunctions.line_angle(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
-
     def bounding_box(self, width, length_multiplier=1.0):
         return (self.midpoint, (self.length * length_multiplier, width), np.degrees(self.angle))
-
-    # def bounding_box_points(self, width, length_multiplier=1.0):
-    #     return rotated_rects_points(self.midpoint, (self.length * length_multiplier, width), self.angle)
 
     def extended(self, ratio=1.1, from_a=True, from_b=True):
 
@@ -126,14 +114,7 @@ class Line(Sequence):
             data[2] = self.midpoint[0] + direction[0] * amount
             data[3] = self.midpoint[1] + direction[1] * amount
 
-        # new_line = Line(data)
-        # if from_b and not from_a and ratio > 1:
-        #     print(ratio, new_line.length, self.length)
-        #     print(self.point_a, self.point_b)
-        #     print(new_line.point_a, new_line.point_b)
-
-        return Line(data)
-        
+        return Line(data)        
 
     def in_range(self, lines, angle_threshold):
         return list(filter(lambda line: not line.dead and LineFunctions.line_angle_difference(self.angle, line.angle) <= angle_threshold, lines)) 
@@ -168,6 +149,12 @@ def closest_line_point(x0, y0, x1, y1, px, py): #minimum angle between lines seg
 @nb.jit(nopython=True)
 def bounding_box(line, width, length_multiplier=1.0):
     return (line.midpoint, (line.length * length_multiplier, width), np.degrees(line.angle))
+
+@nb.jit(nopython=True)
+def euclidean(point_a, point_b):
+    dx = point_b[0] - point_a[0]
+    dy = point_b[1] - point_a[1]
+    return math.sqrt(dx * dx + dy * dy)
 
 @nb.jit(nopython=True)
 def sqeuclidean(point_a, point_b):
@@ -419,7 +406,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
                 data = merge_line_pair(data, (line_b.point_a, line_b.point_b))
 
         if line_a.dead:
-            lines[i] = Line(np.array([data[0][0], data[0][1], data[1][0], data[1][1]], dtype=np.int), group=line_a.group, id=line_a.id)
+            lines[i] = Line(np.array((data[0][0], data[0][1], data[1][0], data[1][1]), dtype=float), 1.0, 1.0)
 
     return list(filter(lambda x: not x.dead, lines))
 
