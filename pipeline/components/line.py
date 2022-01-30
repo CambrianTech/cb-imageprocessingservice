@@ -7,21 +7,22 @@ from numba.experimental import jitclass
 
 from scipy.spatial import distance
 from bisect import bisect_left, bisect_right
-from cambrian.LineFunctions import LineFunctions
 from pipeline.misc.utils import normalize
 
-# @jitclass(spec=[
-#             ("x0", nb.types.float32), ("y0", nb.types.float32), ("x1", nb.types.float32), ("y1", nb.types.float32), 
-#             ("dx", nb.types.float32), ("dy", nb.types.float32),
-#             ("dead", nb.types.boolean),
-#             ("length", nb.types.float32),
-#             ("angle", nb.types.float32),
-#             ("midpoint", nb.types.UniTuple(nb.types.float32, 2)),
-#             ])
 
 def out_of_range(x, y, width, height):
     return x < 0 or y < 0 or x >= width or y >= height
 
+@jitclass(spec=[
+            ("data", nb.types.float32[:]), 
+            ("dy", nb.types.float32),
+            ("dx", nb.types.float32),
+            ("length", nb.types.float32),
+            ("midpoint", nb.types.UniTuple(nb.types.float32, 2)),
+            ("angle", nb.types.float32),
+            ("direction", nb.types.float32[:]),
+            ("dead", nb.types.boolean),
+            ])
 class Line():
     def __init__(self, data:np.array, sx=1.0, sy=1.0):
         self.data = data
@@ -50,8 +51,6 @@ class Line():
         return (int(self.data[2]), int(self.data[3]))
 
     def get_intersection(self, other):
-        #return LineFunctions.get_intersection(self.point_a, self.point_b, other.point_a, other.point_b)
-
         return get_line_intersection(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], \
             other.point_a[0], other.point_a[1], other.point_b[0], other.point_b[1])
 
@@ -108,10 +107,10 @@ class Line():
         return Line(data)        
 
     def in_range(self, lines, angle_threshold):
-        return list(filter(lambda line: not line.dead and LineFunctions.line_angle_difference(self.angle, line.angle) <= angle_threshold, lines)) 
+        return list(filter(lambda line: not line.dead and line_angle_difference(self.angle, line.angle) <= angle_threshold, lines)) 
 
     def copy(self):
-        return Line(self.data)
+        return Line(self.data, 1.0, 1.0)
 
 #jit functions, unused:
 @nb.jit(nopython=True)
