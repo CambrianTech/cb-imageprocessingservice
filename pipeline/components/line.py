@@ -25,7 +25,7 @@ def out_of_range(x, y, width, height):
             ])
 class Line():
     def __init__(self, data:np.array, sx=1.0, sy=1.0):
-        self.data = data
+        self.data = data.astype(nb.types.float32)
         self.data[0] *= sx
         self.data[2] *= sx
         self.data[1] *= sy
@@ -72,11 +72,11 @@ class Line():
 
     @property
     def normal_a(self):
-        return np.array((-self.direction[1], self.direction[0]), dtype=float)
+        return np.array((-self.direction[1], self.direction[0]))
 
     @property
     def normal_b(self):
-        return np.array((self.direction[1], -self.direction[0]), dtype=float)
+        return np.array((self.direction[1], -self.direction[0]))
 
     def closest_point(self, point):
         return closest_line_point(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], point[0], point[1])
@@ -106,8 +106,15 @@ class Line():
 
         return Line(data)        
 
+    # def in_range(self, lines, angle_threshold):
+    #     return list(filter(lambda line: not line.dead and line_angle_difference(self.angle, line.angle) <= angle_threshold, lines)) 
+
     def in_range(self, lines, angle_threshold):
-        return list(filter(lambda line: not line.dead and line_angle_difference(self.angle, line.angle) <= angle_threshold, lines)) 
+        filtered = []
+        for line in lines:
+            if not line.dead and line_angle_difference(self.angle, line.angle) <= angle_threshold:
+                filtered.append(line)
+        return filtered
 
     def copy(self):
         return Line(self.data, 1.0, 1.0)
@@ -124,10 +131,6 @@ def line_angle_difference(x, y): #minimum angle between lines segments cannot di
         diff = math.pi - diff
 
     return diff
-
-def line_angle(x0, y0, x1, y1):
-    #return np.arctan2(y1 - y0, x1 - x0)
-    return math.atan2(float(y1 - y0), float(x1 - x0))
 
 @nb.jit(nopython=True)
 def closest_line_point(x0, y0, x1, y1, px, py): #minimum angle between lines segments cannot differ by more than 90 degrees
@@ -374,7 +377,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
         line_a = lines[i]
         if line_a.dead: continue
 
-        rect_a = line_a.bounding_box(search_width, length_multiplier=search_length)
+        rect_a = bounding_box(line_a, width=search_width, length_multiplier=search_length)
         data = (line_a.point_a, line_a.point_b)
 
         candidates = line_a.in_range(lines[:i] + lines[i+1:], angle_threshold)
@@ -386,7 +389,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
             if dist_sq <= min_dist_sq:
                 result = 1
             else:
-                rect_b = line_b.bounding_box(search_width, length_multiplier=search_length)
+                rect_b = bounding_box(line_b, width=search_width, length_multiplier=search_length)
                 result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
 
             if result != 0:
