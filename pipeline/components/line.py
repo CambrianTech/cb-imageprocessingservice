@@ -172,51 +172,6 @@ def point_on_image_edge(point, image, min_distance=3):
 def line_on_image_edge(point_a, point_b, image, min_distance=3):
     return point_on_image_edge(point_a, image, min_distance) and point_on_image_edge(point_a, image, min_distance) & point_on_image_edge(point_b, image, min_distance) > 0
 
-@nb.jit(nopython=True)
-def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy):
-
-    dlix = (bx - ax);
-    dliy = (by - ay);
-    dljx = (dx - cx);
-    dljy = (dy - cy);
-
-    li = math.sqrt((dlix * dlix) + (dliy * dliy));
-    lj = math.sqrt((dljx * dljx) + (dljy * dljy));
-
-    xg = (li * (ax + bx) + lj * (cx + dx)) / (2.0 * (li + lj));
-    yg = (li * (ay + by) + lj * (cy + dy)) / (2.0 * (li + lj));
-
-    if (dlix == 0.0): thi = math.pi / 2.0;
-    else: thi = math.atan(dliy / dlix);
-
-    if (dljx == 0.0): thj = math.pi / 2.0;
-    else: thj = math.atan(dljy / dljx);
-
-    if abs(thi - thj) <= math.pi / 2.0:
-        thr = (li * thi + lj * thj) / (li + lj);
-    else:
-        tmp = thj - math.pi * (thj / abs(thj));
-        thr = li * thi + lj * tmp;
-        thr /= (li + lj);
-
-    sin_thr = math.sin(thr)
-    cos_thr = math.cos(thr)
-
-    axg = (ay - yg) * sin_thr + (ax - xg) * cos_thr;
-    bxg = (by - yg) * sin_thr + (bx - xg) * cos_thr;
-    cxg = (cy - yg) * sin_thr + (cx - xg) * cos_thr;
-    dxg = (dy - yg) * sin_thr + (dx - xg) * cos_thr;
-
-    delta1xg = min(axg,min(bxg,min(cxg,dxg)));
-    delta2xg = max(axg,max(bxg,max(cxg,dxg)));
-
-    delta1x = delta1xg * cos_thr + xg;
-    delta1y = delta1xg * sin_thr + yg;
-    delta2x = delta2xg * cos_thr + xg;
-    delta2y = delta2xg * sin_thr + yg;
-
-    return delta1x, delta1y, delta2x, delta2y
-
 #(line.midpoint, (line.length * length_multiplier, width), np.degrees(line.angle))
 @nb.jit(nopython=True)
 def rotated_rects_points(center, size, angle):
@@ -356,6 +311,52 @@ def draw_line(line, img, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, li
 def draw_lines(img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
     [draw_line(line, img, color=color, thickness=thickness, sx=sx, sy=sy, lineType=lineType) for line in lines]
 
+
+@nb.jit(nopython=True)
+def merge_line_pair(line_a, line_b):
+
+    dlix = (line_a[2] - line_a[0]);
+    dliy = (line_a[3] - line_a[1]);
+    dljx = (line_b[2] - line_b[0]);
+    dljy = (line_b[3] - line_b[1]);
+
+    li = math.sqrt((dlix * dlix) + (dliy * dliy));
+    lj = math.sqrt((dljx * dljx) + (dljy * dljy));
+
+    xg = (li * (line_a[0] + line_a[2]) + lj * (line_b[0] + line_b[2])) / (2.0 * (li + lj));
+    yg = (li * (line_a[1] + line_a[3]) + lj * (line_b[1] + line_b[3])) / (2.0 * (li + lj));
+
+    if (dlix == 0.0): thi = math.pi / 2.0;
+    else: thi = math.atan(dliy / dlix);
+
+    if (dljx == 0.0): thj = math.pi / 2.0;
+    else: thj = math.atan(dljy / dljx);
+
+    if abs(thi - thj) <= math.pi / 2.0:
+        thr = (li * thi + lj * thj) / (li + lj);
+    else:
+        tmp = thj - math.pi * (thj / abs(thj));
+        thr = li * thi + lj * tmp;
+        thr /= (li + lj);
+
+    sin_thr = math.sin(thr)
+    cos_thr = math.cos(thr)
+
+    axg = (line_a[1] - yg) * sin_thr + (line_a[0] - xg) * cos_thr;
+    bxg = (line_a[3] - yg) * sin_thr + (line_a[2] - xg) * cos_thr;
+    cxg = (line_b[1] - yg) * sin_thr + (line_b[0] - xg) * cos_thr;
+    dxg = (line_b[3] - yg) * sin_thr + (line_b[2] - xg) * cos_thr;
+
+    delta1xg = min(axg,min(bxg,min(cxg,dxg)));
+    delta2xg = max(axg,max(bxg,max(cxg,dxg)));
+
+    delta1x = delta1xg * cos_thr + xg;
+    delta1y = delta1xg * sin_thr + yg;
+    delta2x = delta2xg * cos_thr + xg;
+    delta2y = delta2xg * sin_thr + yg;
+
+    return delta1x, delta1y, delta2x, delta2y
+
 def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
 
     lines = [line.copy() for line in lines]
@@ -368,7 +369,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
         if line_a.dead: continue
 
         rect_a = bounding_box(line_a, width=search_width, length_multiplier=search_length)
-        data = (line_a.point_a[0], line_a.point_a[1], line_a.point_b[0], line_a.point_b[1])
+        data = line_a.data
 
         candidates = line_a.in_range(lines[:i] + lines[i+1:], angle_threshold)
 
@@ -386,9 +387,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
                 line_a.dead = True
                 line_b.dead = True
 
-                #data = merge_line_pair(data, (line_b.point_a, line_b.point_b))
-                data = merge_line_pair(data[0], data[1], data[2], data[3], 
-                                       line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3])
+                data = merge_line_pair(data, line_b.data)
 
         if line_a.dead:
             lines[i] = Line(np.array(data, dtype=float), 1.0, 1.0)
