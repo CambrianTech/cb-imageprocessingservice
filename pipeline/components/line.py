@@ -173,17 +173,7 @@ def line_on_image_edge(point_a, point_b, image, min_distance=3):
     return point_on_image_edge(point_a, image, min_distance) and point_on_image_edge(point_a, image, min_distance) & point_on_image_edge(point_b, image, min_distance) > 0
 
 @nb.jit(nopython=True)
-def merge_line_pair(line_a, line_b):
-
-    ax = line_a[0][0]
-    ay = line_a[0][1]
-    bx = line_a[1][0]
-    by = line_a[1][1]
-
-    cx = line_b[0][0]
-    cy = line_b[0][1]
-    dx = line_b[1][0]
-    dy = line_b[1][1]
+def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy):
 
     dlix = (bx - ax);
     dliy = (by - ay);
@@ -225,7 +215,7 @@ def merge_line_pair(line_a, line_b):
     delta2x = delta2xg * cos_thr + xg;
     delta2y = delta2xg * sin_thr + yg;
 
-    return (delta1x, delta1y), (delta2x, delta2y) 
+    return delta1x, delta1y, delta2x, delta2y
 
 #(line.midpoint, (line.length * length_multiplier, width), np.degrees(line.angle))
 @nb.jit(nopython=True)
@@ -378,7 +368,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
         if line_a.dead: continue
 
         rect_a = bounding_box(line_a, width=search_width, length_multiplier=search_length)
-        data = (line_a.point_a, line_a.point_b)
+        data = (line_a.point_a[0], line_a.point_a[1], line_a.point_b[0], line_a.point_b[1])
 
         candidates = line_a.in_range(lines[:i] + lines[i+1:], angle_threshold)
 
@@ -396,10 +386,12 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
                 line_a.dead = True
                 line_b.dead = True
 
-                data = merge_line_pair(data, (line_b.point_a, line_b.point_b))
+                #data = merge_line_pair(data, (line_b.point_a, line_b.point_b))
+                data = merge_line_pair(data[0], data[1], data[2], data[3], 
+                                       line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3])
 
         if line_a.dead:
-            lines[i] = Line(np.array((data[0][0], data[0][1], data[1][0], data[1][1]), dtype=float), 1.0, 1.0)
+            lines[i] = Line(np.array(data, dtype=float), 1.0, 1.0)
 
     return list(filter(lambda x: not x.dead, lines))
 
