@@ -4,7 +4,7 @@ import numba as nb
 import cv2
 import uuid
 from numba.experimental import jitclass
-from collections.abc import Sequence
+
 from scipy.spatial import distance
 from bisect import bisect_left, bisect_right
 from cambrian.LineFunctions import LineFunctions
@@ -22,7 +22,7 @@ from pipeline.misc.utils import normalize
 def out_of_range(x, y, width, height):
     return x < 0 or y < 0 or x >= width or y >= height
 
-class Line(Sequence):
+class Line():
     def __init__(self, data:np.array, sx=1.0, sy=1.0):
         self.data = data
         self.data[0] *= sx
@@ -40,15 +40,6 @@ class Line(Sequence):
 
         #for tracking
         self.dead = False
-
-    def __getitem__(self, i):
-        return self.data[i]
-
-    def __len__(self):
-        return len(self.data)
-
-    def __lt__(self, other):
-        return line_angle_difference(self.angle, other.angle)
 
     @property
     def point_a(self):
@@ -82,11 +73,11 @@ class Line(Sequence):
 
     @property
     def normal_a(self):
-        return np.array([-self.direction[1], self.direction[0]], dtype=float)
+        return np.array((-self.direction[1], self.direction[0]), dtype=float)
 
     @property
     def normal_b(self):
-        return np.array([self.direction[1], -self.direction[0]], dtype=float)
+        return np.array((self.direction[1], -self.direction[0]), dtype=float)
 
     def closest_point(self, point):
         return closest_line_point(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], point[0], point[1])
