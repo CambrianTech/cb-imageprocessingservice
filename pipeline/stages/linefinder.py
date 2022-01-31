@@ -67,7 +67,7 @@ class PipelineLineFinder(PipelineStep):
 
             sx = data["downscaled"].shape[1] / image.shape[1]
             sy = data["downscaled"].shape[0] / image.shape[0]
-            return list(map(lambda x: Line(x.reshape(4), sx, sy), lines)) if lines is not None else list()
+            return list(map(lambda line: Line(line[0][0] * sx, line[0][1] * sy, line[0][2] * sx, line[0][3] * sy), lines)) if lines is not None else list()
 
         #print("0. elapsed %.2f" % (time() - start)); start = time()
         min_length = int(diagonal / 80)

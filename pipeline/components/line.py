@@ -24,12 +24,8 @@ def out_of_range(x, y, width, height):
             ("dead", nb.types.boolean),
             ])
 class Line():
-    def __init__(self, data:np.array, sx=1.0, sy=1.0):
-        self.data = data.astype(nb.types.float32)
-        self.data[0] *= sx
-        self.data[2] *= sx
-        self.data[1] *= sy
-        self.data[3] *= sy
+    def __init__(self, ax, ay, bx, by):
+        self.data = np.array((ax, ay, bx, by), dtype=nb.types.float32)
         
         self.dy = self.data[2] - self.data[0]
         self.dx = self.data[3] - self.data[1]
@@ -104,7 +100,7 @@ class Line():
             data[2] = self.midpoint[0] + direction[0] * amount
             data[3] = self.midpoint[1] + direction[1] * amount
 
-        return Line(data)        
+        return Line(data[0], data[1], data[2], data[3])        
 
     # def in_range(self, lines, angle_threshold):
     #     return list(filter(lambda line: not line.dead and line_angle_difference(self.angle, line.angle) <= angle_threshold, lines)) 
@@ -117,7 +113,8 @@ class Line():
         return filtered
 
     def copy(self):
-        return Line(self.data, 1.0, 1.0)
+        #todo: ineffcient
+        return Line(self.data[0], self.data[1], self.data[2], self.data[3])
 
 #jit functions, unused:
 @nb.jit(nopython=True)
@@ -390,7 +387,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
                 data = merge_line_pair(data, line_b.data)
 
         if line_a.dead:
-            lines[i] = Line(np.array(data, dtype=float), 1.0, 1.0)
+            lines[i] = Line(data[0], data[1], data[2], data[3])
 
     return list(filter(lambda x: not x.dead, lines))
 
