@@ -117,35 +117,6 @@ class PipelineLineFinder(PipelineStep):
             #log_lines(normals_lines, "normals_lines")
             lines.extend(normals_lines)
 
-        # #find lines in gabor edges:
-        # v_gabor = gabor(bw, 0, 7)
-        # h_gabor = gabor(bw, np.pi/2.0, 9)
-        # edges = cv2.addWeighted(v_gabor, 1.0, h_gabor, 1.0, -60)
-        # edges = cv2.bilateralFilter(edges, 5, 60, 9)
-        # log_image(data, "gabor", edges)
-        # edges = cv2.resize(edges, (self.width, self.height), interpolation = cv2.INTER_CUBIC)
-
-        # gabor_lines = find_lines(edges, min_length, use_lsd=True)
-        # if len(gabor_lines) > 0: 
-        #     gabor_lines = merge_lines(gabor_lines, search_length=0.5, search_width=diagonal/100, angle_threshold=math.radians(5))
-        #     log_lines(gabor_lines, "gabor_lines")
-        #     lines.extend(gabor_lines)
-
-        # #frei chen edges:
-        # clean_edges = frei_chen(bw) * 5 * 255 - 127
-        # clean_edges[clean_edges > 255] = 255
-        # clean_edges[clean_edges < 0] = 0
-        # clean_edges = cv2.bilateralFilter(clean_edges.astype(np.float32), 5, 5, 5)
-        # #clean_edges = bw - clean_edges
-        # #clean_edges[clean_edges < 0] = 0
-
-        # log_image(data, "frei_chen", clean_edges)
-        # frei_lines = find_lines(clean_edges.astype(np.uint8), min_length, use_lsd=True)
-        # if len(frei_lines) > 0: 
-        #     frei_lines = merge_lines(frei_lines, search_width=diagonal/200, search_length=1.1, angle_threshold=math.radians(7))
-        #     log_lines(frei_lines, "frei_lines")
-        #     lines.extend(frei_lines)
-
         #merge all
         lines = merge_lines(lines, search_width=min(diagonal/400, 8))
 
