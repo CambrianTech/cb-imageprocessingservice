@@ -268,7 +268,7 @@ class PipelineRunModels(PipelineStep):
             w, h, _ = images[i].shape
             if w < 1024 and h < 1024:
                 h = int((h // 16) * 16)
-                w = int((w//16) * 16)
+                w = int((w // 16) * 16)
             else:
                 if w >= h:
                     h = int((1024 / w * h // 16) * 16)
@@ -276,13 +276,25 @@ class PipelineRunModels(PipelineStep):
                 else:
                     w = int((1024 / h * w // 16) * 16)
                     h = 1024
-            images[i] = cv2.resize(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB), (h, w)).astype(
-                'float32')
+            images[i] = cv2.resize(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB), (h, w)).astype('float32')
 
-        print("HED resize took %.2f seconds" % (time() - t))
+        print("HED resize took %.2f seconds with %d images" % (time() - t, len(images)))
 
         t = time()
-        outputs = self.model_hed(images)
-        for datum, hed in zip(data, outputs[5]):
+
+        # outputs = self.model_hed(images)
+
+        # for datum, hed in zip(data, outputs[5]):
+        #     datum["hed"] = (255 * hed[:, :, 0]).astype("uint8")
+
+        #with each a different size, these cannot run in parallel:
+        for i in range(len(images)):
+            image = images[i]
+            datum = data[i]
+
+            outputs = self.model_hed([image])
+            hed = outputs[5][0]
+            
             datum["hed"] = (255 * hed[:, :, 0]).astype("uint8")
+
         print("HED model took %.2f seconds" % (time() - t))
