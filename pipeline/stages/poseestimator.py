@@ -305,7 +305,7 @@ def compute_edgelets(lines):
     #     check_class = True
 
     for line in lines:
-        l = line.reshape(4)
+        l = line.data.reshape(4)
         p0, p1 = np.array([l[0], l[1]]), np.array([l[2], l[3]])
         c = (p0 + p1) / 2
         # if check_class:
