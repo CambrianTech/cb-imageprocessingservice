@@ -170,7 +170,7 @@ class Room(Geometry):
         room_missing = self.image.copy() if im_logging_enabled(self.data) else None
 
         total_elevation = 3 #todo: get total elevation from highest and lowest objects. Floor or ceiling could be missing
-        
+
         for surfaceType in SurfaceType:
             
             color = random_color()
@@ -197,7 +197,6 @@ class Room(Geometry):
             if room_missing is not None and len(valid_contours) > 0:
                 cv2.drawContours(room_missing, np.array(valid_contours), -1, color, cv2.FILLED)
                 log_image(self.data, "room_missing", room_missing)
-
 
             #add missing
             for contour in valid_contours:
@@ -270,14 +269,14 @@ class Room(Geometry):
 
 
                     if reference_surface is None:
-                        print(colored("No match for %s" % surfaceType.name, 'yellow'))
-                        
+                        print(colored("No match for %s" % surfaceType.name, 'yellow'))       
 
                 if new_surface is not None:
-                    
-                    self.add_surface(new_surface)
                     print(colored("Creating new %s (%s) using %s as reference" % (surfaceType.name, new_surface.name, reference_surface.name), 'green'))
-            
+                    self.add_surface(new_surface)
+                    
+
+        self.invalidate()
 
     def merge_like_surfaces(self, angle_threshold=np.radians(30), angle_threshold_force=np.radians(20)):
 

@@ -334,8 +334,6 @@ class Surface():
         self._outer_mask = None
         self._inner_mask = None
 
-        self.geometry.invalidate()
-
     @property
     def contours(self):
         if self._contours is None:

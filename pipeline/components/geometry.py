@@ -64,8 +64,6 @@ class Geometry():
             for field in indexed_fields:
                 self.data[field] = np.append(self.data[field], [self.data[field][surface.cloned_from].copy()], axis=0)
 
-            self.invalidate()
-
         self._surfaces[surface.index] = surface
 
     def remove_surface(self, surface):
@@ -108,8 +106,7 @@ class Geometry():
 
     def invalidate(self):
         self._probs = None
-        self._index_mask = None
-        
+        self._index_mask = None        
 
     def refresh_surfaces(self):
         num_before = len(self._surfaces)
