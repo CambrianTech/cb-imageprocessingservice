@@ -17,7 +17,7 @@ from pipeline.misc.utils import get_segmentation_image, random_color
 from pipeline.data.logging import log_segmentation_image, im_logging_enabled, log_image, LogLevel, log_markers
 
 class SurfaceRefinement():
-    def __init__(self, data, masks=None):
+    def __init__(self, data, masks=None, lines=None):
         super().__init__()
         self.data = data
 
