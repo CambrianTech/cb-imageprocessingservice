@@ -17,16 +17,16 @@ from pipeline.misc.utils import get_segmentation_image, random_color
 from pipeline.data.logging import log_segmentation_image, im_logging_enabled, log_image, LogLevel, log_markers
 
 class SurfaceRefinement():
-    def __init__(self, data, masks=None):
+    def __init__(self, data):
         super().__init__()
         self.data = data
 
-        if masks is None:
+        if "room" in self.data:
             self.room = self.data["room"]
             self.masks = [s.mask for s in self.room.surfaces]
         else:
             self.room = None
-            self.masks = [mask.astype(np.uint8) for mask in masks]
+            self.masks = [mask.astype(np.uint8) for mask in self.data["isolated"]]
 
         self.image = self.data["image"]
         self.barriers = self.data["barriers"] if "barriers" in self.data else None
@@ -126,10 +126,15 @@ class PipelineSurfaceRefinement(PipelineStep):
 
     @property
     def output_keys(self) -> list:
-        return ["segmentation"]
+        return ["segmentation", "masks"]
 
     def run(self, data):
         refiner = SurfaceRefinement(data)
         refiner.refine()
+
+        if "room" in data:
+            data["room"] = refiner.room
+
+        data["masks"] = refiner.masks
 
         
