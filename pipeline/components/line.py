@@ -15,36 +15,39 @@ def out_of_range(x, y, width, height):
 
 @jitclass(spec=[
             ("data", nb.types.float32[:]), 
+            ("point_a", nb.types.UniTuple(nb.types.int32, 2)),
+            ("point_b", nb.types.UniTuple(nb.types.int32, 2)),
             ("dy", nb.types.float32),
             ("dx", nb.types.float32),
             ("length", nb.types.float32),
             ("midpoint", nb.types.UniTuple(nb.types.float32, 2)),
             ("angle", nb.types.float32),
             ("direction", nb.types.float32[:]),
+            ("normal_a", nb.types.float32[:]),
+            ("normal_b", nb.types.float32[:]),
             ("dead", nb.types.boolean),
             ])
 class Line():
     def __init__(self, ax, ay, bx, by):
         self.data = np.array((ax, ay, bx, by), dtype=nb.types.float32)
+
+        self.point_a = int(ax), int(ay)
+        self.point_b = int(bx), int(by)
         
         self.dy = self.data[2] - self.data[0]
         self.dx = self.data[3] - self.data[1]
+
         self.length = euclidean(self.point_a, self.point_b)
 
-        self.midpoint = ((self.point_a[0] + self.point_b[0]) / 2, (self.point_a[1] + self.point_b[1]) / 2)
-        self.angle = line_angle(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
+        self.midpoint = ((ax + bx) / 2.0, (ay + by) / 2.0)
+        self.angle = line_angle(ax, ay, bx, by)
         self.direction = np.array((self.dy, self.dx)) / self.length
+
+        self.normal_a = np.array((-self.direction[1], self.direction[0]))
+        self.normal_b = np.array((self.direction[1], -self.direction[0]))
 
         #for tracking
         self.dead = False
-
-    @property
-    def point_a(self):
-        return (int(self.data[0]), int(self.data[1]))
-
-    @property
-    def point_b(self):
-        return (int(self.data[2]), int(self.data[3]))
 
     def get_intersection(self, other):
         return get_line_intersection(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], \
@@ -65,14 +68,6 @@ class Line():
             num_points = int(math.ceil(self.length))
 
         return list(filter(lambda p: not out_of_range(p[0], p[1], width, height), np.linspace(self.point_b, self.point_a, num_points)))
-
-    @property
-    def normal_a(self):
-        return np.array((-self.direction[1], self.direction[0]))
-
-    @property
-    def normal_b(self):
-        return np.array((self.direction[1], -self.direction[0]))
 
     def closest_point(self, point):
         return closest_line_point(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], point[0], point[1])
