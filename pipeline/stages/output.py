@@ -104,14 +104,18 @@ class PipelineOutput(PipelineStep):
                 else:
                     results = self.make_data_v3_dict(data, image_url, lighting_url)
             else:
-                filename = "planes_index_mask.zz"
-                planes_index_mask_url = self.make_url(filename)
-                image = self.get_compressed_index_mask(data["planes_index_mask"])
-                self.save_file(image, filename, planes_index_mask_url)
+                if "planes_index_mask" in data:
+                    filename = "planes_index_mask.zz"
+                    planes_index_mask_url = self.make_url(filename)
+                    image = self.get_compressed_index_mask(data["planes_index_mask"])
+                    self.save_file(image, filename, planes_index_mask_url)
 
-                filename = "planes_alpha_mask.png"
-                planes_alpha_mask_url = self.make_url(filename)
-                self.save_image(data["planes_alpha_mask"], filename, planes_alpha_mask_url)
+                    filename = "planes_alpha_mask.png"
+                    planes_alpha_mask_url = self.make_url(filename)
+                    self.save_image(data["planes_alpha_mask"], filename, planes_alpha_mask_url)
+                else:
+                    planes_index_mask_url = None
+                    planes_alpha_mask_url = None
 
                 #temporary:
                 surfaces = data["room"].surfaces
