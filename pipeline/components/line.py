@@ -8,7 +8,7 @@ from numba.experimental import jitclass
 from scipy.spatial import distance
 from bisect import bisect_left, bisect_right
 from pipeline.misc.utils import normalize
-
+from pipeline.data.logging import Timer
 
 def out_of_range(x, y, width, height):
     return x < 0 or y < 0 or x >= width or y >= height
@@ -355,6 +355,9 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
 
     min_dist_sq = search_width * search_width
 
+    timer = Timer("merge_lines")
+    timer.disable()
+
     for i in range(len(lines)):
         
         line_a = lines[i]
@@ -383,6 +386,8 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
 
         if line_a.dead:
             lines[i] = Line(data[0], data[1], data[2], data[3])
+
+        timer.log_elapsed("loop", every=200)
 
     return list(filter(lambda x: not x.dead, lines))
 
