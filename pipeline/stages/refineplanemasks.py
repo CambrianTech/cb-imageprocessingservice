@@ -185,7 +185,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         number_planes = len(plane_geometry.plane_masks)
 
         ######################################## Initial refinement work
-        refiner = SurfaceRefinement(img_lr, hed_lr, isolated, data["lines"])
+        refiner = SurfaceRefinement(data, isolated)
         segmentation_initial = refiner.refine(data)
         sure_walls = (segmentation_initial == ADE20K.floor.index) #shouldn't this be == ADE20K.wall.index
 
