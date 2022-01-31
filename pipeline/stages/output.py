@@ -86,22 +86,23 @@ class PipelineOutput(PipelineStep):
             self.save_image(data["lighting"], filename, lighting_url)
             data["lighting_url"] = lighting_url
 
-            if self.pipeline.api_level == 2 or self.pipeline.api_level == 3:
-                #data["data_url"] = self.make_url("%s/data_v%d.json" % (self.unique_id, self.pipeline.api_level))
+            if self.pipeline.api_level == 2:
                 filename = "superpixels.png"
                 superpixels_url = self.make_url(filename)
                 self.save_image(data["superpixels"], filename, superpixels_url)
                 data["superpixels_url"] = self.make_url(superpixels_url)
 
-                if "planes" in data:
-                    for i, plane_mask in enumerate(data["planes"]["masks"]):
+
+            if self.pipeline.api_level == 2 or self.pipeline.api_level == 3:                
+                if "masks" in data:
+                    for i, plane_mask in enumerate(data["masks"]):
                         mask_url = self.make_plane_mask_url(i)
                         self.save_image(plane_mask, filename, mask_url)
 
                 if self.pipeline.api_level == 2:
                     results = self.make_data_v2_dict(data, image_url, lighting_url, superpixels_url)
                 else:
-                    results = self.make_data_v3_dict(data, image_url, lighting_url, superpixels_url)
+                    results = self.make_data_v3_dict(data, image_url, lighting_url)
             else:
                 filename = "planes_index_mask.zz"
                 planes_index_mask_url = self.make_url(filename)
@@ -262,7 +263,7 @@ class PipelineOutput(PipelineStep):
         }
 
 
-    def make_data_v3_dict(self, data, image_url, lighting_url, superpixels_url):
+    def make_data_v3_dict(self, data, image_url, lighting_url):
         all_plane_data = data["planes"]["detection"].tolist(
         ) if "planes" in data else []
 
@@ -274,7 +275,6 @@ class PipelineOutput(PipelineStep):
             "images": {
                 "main": image_url,
                 "lighting": lighting_url,
-                "superpixels": superpixels_url,
             },
             "camera": {
                 "fov": data["fov"],

@@ -144,6 +144,7 @@ class Pipeline():
         all_steps[PipelineStepIndex.Barriers] = None
         all_steps[PipelineStepIndex.FindTrim] = None
         all_steps[PipelineStepIndex.FindLegs] = None
+        all_steps[PipelineStepIndex.CombinePlaneMasks] = None
 
         #todo: deprecate these:
 
