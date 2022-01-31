@@ -133,8 +133,6 @@ class Pipeline():
         all_steps[PipelineStepIndex.Output] = output_step
         
         if self.api_level < 3.5:
-            all_steps[PipelineStepIndex.Geometry] = None
-            all_steps[PipelineStepIndex.EstimatePose] = None
             all_steps[PipelineStepIndex.SolveRoom] = None
             all_steps[PipelineStepIndex.VanishingPoints] = None
             all_steps[PipelineStepIndex.Barriers] = None

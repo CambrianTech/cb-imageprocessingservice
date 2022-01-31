@@ -178,27 +178,27 @@ class PipelineRefinePlaneMasks(PipelineStep):
         #break masks into major groups: Floor, Wall, Ceiling, etc
         isolated = data["isolated"]
         
-        plane_geometry = PlaneGeometry(data, isolated, img_lr)
-        plane_geometry.process()
+        # plane_geometry = PlaneGeometry(data, isolated, img_lr)
+        # plane_geometry.process()
 
-        vert_indices = plane_geometry.dimensions[Dimension.Vertical].indices
-        number_planes = len(plane_geometry.plane_masks)
+        vert_indices = data["dimensions"][Dimension.Vertical].indices
+        number_planes = len(data["plane_masks"])
 
         ######################################## Initial refinement work
         refiner = SurfaceRefinement(data, isolated)
         segmentation_initial = refiner.refine(data)
         sure_walls = (segmentation_initial == ADE20K.floor.index) #shouldn't this be == ADE20K.wall.index
 
-        pose_estimator = PoseEstimator(data, img, data["lines"], data["fov"], isolated[SurfaceType.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
-        pose_estimator.estimate()
+        #pose_estimator = PoseEstimator(data, img, data["lines"], data["fov"], isolated[SurfaceType.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
+        #pose_estimator.estimate()
 
-        data["fov"] = pose_estimator.fov
-        data["floor_rotation"] = pose_estimator.floor_rotation
+        #data["fov"] = pose_estimator.fov
+        #data["floor_rotation"] = pose_estimator.floor_rotation
         
-        if plane_geometry.floor_index > -1:
-            plane_geometry.plane_parameters[plane_geometry.floor_index] = pose_estimator.floor_normal * pose_estimator.floor_offset
+        if data["floor_index"] > -1:
+            data["plane_parameters"][data["floor_index"]] = data["floor_normal"] * data["floor_offset"]
 
-        labels_fan, fan_normals_reduced, normals_wall = fan_surfaces(data, img_lr, pose_estimator.edgelets[0], pose_estimator.vp0, sure_walls, isolated[SurfaceType.Wall], plane_geometry.normals_c)
+        labels_fan, fan_normals_reduced, normals_wall = fan_surfaces(data, data["downscaled"], data["edgelets"][0], data["vp0"], sure_walls, isolated[SurfaceType.Wall], data["normals_c"])
 
         vl_image = np.int32(np.zeros((img_lr.shape[0], img_lr.shape[1])))
         vl_image[sure_walls == 0] = 0

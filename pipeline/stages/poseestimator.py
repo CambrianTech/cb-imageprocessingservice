@@ -595,6 +595,10 @@ def fan_surfaces(data, img_lr, locations, vp0, sure_walls, wall_mask, normals_c)
 
     fan_normals_reduced = np.float32([np.mean(normals_c[labels_fan == j], 0) for j in unique_labels])
     lengths = np.sqrt(np.sum(fan_normals_reduced * fan_normals_reduced, -1))
+
+    print("fan_normals_reduced:", fan_normals_reduced.shape, "lengths:", lengths.shape)
+    #broken: fan_normals_reduced: (0,) lengths: ()
+
     fan_normals_reduced /= np.dstack((lengths, lengths, lengths))[0]
 
     labels_fan, fan_normals_reduced, normals_wall = merge_by_angle_sweep(labels_fan, normals_wall,
