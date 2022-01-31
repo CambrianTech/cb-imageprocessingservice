@@ -8,7 +8,7 @@ from time import time
 
 from pipeline.components.line import Line, merge_lines, draw_lines
 from pipeline.core import PipelineStep, PipelineStepIndex
-from pipeline.data.logging import log_image, im_logging_enabled, LogLevel
+from pipeline.data.logging import log_image, im_logging_enabled, LogLevel, Timer
 
 def gabor(bw, theta, lambd, gamma = 0.0, psi = 0.0):
     ksize = lambd
@@ -36,16 +36,32 @@ class PipelineLineFinder(PipelineStep):
     
     def run(self, data):
 
+        timer = Timer("line_finder")
+        timer.disable()
+
+#         7) FindLines
+# line_finder.setup took 0.00 seconds
+# line_finder.bw_lines_a took 0.02 seconds
+# line_finder.bw_lines_b took 0.09 seconds
+# line_finder.merge_lines BW took 5.96 seconds
+# line_finder.bilateralFilter took 0.01 seconds
+# line_finder.hed took 0.06 seconds
+# line_finder.merge_lines HED took 0.76 seconds
+# line_finder.normals_lines took 0.01 seconds
+# line_finder.merge_lines normals_lines took 0.01 seconds
+# line_finder.merge_lines final took 4.31 seconds
+# 7) FindLines took 11.25 seconds
+
         bw = cv2.cvtColor(data["image"], cv2.COLOR_RGB2GRAY)
 
         self.height, self.width = bw.shape[:2]
         diagonal = np.hypot(self.width, self.height)
 
-        start = time()
-
         operating_scale = 1500.0 / diagonal
         if operating_scale < 1.0:
             bw = cv2.resize(bw, (int(self.width * operating_scale), int(self.height * operating_scale)), cv2.INTER_CUBIC)
+
+        timer.log_elapsed("setup")
 
         def log_lines(lines, name):
             if im_logging_enabled(data, LogLevel.Lines):
@@ -69,7 +85,6 @@ class PipelineLineFinder(PipelineStep):
             sy = data["downscaled"].shape[0] / image.shape[0]
             return list(map(lambda line: Line(line[0][0] * sx, line[0][1] * sy, line[0][2] * sx, line[0][3] * sy), lines)) if lines is not None else list()
 
-        #print("0. elapsed %.2f" % (time() - start)); start = time()
         min_length = int(diagonal / 80)
 
         lines = []
@@ -77,15 +92,17 @@ class PipelineLineFinder(PipelineStep):
         #find lines in BW image
         bw_lines_a = find_lines(bw, min_length)
         lines.extend(bw_lines_a)
-        #log_lines(bw_lines_a, "bw_lines_fld")
+
+        timer.log_elapsed("bw_lines_a")
 
         bw_lines_b = find_lines(bw, min_length, True, ang_th=17) #ang_th=22.5 was getting false positives
         lines.extend(bw_lines_b)
-        #log_lines(bw_lines_b, "bw_lines_lsd")
+
+        timer.log_elapsed("bw_lines_b")
 
         lines = merge_lines(lines, search_length=1.0, search_width=diagonal/800, angle_threshold=math.radians(3))
 
-        #log_lines(lines, "bw_lines")
+        timer.log_elapsed("merge_lines BW")
 
         #find lines in hed hed edges
         sx = data["downscaled"].shape[1] / data["hed"].shape[1]
@@ -93,10 +110,14 @@ class PipelineLineFinder(PipelineStep):
 
         hed = data["hed"].copy()
         hed = cv2.bilateralFilter(hed, 13, 40, 9) #todo: apply non-maxima-suppression (NMS) to image instead
+        timer.log_elapsed("bilateralFilter")
+
         hed_lines = find_lines(hed, min_length, use_lsd=True, ang_th=12) #ang_th=22.5 was getting false positives
-        #log_lines(hed_lines, "hed_lines_initial")
+        timer.log_elapsed("hed")
 
         hed_lines = merge_lines(hed_lines, search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(3))
+
+        timer.log_elapsed("merge_lines HED")
 
         if len(hed_lines) > 0: 
             #log_lines(hed_lines, "hed_lines")
@@ -110,15 +131,19 @@ class PipelineLineFinder(PipelineStep):
         normals_lines = []
         for i in range(0, 3):
             normals_lines.extend(find_lines(normals[i], min_length))
+
+        timer.log_elapsed("normals_lines")
         
         if len(normals_lines) > 0:
             #cleanup normals
             normals_lines = merge_lines(normals_lines, search_width=diagonal/300)
-            #log_lines(normals_lines, "normals_lines")
+            timer.log_elapsed("merge_lines normals_lines")
+
             lines.extend(normals_lines)
 
         #merge all
         lines = merge_lines(lines, search_width=min(diagonal/400, 8))
+        timer.log_elapsed("merge_lines final")
 
         # print("8. elapsed %.2f" % (time() - start)); start = time()
 

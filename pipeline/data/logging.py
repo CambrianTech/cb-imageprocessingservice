@@ -14,17 +14,26 @@ class Timer():
     def __init__(self, prefix=None, color="cyan"):
         self.prefix = prefix
         self.color = color
+        self.enabled = True
         self.reset()
 
     def reset(self):
         self.checktime = time()
 
     def log_elapsed(self, name):
+        if not self.enabled: return
+
         elapsed = time() - self.checktime
         if self.prefix is not None:
             name = self.prefix + "." + name
         print(colored("%s took %.2f seconds" % (name, elapsed), self.color))
         self.reset()
+
+    def disable(self):
+        self.enabled = False
+
+    def enable(self):
+        self.enabled = True
 
 class LogLevel(IntFlag):
     Nothing =       0
