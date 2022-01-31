@@ -17,10 +17,17 @@ from pipeline.misc.utils import get_segmentation_image, random_color
 from pipeline.data.logging import log_segmentation_image, im_logging_enabled, log_image, LogLevel, log_markers
 
 class SurfaceRefinement():
-    def __init__(self, data):
+    def __init__(self, data, masks=None):
         super().__init__()
         self.data = data
-        self.room = self.data["room"]
+
+        if masks is None:
+            self.room = self.data["room"]
+            self.masks = [s.mask for s in self.room.surfaces]
+        else:
+            self.room = None
+            self.masks = masks
+
         self.image = self.data["image"]
         self.barriers = self.data["barriers"] if "barriers" in self.data else None
         
@@ -28,9 +35,7 @@ class SurfaceRefinement():
         self.data["lighting"] = cv2.edgePreservingFilter(np.uint8(self.data["lighting"]), flags=1, sigma_s=10, sigma_r=1.0)
         log_image(self.data, 'lighting_smooth', self.data["lighting"])
 
-        masks = [s.mask for s in self.room.surfaces]
-        
-        num_surfaces = len(self.room.surfaces)
+        num_masks = len(self.masks)
 
         def run_watershed(src, freedom=0.15, use_cv=False):
 
@@ -38,7 +43,7 @@ class SurfaceRefinement():
             markers = np.zeros((src.shape[0], src.shape[1]), dtype=np.int32)
 
             def draw_surface_markers(surface, mask, color):
-                if surface.surfaceType == SurfaceType.OnFloor:
+                if surface is not None and surface.surfaceType == SurfaceType.OnFloor:
                     watershed_mask[mask > 0] = 0
                 dist_transform = cv2.distanceTransform(mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
                 markers[dist_transform > freedom * dist_transform.max()] = color
@@ -51,11 +56,11 @@ class SurfaceRefinement():
                     barrier.line.draw(markers, color= -1, thickness=1, lineType=cv2.LINE_4, sx=sx, sy=sy)
                     barrier.line.draw(watershed_mask, color=0, thickness=1, lineType=cv2.LINE_4, sx=sx, sy=sy)
 
-            for index in range(num_surfaces):
-                surface = self.room.surfaces[index]
-                if masks[index].shape[0] != src.shape[0] or masks[index].shape[1] != src.shape[1]:
-                    masks[index] = cv2.resize(masks[index], (src.shape[1], src.shape[0]), interpolation=cv2.INTER_NEAREST) 
-                draw_surface_markers(surface, mask=masks[index], color=index+1)
+            for index in range(num_masks):
+                surface = self.room.surfaces[index] if self.room is not None else None
+                if self.masks[index].shape[0] != src.shape[0] or self.masks[index].shape[1] != src.shape[1]:
+                    self.masks[index] = cv2.resize(self.masks[index], (src.shape[1], src.shape[0]), interpolation=cv2.INTER_NEAREST) 
+                draw_surface_markers(surface, mask=self.masks[index], color=index+1)
 
             if self.barriers is not None:
                 #lines_mask = None
@@ -77,14 +82,14 @@ class SurfaceRefinement():
             log_markers(self.data, "room_markers_result", markers)
 
             #set masks:
-            for index in range(num_surfaces):
-                surface = self.room.surfaces[index]
+            for index in range(num_masks):
+                surface = self.room.surfaces[index] if self.room is not None else None
 
-                if surface.surfaceType == SurfaceType.OnFloor: 
+                if surface is not None and surface.surfaceType == SurfaceType.OnFloor: 
                     continue
 
                 color = index + 1
-                mask = np.zeros_like(masks[index])
+                mask = np.zeros_like(self.masks[index])
                 mask[markers == color] = 1
                 # if lines_mask is not None:
                 #     mask[lines_mask > 0] = 0
@@ -92,7 +97,7 @@ class SurfaceRefinement():
                 kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
                 mask = cv2.dilate(mask, kernel)
                 #mask[watershed_mask == 0] = 0
-                masks[index] = mask
+                self.masks[index] = mask
 
 
         hed = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
@@ -102,12 +107,11 @@ class SurfaceRefinement():
         #denoised = cv2.bilateralFilter(self.image[:,:,1], 9, 20, 20)
         #run_watershed(denoised, freedom=0.025)
 
-        #commit changes
-        for index in range(num_surfaces):
-            surface = self.room.surfaces[index]
-            surface.final_mask = masks[index]
-
-        log_image(self.data, "room_final", self.room.get_debug_image())
+        if self.room is not None: #commit changes
+            for index in range(num_masks):
+                surface = self.room.surfaces[index]
+                surface.final_mask = self.masks[index]
+            log_image(self.data, "room_final", self.room.get_debug_image())
         
         
 class PipelineSurfaceRefinement(PipelineStep):

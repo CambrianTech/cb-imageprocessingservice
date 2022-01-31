@@ -40,91 +40,6 @@ def gabor_filter(bw, theta, lambd, gamma=0.0, psi=0.0):
     result = cv2.filter2D(bw, cv2.CV_8UC1, cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_32F))
     return result
 
-
-def find_lines(img, gradient, normals):
-
-    height, width = img.shape[:2]
-    diagonal = np.hypot(width, height)
-    # print("image w,h", width, height)
-
-    bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gabor_scale = 1500.0 / diagonal
-    bw_res = cv2.resize(bw, (int(width * gabor_scale), int(height * gabor_scale)),
-                        cv2.INTER_CUBIC) if gabor_scale < 1.0 else bw
-
-    v_gabor = gabor_filter(bw_res, 0, 7)
-    h_gabor = gabor_filter(bw_res, np.pi / 2.0, 9)
-    gabor = cv2.addWeighted(v_gabor, 3.0, h_gabor, 3.0, -20)
-    gabor = cv2.bilateralFilter(gabor, 5, 5, 5)
-    gabor = cv2.resize(gabor, (width, height), interpolation=cv2.INTER_CUBIC)
-
-    contours_src = cv2.addWeighted(v_gabor, 1.0, h_gabor, 1.0, 0)
-    contours_src = cv2.resize(contours_src, (width, height), interpolation=cv2.INTER_CUBIC)
-
-    
-    contours_src = cv2.adaptiveThreshold(contours_src, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,
-                                         int(diagonal / 50) * 2 + 1, -30)
-
-    contours_dilated = rough_dilate_erode(True, contours_src, 3, scale=400 / diagonal, interpolation=cv2.INTER_AREA)
-
-    if gradient is None:
-        Line.prepare(img, contours_dilated, None)
-    else:
-        stacked = np.dstack((img, gradient))
-        Line.prepare(stacked, contours_dilated, None)
-
-
-    # find all liens in the edge image
-    fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 60.0), 1.41, 200, 240, 3, False)
-    lines1 = fld.detect(gabor)
-
-    aperture = 5
-    fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 30.0), 1.41, 200, 220, aperture, False)
-    lines2 = fld.detect(bw - (frei_chen(bw) * 5.0).astype("uint8"))
-
-    aperture = 5
-    fld = cv2.ximgproc.createFastLineDetector(int(diagonal / 15.0), 1.41,_canny_aperture_size=aperture, _do_merge=False)
-    lines3 = fld.detect(gabor)
-
-    sy = gabor.shape[0] / normals.shape[0]
-    sx = gabor.shape[1] / normals.shape[1]
-    fld = cv2.ximgproc.createFastLineDetector(64, _canny_aperture_size=7, _do_merge=False)
-    lines4 = fld.detect(cv2.cvtColor(np.uint8(normals), cv2.COLOR_BGR2GRAY))
-    lines4 = lines4 * [[sx, sy, sx, sy]]
-
-    lines = np.concatenate((lines1, lines2, lines3, lines4))
-    confs = []
-
-    line_data = []
-
-    if lines is not None:
-        for line in lines:
-            new_line = Line(line[0][0], line[0][1], line[0][2], line[0][3])
-            l = new_line.length
-            # mp = np.int32(new_line.midpoint)
-            # pt1 = np.int32(new_line.point_a)
-            # pt2 = np.int32(new_line.point_b)
-            cm = new_line.get_color_mean()
-            # print("color_mean", cm)
-            if cm[3]<2 or l < int(diagonal / 60.0): continue
-
-            # if mask[mp[1],mp[0]]>0: continue
-            conf = new_line.get_confidence()
-            if conf > 0.2:
-                confs.append(conf)
-                line_data.append(new_line)
-
-    line_data = [line_data[i] for i in np.argsort(confs)]
-
-    line_data = Line.merge(line_data, diagonal / 120.0, search_length=1.03, angle_threshold=math.radians(3.0))
-
-    # # # #
-    line_data, intersections = Line.find_corners(line_data, search_length=1.5, angle_threshold=math.radians(5.0),
-                                                 parallel_threshold=math.radians(5), confidence_diff=0.4)
-
-    return line_data, lines
-
-
 #######################################
 
 def get_planes_class(plane_masks, class_labels):
@@ -270,13 +185,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
         number_planes = len(plane_geometry.plane_masks)
 
         ######################################## Initial refinement work
-        line_data, lines = find_lines(data["image"], cv2.resize(hed_lr, (data["image"].shape[1], data["image"].shape[0])), data["normals"])
-
-        refiner = SurfaceRefinement(img_lr, hed_lr, isolated, lines)
+        refiner = SurfaceRefinement(img_lr, hed_lr, isolated, data["lines"])
         segmentation_initial = refiner.refine(data)
         sure_walls = (segmentation_initial == ADE20K.floor.index) #shouldn't this be == ADE20K.wall.index
 
-        pose_estimator = PoseEstimator(data, img, lines, data["fov"], isolated[SurfaceType.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
+        pose_estimator = PoseEstimator(data, img, data["lines"], data["fov"], isolated[SurfaceType.Floor], plane_geometry.floor_normal, plane_geometry.floor_offset)
         pose_estimator.estimate()
 
         data["fov"] = pose_estimator.fov
@@ -526,27 +439,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         final_labels[final_masks[0] > 0] = 1
         final_labels += 1
         final_labels = np.uint8(final_labels)
-
-        length_threshold = 32
-        canny_aperture_size = 7
-
-        fld = cv2.ximgproc.createFastLineDetector(_length_threshold=length_threshold,
-                                                  _canny_aperture_size=canny_aperture_size)
         final_labels[vl_image > 0] = 0
-        lines = fld.detect(final_labels)
-
-        final_line_data = []
-        for line in line_data:
-            # t = final_labels_hr[int(line.midpoint[1]),int(line.midpoint[0])]
-            # if t==0:
-            final_line_data.append(line)
-
-        if lines is not None:
-            for line in lines:
-                new_line = Line(line[0][0] / sx, line[0][1] / sy, line[0][2] / sx, line[0][3] / sy)
-                if new_line.get_confidence() > 0.1: final_line_data.append(new_line)
-
-        final_line_data = Line.merge(final_line_data, 3, search_length=1.01, angle_threshold=math.radians(1.0))
 
         mask_res = 2048
         mask_shape = (mask_res, int(mask_res * img.shape[0] / img.shape[1]))
@@ -561,10 +454,11 @@ class PipelineRefinePlaneMasks(PipelineStep):
         final_labels_hr[final_masks_hr[0] > 0] = 1
         final_labels_hr += 1
 
-        final_merged_lines = Line.draw_all(final_line_data, np.zeros_like(final_labels_hr), color=1, thickness=6,
-                                           sx=final_labels_hr.shape[1] / img.shape[1],
-                                           sy=final_labels_hr.shape[0] / img.shape[0],
-                                           lineType=cv2.LINE_AA)
+        final_merged_lines = np.zeros_like(final_labels_hr)
+
+        #def draw_lines(img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
+        draw_lines(final_merged_lines, data["lines"], color=1, thickness=6, 
+                   sx=final_labels_hr.shape[1] / img.shape[1], sy=final_labels_hr.shape[0] / img.shape[0], lineType=cv2.LINE_AA)
 
         edges = cv2.Canny(cv2.cvtColor(
             cv2.GaussianBlur(cv2.resize(img, (final_merged_lines.shape[1], final_merged_lines.shape[0])), (3, 3), 2),
