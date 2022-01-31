@@ -312,47 +312,45 @@ def draw_lines(img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, 
 @nb.jit(nopython=True)
 def merge_line_pair(line_a, line_b):
 
-    dlix = (line_a[2] - line_a[0]);
-    dliy = (line_a[3] - line_a[1]);
-    dljx = (line_b[2] - line_b[0]);
-    dljy = (line_b[3] - line_b[1]);
+    dlix = line_a[2] - line_a[0]
+    dliy = line_a[3] - line_a[1]
+    dljx = line_b[2] - line_b[0]
+    dljy = line_b[3] - line_b[1]
 
-    li = math.sqrt((dlix * dlix) + (dliy * dliy));
-    lj = math.sqrt((dljx * dljx) + (dljy * dljy));
+    li = math.sqrt((dlix * dlix) + (dliy * dliy))
+    lj = math.sqrt((dljx * dljx) + (dljy * dljy))
 
-    xg = (li * (line_a[0] + line_a[2]) + lj * (line_b[0] + line_b[2])) / (2.0 * (li + lj));
-    yg = (li * (line_a[1] + line_a[3]) + lj * (line_b[1] + line_b[3])) / (2.0 * (li + lj));
+    xg = (li * (line_a[0] + line_a[2]) + lj * (line_b[0] + line_b[2])) / (2.0 * (li + lj))
+    yg = (li * (line_a[1] + line_a[3]) + lj * (line_b[1] + line_b[3])) / (2.0 * (li + lj))
 
-    if (dlix == 0.0): thi = math.pi / 2.0;
-    else: thi = math.atan(dliy / dlix);
+    if (dlix == 0.0): thi = math.pi / 2.0
+    else: thi = math.atan(dliy / dlix)
 
-    if (dljx == 0.0): thj = math.pi / 2.0;
-    else: thj = math.atan(dljy / dljx);
+    if (dljx == 0.0): thj = math.pi / 2.0
+    else: thj = math.atan(dljy / dljx)
 
     if abs(thi - thj) <= math.pi / 2.0:
-        thr = (li * thi + lj * thj) / (li + lj);
+        thr = (li * thi + lj * thj) / (li + lj)
     else:
-        tmp = thj - math.pi * (thj / abs(thj));
-        thr = li * thi + lj * tmp;
-        thr /= (li + lj);
+        tmp = thj - math.pi * (thj / abs(thj))
+        thr = li * thi + lj * tmp
+        thr /= (li + lj)
 
     sin_thr = math.sin(thr)
     cos_thr = math.cos(thr)
 
-    axg = (line_a[1] - yg) * sin_thr + (line_a[0] - xg) * cos_thr;
-    bxg = (line_a[3] - yg) * sin_thr + (line_a[2] - xg) * cos_thr;
-    cxg = (line_b[1] - yg) * sin_thr + (line_b[0] - xg) * cos_thr;
-    dxg = (line_b[3] - yg) * sin_thr + (line_b[2] - xg) * cos_thr;
+    axg = (line_a[1] - yg) * sin_thr + (line_a[0] - xg) * cos_thr
+    bxg = (line_a[3] - yg) * sin_thr + (line_a[2] - xg) * cos_thr
+    cxg = (line_b[1] - yg) * sin_thr + (line_b[0] - xg) * cos_thr
+    dxg = (line_b[3] - yg) * sin_thr + (line_b[2] - xg) * cos_thr
 
-    delta1xg = min(axg,min(bxg,min(cxg,dxg)));
-    delta2xg = max(axg,max(bxg,max(cxg,dxg)));
+    delta1xg = min(axg, min(bxg, min(cxg,dxg)))
+    delta2xg = max(axg, max(bxg, max(cxg,dxg)))
 
-    delta1x = delta1xg * cos_thr + xg;
-    delta1y = delta1xg * sin_thr + yg;
-    delta2x = delta2xg * cos_thr + xg;
-    delta2y = delta2xg * sin_thr + yg;
-
-    return delta1x, delta1y, delta2x, delta2y
+    return  delta1xg * cos_thr + xg, \
+            delta1xg * sin_thr + yg, \
+            delta2xg * cos_thr + xg, \
+            delta2xg * sin_thr + yg
 
 def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
 
