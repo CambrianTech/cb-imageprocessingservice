@@ -133,7 +133,6 @@ class Pipeline():
         all_steps[PipelineStepIndex.Output] = output_step
         
         if self.api_level < 3.5:
-            all_steps[PipelineStepIndex.FindLines] = None
             all_steps[PipelineStepIndex.Geometry] = None
             all_steps[PipelineStepIndex.EstimatePose] = None
             all_steps[PipelineStepIndex.SolveRoom] = None
@@ -148,6 +147,11 @@ class Pipeline():
         all_steps[PipelineStepIndex.Barriers] = None
         all_steps[PipelineStepIndex.FindTrim] = None
         all_steps[PipelineStepIndex.FindLegs] = None
+
+        #todo: deprecate these:
+
+        #all_steps[PipelineStepIndex.EstimatePose] = None
+        #all_steps[PipelineStepIndex.Geometry] = None
         
 
         self.steps = []
