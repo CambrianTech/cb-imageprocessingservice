@@ -16,36 +16,40 @@ class Timer():
         self.color = color
         self.enabled = True
         self.counters = {}
+        self.total_elapsed = {}
         self.reset()
 
     def reset(self):
         self.checktime = time()
 
-    def log_elapsed(self, name, every=1, description=None):
+    def log_elapsed(self, name, every=None, description=None):
         if not self.enabled: return
 
-        if every > 1:
-            if name not in self.counters.keys():
-                self.counters[name] = 0
-            
-            self.counters[name] += 1
-            if self.counters[name] % every != 0:
-                return
-
         elapsed = time() - self.checktime
+        self.reset()
 
         if self.prefix is not None:
             name = self.prefix + "." + name
+               
+        self.total_elapsed[name] = elapsed + self.total_elapsed[name] if name in self.total_elapsed else elapsed
+        elapsed = self.total_elapsed[name]
 
-        if every > 1:
-            print(colored("%s took a total of %.4f seconds, %d iterations %.4f per" % (name, elapsed, every, elapsed / every), self.color))
+        if every is not None:
+            self.counters[name] = 1 + self.counters[name] if name in self.counters else 1
+
+            if self.counters[name] % every != 0:
+                return
+
+            every = self.counters[name]
+            self.counters[name] = 0
+            print(colored("%s took a total of %.4f seconds for %d iterations, avg: %.4f" % (name, elapsed, every, elapsed / every), self.color))
         else:
             print(colored("%s took %.4f seconds" % (name, elapsed), self.color))
+
+        self.total_elapsed[name] = 0
         
         if description is not None:
-            print(colored(description, "grey"))
-
-        self.reset()
+            print("--", colored(description, "grey"))
 
     def disable(self):
         self.enabled = False

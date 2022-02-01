@@ -366,9 +366,10 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
         rect_a = bounding_box(line_a, width=search_width, length_multiplier=search_length)
         data = line_a.data
 
-        candidates = line_a.in_range(lines[:i] + lines[i+1:], angle_threshold)
+        for line_b in lines:
 
-        for line_b in candidates:
+            if line_a == line_b or line_b.dead or line_angle_difference(line_a.angle, line_b.angle) > angle_threshold:
+                continue
 
             dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
 
@@ -377,6 +378,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
             else:
                 rect_b = bounding_box(line_b, width=search_width, length_multiplier=search_length)
                 result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+
 
             if result != 0:
                 line_a.dead = True
@@ -387,7 +389,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
         if line_a.dead:
             lines[i] = Line(data[0], data[1], data[2], data[3])
 
-        timer.log_elapsed("loop", every=200)
+    timer.log_elapsed("in_range", 1)
 
     return list(filter(lambda x: not x.dead, lines))
 
