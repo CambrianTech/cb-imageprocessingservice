@@ -371,14 +371,13 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
             if line_a == line_b or line_b.dead or line_angle_difference(line_a.angle, line_b.angle) > angle_threshold:
                 continue
 
-            dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
+            dist_sq = sqeuclidean(line_a.midpoint, line_b.midpoint)
 
             if dist_sq <= min_dist_sq:
                 result = 1
             else:
                 rect_b = bounding_box(line_b, width=search_width, length_multiplier=search_length)
                 result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
-
 
             if result != 0:
                 line_a.dead = True
