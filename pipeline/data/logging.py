@@ -51,7 +51,7 @@ class Timer():
             if self.counters[name] % every != 0:
                 return
 
-            every = self.counters[name]
+            every = self.counters[name] - 1
             self.counters[name] = 0
             print(colored("%s took a total of %.4f seconds for %d iterations, avg: %.4f" % (name, elapsed, every, elapsed / every), self.color))
         else:

@@ -34,13 +34,15 @@ class SurfaceRefinement():
 
         timer = Timer("refine")
         #timer.disable()
-        
-        # refine.dist_transform took a total of 0.0393 seconds for 19 iterations, avg: 0.0021
-        # refine.draw_surface_markers took a total of 0.0008 seconds for 19 iterations, avg: 0.0000
-        # refine.draw_barrier_markers took a total of 0.7154 seconds for 2 iterations, avg: 0.3577
-        # refine.cv2.watershed took a total of 0.0009 seconds for 2 iterations, avg: 0.0005
-        # refine.set masks took a total of 0.0299 seconds for 2 iterations, avg: 0.0149
-        # 15) Refine took 0.94 seconds
+
+        # Reading data from data/bedroom-one-window/data.pickle
+        # 15) Refine
+        # refine.dist_transform took a total of 0.0369 seconds for 18 iterations, avg: 0.0021
+        # refine.draw_surface_markers took a total of 0.0009 seconds for 18 iterations, avg: 0.0001
+        # refine.draw_lines took a total of 0.7147 seconds for 1 iterations, avg: 0.7147 <--- (slow why?)
+        # refine.cv2.watershed took a total of 0.0008 seconds for 1 iterations, avg: 0.0008
+        # refine.set masks took a total of 0.0317 seconds for 1 iterations, avg: 0.0317
+        # 15) Refine took 0.95 seconds
 
         def run_watershed(src, freedom=0.15, use_cv=False):
 
@@ -78,13 +80,13 @@ class SurfaceRefinement():
                 #lines_mask = None
                 for sb in self.barriers.values():
                     draw_barrier_markers(sb.barrier_groups)
+                timer.time_event("draw_barrier_markers")
 
             elif use_cv:
-                #lines_mask = np.zeros(src.shape[:2], dtype=np.uint8)
+                #bright green
                 draw_lines(src, self.data["lines"], color=(0,255,0), thickness=2, sx=sx, sy=sy)
-                #watershed_mask[lines_mask > 0] = 0
+                timer.time_event("draw_lines")
 
-            timer.time_event("draw_barrier_markers")
             log_markers(self.data, "room_markers", markers)
 
             timer.reset()
