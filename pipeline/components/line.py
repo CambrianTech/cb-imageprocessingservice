@@ -355,8 +355,8 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
 
     min_dist_sq = search_width * search_width
 
-    timer = Timer("merge_lines")
-    timer.disable()
+    #timer = Timer("merge_lines")
+    #timer.disable()
 
     for i in range(len(lines)):
         
@@ -388,7 +388,9 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
         if line_a.dead:
             lines[i] = Line(data[0], data[1], data[2], data[3])
 
-    timer.log_elapsed("in_range", 1)
+
+
+    #timer.log_elapsed("in_range", 1)
 
     return list(filter(lambda x: not x.dead, lines))
 
