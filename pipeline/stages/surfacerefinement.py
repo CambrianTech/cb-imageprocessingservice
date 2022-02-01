@@ -11,10 +11,10 @@ import cambrian.image_processing as ip
 
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
-from pipeline.components.line import Line
+from pipeline.components.line import Line, draw_lines
 from .planegeometry import Dimension
 from pipeline.misc.utils import get_segmentation_image, random_color
-from pipeline.data.logging import log_segmentation_image, im_logging_enabled, log_image, LogLevel, log_markers
+from pipeline.data.logging import log_segmentation_image, im_logging_enabled, log_image, LogLevel, log_markers, Timer
 
 class SurfaceRefinement():
     def __init__(self, data):
@@ -39,6 +39,8 @@ class SurfaceRefinement():
 
         def run_watershed(src, freedom=0.15, use_cv=False):
 
+            timer = Timer("watershed")
+
             watershed_mask = np.ones(src.shape, dtype=np.int32)
             markers = np.zeros((src.shape[0], src.shape[1]), dtype=np.int32)
 
@@ -62,24 +64,31 @@ class SurfaceRefinement():
                     self.masks[index] = cv2.resize(self.masks[index], (src.shape[1], src.shape[0]), interpolation=cv2.INTER_NEAREST) 
                 draw_surface_markers(surface, mask=self.masks[index], color=index+1)
 
+            timer.log_elapsed("surface_markers")
+
             if self.barriers is not None:
                 #lines_mask = None
                 for sb in self.barriers.values():
                     draw_barrier_markers(sb.barrier_groups)
             elif use_cv:
                 #lines_mask = np.zeros(src.shape[:2], dtype=np.uint8)
-                Line.draw_all(src, self.data["lines"], color=(0,255,0), thickness=2, sx=sx, sy=sy)
+                draw_lines(src, self.data["lines"], color=(0,255,0), thickness=2, sx=sx, sy=sy)
                 #watershed_mask[lines_mask > 0] = 0
+
+            timer.log_elapsed("barrier_markers")
 
             log_markers(self.data, "room_markers", markers)
 
             if use_cv:
                 markers = cv2.watershed(src, markers)
+                timer.log_elapsed("cv2.watershed")
             else:
                 markers = np.int32(watershed(src, markers, mask=watershed_mask))
+                timer.log_elapsed("watershed")
             markers[markers<0] = 0
 
             log_markers(self.data, "room_markers_result", markers)
+
 
             #set masks:
             for index in range(num_masks):
@@ -100,12 +109,12 @@ class SurfaceRefinement():
                 self.masks[index] = mask
 
 
-        hed = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
-        run_watershed(hed, freedom=0.03)
+        # hed = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
+        # run_watershed(hed, freedom=0.03)
 
         #denoised = rank.median(self.image[:,:,1], disk(5))
         #denoised = cv2.bilateralFilter(self.image[:,:,1], 9, 20, 20)
-        #run_watershed(denoised, freedom=0.025)
+        run_watershed(self.image, freedom=0.025, use_cv=True)
 
         if self.room is not None: #commit changes
             for index in range(num_masks):
