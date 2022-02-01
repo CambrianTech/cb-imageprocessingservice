@@ -33,6 +33,14 @@ class SurfaceRefinement():
         num_surfaces = len(self.room.surfaces)
 
         timer = Timer("refine")
+        #timer.disable()
+        
+        # refine.dist_transform took a total of 0.0393 seconds for 19 iterations, avg: 0.0021
+        # refine.draw_surface_markers took a total of 0.0008 seconds for 19 iterations, avg: 0.0000
+        # refine.draw_barrier_markers took a total of 0.7154 seconds for 2 iterations, avg: 0.3577
+        # refine.cv2.watershed took a total of 0.0009 seconds for 2 iterations, avg: 0.0005
+        # refine.set masks took a total of 0.0299 seconds for 2 iterations, avg: 0.0149
+        # 15) Refine took 0.94 seconds
 
         def run_watershed(src, freedom=0.15, use_cv=False):
 
