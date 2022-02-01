@@ -82,7 +82,7 @@ class Room(Geometry):
 
         invalid_mask = self.remove_invalid_surfaces()
         
-        if cv2.countNonZero(invalid_mask) > 50:
+        if im_logging_enabled(self.data) and cv2.countNonZero(invalid_mask) > 50:
             debug = self.image.copy()
             debug[invalid_mask > 0] = [0,255,0]
             log_image(self.data, "room_removed", debug)
@@ -501,6 +501,8 @@ class Room(Geometry):
             child_surface.parent = candidates[0]
         
     def get_debug_image(self):
+        if not im_logging_enabled(self.data): 
+            return None
 
         img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV_FULL)
         hues = random.sample(range(0, 360), len(self.surfaces))

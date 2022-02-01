@@ -99,16 +99,6 @@ class Line():
 
         return Line(data[0], data[1], data[2], data[3])        
 
-    # def in_range(self, lines, angle_threshold):
-    #     return list(filter(lambda line: not line.dead and line_angle_difference(self.angle, line.angle) <= angle_threshold, lines)) 
-
-    def in_range(self, lines, angle_threshold):
-        filtered = []
-        for line in lines:
-            if not line.dead and line_angle_difference(self.angle, line.angle) <= angle_threshold:
-                filtered.append(line)
-        return filtered
-
     def copy(self):
         #todo: ineffcient
         return Line(self.data[0], self.data[1], self.data[2], self.data[3])
@@ -387,8 +377,6 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
 
         if line_a.dead:
             lines[i] = Line(data[0], data[1], data[2], data[3])
-
-
 
     #timer.log_elapsed("in_range", 1)
 
