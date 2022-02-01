@@ -84,7 +84,7 @@ class SurfaceRefinement():
 
             elif use_cv:
                 #bright green
-                draw_lines(src, self.data["lines"], color=(0,255,0), thickness=2, sx=sx, sy=sy)
+                draw_lines(src, self.data["lines"], color=(0,255,0), sx=sx, sy=sy)
                 timer.time_event("draw_lines")
 
             log_markers(self.data, "room_markers", markers)

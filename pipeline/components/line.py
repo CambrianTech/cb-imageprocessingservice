@@ -291,10 +291,10 @@ def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
 def draw_line(line, img, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
     cv2.line(img, (int(line.point_a[0] * sx), int(line.point_a[1] * sy)), (int(line.point_b[0] * sx), int(line.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
 
-@nb.jit(nopython=False)
 def draw_lines(img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
-    [draw_line(line, img, color=color, thickness=thickness, sx=sx, sy=sy, lineType=lineType) for line in lines]
-
+    pts = np.array([line.data for line in lines])
+    pts = (pts.reshape((-1,1,2)) * sx).astype(np.int32)  #todo: scale simplified to sx==sy but some programs might mess up <--Derrick fix numpy math for me
+    cv2.polylines(img, [pts], True, color, thickness=thickness, lineType=lineType)
 
 @nb.jit(nopython=True)
 def merge_line_pair(line_a, line_b):
