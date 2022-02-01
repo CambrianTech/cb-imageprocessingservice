@@ -21,9 +21,7 @@ class RoomSolver():
 
     def solve(self, confidence=0.95):
         
-        wall_contours = []
-
-        #add the walls:
+        #add all the applicable surfaces:
         for i in range(len(self.room.probs)):
             self.room.add_surface(Surface(self.data, i))
 
