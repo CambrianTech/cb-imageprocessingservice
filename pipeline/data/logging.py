@@ -46,8 +46,6 @@ class Timer():
         elapsed = self.total_elapsed[name]
 
         if every is not None:
-            if name not in self.counters:
-                print("register %s" % name)
             self.counters[name] = 1 + self.counters[name] if name in self.counters else 1
 
             if self.counters[name] % every != 0:
