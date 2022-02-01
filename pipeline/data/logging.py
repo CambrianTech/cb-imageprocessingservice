@@ -5,6 +5,7 @@ import pickle
 from enum import IntFlag
 from termcolor import colored
 from time import time
+import sys
 
 from .ade20k import ADE20K
 from pipeline.misc.utils import get_segmentation_image
@@ -22,19 +23,31 @@ class Timer():
     def reset(self):
         self.checktime = time()
 
-    def log_elapsed(self, name, every=None, description=None):
+    def time_event(self, name):
+        self.log_elapsed(name, every=10000)
+
+    def log_event(self, name): #print timing accumulation and mean, and then trigger reset
+        self.log_elapsed(name, every=1) #trigger print and reset now
+
+    def log_all_events(self):
+        names = list(self.counters.keys())
+        [self.log_elapsed(name, every=1, disabled_prefix=True) for name in names]
+
+    def log_elapsed(self, name, every=None, description=None, disabled_prefix=False):
         if not self.enabled: return
 
         elapsed = time() - self.checktime
         self.reset()
 
-        if self.prefix is not None:
+        if self.prefix is not None and not disabled_prefix:
             name = self.prefix + "." + name
                
         self.total_elapsed[name] = elapsed + self.total_elapsed[name] if name in self.total_elapsed else elapsed
         elapsed = self.total_elapsed[name]
 
         if every is not None:
+            if name not in self.counters:
+                print("register %s" % name)
             self.counters[name] = 1 + self.counters[name] if name in self.counters else 1
 
             if self.counters[name] % every != 0:
