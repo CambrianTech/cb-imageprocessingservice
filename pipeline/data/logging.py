@@ -18,7 +18,8 @@ class Timer():
         self.enabled = True
         self.counters = {}
         self.total_elapsed = {}
-        self.reset()
+        self.start = time()
+        self.checktime = self.start
 
     def reset(self):
         self.checktime = time()
@@ -32,8 +33,8 @@ class Timer():
     def log_all_events(self):
         names = list(self.counters.keys())
         [self.log_elapsed(name, every=1, disabled_prefix=True) for name in names]
-        if len(names) == 0:
-            self.log_elapsed("total") #at least post something, so total
+        if len(names) != 1: #if not a single timer output the total:
+            print(colored("%s took %.4f seconds total" % (self.prefix, time() - self.start), self.color, attrs=['bold'] if len(names) > 1 else None))
 
     def log_elapsed(self, name, every=None, description=None, disabled_prefix=False):
         if not self.enabled: return
@@ -55,7 +56,8 @@ class Timer():
 
             every = self.counters[name] - 1
             self.counters[name] = 0
-            print(colored("%s took a total of %.4f seconds for %d iterations, avg: %.4f" % (name, elapsed, every, elapsed / every), self.color))
+            iterations_text = " for %d iterations, avg: %.4f" % (every, elapsed / every) if every > 1 else ""
+            print(colored("%s took a total of %.4f seconds%s" % (name, elapsed, iterations_text), self.color))
         else:
             print(colored("%s took %.4f seconds" % (name, elapsed), self.color))
 

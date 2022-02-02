@@ -68,17 +68,17 @@ class Room(Geometry):
 
         log_segmentation_image(self.data, "semantic_labels", self.semantic_labels, self.image, labelset=ADE20K)
 
-        timer.log_elapsed("setup")
+        timer.time_event("setup")
 
         self.analyze_surfaces()
         log_image(self.data, "room_initial", self.get_debug_image())
 
-        timer.log_elapsed("analyze_surfaces")
+        timer.time_event("analyze_surfaces")
 
         self.refine_surfaces(min_confidence=0.1) #preserve plane context information i.e. probs < min_confidence are ignored
         log_image(self.data, "room_refined", self.get_debug_image())
 
-        timer.log_elapsed("refine_surfaces")
+        timer.time_event("refine_surfaces")
 
         invalid_mask = self.remove_invalid_surfaces()
         
@@ -87,17 +87,17 @@ class Room(Geometry):
             debug[invalid_mask > 0] = [0,255,0]
             log_image(self.data, "room_removed", debug)
 
-        timer.log_elapsed("remove_invalid_surfaces")
+        timer.time_event("remove_invalid_surfaces")
 
         self.add_missing_surfaces(invalid_mask)
         log_image(self.data, "room_missing_added", self.get_debug_image())
 
-        timer.log_elapsed("add_missing_surfaces")
+        timer.time_event("add_missing_surfaces")
 
         self.refine_surfaces(debug_suffix="_final")
         log_image(self.data, "room_refined_again", self.get_debug_image())
 
-        timer.log_elapsed("room.refine_surfaces")
+        timer.time_event("room.refine_surfaces")
 
         self.merge_like_surfaces()
 
@@ -105,9 +105,13 @@ class Room(Geometry):
 
         log_image(self.data, "room", self.get_debug_image())
 
-        timer.log_elapsed("merge_like_surfaces")
+        timer.time_event("merge_like_surfaces")
 
         self.assign_parents()
+
+        timer.time_event("assign_parents")
+
+        timer.log_all_events()
 
     def analyze_surfaces(self):
         #perform initial analysis
