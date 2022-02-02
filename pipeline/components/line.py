@@ -303,18 +303,18 @@ def draw_lines(img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, 
     cv2.drawContours(img, pts, -1, color, thickness=thickness, lineType=lineType)
 
 @nb.jit(nopython=True)
-def merge_line_pair(line_a, line_b):
+def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy):
 
-    dlix = line_a[2] - line_a[0]
-    dliy = line_a[3] - line_a[1]
-    dljx = line_b[2] - line_b[0]
-    dljy = line_b[3] - line_b[1]
+    dlix = bx - ax
+    dliy = by - ay
+    dljx = dx - cx
+    dljy = dy - cy
 
     li = math.sqrt((dlix * dlix) + (dliy * dliy))
     lj = math.sqrt((dljx * dljx) + (dljy * dljy))
 
-    xg = (li * (line_a[0] + line_a[2]) + lj * (line_b[0] + line_b[2])) / (2.0 * (li + lj))
-    yg = (li * (line_a[1] + line_a[3]) + lj * (line_b[1] + line_b[3])) / (2.0 * (li + lj))
+    xg = (li * (ax + bx) + lj * (cx + dx)) / (2.0 * (li + lj))
+    yg = (li * (ay + by) + lj * (cy + dy)) / (2.0 * (li + lj))
 
     if (dlix == 0.0): thi = math.pi / 2.0
     else: thi = math.atan(dliy / dlix)
@@ -332,10 +332,10 @@ def merge_line_pair(line_a, line_b):
     sin_thr = math.sin(thr)
     cos_thr = math.cos(thr)
 
-    axg = (line_a[1] - yg) * sin_thr + (line_a[0] - xg) * cos_thr
-    bxg = (line_a[3] - yg) * sin_thr + (line_a[2] - xg) * cos_thr
-    cxg = (line_b[1] - yg) * sin_thr + (line_b[0] - xg) * cos_thr
-    dxg = (line_b[3] - yg) * sin_thr + (line_b[2] - xg) * cos_thr
+    axg = (ay - yg) * sin_thr + (ax - xg) * cos_thr
+    bxg = (by - yg) * sin_thr + (bx - xg) * cos_thr
+    cxg = (cy - yg) * sin_thr + (cx - xg) * cos_thr
+    dxg = (dy - yg) * sin_thr + (dx - xg) * cos_thr
 
     delta1xg = min(axg, min(bxg, min(cxg,dxg)))
     delta2xg = max(axg, max(bxg, max(cxg,dxg)))
@@ -351,7 +351,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
 
     min_dist_sq = search_width * search_width
 
-    #timer = Timer("merge_lines")
+    timer = Timer("merge_lines")
     #timer.disable()
 
     for i in range(len(lines)):
@@ -372,21 +372,22 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
             if dist_sq <= min_dist_sq:
                 result = 1
             else:
-                #timer.reset()
+                timer.reset()
                 rect_b = bounding_box(line_b, width=search_width, length_multiplier=search_length)
                 result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
-                #timer.time_event("rotatedRectangleIntersection")
+                timer.time_event("rotatedRectangleIntersection")
 
             if result != 0:
                 line_a.dead = True
                 line_b.dead = True
-
-                data = merge_line_pair(data, line_b.data)
+                timer.reset()
+                data = merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3])
+                timer.time_event("merge_line_pair")
 
         if line_a.dead:
             lines[i] = Line(data[0], data[1], data[2], data[3])
 
-    #timer.log_all_events()
+    timer.log_all_events()
 
     return list(filter(lambda x: not x.dead, lines))
 

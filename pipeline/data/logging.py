@@ -24,7 +24,7 @@ class Timer():
         self.checktime = time()
 
     def time_event(self, name):
-        self.log_elapsed(name, every=10000)
+        self.log_elapsed(name, every=1000000)
 
     def log_event(self, name): #print timing accumulation and mean, and then trigger reset
         self.log_elapsed(name, every=1) #trigger print and reset now
