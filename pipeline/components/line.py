@@ -38,7 +38,7 @@ class Line():
 
         self.midpoint = ((ax + bx) / 2.0, (ay + by) / 2.0)
         self.angle = line_angle(ax, ay, bx, by)
-        self.direction = np.array((self.dy, self.dx)) / self.length
+        self.direction = np.array((self.dy / self.length, self.dx / self.length))
 
         #for tracking
         self.dead = False
@@ -303,12 +303,12 @@ def draw_lines(img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, 
     cv2.drawContours(img, pts, -1, color, thickness=thickness, lineType=lineType)
 
 @nb.jit(nopython=True)
-def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy):
+def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy, dljx, dljy):
 
     dlix = bx - ax
     dliy = by - ay
-    dljx = dx - cx
-    dljy = dy - cy
+    #dljx = dx - cx
+    #dljy = dy - cy
 
     li = math.sqrt((dlix * dlix) + (dliy * dliy))
     lj = math.sqrt((dljx * dljx) + (dljy * dljy))
@@ -381,7 +381,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
                 line_a.dead = True
                 line_b.dead = True
                 timer.reset()
-                data = merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3])
+                data = merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], line_b.dx, line_b.dy)
                 timer.time_event("merge_line_pair")
 
         if line_a.dead:
