@@ -51,7 +51,6 @@ class SurfaceRefinement():
                     watershed_mask[mask > 0] = 0
 
                 timer.reset()
-                #dist_transform = cv2.distanceTransform(mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
                 dist_transform = surface.mask_transform
 
                 #uncommon case where image was smaller than neural net size

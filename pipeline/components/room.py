@@ -341,7 +341,8 @@ class Room(Geometry):
             
             for index in range(num_surfaces):
                 surface = surfaces[index]
-                dist_transform = cv2.distanceTransform(surface.mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
+                #dist_transform = cv2.distanceTransform(surface.mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
+                dist_transform = surface.mask_transform
                 markers[dist_transform > 0.15 * dist_transform.max()] = index + 1
 
             markers[disputed_areas > 0] = 0
