@@ -420,7 +420,7 @@ class SurfaceBarriers():
     def getBarrier(self, index, elements=None):
         return next(filter(lambda barrier: barrier.index == index, self.barrier_groups if elements is None else elements), None)
         
-    def refine(self, all_barriers):
+    def refine(self, all_barriers, contours):
         global debug_objects
 
         max_angle_parallel = np.radians(13)
@@ -430,7 +430,7 @@ class SurfaceBarriers():
         epsilon = min_distance
 
         self.set_initial_endpoints()
-        self.cull_barriers(all_barriers)
+        self.cull_barriers(all_barriers, contours)
 
         #now extend and link all:
         def get_best_termination(terminations):            
@@ -795,9 +795,9 @@ class SurfaceBarriers():
         self.barrier_groups = list(filter(lambda x: not x.dead, self.barrier_groups))
 
 
-    def cull_barriers(self, all_barriers):
+    def cull_barriers(self, all_barriers, contours):
 
-        contours, contour_lengths = self.room.contours[self.surface.surfaceType]
+        contours, contour_lengths = contours[self.surface.surfaceType]
 
         elementA = self.getBarrier(242)
         padding = self.diagonal / 100
@@ -1141,8 +1141,29 @@ class PipelineBarrierFinder(PipelineStep):
         for surface in self.surfaces:
             all_barriers.extend(surface.barriers.barrier_groups)
 
+
+        #get contours for all isolated masks
+        contours = {}
+        border_size=3
+        for surfaceType in SurfaceType:
+            mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
+            mask[self.room.isolated_labels == surfaceType] = 1
+            mask = cv2.copyMakeBorder(mask, border_size, border_size, border_size, border_size, cv2.BORDER_CONSTANT, value=0)
+
+            _contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            contour_lengths = []
+            #remove border offset, get lengths:
+            contours = []
+            for contour in _contours:
+                contour = (contour.flatten() - border_size).reshape(contour.shape) #remove offset
+                contours.append(contour)
+                contour_lengths.append(cv2.arcLength(contour, True))
+
+            contours[surfaceType] = contours, contour_lengths
+
         for surface in self.surfaces:
-            self.barriers[surface.uniqueId].refine(all_barriers)
+            self.barriers[surface.uniqueId].refine(all_barriers, contours)
 
         # bs = BarrierSolver(self.data, self.barriers)
         # bs.solve()
