@@ -305,12 +305,12 @@ def draw_lines(img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, 
     cv2.drawContours(img, pts, -1, color, thickness=thickness, lineType=lineType)
 
 @nb.jit(nopython=True)
-def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy, dljx, dljy):
+def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy):
 
     dlix = bx - ax
     dliy = by - ay
-    #dljx = dx - cx
-    #dljy = dy - cy
+    dljx = dx - cx
+    dljy = dy - cy
 
     li = math.sqrt((dlix * dlix) + (dliy * dliy))
     lj = math.sqrt((dljx * dljx) + (dljy * dljy))
@@ -383,7 +383,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
                 line_a.dead = True
                 line_b.dead = True
                 timer.reset()
-                data = merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], line_b.dx, line_b.dy)
+                data = merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3])
                 timer.time_event("merge_line_pair")
 
         if line_a.dead:
