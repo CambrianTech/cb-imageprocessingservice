@@ -35,14 +35,11 @@ class SurfaceRefinement():
         timer = Timer("refine")
         #timer.disable()
 
-        # Reading data from data/bedroom-one-window/data.pickle
-        # 15) Refine
-        # refine.dist_transform took a total of 0.0369 seconds for 18 iterations, avg: 0.0021
-        # refine.draw_surface_markers took a total of 0.0009 seconds for 18 iterations, avg: 0.0001
-        # refine.draw_lines took a total of 0.7147 seconds for 1 iterations, avg: 0.7147 <--- (slow why?)
-        # refine.cv2.watershed took a total of 0.0008 seconds for 1 iterations, avg: 0.0008
-        # refine.set masks took a total of 0.0317 seconds for 1 iterations, avg: 0.0317
-        # 15) Refine took 0.95 seconds
+        # refine.dist_transform took a total of 0.2879 seconds for 18 iterations, avg: 0.0160
+        # refine.draw_surface_markers took a total of 0.0168 seconds for 18 iterations, avg: 0.0009
+        # refine.draw_lines took a total of 0.0008 seconds for 1 iterations, avg: 0.0008
+        # refine.cv2.watershed took a total of 0.0255 seconds for 1 iterations, avg: 0.0255
+        # refine.set masks took a total of 0.0905 seconds for 1 iterations, avg: 0.0905
 
         def run_watershed(src, freedom=0.15, use_cv=False):
 
@@ -54,7 +51,13 @@ class SurfaceRefinement():
                     watershed_mask[mask > 0] = 0
 
                 timer.reset()
-                dist_transform = cv2.distanceTransform(mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
+                #dist_transform = cv2.distanceTransform(mask, distanceType=cv2.DIST_L2, maskSize=3, dstType=cv2.CV_8U)
+                dist_transform = surface.mask_transform
+
+                #uncommon case where image was smaller than neural net size
+                if dist_transform.shape[0] != src.shape[0] or dist_transform.shape[1] != src.shape[1]:
+                    dist_transform = cv2.resize(dist_transform, (src.shape[1], src.shape[0])) 
+
                 markers[dist_transform > freedom * dist_transform.max()] = color
                 timer.time_event("dist_transform")
 

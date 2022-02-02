@@ -34,6 +34,7 @@ class Surface():
         self._mask_edges = None
         self._mask_expanded = None
         self._surface_mask = None
+        self._mask_transform = None
         self._outer_mask = None
         self._inner_mask = None
 
@@ -295,20 +296,35 @@ class Surface():
         return self._surface_mask
 
     @property
+    def mask_transform(self):
+        if self._mask_transform is None:
+            trans = cv2.distanceTransform(self.surface_mask, cv2.DIST_L2, 5)
+            self._mask_transform = trans[mask_padding:-mask_padding,mask_padding:-mask_padding]
+
+        return self._mask_transform
+
+    # @property
+    # def outer_mask(self):
+    #     if self._outer_mask is None:
+    #         trans = cv2.distanceTransform(1 - self.surface_mask, cv2.DIST_L2, 5)
+    #         _, self._outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
+    #         self._outer_mask = self._outer_mask[mask_padding:-mask_padding,mask_padding:-mask_padding].astype(np.uint8)
+
+    #     return self._outer_mask
+
+    @property
     def outer_mask(self):
         if self._outer_mask is None:
-            trans = cv2.distanceTransform(1 - self.surface_mask, cv2.DIST_L2, 5)
-            _, self._outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
-            self._outer_mask = self._outer_mask[mask_padding:-mask_padding,mask_padding:-mask_padding].astype(np.uint8)
+            _, result = cv2.threshold(1 - self.mask_transform, 0.05 * self.mask_transform.max(), 1, 0)
+            self._outer_mask = result.astype(np.uint8)
 
         return self._outer_mask
 
     @property
     def inner_mask(self):
         if self._inner_mask is None:
-            trans = cv2.distanceTransform(self.surface_mask, cv2.DIST_L2, 5)
-            _, self._inner_mask = cv2.threshold(trans, 0.5 * trans.max(), 1, 0)
-            self._inner_mask = self._inner_mask[mask_padding:-mask_padding,mask_padding:-mask_padding].astype(np.uint8)
+            _, result = cv2.threshold(self.mask_transform, 0.5 * self.mask_transform.max(), 1, 0)
+            self._inner_mask = result.astype(np.uint8)
 
         return self._inner_mask
 
@@ -331,6 +347,7 @@ class Surface():
         self._mask_expanded = None
 
         self._surface_mask = None
+        self._mask_transform = None
         self._outer_mask = None
         self._inner_mask = None
 
