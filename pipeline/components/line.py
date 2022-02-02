@@ -22,6 +22,7 @@ def out_of_range(x, y, width, height):
             ("length", nb.types.float32),
             ("midpoint", nb.types.UniTuple(nb.types.float32, 2)),
             ("angle", nb.types.float32),
+            ("degrees", nb.types.float32),
             ("direction", nb.types.float32[:]),
             ("dead", nb.types.boolean),
             ])
@@ -37,7 +38,8 @@ class Line():
         self.length = euclidean(self.point_a, self.point_b)
 
         self.midpoint = ((ax + bx) / 2.0, (ay + by) / 2.0)
-        self.angle = line_angle(ax, ay, bx, by)
+        self.angle = math.atan2(self.dy, self.dx)
+        self.degrees = np.degrees(self.angle)
         self.direction = np.array((self.dy / self.length, self.dx / self.length))
 
         #for tracking
@@ -78,7 +80,7 @@ class Line():
         draw_line(line, img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
 
     def bounding_box(self, width, length_multiplier=1.0):
-        return (self.midpoint, (self.length * length_multiplier, width), np.degrees(self.angle))
+        return (self.midpoint, (self.length * length_multiplier, width), self.degrees)
 
     def extended(self, ratio=1.1, from_a=True, from_b=True):
 
@@ -125,7 +127,7 @@ def closest_line_point(x0, y0, x1, y1, px, py): #minimum angle between lines seg
 
 @nb.jit(nopython=True)
 def bounding_box(line, width, length_multiplier=1.0):
-    return (line.midpoint, (line.length * length_multiplier, width), np.degrees(line.angle))
+    return (line.midpoint, (line.length * length_multiplier, width), line.degrees)
 
 @nb.jit(nopython=True)
 def euclidean(point_a, point_b):
@@ -347,7 +349,7 @@ def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy, dljx, dljy):
 
 def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
 
-    lines = [line.copy() for line in lines]
+    #lines = [line.copy() for line in lines]
 
     min_dist_sq = search_width * search_width
 
@@ -364,7 +366,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
 
         for line_b in lines:
 
-            if line_a == line_b or line_b.dead or line_angle_difference(line_a.angle, line_b.angle) > angle_threshold:
+            if line_angle_difference(line_a.angle, line_b.angle) > angle_threshold or line_b.dead or line_a == line_b:
                 continue
 
             dist_sq = sqeuclidean(line_a.midpoint, line_b.midpoint)
