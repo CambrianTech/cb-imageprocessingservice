@@ -354,7 +354,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
     min_dist_sq = search_width * search_width
 
     timer = Timer("merge_lines")
-    #timer.disable()
+    timer.disable()
 
     for i in range(len(lines)):
         

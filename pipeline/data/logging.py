@@ -32,6 +32,8 @@ class Timer():
     def log_all_events(self):
         names = list(self.counters.keys())
         [self.log_elapsed(name, every=1, disabled_prefix=True) for name in names]
+        if len(names) == 0:
+            self.log_elapsed("total") #at least post something, so total
 
     def log_elapsed(self, name, every=None, description=None, disabled_prefix=False):
         if not self.enabled: return
