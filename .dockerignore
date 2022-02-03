@@ -21,9 +21,11 @@ coverage.xml
 
 planercnn
 scripts
+data
+single
+#cb-core
 
-#images
-#results
-#sklearn_models
-#tensorflow_models
-#gluon_models
+results
+sklearn_models
+tensorflow_models
+gluon_models
