@@ -83,20 +83,22 @@ RUN chmod a+rwx /etc/bash.bashrc
 #FROM base
 
 WORKDIR /cb-backend/
-COPY . .
-
-RUN chmod 755 ./start.sh
 
 # MXNet and GluonCV prereleases
 RUN pip3 install --pre --upgrade gluoncv
 RUN pip3 install --upgrade mxnet-cu100mkl -f https://dist.mxnet.io/python/all
 
-
 # libglib needed for OpenCV
 RUN apt-get update && apt-get install --no-install-recommends -y libglib2.0-0 && apt-get clean
 
+COPY ./requirements.txt .
 RUN pip3 install -r requirements.txt --no-cache-dir
-RUN pip3 install ./cb-core/ --no-cache-dir
+
+COPY ./cb-core ./cb-core
+RUN pip3 install ./cb-core --no-cache-dir
+
+COPY . .
+RUN chmod 755 ./start.sh
 
 EXPOSE 8080
 

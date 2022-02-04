@@ -6,7 +6,7 @@ from multiprocessing import cpu_count
 
 
 class PipelineStep(metaclass=ABCMeta):
-    def __init__(self, batch_max_wait_time=1.0, batch_debounce_time=0.2, batch_max_size=4):
+    def __init__(self, batch_max_wait_time=1.0, batch_debounce_time=0.2, batch_max_size=1):
         self.batch_max_wait_time = batch_max_wait_time
         self.batch_debounce_time = batch_debounce_time
         self.batch_max_size = batch_max_size
