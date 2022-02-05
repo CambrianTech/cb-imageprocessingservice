@@ -242,18 +242,6 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
             if metadata is not None:
                 await loop.run_in_executor(None, push_metrics)
 
-    print("Trying to get instance metadata")
-
-    metadata = None
-
-    if results_local_dir is None:
-        metadata = _get_instance_metadata()
-    else:
-        metadata = None
-        print("Working locally. Metadata set to None")
-
-    if metadata is not None:
-        print("Instance metadata:", metadata)
 
     print("Starting metrics loop")
     asyncio.ensure_future(push_metrics_loop())
