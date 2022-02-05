@@ -88,42 +88,15 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
     # Pipeline for finding planes, generating lighting and predicting fov.
     async def planes_pipeline(input_dict: typing.Dict):
         total_start_time = time()
+        if 'image_s3_key' in input_dict:
+            input_dict['unique_id'] = input_dict['image_s3_key']
+            print("Warning 'image_s3_key' is no longer being used. Please update this to 'unique_id'")
+
         results = await pipeline.process(input_dict)
         total_pipeline_time = time() - total_start_time
         print("Planes total pipeline time: %.2fs" % total_pipeline_time)
         total_pipeline_times.append((total_pipeline_time, datetime.datetime.now(dateutil.tz.tzlocal())))
         return results
-
-    # Setup http server
-    def get_pipeline_handler(pipeline_fn):
-        async def handle(request):
-            print("Handle segment:", request, "(items waiting in pipeline: %d)" %
-                  num_waiting_items(pipeline.steps))
-
-            # Get image S3 key from GET request
-            unique_id = request.match_info.get("id", None)
-            if unique_id is None:
-                raise web.HTTPBadRequest()
-
-            data = {"unique_id": unique_id}
-
-            data = await pipeline_fn(data)
-
-            response_dict = {
-                "lighting_url": data["lighting_url"],
-                "semantic_url": data["semantic_url"],
-                "data_url": data["data_v3_url"],
-                "superpixels_url": data["superpixels_url"],
-            }
-
-            if "data_v2_url" in data:
-                response_dict["data_v2_url"] = data["data_v2_url"]
-
-            if "data_v3_url" in data:
-                response_dict["data_v3_url"] = data["data_v3_url"]
-
-            return web.json_response(response_dict)
-        return handle
 
     print("SQS Queue name:", sqs_queue_name)
     if sqs_queue_name is not None:
