@@ -28,7 +28,7 @@ class PipelineStepIndex(IntEnum):
     Output = 18
 
 class PipelineStep(metaclass=ABCMeta):
-    def __init__(self, pipeline, batch_max_wait_time=1.0, batch_debounce_time=0.2, batch_max_size=4):
+    def __init__(self, pipeline, batch_max_wait_time=1.0, batch_debounce_time=0.2, batch_max_size=1):
         self.pipeline = pipeline
         self.batch_max_wait_time = batch_max_wait_time
         self.batch_debounce_time = batch_debounce_time
