@@ -8,6 +8,7 @@ from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.misc.utils import camera_fov_res_to_intrinsics
 
 def _remote_plane_detect(address, data):
+    print("Remote detection", address)
     input_dicts = [{
         "image": datum["image"],
         "camera": camera_fov_res_to_intrinsics(datum["fov"], np.array([datum["image"].shape[1], datum["image"].shape[0]], dtype=np.float32))[0]
