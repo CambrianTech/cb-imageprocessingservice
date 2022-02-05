@@ -94,12 +94,11 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
     # Pipeline for finding planes, generating lighting and predicting fov.
     async def planes_pipeline(input_dict: typing.Dict):
         total_start_time = time()
-        for step in steps:
-            input_dict = await schedule_and_wait(step.schedule, input_dict)
+        results = await pipeline.process(input_dict)
         total_pipeline_time = time() - total_start_time
         print("Planes total pipeline time: %.2fs" % total_pipeline_time)
         total_pipeline_times.append((total_pipeline_time, datetime.datetime.now(dateutil.tz.tzlocal())))
-        return input_dict
+        return results
 
     # Setup http server
     def get_pipeline_handler(pipeline_fn):
@@ -320,9 +319,9 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
     segment_resource = app.router.add_resource("/segment/{id}")
     planes_resource = app.router.add_resource("/planes/{id}")
     cors.add(segment_resource.add_route(
-        "GET", get_pipeline_handler(pipeline.process)))
+        "GET", get_pipeline_handler(planes_pipeline)))
     cors.add(planes_resource.add_route(
-        "GET", get_pipeline_handler(pipeline.process)))
+        "GET", get_pipeline_handler(planes_pipeline)))
 
     # Add endpoint for directly getting and uploading images if local
     # image input dir was defined
