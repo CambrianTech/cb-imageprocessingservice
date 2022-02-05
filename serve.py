@@ -53,24 +53,16 @@ def _get_instance_metadata():
 @click.argument("plane_url", type=click.STRING)
 @click.option("--sqs-queue-name", type=click.STRING, default=None)
 @click.option('--api', type=int, default=3, help='api level: 1-4')
-@click.option("--image-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
-@click.option("--results-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--logging_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
 @click.option('--log_level', type=int, default=0, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
 def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_uploads_bucket, results_bucket, plane_url, sqs_queue_name,
-         api, image_local_dir, results_local_dir, logging_dir, log_level, log_step):
+         api, logging_dir, log_level, log_step):
 
     print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
     print("Creating pipeline")
-
-    if image_local_dir is not None and not os.path.exists(image_local_dir):
-        os.makedirs(image_local_dir)
-
-    if results_local_dir is not None and not os.path.exists(results_local_dir):
-        os.makedirs(results_local_dir)
 
     logging_step = PipelineStepIndex(log_step) if log_step is not None else None
 
@@ -112,16 +104,6 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
                 raise web.HTTPBadRequest()
 
             data = {"unique_id": unique_id}
-
-            # Add local directories to initial data if specified
-            if image_local_dir is not None:
-                print(
-                    "WARNING: Do not use in production: image local dir set to", image_local_dir)
-                data["image_local_dir"] = image_local_dir
-            if results_local_dir is not None:
-                print(
-                    "WARNING: Do not use in production: results local dir set to", results_local_dir)
-                data["results_local_dir"] = results_local_dir
 
             data = await pipeline_fn(data)
 
@@ -179,36 +161,6 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
 
     async def handle_healthcheck(request):
         return web.Response(text="Healthy")
-
-    async def handle_local_upload(request):
-        print("Handle local file upload.", request)
-
-        unique_id = request.match_info.get("id", None)
-        if unique_id is None:
-            raise web.HTTPBadRequest()
-
-        output_dir = join(image_local_dir, user_uploads_bucket)
-        os.makedirs(output_dir, exist_ok=True)
-
-        # Read 1MB chunks into the file
-        with open(join(output_dir, unique_id), "wb") as image_file:
-            while True:
-                chunk = await request.content.read(1024*1024)
-                if not chunk:
-                    break
-                image_file.write(chunk)
-
-        return web.json_response({})
-
-    async def handle_get_image(request):
-        print("Handle get image:", request)
-
-        unique_id = request.match_info.get("id", None)
-        bucket = request.match_info.get("bucket", None)
-        if unique_id is None or bucket is None:
-            raise web.HTTPBadRequest()
-
-        return web.FileResponse(os.path.join(results_local_dir, bucket, unique_id))
 
     async def push_metrics_loop():
         loop = asyncio.get_event_loop()
@@ -314,23 +266,6 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
             allow_headers="*",
         )
     })
-
-    # Add public (CORS) routes
-    segment_resource = app.router.add_resource("/segment/{id}")
-    planes_resource = app.router.add_resource("/planes/{id}")
-    cors.add(segment_resource.add_route(
-        "GET", get_pipeline_handler(planes_pipeline)))
-    cors.add(planes_resource.add_route(
-        "GET", get_pipeline_handler(planes_pipeline)))
-
-    # Add endpoint for directly getting and uploading images if local
-    # image input dir was defined
-    if image_local_dir is not None:
-        upload_resource = app.router.add_resource("/upload/{id}")
-        cors.add(upload_resource.add_route("PUT", handle_local_upload))
-
-        get_image_resource = app.router.add_resource("/getimage/{bucket}/{id}")
-        cors.add(get_image_resource.add_route("GET", handle_get_image))
 
     # Add private (non-CORS) routes
     app.add_routes([
