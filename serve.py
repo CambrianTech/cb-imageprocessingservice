@@ -64,19 +64,17 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
 
     print("Creating pipeline")
 
-    logging_step = PipelineStepIndex(log_step) if log_step is not None else None
-
     pipeline = Pipeline(PipelineMode.Serve, api, 
+        src_path=user_uploads_bucket, 
+        dest_path=results_bucket,
         model_path=model_path, 
         semantic_model_path=semantic_model_path, 
         fov_model_path=fov_model_path, 
         hed_model_path=hed_model_path,
         planes_url=plane_url, 
-        src_path=user_uploads_bucket, 
-        dest_path=results_bucket,
         logging_dir=logging_dir, 
         logging_level=log_level, 
-        logging_step=logging_step
+        logging_step=log_step
         )
 
     pipeline.start()
