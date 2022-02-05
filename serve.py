@@ -88,6 +88,7 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
     # Pipeline for finding planes, generating lighting and predicting fov.
     async def planes_pipeline(input_dict: typing.Dict):
         total_start_time = time()
+        print("Processing queue item", input_dict)
         if 'image_s3_key' in input_dict:
             input_dict['unique_id'] = input_dict['image_s3_key']
             print("Warning 'image_s3_key' is no longer being used. Please update this to 'unique_id'")
