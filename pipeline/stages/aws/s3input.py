@@ -8,4 +8,4 @@ class PipelineS3Input(PipelineInput):
         print("Getting image from s3", self.pipeline.src_path, "ID", data["unique_id"])
         data["image"] = self.pipeline.s3_client.get_image_from_s3(self.pipeline.src_path, data["unique_id"])
         data["image"] = data["image"][:, :, :3] #drop alpha channel
-        print("Got image %s at shape" % data["unique_id"], data["image"].shape)
+        print("Got image %s with shape" % data["unique_id"], data["image"].shape)
