@@ -160,6 +160,7 @@ class Pipeline():
 
         #start RemoteNetworks if needed downstream
         if self.mode != PipelineMode.Restore or self.restore_step <= PipelineStepIndex.RemoteNetworks:
+            print("Listening on port ", self.cpu_networks_port, "runcpunetworks.py")
             subprocess.Popen(["python3", "runcpunetworks.py", self.model_path, str(self.cpu_networks_port)])
 
         # Start the processing workers for all steps

@@ -29,7 +29,10 @@ def feed_images_batched(model, images_batch: list) -> list:
             # Resize to target size. This needs to be
             # done before potentially expanding the
             # channels dimension as it removes it again.
-            img = cv2.resize(img, tuple(shape[1:3]))
+            size = tuple(shape[1:3])
+            size = int(size[0], int(size[1]))
+            print("Resizing image %s to match tensor input" % key, size)
+            img = cv2.resize(img, size)
 
             # Make sure we have the channels dimension
             # for 1-channel images.

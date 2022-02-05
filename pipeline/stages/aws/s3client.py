@@ -10,7 +10,8 @@ except:
 class S3Client:
     def __init__(self):
         super().__init__()
-        self.s3_client = boto3.client("s3")
+        self.session = boto3.session.Session()
+        self.s3_client = self.session.client('s3')
 
     def get_image_from_s3(self, bucket: str, key: str) -> np.ndarray:
         data = BytesIO()

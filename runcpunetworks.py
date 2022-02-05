@@ -28,10 +28,13 @@ def main(model_path, port):
 
             # Load images as numpy array from received file.
             # Dimensions: [B, H, W, C]
+            print("Loading data from request", json.dumps(data, indent=4).encode("utf-8"))
             images = pickle.loads(data)
 
             lighting = feed_image_batched(model_lighting, images)
             normals = feed_image_batched(model_normals, images)
+
+            print("Obtained lighting and normals", lighting.shape, normals.shape)
 
             return web.Response(body=pickle.dumps({
                 "lighting": lighting,
