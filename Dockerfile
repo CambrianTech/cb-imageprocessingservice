@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         cuda-curand-${CUDA/./-} \
         cuda-cusolver-${CUDA/./-} \
         cuda-cusparse-${CUDA/./-} \
-	cuda-nvrtc-${CUDA/./-} \
+        cuda-nvrtc-${CUDA/./-} \
         curl \
         libcudnn7=${CUDNN}+cuda${CUDA} \
         libfreetype6-dev \
@@ -32,7 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         unzip \
         libsm6 \
         libxext6 \
-        libxrender-dev
+        libxrender-dev \
+        python3-opencv
 
 RUN [ "${ARCH}" = ppc64le ] || (apt-get update && \
         apt-get install nvinfer-runtime-trt-repo-ubuntu1804-5.0.2-ga-cuda${CUDA} \
