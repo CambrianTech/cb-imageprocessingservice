@@ -59,6 +59,10 @@ def _get_instance_metadata():
 def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_uploads_bucket, results_bucket, plane_url, sqs_queue_name,
          api, logging_dir, log_level, log_step):
 
+    metadata = _get_instance_metadata()
+    
+    #print("Instance metadata:", metadata)
+
     print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
