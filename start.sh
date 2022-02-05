@@ -8,4 +8,4 @@ echo "Downloading S3 data"
 aws s3 cp s3://$FILES_BUCKET . --recursive
 
 echo "Starting python serve script"
-python3 serve.py ./tensorflow_models/ ./gluon_models/ ./sklearn_models/fov_classifier_lc128.joblib $USER_UPLOADS_BUCKET $RESULTS_BUCKET $PLANES_ADDRESS --sqs-queue-name $SQS_QUEUE_NAME
+python3 serve.py ./tensorflow_models/ ./gluon_models/ ./sklearn_models/fov_classifier_lc128.joblib ./hed_model/HED_pretrained_bsds.npz $USER_UPLOADS_BUCKET $RESULTS_BUCKET $PLANES_ADDRESS --sqs-queue-name $SQS_QUEUE_NAME
