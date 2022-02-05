@@ -121,15 +121,15 @@ class Pipeline():
         all_steps[PipelineStepIndex.ExtractSurfaces] = PipelineExtractSurfaces
         all_steps[PipelineStepIndex.FindLines] = PipelineLineFinder
         all_steps[PipelineStepIndex.SolveRoom] = PipelineRoomSolver
-        all_steps[PipelineStepIndex.VanishingPoints] = PipelineVanishingPointFinder if self.api_level > 3 else None
-        all_steps[PipelineStepIndex.Barriers] = PipelineBarrierFinder if self.api_level > 3 else None
-        all_steps[PipelineStepIndex.FindTrim] = PipelineTrimFinder if self.api_level > 3 else None
-        all_steps[PipelineStepIndex.FindLegs] = PipelineLegFinder if self.api_level > 3 else None
+        all_steps[PipelineStepIndex.VanishingPoints] = None
+        all_steps[PipelineStepIndex.Barriers] = None
+        all_steps[PipelineStepIndex.FindTrim] = None
+        all_steps[PipelineStepIndex.FindLegs] = None
         all_steps[PipelineStepIndex.Geometry] = PipelinePlaneGeometry
         all_steps[PipelineStepIndex.EstimatePose] = PipelinePoseEstimator
         all_steps[PipelineStepIndex.Refine] = PipelineSurfaceRefinement
-        all_steps[PipelineStepIndex.Superpixels] = PipelineSuperpixels if self.api_level < 3 else None
-        all_steps[PipelineStepIndex.CombinePlaneMasks] = PipelineCombinePlaneMasks if self.api_level > 3 else None
+        all_steps[PipelineStepIndex.Superpixels] = None
+        all_steps[PipelineStepIndex.CombinePlaneMasks] = None
         all_steps[PipelineStepIndex.Output] = output_step
         
 
@@ -137,6 +137,7 @@ class Pipeline():
         #all_steps[PipelineStepIndex.EstimatePose] = None
         #all_steps[PipelineStepIndex.Geometry] = None
         
+        print("Initializing steps %d through %d" % (self.start_step, self.stop_step))
 
         self.steps = []
         self.push(input_step(self))
@@ -145,7 +146,9 @@ class Pipeline():
 
             initializer = all_steps[index]
             if not initializer is None:
-                self.push(initializer(self))            
+                print("Initializing step", PipelineStepIndex(index))
+                self.push(initializer(self))
+                print(PipelineStepIndex(index), "Added")    
 
 
     def start(self):

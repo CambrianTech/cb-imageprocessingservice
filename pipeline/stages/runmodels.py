@@ -198,6 +198,8 @@ class PipelineRunModels(PipelineStep):
     def __init__(self, pipeline):
         super().__init__(pipeline)
 
+        print("Initialized PipelineRunModels")
+
         _ = tf.Session(config=get_session_config(use_gpu=True))
 
         self.mx_ctx = mx.gpu(0)

@@ -53,7 +53,7 @@ async def process_files(pipeline, files):
 @click.argument("fov_model_path", default='sklearn_models/fov_classifier_lc128.joblib', type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("hed_model_path", default='hed_model/HED_pretrained_bsds.npz', type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("planes_url", default='http://localhost:8081/', type=click.STRING)
-@click.option('--api', type=int, default=3, help='api level: 1-4')
+@click.option('--api', type=int, default=4, help='api level: 1-4')
 @click.option('--restore', type=int, help='Pipeline step to restore from. Data pickle files expected inside input_dir')
 @click.option('--export', type=int, help='Pipeline step to export')
 @click.option('--stop', type=int, default=None, help='Stop after step')
