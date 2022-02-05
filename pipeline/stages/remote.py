@@ -44,6 +44,7 @@ class PipelineRemotePlaneDetector(PipelineStep):
 
     def run(self, data):
         t = time()
+        print("Running remote planes", self.pipeline.planes_url)
         plane_rcnn_outputs = _remote_plane_detect(self.pipeline.planes_url, data)
         print("Remote planes took %.2f seconds" % (time() - t))
 
