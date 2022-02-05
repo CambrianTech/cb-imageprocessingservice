@@ -15,6 +15,7 @@ SHELL ["/bin/bash", "-c"]
 # Pick up some TF dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
+        python3-opencv \
         cuda-command-line-tools-${CUDA/./-} \
         cuda-cublas-${CUDA/./-} \
         cuda-cufft-${CUDA/./-} \
@@ -32,8 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         unzip \
         libsm6 \
         libxext6 \
-        libxrender-dev \
-        python3-opencv
+        libxrender-dev
 
 RUN [ "${ARCH}" = ppc64le ] || (apt-get update && \
         apt-get install nvinfer-runtime-trt-repo-ubuntu1804-5.0.2-ga-cuda${CUDA} \
