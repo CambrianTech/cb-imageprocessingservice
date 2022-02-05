@@ -15,7 +15,6 @@ SHELL ["/bin/bash", "-c"]
 # Pick up some TF dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
-        python3-opencv \
         cuda-command-line-tools-${CUDA/./-} \
         cuda-cublas-${CUDA/./-} \
         cuda-cufft-${CUDA/./-} \
@@ -90,7 +89,7 @@ RUN pip3 install --pre --upgrade gluoncv
 RUN pip3 install --upgrade mxnet-cu100mkl -f https://dist.mxnet.io/python/all
 
 # libglib needed for OpenCV
-RUN apt-get update && apt-get install --no-install-recommends -y libglib2.0-0 && apt-get clean
+RUN apt-get update && apt-get install --no-install-recommends -y libgl1 libglib2.0-0 && apt-get clean
 
 COPY ./requirements.txt .
 RUN pip3 install -r requirements.txt --no-cache-dir
