@@ -7,12 +7,14 @@ import datetime
 import dateutil
 from time import time
 import typing
+import functools
 
 import click
 from aiohttp import web
 import aiohttp_cors
 import boto3
 import requests
+from gpuinfo import GPUInfo
 
 from pipeline.pipeline import Pipeline, PipelineMode
 
@@ -49,13 +51,14 @@ def _get_instance_metadata():
 @click.argument("user_uploads_bucket", type=click.STRING)
 @click.argument("results_bucket", type=click.STRING)
 @click.argument("plane_url", type=click.STRING)
+@click.option("--sqs-queue-name", type=click.STRING, default=None)
 @click.option('--api', type=int, default=3, help='api level: 1-4')
 @click.option("--image-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--results-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--logging_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
 @click.option('--log_level', type=int, default=0, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
-def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_uploads_bucket, results_bucket, plane_url, 
+def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_uploads_bucket, results_bucket, plane_url, sqs_queue_name,
          api, image_local_dir, results_local_dir, logging_dir, log_level, log_step):
 
     print("Setting default executor")
@@ -85,6 +88,18 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
         )
 
     pipeline.start()
+
+    total_pipeline_times = []
+
+    # Pipeline for finding planes, generating lighting and predicting fov.
+    async def planes_pipeline(input_dict: typing.Dict):
+        total_start_time = time()
+        for step in steps:
+            input_dict = await schedule_and_wait(step.schedule, input_dict)
+        total_pipeline_time = time() - total_start_time
+        print("Planes total pipeline time: %.2fs" % total_pipeline_time)
+        total_pipeline_times.append((total_pipeline_time, datetime.datetime.now(dateutil.tz.tzlocal())))
+        return input_dict
 
     # Setup http server
     def get_pipeline_handler(pipeline_fn):
@@ -127,15 +142,51 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
             return web.json_response(response_dict)
         return handle
 
+    print("SQS Queue name:", sqs_queue_name)
+    if sqs_queue_name is not None:
+        if metadata is None:
+            raise Exception("sqs_queue name was set but metadata was none")
+        
+        async def sqs_loop():
+            loop = asyncio.get_event_loop()
+
+            print("Getting SQS queue with name", sqs_queue_name)
+            sqs = boto3.resource("sqs", region_name=metadata["region"])
+            sqs_queue = sqs.get_queue_by_name(QueueName=sqs_queue_name)
+
+            def get_new_messages():
+                return sqs_queue.receive_messages(MaxNumberOfMessages=1, WaitTimeSeconds=10)
+
+            print("Starting to ingest SQS messages")
+            while True:
+                try:
+                    msgs = await loop.run_in_executor(None, get_new_messages)
+                except Exception as e:
+                    print("Failed to receive messages from SQS queue:", e)
+                    continue
+                for msg in msgs:
+                    print("Received SQS message:", msg)
+                    await loop.run_in_executor(None, msg.delete)
+                    try:
+                        print("Loading SQS message")
+                        msg_data = json.loads(msg.body)
+                        print("Running message in pipeline", msg_data)
+                        result_data = await planes_pipeline(msg_data)
+                        print("Got pipeline results", result_data)
+                    except Exception as e:
+                        print("Error processing SQS message:", e)
+        print("Starting SQS loop")
+        asyncio.ensure_future(sqs_loop())
+
     async def handle_healthcheck(request):
         return web.Response(text="Healthy")
 
     async def handle_local_upload(request):
-        print("Handle local file upload", request)
+        print("Handle local file upload.", request)
 
         unique_id = request.match_info.get("id", None)
         if unique_id is None:
-            raise web.HTTPBadRequest("id parameter not supplied")
+            raise web.HTTPBadRequest()
 
         output_dir = join(image_local_dir, user_uploads_bucket)
         os.makedirs(output_dir, exist_ok=True)
@@ -156,9 +207,87 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
         unique_id = request.match_info.get("id", None)
         bucket = request.match_info.get("bucket", None)
         if unique_id is None or bucket is None:
-            raise web.HTTPBadRequest("id parameter not supplied")
+            raise web.HTTPBadRequest()
 
         return web.FileResponse(os.path.join(results_local_dir, bucket, unique_id))
+
+    async def push_metrics_loop():
+        loop = asyncio.get_event_loop()
+
+        if metadata is not None:
+            cw = boto3.client("cloudwatch", region_name=metadata["region"])
+
+        def push_metrics():
+            metric_time = datetime.datetime.now(dateutil.tz.tzlocal())
+
+            metric_data = []
+
+            for total_pipeline_time, total_pipeline_time_timestamp in total_pipeline_times:
+                metric_data.append({
+                    "MetricName": "PipelineTotalTime",
+                    "Dimensions": [{
+                        "Name": "ClusterName",
+                        "Value": metadata["cluster"]
+                    }],
+                    "Timestamp": total_pipeline_time_timestamp,
+                    "Value": total_pipeline_time
+                })
+            total_pipeline_times.clear()
+
+            gpu_usages, gpu_memories = GPUInfo.gpu_usage()
+            print("GPU Usages:", gpu_usages, "memories:", gpu_memories)
+            if len(gpu_usages) > 0:
+                for gpu_index, (gpu_usage, gpu_memory) in enumerate(zip(gpu_usages, gpu_memories)):
+                    metric_data.append({
+                        "MetricName": "GPUUsage%d" % gpu_index,
+                        "Dimensions": [{
+                            "Name": "ClusterName",
+                            "Value": metadata["cluster"]
+                        }],
+                        "Timestamp": metric_time,
+                        "Value": gpu_usage
+                    })
+
+                    metric_data.append({
+                        "MetricName": "GPUMemory%d" % gpu_index,
+                        "Dimensions": [{
+                            "Name": "ClusterName",
+                            "Value": metadata["cluster"]
+                        }],
+                        "Timestamp": metric_time,
+                        "Value": gpu_memory
+                    })
+            else:
+                metric_data.append({
+                    "MetricName": "GPUUsage0",
+                    "Dimensions": [{
+                        "Name": "ClusterName",
+                        "Value": metadata["cluster"]
+                    }],
+                    "Timestamp": metric_time,
+                    "Value": 0
+                })
+
+                metric_data.append({
+                    "MetricName": "GPUMemory0",
+                    "Dimensions": [{
+                        "Name": "ClusterName",
+                        "Value": metadata["cluster"]
+                    }],
+                    "Timestamp": metric_time,
+                    "Value": 0
+                })
+
+            cw.put_metric_data(
+                Namespace="ImageProcessingService",
+                MetricData=metric_data
+            )
+
+        # Publish metrics to CloudWatch every minute
+        while True:
+            await asyncio.sleep(60)
+            if metadata is not None:
+                await loop.run_in_executor(None, push_metrics)
 
     print("Trying to get instance metadata")
 
@@ -172,40 +301,6 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
 
     if metadata is not None:
         print("Instance metadata:", metadata)
-
-    async def push_metrics_loop():
-        loop = asyncio.get_event_loop()
-
-        if metadata is not None:
-            cw = boto3.client("cloudwatch", region_name=metadata["region"])
-
-        def push_metrics(avg_waiting_items):
-            cw.put_metric_data(Namespace="ImageProcessingService",
-                               MetricData=[{
-                                   "MetricName": "PipelineWaitingItems",
-                                   "Dimensions": [{
-                                       "Name": "ClusterName",
-                                       "Value": metadata["cluster"]
-                                   }],
-                                   "Timestamp": datetime.datetime.now(
-                                       dateutil.tz.tzlocal()),
-                                   "Value": avg_waiting_items
-                               }])
-
-        avg_waiting_items = 0
-
-        # Publish metrics to CloudWatch every minute
-        while True:
-            for _ in range(60):
-                await asyncio.sleep(1)
-                avg_waiting_items = 0.9 * avg_waiting_items + \
-                    0.1 * num_waiting_items(pipeline.steps)
-
-            print("Waiting items: %.2f (avg: %.2f)" %
-                  (num_waiting_items(pipeline.steps), avg_waiting_items))
-
-            if metadata is not None:
-                await loop.run_in_executor(None, push_metrics, avg_waiting_items)
 
     print("Starting metrics loop")
     asyncio.ensure_future(push_metrics_loop())
