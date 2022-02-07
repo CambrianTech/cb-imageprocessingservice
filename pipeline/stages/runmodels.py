@@ -195,12 +195,12 @@ class Model(ModelDesc):
 
 
 class PipelineRunModels(PipelineStep):
-    def __init__(self, pipeline):
-        super().__init__(pipeline)
+    def __init__(self, pipeline, config):
+        super().__init__(pipeline, config)
 
         print("Initialized PipelineRunModels")
 
-        _ = tf.Session(config=get_session_config(use_gpu=True))
+        _ = tf.Session(config=get_session_config(use_gpu=config.use_gpu))
 
         self.mx_ctx = mx.gpu(0)
         self.model_semantic = get_model(
@@ -214,7 +214,7 @@ class PipelineRunModels(PipelineStep):
             input_names=['image'],
             output_names=['output%d' % k for k in range(1, 7)],
             session_creator=NewSessionCreator(
-                config=get_session_config(use_gpu=True))
+                config=get_session_config(use_gpu=config.use_gpu))
         ))
 
     @property

@@ -13,8 +13,8 @@ from pipeline.core import PipelineStep, PipelineStepIndex
 surface_types = ["unknown", "floor", "wall", "horizontal", "vertical"]
 
 class PipelineOutput(PipelineStep):
-    def __init__(self, pipeline, outfile_name="data.json", preview_size=1024, thumbnail_size=320):
-        super().__init__(pipeline)
+    def __init__(self, pipeline, config, outfile_name="data.json", preview_size=1024, thumbnail_size=320):
+        super().__init__(pipeline, config)
         self.outfile_name = outfile_name
         self.preview_size = preview_size
         self.thumbnail_size = thumbnail_size

@@ -4,7 +4,7 @@ import subprocess
 from enum import IntEnum
 from termcolor import colored
 
-from .core import schedule_and_wait, PipelineStep, PipelineStepIndex
+from .core import schedule_and_wait, PipelineStep, PipelineStepIndex, PipelineStepConfig
 from .data.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, LogLevel, set_logging_level
 
 from .stages.aws.s3client import S3Client
@@ -103,6 +103,8 @@ class Pipeline():
 
     def assemble(self):
 
+        config = PipelineStepConfig()
+
         #Important: some devices may not be able to instantiate a class, so a list is first built
         if self.mode == PipelineMode.Serve:
             self.s3_client = S3Client()
@@ -141,14 +143,14 @@ class Pipeline():
         print("Initializing steps %d through %d" % (self.start_step, self.stop_step))
 
         self.steps = []
-        self.push(input_step(self))
+        self.push(input_step(self, config))
 
         for index in range(self.start_step, self.stop_step + 1):
 
             initializer = all_steps[index]
             if not initializer is None:
                 print("Initializing step", PipelineStepIndex(index))
-                self.push(initializer(self))
+                self.push(initializer(self, config))
                 print(PipelineStepIndex(index), "Added")    
 
 
@@ -172,7 +174,10 @@ class Pipeline():
         print("Stopping threads")
         self._running = False
         if self.child_process is not None:
-            os.killpg(os.getpgid(self.child_process.pid), 15)
+            try:
+                os.killpg(os.getpgid(self.child_process.pid), 15)
+            except ProcessLookupError:
+                print(colored("Warning: Python subprocess runcpunetworks.py already exited. It probably crashed!", 'yellow', attrs=['bold']))
 
         for step in self.steps:
             step.stop()

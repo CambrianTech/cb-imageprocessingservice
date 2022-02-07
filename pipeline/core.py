@@ -5,6 +5,7 @@ import typing
 from multiprocessing import cpu_count
 from enum import IntEnum
 from termcolor import colored
+from types import SimpleNamespace
 
 class PipelineStepIndex(IntEnum):
     Input = 0
@@ -27,12 +28,19 @@ class PipelineStepIndex(IntEnum):
     CombinePlaneMasks = 17
     Output = 18
 
+class PipelineStepConfig(SimpleNamespace):
+    use_gpu=True
+    batch_max_wait_time=1.0
+    batch_debounce_time=0.2
+    batch_max_size=1
+
 class PipelineStep(metaclass=ABCMeta):
-    def __init__(self, pipeline, batch_max_wait_time=1.0, batch_debounce_time=0.2, batch_max_size=1):
+    def __init__(self, pipeline, config:PipelineStepConfig):
         self.pipeline = pipeline
-        self.batch_max_wait_time = batch_max_wait_time
-        self.batch_debounce_time = batch_debounce_time
-        self.batch_max_size = batch_max_size
+        self.config = config
+        self.batch_max_wait_time = config.batch_max_wait_time
+        self.batch_debounce_time = config.batch_debounce_time
+        self.batch_max_size = config.batch_max_size
         self._running = False
         self._input_queue = asyncio.Queue()
 
