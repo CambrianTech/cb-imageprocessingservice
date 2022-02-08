@@ -11,7 +11,9 @@ from termcolor import colored
 
 class PipelineReverseRenderer(PipelineStep):
 
-    child_process=None
+    def __init__(self, pipeline):
+        super().__init__(pipeline)
+        self.child_process = None
 
     @property
     def index(self) -> PipelineStepIndex:
@@ -31,8 +33,8 @@ class PipelineReverseRenderer(PipelineStep):
 
     def _remote_networks(self, data):
         if self.child_process is None:
-            print("Listening on port ", self.config.cpu_networks_port, "runcpunetworks.py")
-            self.child_process = subprocess.Popen(["python3", "runcpunetworks.py", self.config.model_path, str(self.config.cpu_networks_port)])
+            print("Listening on port ", self.config.cpu_networks_port, self.config.cpu_networks_script)
+            self.child_process = subprocess.Popen(["python3", self.config.cpu_networks_script, self.config.model_path, str(self.config.cpu_networks_port)])
             time.sleep(15) #do something better like poll for it to start
 
         try:
@@ -51,6 +53,9 @@ class PipelineReverseRenderer(PipelineStep):
 
     def run(self, data: dict) -> None:
         response_dict = self._remote_networks(data)
+
+        if response_dict is None:
+            return
 
         for datum, lighting, normals in zip(data, response_dict["lighting"], response_dict["normals"]):
             datum["lighting"] = lighting

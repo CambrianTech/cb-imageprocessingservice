@@ -43,7 +43,7 @@ class PipelineConfig(SimpleNamespace):
 
     src_path=None
     dest_path=None
-    cpu_networks_port=8082
+
     model_path="tensorflow_models"
     semantic_model_path="gluon_models"
     fov_model_path = "sklearn_models/fov_classifier_lc128.joblib"
@@ -58,6 +58,9 @@ class PipelineConfig(SimpleNamespace):
     logging_level=None
     logging_step:PipelineStepIndex = None
 
+    cpu_networks_port=8082
+    cpu_networks_script="runcpunetworks.py"
+    
     @property
     def cpu_networks_path(self) -> str:
         return "http://localhost:%d" % self.cpu_networks_port
