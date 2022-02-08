@@ -3,7 +3,8 @@ import cv2
 import tensorflow as tf
 
 tf.get_logger().setLevel('ERROR')
-tf_config = tf.ConfigProto if tf.__version__ < "2.0" else tf.compat.v1.ConfigProto
+tf_legacy = tf.__version__ < "2.0"
+tf_config = tf.ConfigProto if tf_legacy else tf.compat.v1.ConfigProto
 
 def get_session_config(use_gpu=True, dynamic_gpu_memory=True):
     # Allow GPU memory growth so tensorflow doesn't allocate all memory
@@ -144,11 +145,9 @@ def load_model(model_path: str, session_config=None):
     try:
         model = tf.contrib.predictor.from_saved_model(model_path, config=session_config)
     except:
+        #https://www.tensorflow.org/guide/saved_model
         model = tf.saved_model.load(model_path)
 
-    #input_keys = ", ".join(model.feed_tensors.keys())
-    #output_keys = ", ".join(model.fetch_tensors.keys())
-    #print("Loaded model with inputs", input_keys, "and outputs", output_keys)
     print("Load complete for model at path", model_path)
 
     return model
