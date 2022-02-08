@@ -39,9 +39,8 @@ def main(model_path, port):
                 "normals": normals
             }))
         except Exception as e:
-           print("Error:", e)
-
-        return web.HTTPInternalServerError()
+            print("Error:", e)
+            return web.HTTPInternalServerError()
 
     app = web.Application(client_max_size=max_size)
     app.add_routes(routes)
