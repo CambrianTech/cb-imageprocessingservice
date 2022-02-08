@@ -1,7 +1,7 @@
 import requests
 import numpy as np
 import pickle
-from time import time
+import time
 import cv2
 import subprocess
 
@@ -11,9 +11,7 @@ from termcolor import colored
 
 class PipelineReverseRenderer(PipelineStep):
 
-    def __init__(self, pipeline):
-        super().__init__(pipeline)
-        self.child_process = _start_process(self.config)
+    child_process=None
 
     @property
     def index(self) -> PipelineStepIndex:
@@ -32,20 +30,27 @@ class PipelineReverseRenderer(PipelineStep):
         return True
 
     def _remote_networks(self, data):
-        print("Posting data to %s" % config.cpu_networks_path)
-        images = [datum["image"] for datum in data]
-        response_bytes = requests.post(config.cpu_networks_path, data=pickle.dumps(images)).content
-        return pickle.loads(response_bytes)
+        if self.child_process is None:
+            print("Listening on port ", self.config.cpu_networks_port, "runcpunetworks.py")
+            self.child_process = subprocess.Popen(["python3", "runcpunetworks.py", self.config.model_path, str(self.config.cpu_networks_port)])
+            time.sleep(15) #do something better like poll for it to start
 
-    def _start_process(self):
-        #start RemoteNetworks if needed downstream
-        print("Listening on port ", config.cpu_networks_port, "runcpunetworks.py")
-        return subprocess.Popen(["python3", "runcpunetworks.py", config.model_path, str(config.cpu_networks_port)])
+        try:
+            print("Posting data to %s" % self.config.cpu_networks_path)
+            images = [datum["image"] for datum in data]
+            resp = requests.post(self.config.cpu_networks_path, data=pickle.dumps(images))
+            resp.raise_for_status()
+
+            if resp.ok:
+                return pickle.loads(resp.content)
+
+        except requests.exceptions.HTTPError as e:
+            error_message = e.response.text
+            print(colored(error_message, 'red', attrs=['bold']))
+        
 
     def run(self, data: dict) -> None:
-        t = time()
-        response_dict = _remote_networks(self.config, data)
-        print("Remote networks took %.2f seconds" % (time() - t))
+        response_dict = self._remote_networks(data)
 
         for datum, lighting, normals in zip(data, response_dict["lighting"], response_dict["normals"]):
             datum["lighting"] = lighting

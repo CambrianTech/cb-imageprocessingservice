@@ -30,16 +30,19 @@ def get_file_paths(input_dir, pattern=None):
 
 async def process_files(pipeline, files):
 
-    index = 1
-    
-    for path in files:
-        url = Path(path)
-        unique_id = url.parents[0].name if len(url.parents) > 0 else url.name
-        data = {"path": path, "unique_id": unique_id if path.suffix == ".pickle" else url.stem}
+    try:
+        index = 1
 
-        print("\nProcessing file %d of %d\n" % (index, len(files)))
-        await pipeline.process(data)
-        index += 1
+        for path in files:
+            url = Path(path)
+            unique_id = url.parents[0].name if len(url.parents) > 0 else url.name
+            data = {"path": path, "unique_id": unique_id if path.suffix == ".pickle" else url.stem}
+
+            print("\nProcessing file %d of %d\n" % (index, len(files)))
+            await pipeline.process(data)
+            index += 1
+    finally:
+        pipeline.stop()
 
 
 #For instance, to restore from step 6 (before refinement):

@@ -152,40 +152,35 @@ class Pipeline():
 
     async def process(self, data):
 
-        try:
+        if (len(self.steps) == 0): return
 
-            if (len(self.steps) == 0): return
+        if self.config.logging_dir is not None and not os.path.exists(self.config.logging_dir):
+            os.makedirs(self.config.logging_dir)
 
-            if self.config.logging_dir is not None and not os.path.exists(self.config.logging_dir):
-                os.makedirs(self.config.logging_dir)
+        start_time = time.time()
 
-            start_time = time.time()
+        print(colored("Running stages %s through %s" % (self.steps[1].description, self.steps[len(self.steps)-1].description), attrs=['bold']))
 
-            print(colored("Running stages %s through %s" % (self.steps[1].description, self.steps[len(self.steps)-1].description), attrs=['bold']))
+        for step in self.steps:
 
-            for step in self.steps:
+            if not self.running: break
 
-                if not self.running: break
+            #consider perhaps passing logging down into steps, trigger off that
+            logging_dir = None if self.config.logging_dir is None else os.path.join(self.config.logging_dir, get_unique_id(data))
 
-                #consider perhaps passing logging down into steps, trigger off that
-                logging_dir = None if self.config.logging_dir is None else os.path.join(self.config.logging_dir, get_unique_id(data))
+            set_logging_dir(data, logging_dir)
+            set_logging_level(data, self.config.logging_level)
+            
+            set_logging_step(data, self.config.logging_step, step.index)
+            print(step.description)
 
-                set_logging_dir(data, logging_dir)
-                set_logging_level(data, self.config.logging_level)
-                
-                set_logging_step(data, self.config.logging_step, step.index)
-                print(step.description)
+            step_start = time.time()
+            data = await schedule_and_wait(step.schedule, data)
+            print("%s took %.2f seconds" % (step.description, time.time() - step_start))
 
-                step_start = time.time()
-                data = await schedule_and_wait(step.schedule, data)
-                print("%s took %.2f seconds" % (step.description, time.time() - step_start))
+            if step.index == self.config.export_step and logging_dir is not None:
+                log_data(data)
 
-                if step.index == self.config.export_step and logging_dir is not None:
-                    log_data(data)
+        print(colored("All stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
 
-            print(colored("All stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
-
-            return data
-
-        except:
-            self.stop()
+        return data

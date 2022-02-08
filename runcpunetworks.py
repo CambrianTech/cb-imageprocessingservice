@@ -4,9 +4,7 @@ import pickle
 from aiohttp import web
 import numpy as np
 import click
-
 from modelutils import feed_image_batched, load_model, get_session_config
-
 
 @click.command()
 @click.argument("model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
@@ -28,7 +26,7 @@ def main(model_path, port):
 
             # Load images as numpy array from received file.
             # Dimensions: [B, H, W, C]
-            print("Loading data from request", json.dumps(data, indent=4).encode("utf-8"))
+            print("Loading data from request")
             images = pickle.loads(data)
 
             lighting = feed_image_batched(model_lighting, images)
