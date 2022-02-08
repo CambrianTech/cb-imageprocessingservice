@@ -20,6 +20,15 @@ def main(model_path, port, message):
 
     routes = web.RouteTableDef()
 
+    @routes.post("/healthcheck")
+    async def healthcheck(request):
+        print("Received healthcheck request:", request)
+        try:
+            return web.Response(body=message)
+        except Exception as e:
+            print("Error:", e)
+            return web.HTTPInternalServerError()
+
     @routes.post("/")
     async def index(request):
         print("Received request:", request)
