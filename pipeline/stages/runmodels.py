@@ -19,9 +19,15 @@ import mxnet as mx
 from .combineplanemasks import combine_plane_masks, combine_plane_clusters
 from pipeline.core import PipelineStep, PipelineStepIndex
 
+import mxnet as mx
+def gpu_device(gpu_number=0):
+    try:
+        _ = mx.nd.array([1, 2, 3], ctx=mx.gpu(gpu_number))
+    except mx.MXNetError:
+        return None
+    return mx.gpu(gpu_number)
+
 # HED from Tensorpack examples: https://github.com/tensorpack/tensorpack/tree/master/examples/HED
-
-
 def class_balanced_sigmoid_cross_entropy(logits, label, name='cross_entropy_loss'):
     """
     The class-balanced cross entropy loss,
@@ -199,10 +205,14 @@ class PipelineRunModels(PipelineStep):
         super().__init__(pipeline, config)
 
         print("Initialized PipelineRunModels")
+        self.gpu_id = gpu_device()
+        if config.use_gpu and self.gpu_id is None:
+            print("NO GPU FOUND!")
+            return
 
         _ = tf.Session(config=get_session_config(use_gpu=config.use_gpu))
 
-        self.mx_ctx = mx.gpu(0)
+        self.mx_ctx = mx.gpu(self.gpu_id) if self.gpu_id is None else mx.cpu()
         self.model_semantic = get_model(
             "deeplab_resnest269_ade", pretrained=True,
             root=self.pipeline.semantic_model_path, ctx=self.mx_ctx
@@ -219,7 +229,7 @@ class PipelineRunModels(PipelineStep):
 
     @property
     def index(self) -> PipelineStepIndex:
-        return PipelineStepIndex.RemoteNetworks
+        return PipelineStepIndex.RunModels
 
     @property
     def required_keys(self) -> list:
@@ -234,6 +244,11 @@ class PipelineRunModels(PipelineStep):
         return True
 
     def run(self, data):
+
+        if self.gpu_id is None:
+            print("No GPU, skipping", self.description)
+            return
+
         images = [datum["image"] for datum in data]
 
         t = time()
@@ -293,6 +308,8 @@ class PipelineRunModels(PipelineStep):
         for i in range(len(images)):
             image = images[i]
             datum = data[i]
+
+            if "hed" in datum: continue
 
             outputs = self.model_hed([image])
             hed = outputs[5][0]

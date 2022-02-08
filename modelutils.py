@@ -2,15 +2,17 @@ import numpy as np
 import cv2
 import tensorflow as tf
 
+tf.get_logger().setLevel('ERROR')
+tf_config = tf.ConfigProto if tf.__version__ < "2.0" else tf.compat.v1.ConfigProto
 
-def get_session_config(use_gpu=True, dynamic_gpu_memory=True) -> tf.ConfigProto:
+def get_session_config(use_gpu=True, dynamic_gpu_memory=True):
     # Allow GPU memory growth so tensorflow doesn't allocate all memory
     if use_gpu:
-        config = tf.ConfigProto()
+        config = tf_config()
         config.gpu_options.per_process_gpu_memory_fraction = 0.3
         config.gpu_options.allow_growth = dynamic_gpu_memory
     else:
-        config = tf.ConfigProto(device_count={ "GPU": 0 })
+        config = tf_config(device_count={ "GPU": 0 })
     return config
 
 
@@ -138,7 +140,13 @@ def feed_image(model, image: np.ndarray) -> np.ndarray:
 
 def load_model(model_path: str, session_config=None):
     print("Loading model from", model_path)
-    model = tf.contrib.predictor.from_saved_model(model_path, config=session_config)
+
+    try:
+        model = tf.contrib.predictor.from_saved_model(model_path, config=session_config)
+    except:
+        converter = tf.lite.TFLiteConverter.from_saved_model(model_path)
+        model = converter.convert()
+
     input_keys = ", ".join(model.feed_tensors.keys())
     output_keys = ", ".join(model.fetch_tensors.keys())
     print("Loaded model with inputs", input_keys, "and outputs", output_keys)
