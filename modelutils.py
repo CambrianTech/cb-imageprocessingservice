@@ -144,12 +144,13 @@ def load_model(model_path: str, session_config=None):
     try:
         model = tf.contrib.predictor.from_saved_model(model_path, config=session_config)
     except:
-        converter = tf.lite.TFLiteConverter.from_saved_model(model_path)
-        model = converter.convert()
+        model = tf.saved_model.load(model_path)
 
-    input_keys = ", ".join(model.feed_tensors.keys())
-    output_keys = ", ".join(model.fetch_tensors.keys())
-    print("Loaded model with inputs", input_keys, "and outputs", output_keys)
+    #input_keys = ", ".join(model.feed_tensors.keys())
+    #output_keys = ", ".join(model.fetch_tensors.keys())
+    #print("Loaded model with inputs", input_keys, "and outputs", output_keys)
+    print("Load complete for model at path", model_path)
+
     return model
 
 

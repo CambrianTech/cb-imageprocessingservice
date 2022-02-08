@@ -162,9 +162,9 @@ class Pipeline():
             print("Logging is enabled for step", self.logging_step.name)
 
         #start RemoteNetworks if needed downstream
-        #if self.mode != PipelineMode.Restore or self.restore_step <= PipelineStepIndex.RemoteNetworks:
-        print("Listening on port ", self.cpu_networks_port, "runcpunetworks.py")
-        self.child_process = subprocess.Popen(["python3", "runcpunetworks.py", self.model_path, str(self.cpu_networks_port)])
+        if self.mode != PipelineMode.Restore or self.restore_step <= PipelineStepIndex.RemoteNetworks:
+            print("Listening on port ", self.cpu_networks_port, "runcpunetworks.py")
+            self.child_process = subprocess.Popen(["python3", "runcpunetworks.py", self.model_path, str(self.cpu_networks_port)])
 
         # Start the processing workers for all steps
         for step in self.steps:
