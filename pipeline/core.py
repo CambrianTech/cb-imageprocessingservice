@@ -177,8 +177,6 @@ class PipelineStep(metaclass=ABCMeta):
                 if not result_future.cancelled():
                     result_future.set_result(datum)
 
-        print(colored("Task is finished", attrs=['bold']))
-
 
 def schedule_and_wait(func: typing.Callable[[typing.Dict, asyncio.Future], None], input_dict: typing.Dict) -> asyncio.Future:
     """Calls a function and returns a future that the function is supposed to fullfil."""
