@@ -3,7 +3,10 @@ import numpy as np
 import pickle
 import time
 import cv2
+
+import os
 import subprocess
+import select
 
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.misc.utils import camera_fov_res_to_intrinsics
@@ -31,11 +34,31 @@ class PipelineReverseRenderer(PipelineStep):
     def is_batched(self) -> bool:
         return True
 
-    def _remote_networks(self, data):
+    def _remote_networks(self, data, timeout=15, debounce=0.5, success_message = "$SUCCESS"):
         if self.child_process is None:
-            print("Listening on port ", self.config.cpu_networks_port, self.config.cpu_networks_script)
-            self.child_process = subprocess.Popen(["python3", self.config.cpu_networks_script, self.config.model_path, str(self.config.cpu_networks_port)])
-            time.sleep(15) #do something better like poll for it to start
+            start = time.time()
+
+            service_name = "%s:%d" % (self.config.cpu_networks_script, self.config.cpu_networks_port)
+            print(colored("Connecting to %s" % service_name, 'green'))
+
+            self.child_process = subprocess.Popen(["python3", self.config.cpu_networks_script, self.config.model_path, str(self.config.cpu_networks_port), success_message], \
+                stderr=subprocess.PIPE, universal_newlines=True)
+            
+            stream = self.child_process.stderr
+
+            y = select.poll()
+            y.register(stream, select.POLLIN)
+
+            while time.time() - start < timeout:
+                if y.poll(1):
+                    line = stream.readline()
+                    if len(line):
+                        line = line.strip()
+                        if line == success_message:
+                            print(colored("Connection to %s successful. Received message: %s" % (service_name, line), 'green'))
+                            break
+                else:
+                    time.sleep(debounce)
 
         try:
             print("Posting data to %s" % self.config.cpu_networks_path)

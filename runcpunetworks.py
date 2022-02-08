@@ -1,5 +1,6 @@
 import os
 import pickle
+import sys
 
 from aiohttp import web
 import numpy as np
@@ -9,7 +10,8 @@ from modelutils import feed_image_batched, load_model, get_session_config
 @click.command()
 @click.argument("model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("port", type=click.IntRange(0, 65535))
-def main(model_path, port):
+@click.argument("message", default="SUCCESS", type=click.STRING)
+def main(model_path, port, message):
     max_size = 100 * 1024 * 1024  # Max size to receive
 
     print("Loading models from", model_path)
@@ -45,9 +47,10 @@ def main(model_path, port):
     app = web.Application(client_max_size=max_size)
     app.add_routes(routes)
 
+    print(message, file=sys.stderr) #SIGNAL SUCCESS
+
     print("Starting web app on port", port)
     web.run_app(app, port=port)
-
 
 if __name__ == "__main__":
     main()
