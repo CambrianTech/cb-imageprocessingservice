@@ -73,6 +73,8 @@ class PipelineReverseRenderer(PipelineStep):
                     if line == success_message:
                         print(colored("Connection to %s successful. Received message: %s" % (service_name, line), 'green'))
                         break
+                    else:
+                        print("subprocess", line)
             else:
                 time.sleep(debounce)
 

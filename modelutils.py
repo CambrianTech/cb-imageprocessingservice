@@ -144,11 +144,11 @@ def load_model(model_path: str, session_config=None):
 
     try:
         model = tf.contrib.predictor.from_saved_model(model_path, config=session_config)
+        print("Load complete for model at path", model_path)
     except:
         #https://www.tensorflow.org/guide/saved_model
         model = tf.saved_model.load(model_path)
-
-    print("Load complete for model at path", model_path)
+        print("Load complete for model at path", model_path, list(model.signatures.keys()))
 
     return model
 
