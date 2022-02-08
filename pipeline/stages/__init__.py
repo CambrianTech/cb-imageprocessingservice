@@ -1,3 +1,3 @@
-from . import fov, planegeometry, superpixels, input, poseestimator, surfacerefinement, \
-	barrierfinder, legfinder, primaryangle, trimfinder, combineplanemasks, lighting, refineplanemasks, vanishingpointfinder, \
-	extractsurfaces, linefinder, remote, fileinput,	noop, roomsolver, fileoutput, output, runmodels
+from . import barrierfinder, combineplanemasks, extractsurfaces, fileinput, fileoutput, fov, \
+    input, legfinder, lighting, linefinder, noop, output, planedetector, planegeometry, poseestimator, primaryangle, \
+    refineplanemasks, reverserenderer, roomsolver, runmodels, superpixels, surfacerefinement, trimfinder, vanishingpointfinder

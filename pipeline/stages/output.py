@@ -13,12 +13,12 @@ from pipeline.core import PipelineStep, PipelineStepIndex
 surface_types = ["unknown", "floor", "wall", "horizontal", "vertical"]
 
 class PipelineOutput(PipelineStep):
-    def __init__(self, pipeline, config, outfile_name="data.json", preview_size=1024, thumbnail_size=320):
-        super().__init__(pipeline, config)
+    def __init__(self, pipeline, outfile_name="data.json", preview_size=1024, thumbnail_size=320):
+        super().__init__(pipeline)
         self.outfile_name = outfile_name
         self.preview_size = preview_size
         self.thumbnail_size = thumbnail_size
-        self.y_up = self.pipeline.api_level > 3
+        self.y_up = self.config.api_level > 3
 
     @property
     def index(self) -> PipelineStepIndex:
@@ -26,11 +26,11 @@ class PipelineOutput(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        if self.pipeline.api_level == 1:
+        if self.config.api_level == 1:
             return ["mask", "lighting", "superpixels"]
-        elif self.pipeline.api_level == 2:
+        elif self.config.api_level == 2:
             return ["lighting", "superpixels"]
-        elif self.pipeline.api_level == 3:
+        elif self.config.api_level == 3:
             return ["planes", "lighting"]
 
         return ["planes", "lighting", "planes_alpha_mask", "planes_index_mask"]
@@ -38,9 +38,9 @@ class PipelineOutput(PipelineStep):
     @property
     def output_keys(self) -> list:
 
-        if self.pipeline.api_level == 1:
+        if self.config.api_level == 1:
             return ["version", "data_url", "lighting_url", "superpixels_url", "mask"]
-        elif self.pipeline.api_level < 4:
+        elif self.config.api_level < 4:
             return ["version", "data_url", "lighting_url", "superpixels_url"]
 
         return ["version", "data_url"]
@@ -56,7 +56,7 @@ class PipelineOutput(PipelineStep):
     def run(self, data):
         self.unique_id = data["unique_id"]
 
-        data["version"] = self.pipeline.api_level
+        data["version"] = self.config.api_level
         data["data_url"] = self.make_url(self.outfile_name)
 
         filename = "background.jpg"
@@ -75,7 +75,7 @@ class PipelineOutput(PipelineStep):
         thumbnail_url = self.make_url(filename)
         self.save_image(scale_to_constraint(data["image"], self.thumbnail_size), filename, thumbnail_url, 60)
 
-        if self.pipeline.api_level == 1:
+        if self.config.api_level == 1:
             filename = "mask.png"
             mask_url = self.make_url(filename)
             self.save_image(data["mask"], filename, mask_url)
@@ -86,20 +86,20 @@ class PipelineOutput(PipelineStep):
             self.save_image(data["lighting"], filename, lighting_url)
             data["lighting_url"] = lighting_url
 
-            if self.pipeline.api_level == 2:
+            if self.config.api_level == 2:
                 filename = "superpixels.png"
                 superpixels_url = self.make_url(filename)
                 self.save_image(data["superpixels"], filename, superpixels_url)
                 data["superpixels_url"] = self.make_url(superpixels_url)
 
 
-            if self.pipeline.api_level == 2 or self.pipeline.api_level == 3:                
+            if self.config.api_level == 2 or self.config.api_level == 3:                
                 if "masks" in data:
                     for i, plane_mask in enumerate(data["masks"]):
                         mask_url = self.make_plane_mask_url(i)
                         self.save_image(plane_mask, filename, mask_url)
 
-                if self.pipeline.api_level == 2:
+                if self.config.api_level == 2:
                     results = self.make_data_v2_dict(data, image_url, lighting_url, superpixels_url)
                 else:
                     results = self.make_data_v3_dict(data, image_url, lighting_url)
@@ -149,7 +149,7 @@ class PipelineOutput(PipelineStep):
 
     def make_data_dict(self, data):
         return {
-            "version": self.pipeline.api_level,
+            "version": self.config.api_level,
             "cameraPosition": [0.0, data["camera_elevation"], 0.0],
             "cameraRotation": data["camera_rotation"],
             "floorRotation": data["floor_rotation"],

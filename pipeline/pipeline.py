@@ -1,10 +1,9 @@
 import os
 import time
-import subprocess
 from enum import IntEnum
 from termcolor import colored
 
-from .core import schedule_and_wait, PipelineStep, PipelineStepIndex, PipelineStepConfig
+from .core import schedule_and_wait, PipelineStep, PipelineStepIndex, PipelineMode
 from .data.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, LogLevel, set_logging_level
 
 from .stages.aws.s3client import S3Client
@@ -19,7 +18,8 @@ from .stages.planegeometry import PipelinePlaneGeometry
 from .stages.refineplanemasks import PipelineRefinePlaneMasks
 from .stages.linefinder import PipelineLineFinder
 from .stages.combineplanemasks import PipelineCombinePlaneMasks
-from .stages.remote import PipelineRemotePlaneDetector, PipelineRemoteNetworks
+from .stages.planedetector import PipelinePlaneDetector
+from .stages.reverserenderer import PipelineReverseRenderer
 from .stages.poseestimator import PipelinePoseEstimator
 from .stages.extractsurfaces import PipelineExtractSurfaces
 from .stages.surfacerefinement import PipelineSurfaceRefinement
@@ -56,57 +56,27 @@ class PipelineNoOp(PipelineStep):
     def description(self) -> str:
         return "%d) %s (noop)" % (int(self.index), self.index.name) 
 
-class PipelineMode(IntEnum):
-    Serve = 0
-    Process = 1
-    Restore = 2
-
 #labels for ade20k, subtract = 1 for output number. 
 class Pipeline():
 
-    def __init__(self,  mode:PipelineMode, api_level, \
-                        model_path=None, semantic_model_path=None, fov_model_path=None, hed_model_path=None, \
-                        planes_url=None, src_path=None, dest_path=None, cpu_networks_port = 8082, \
-                        restore_step:PipelineStepIndex=None, export_step:PipelineStepIndex=None, stop_step=None, \
-                        logging_dir=None, logging_level=LogLevel.Nothing, logging_step:PipelineStepIndex=None):
+    def __init__(self, config):
 
-        self.mode = PipelineMode(mode)
-        self.api_level = api_level
+        self.config = config
         self._running = False
-        self.child_process = None
 
-        self.model_path = model_path
-        self.semantic_model_path = semantic_model_path
-        self.hed_model_path = hed_model_path
+        self.start_step = PipelineStepIndex(self.config.restore_step if self.config.restore_step is not None else PipelineStepIndex.Input + 1)
 
-        self.fov_model_path = fov_model_path 
-        self.planes_url = planes_url 
-        self.src_path = src_path 
-        self.dest_path = dest_path
-        self.cpu_networks_port = cpu_networks_port
-        self.remote_path = "http://localhost:%d" % cpu_networks_port
-        self.restore_step = None if restore_step is None else PipelineStepIndex(restore_step)
-        self.export_step = None if export_step is None else PipelineStepIndex(export_step)
-
-        self.logging_dir = logging_dir
-        self.logging_level = logging_level
-        self.logging_step = None if logging_step is None else PipelineStepIndex(logging_step)
-
-        self.start_step = PipelineStepIndex(self.restore_step if self.restore_step is not None else PipelineStepIndex.Input + 1)
-
-        if stop_step is None:
-            self.stop_step = PipelineStepIndex(self.export_step if self.export_step is not None else PipelineStepIndex.Output)
+        if self.config.stop_step is None:
+            self.stop_step = PipelineStepIndex(self.config.export_step if self.config.export_step is not None else PipelineStepIndex.Output)
         else:
-            self.stop_step = PipelineStepIndex(stop_step)
+            self.stop_step = PipelineStepIndex(self.config.stop_step)
 
         self.assemble()
 
     def assemble(self):
 
-        config = PipelineStepConfig()
-
         #Important: some devices may not be able to instantiate a class, so a list is first built
-        if self.mode == PipelineMode.Serve:
+        if self.config.mode == PipelineMode.Serve:
             self.s3_client = S3Client()
             input_step = PipelineS3Input
             output_step = PipelineS3Output
@@ -116,10 +86,10 @@ class Pipeline():
 
         all_steps = list([None] * (PipelineStepIndex.Output + 1))
 
-        all_steps[PipelineStepIndex.RemoteNetworks] = PipelineRemoteNetworks
         all_steps[PipelineStepIndex.CalculateFov] = PipelineCalculateFov
-        all_steps[PipelineStepIndex.RemotePlaneDetector] = PipelineRemotePlaneDetector
+        all_steps[PipelineStepIndex.PlaneDetector] = PipelinePlaneDetector
         all_steps[PipelineStepIndex.RunModels] = PipelineRunModels
+        all_steps[PipelineStepIndex.ReverseRenderer] = PipelineReverseRenderer
         all_steps[PipelineStepIndex.DeterminePrimaryAngles] = PipelineDeterminePrimaryAngles
         all_steps[PipelineStepIndex.ExtractSurfaces] = PipelineExtractSurfaces
         all_steps[PipelineStepIndex.FindLines] = PipelineLineFinder
@@ -143,14 +113,14 @@ class Pipeline():
         print("Initializing steps %d through %d" % (self.start_step, self.stop_step))
 
         self.steps = []
-        self.push(input_step(self, config))
+        self.push(input_step(self))
 
         for index in range(self.start_step, self.stop_step + 1):
 
             initializer = all_steps[index]
             if not initializer is None:
                 print("Initializing step", PipelineStepIndex(index))
-                self.push(initializer(self, config))
+                self.push(initializer(self))
                 print(PipelineStepIndex(index), "Added")    
 
 
@@ -158,13 +128,8 @@ class Pipeline():
         print("Starting threads")
         self._running = True
 
-        if self.logging_step is not None:
-            print("Logging is enabled for step", self.logging_step.name)
-
-        #start RemoteNetworks if needed downstream
-        if self.mode != PipelineMode.Restore or self.restore_step <= PipelineStepIndex.RemoteNetworks:
-            print("Listening on port ", self.cpu_networks_port, "runcpunetworks.py")
-            self.child_process = subprocess.Popen(["python3", "runcpunetworks.py", self.model_path, str(self.cpu_networks_port)])
+        if self.config.logging_step is not None:
+            print("Logging is enabled for step", self.config.logging_step.name)
 
         # Start the processing workers for all steps
         for step in self.steps:
@@ -173,11 +138,6 @@ class Pipeline():
     def stop(self):
         print("Stopping threads")
         self._running = False
-        if self.child_process is not None:
-            try:
-                os.killpg(os.getpgid(self.child_process.pid), 15)
-            except ProcessLookupError:
-                print(colored("Warning: Python subprocess runcpunetworks.py already exited. It probably crashed!", 'yellow', attrs=['bold']))
 
         for step in self.steps:
             step.stop()
@@ -192,35 +152,40 @@ class Pipeline():
 
     async def process(self, data):
 
-        if (len(self.steps) == 0): return
+        try:
 
-        if self.logging_dir is not None and not os.path.exists(self.logging_dir):
-            os.makedirs(self.logging_dir)
+            if (len(self.steps) == 0): return
 
-        start_time = time.time()
+            if self.config.logging_dir is not None and not os.path.exists(self.config.logging_dir):
+                os.makedirs(self.config.logging_dir)
 
-        print(colored("Running stages %s through %s" % (self.steps[1].description, self.steps[len(self.steps)-1].description), attrs=['bold']))
+            start_time = time.time()
 
-        for step in self.steps:
+            print(colored("Running stages %s through %s" % (self.steps[1].description, self.steps[len(self.steps)-1].description), attrs=['bold']))
 
-            if not self.running: break
+            for step in self.steps:
 
-            #consider perhaps passing logging down into steps, trigger off that
-            logging_dir = None if self.logging_dir is None else os.path.join(self.logging_dir, get_unique_id(data))
+                if not self.running: break
 
-            set_logging_dir(data, logging_dir)
-            set_logging_level(data, self.logging_level)
-            
-            set_logging_step(data, self.logging_step, step.index)
-            print(step.description)
+                #consider perhaps passing logging down into steps, trigger off that
+                logging_dir = None if self.config.logging_dir is None else os.path.join(self.config.logging_dir, get_unique_id(data))
 
-            step_start = time.time()
-            data = await schedule_and_wait(step.schedule, data)
-            print("%s took %.2f seconds" % (step.description, time.time() - step_start))
+                set_logging_dir(data, logging_dir)
+                set_logging_level(data, self.config.logging_level)
+                
+                set_logging_step(data, self.config.logging_step, step.index)
+                print(step.description)
 
-            if step.index == self.export_step and logging_dir is not None:
-                log_data(data)
+                step_start = time.time()
+                data = await schedule_and_wait(step.schedule, data)
+                print("%s took %.2f seconds" % (step.description, time.time() - step_start))
 
-        print(colored("All stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
+                if step.index == self.config.export_step and logging_dir is not None:
+                    log_data(data)
 
-        return data
+            print(colored("All stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
+
+            return data
+
+        except:
+            self.stop()

@@ -14,8 +14,8 @@ import signal
 from concurrent.futures import ThreadPoolExecutor
 from termcolor import colored
 
-from pipeline.core import ask_exit
-from pipeline.pipeline import Pipeline, PipelineMode
+from pipeline.core import ask_exit, PipelineMode, PipelineConfig, PipelineStepIndex
+from pipeline.pipeline import Pipeline
 from pipeline.data.logging import LogLevel
 
 def get_file_paths(input_dir, pattern=None):
@@ -31,7 +31,7 @@ def get_file_paths(input_dir, pattern=None):
 async def process_files(pipeline, files):
 
     index = 1
-
+    
     for path in files:
         url = Path(path)
         unique_id = url.parents[0].name if len(url.parents) > 0 else url.name
@@ -45,30 +45,30 @@ async def process_files(pipeline, files):
 #For instance, to restore from step 6 (before refinement):
 #python -W ignore harness.py data --restore=6
 
+default_config = PipelineConfig()
+
 @click.command()
 @click.argument("input_dir", default='test_images', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("output_dir", default='output', type=click.Path(exists=False, file_okay=False, dir_okay=True))
-@click.argument("model_path", default='tensorflow_models', type=click.Path(exists=True, file_okay=False, dir_okay=True))
-@click.argument("semantic_model_path", default='gluon_models', type=click.Path(exists=True, file_okay=False, dir_okay=True))
-@click.argument("fov_model_path", default='sklearn_models/fov_classifier_lc128.joblib', type=click.Path(exists=True, file_okay=True, dir_okay=False))
-@click.argument("hed_model_path", default='hed_model/HED_pretrained_bsds.npz', type=click.Path(exists=True, file_okay=True, dir_okay=False))
-@click.argument("planes_url", default='http://localhost:8081/', type=click.STRING)
-@click.option('--api', type=int, default=4, help='api level: 1-4')
-@click.option('--restore', type=int, help='Pipeline step to restore from. Data pickle files expected inside input_dir')
-@click.option('--export', type=int, help='Pipeline step to export')
-@click.option('--stop', type=int, default=None, help='Stop after step')
-@click.option("--logging_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
+@click.argument("model_path", default=default_config.model_path, type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("semantic_model_path", default=default_config.semantic_model_path, type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("fov_model_path", default=default_config.fov_model_path, type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("hed_model_path", default=default_config.hed_model_path, type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("planes_url", default=default_config.planes_url, type=click.STRING)
+@click.option('--api', type=int, default=default_config.api_level, help='api level: 1-4')
+@click.option('--restore', type=int, default=default_config.restore_step, help='Pipeline step to restore from. Data pickle files expected inside input_dir')
+@click.option('--export', type=int, default=default_config.export_step, help='Pipeline step to export')
+@click.option('--stop', type=int, default=default_config.stop_step, help='Stop after step')
+@click.option("--log_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
 @click.option('--log_level', type=int, default=LogLevel.Default, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
-@click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
-def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, hed_model_path, planes_url, 
-         api, restore, export, stop, logging_dir, log_level, log_step):
+@click.option('--log_step', type=int, default=default_config.logging_step, help='Log only a single step in the pipeline')
+def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, hed_model_path, planes_url, \
+         api, restore, export, stop, log_dir, log_level, log_step):
 
     if not os.path.exists(input_dir):
         raise Exception('The directory does not exist at path {}'.format(input_dir)) 
 
     
-    mode = PipelineMode.Restore if restore is not None else PipelineMode.Process
-
     file_pattern = "*.pickle" if restore is not None else None
 
     files = get_file_paths(input_dir, file_pattern)
@@ -85,10 +85,26 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     if len(files) == 0:
         raise Exception('No files found at path {}'.format(input_dir)) 
     
+    config = PipelineConfig()
+    config.mode = PipelineMode.Restore if restore is not None else PipelineMode.Process
+    config.src_path=input_dir
+    config.dest_path=output_dir
 
-    pipeline = Pipeline(mode, api, src_path=input_dir, dest_path=output_dir, restore_step=restore, export_step=export, stop_step=stop, \
-                        logging_dir=logging_dir, logging_level=log_level, logging_step=log_step, \
-                        model_path=model_path, semantic_model_path=semantic_model_path, fov_model_path=fov_model_path, hed_model_path=hed_model_path, planes_url=planes_url)
+    config.model_path = model_path
+    config.semantic_model_path = semantic_model_path
+    config.fov_model_path = fov_model_path
+    config.hed_model_path = hed_model_path
+    config.planes_url = planes_url
+
+    config.api_level = api
+    config.restore_step = None if restore is None else PipelineStepIndex(restore)
+    config.export_step = None if export is None else PipelineStepIndex(export)
+    config.stop_step = None if stop is None else PipelineStepIndex(stop)
+    config.logging_dir = log_dir
+    config.logging_level = log_level
+    config.logging_step = None if log_step is None else PipelineStepIndex(log_step)
+
+    pipeline = Pipeline(config)
 
 
     loop = asyncio.get_event_loop()

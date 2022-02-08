@@ -9,10 +9,10 @@ from types import SimpleNamespace
 
 class PipelineStepIndex(IntEnum):
     Input = 0
-    RemoteNetworks = 1
-    CalculateFov = 2
-    RemotePlaneDetector = 3
-    RunModels = 4
+    CalculateFov = 1
+    PlaneDetector = 2
+    RunModels = 3
+    ReverseRenderer = 4
     DeterminePrimaryAngles = 5
     ExtractSurfaces = 6
     FindLines = 7
@@ -28,19 +28,45 @@ class PipelineStepIndex(IntEnum):
     CombinePlaneMasks = 17
     Output = 18
 
-class PipelineStepConfig(SimpleNamespace):
+class PipelineMode(IntEnum):
+    Serve = 0
+    Process = 1
+    Restore = 2
+
+class PipelineConfig(SimpleNamespace):
+    mode:PipelineMode = PipelineMode.Serve
+    api_level=4
     use_gpu=True
     batch_max_wait_time=1.0
     batch_debounce_time=0.2
     batch_max_size=1
 
+    src_path=None
+    dest_path=None
+    cpu_networks_port=8082
+    model_path="tensorflow_models"
+    semantic_model_path="gluon_models"
+    fov_model_path = "sklearn_models/fov_classifier_lc128.joblib"
+    hed_model_path = "hed_model/HED_pretrained_bsds.npz"
+    planes_url="http://localhost:8081/"
+
+    restore_step:PipelineStepIndex=None
+    export_step:PipelineStepIndex=None
+    stop_step:PipelineStepIndex=None
+
+    logging_dir=None
+    logging_level=None
+    logging_step:PipelineStepIndex = None
+
+    @property
+    def cpu_networks_path(self) -> str:
+        return "http://localhost:%d" % self.cpu_networks_port
+
+
 class PipelineStep(metaclass=ABCMeta):
-    def __init__(self, pipeline, config:PipelineStepConfig):
+    def __init__(self, pipeline):
         self.pipeline = pipeline
-        self.config = config
-        self.batch_max_wait_time = config.batch_max_wait_time
-        self.batch_debounce_time = config.batch_debounce_time
-        self.batch_max_size = config.batch_max_size
+        self.config = pipeline.config
         self._running = False
         self._input_queue = asyncio.Queue()
 
@@ -117,12 +143,12 @@ class PipelineStep(metaclass=ABCMeta):
                 # Add items from the queue while more are available.
                 # Do this by waiting a small amount of time for new data
                 # up to a maximum time.
-                while wait_time < self.batch_max_wait_time and len(data) < self.batch_max_size:
-                    await asyncio.sleep(self.batch_debounce_time)
+                while wait_time < self.config.batch_max_wait_time and len(data) < self.config.batch_max_size:
+                    await asyncio.sleep(self.config.batch_debounce_time)
                     try:
                         # Dequeue until we have enough for a batch
                         # or until we run out.
-                        while len(data) < self.batch_max_size:
+                        while len(data) < self.config.batch_max_size:
                             datum, result_future = self._input_queue.get_nowait()
                             if not result_future.cancelled():
                                 result_futures.append(result_future)

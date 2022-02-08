@@ -18,17 +18,11 @@ def _remote_plane_detect(address, data):
         address, data=pickle.dumps(input_dicts)).content
     return pickle.loads(response_bytes)
 
-def _remote_networks(address, data):
-    images = [datum["image"] for datum in data]
-    response_bytes = requests.post(address, data=pickle.dumps(images)).content
-    return pickle.loads(response_bytes)
-
-
-class PipelineRemotePlaneDetector(PipelineStep):
+class PipelinePlaneDetector(PipelineStep):
 
     @property
     def index(self) -> PipelineStepIndex:
-        return PipelineStepIndex.RemotePlaneDetector
+        return PipelineStepIndex.PlaneDetector
 
     @property
     def required_keys(self) -> list:
@@ -44,8 +38,8 @@ class PipelineRemotePlaneDetector(PipelineStep):
 
     def run(self, data):
         t = time()
-        print("Running remote planes", self.pipeline.planes_url)
-        plane_rcnn_outputs = _remote_plane_detect(self.pipeline.planes_url, data)
+        print("Running remote planes", self.config.planes_url)
+        plane_rcnn_outputs = _remote_plane_detect(self.config.planes_url, data)
         print("Remote planes took %.2f seconds" % (time() - t))
 
         for datum, plane_rcnn_output in zip(data, plane_rcnn_outputs):
@@ -61,32 +55,4 @@ class PipelineRemotePlaneDetector(PipelineStep):
             # Extents
             datum["planes"]["detection"][:, 0] -= 80  # min y
             datum["planes"]["detection"][:, 2] -= 80  # max y
-
-
-class PipelineRemoteNetworks(PipelineStep):
-
-    @property
-    def index(self) -> PipelineStepIndex:
-        return PipelineStepIndex.RemoteNetworks
-
-    @property
-    def required_keys(self) -> list:
-        return ["image"]
-
-    @property
-    def output_keys(self) -> list:
-        return ["lighting", "normals"]
-
-    @property
-    def is_batched(self) -> bool:
-        return True
-
-    def run(self, data: dict) -> None:
-        t = time()
-        response_dict = _remote_networks(self.pipeline.remote_path, data)
-        print("Remote networks took %.2f seconds" % (time() - t))
-
-        for datum, lighting, normals in zip(data, response_dict["lighting"], response_dict["normals"]):
-            datum["lighting"] = lighting
-            datum["normals"] = normals
 

@@ -53,7 +53,7 @@ def _get_instance_metadata():
 @click.argument("plane_url", type=click.STRING)
 @click.option("--sqs-queue-name", type=click.STRING, default=None)
 @click.option('--api', type=int, default=4, help='api level: 1-4')
-@click.option("--logging_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
+@click.option("--log_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
 @click.option('--log_level', type=int, default=0, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
 def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_uploads_bucket, results_bucket, plane_url, sqs_queue_name,

@@ -2,9 +2,9 @@ from pipeline.core import PipelineStep, PipelineStepIndex
 import joblib
 
 class PipelineCalculateFov(PipelineStep):
-    def __init__(self, pipeline, config):
-        super().__init__(pipeline, config)
-        self.classifier = joblib.load(self.pipeline.fov_model_path)
+    def __init__(self, pipeline):
+        super().__init__(pipeline)
+        self.classifier = joblib.load(self.config.fov_model_path)
 
     @property
     def index(self) -> PipelineStepIndex:

@@ -206,25 +206,25 @@ class PipelineRunModels(PipelineStep):
 
         print("Initialized PipelineRunModels")
         self.gpu_id = gpu_device()
-        if config.use_gpu and self.gpu_id is None:
+        if self.config.use_gpu and self.gpu_id is None:
             print("NO GPU FOUND!")
             return
 
-        _ = tf.Session(config=get_session_config(use_gpu=config.use_gpu))
+        _ = tf.Session(config=get_session_config(use_gpu=self.config.use_gpu))
 
         self.mx_ctx = mx.gpu(self.gpu_id) if self.gpu_id is None else mx.cpu()
         self.model_semantic = get_model(
             "deeplab_resnest269_ade", pretrained=True,
-            root=self.pipeline.semantic_model_path, ctx=self.mx_ctx
+            root=self.config.semantic_model_path, ctx=self.mx_ctx
         )
 
         self.model_hed = OfflinePredictor(PredictConfig(
             model=Model(),
-            session_init=SmartInit(self.pipeline.hed_model_path),
+            session_init=SmartInit(self.config.hed_model_path),
             input_names=['image'],
             output_names=['output%d' % k for k in range(1, 7)],
             session_creator=NewSessionCreator(
-                config=get_session_config(use_gpu=config.use_gpu))
+                config=get_session_config(use_gpu=self.config.use_gpu))
         ))
 
     @property
