@@ -76,9 +76,6 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
     config.sqs_queue_name = sqs_queue_name
 
     config.api_level = api
-    config.restore_step = None if restore is None else PipelineStepIndex(restore)
-    config.export_step = None if export is None else PipelineStepIndex(export)
-    config.stop_step = None if stop is None else PipelineStepIndex(stop)
     config.logging_dir = log_dir
     config.logging_level = log_level
     config.logging_step = None if log_step is None else PipelineStepIndex(log_step)

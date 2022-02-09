@@ -201,8 +201,8 @@ class Model(ModelDesc):
 
 
 class PipelineRunModels(PipelineStep):
-    def __init__(self, pipeline, config):
-        super().__init__(pipeline, config)
+    def __init__(self, pipeline):
+        super().__init__(pipeline)
 
         print("Initialized PipelineRunModels")
         self.gpu_id = gpu_device()
