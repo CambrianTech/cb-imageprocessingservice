@@ -16,7 +16,8 @@ import boto3
 import requests
 from gpuinfo import GPUInfo
 
-from pipeline.pipeline import Pipeline, PipelineMode
+from pipeline.pipeline import Pipeline
+from pipeline.config import PipelineMode, PipelineConfig
 
 def _get_instance_metadata():
     metadata = {}
@@ -42,22 +43,47 @@ def _get_instance_metadata():
     metadata["cluster"] = container_metadata["Cluster"]
     return metadata
 
+default_config = PipelineConfig()
 
 @click.command()
-@click.argument("model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
-@click.argument("semantic_model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
-@click.argument("fov_model_path", type=click.Path(exists=True, file_okay=True, dir_okay=False))
-@click.argument("hed_model_path", default='hed_model/HED_pretrained_bsds.npz', type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("model_path", default=default_config.model_path, type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("semantic_model_path", default=default_config.semantic_model_path, type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("fov_model_path", default=default_config.fov_model_path, type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("hed_model_path", default=default_config.hed_model_path, type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("user_uploads_bucket", type=click.STRING)
 @click.argument("results_bucket", type=click.STRING)
-@click.argument("plane_url", type=click.STRING)
+@click.argument("planes_url", default=default_config.planes_url, type=click.STRING)
 @click.option("--sqs-queue-name", type=click.STRING, default=None)
-@click.option('--api', type=int, default=4, help='api level: 1-4')
-@click.option("--log_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
-@click.option('--log_level', type=int, default=0, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
-@click.option('--log_step', type=int, default=None, help='Log only a single step in the pipeline')
-def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_uploads_bucket, results_bucket, plane_url, sqs_queue_name,
-         api, logging_dir, log_level, log_step):
+@click.option('--api', type=int, default=default_config.api_level, help='api level: 1-4')
+@click.option("--log_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default=default_config.logging_dir)
+@click.option('--log_level', type=int, default=default_config.logging_level, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
+@click.option('--log_step', type=int, default=default_config.logging_step, help='Log only a single step in the pipeline')
+def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_uploads_bucket, results_bucket, plane_url, 
+        sqs_queue_name, api, log_dir, log_level, log_step):
+
+    print("Creating pipeline")
+
+    config = PipelineConfig()
+    config.mode = PipelineMode.Serve
+    config.src_path=user_uploads_bucket
+    config.dest_path=results_bucket
+
+    config.model_path = model_path
+    config.semantic_model_path = semantic_model_path
+    config.fov_model_path = fov_model_path
+    config.hed_model_path = hed_model_path
+    config.planes_url = planes_url
+    config.sqs_queue_name = sqs_queue_name
+
+    config.api_level = api
+    config.restore_step = None if restore is None else PipelineStepIndex(restore)
+    config.export_step = None if export is None else PipelineStepIndex(export)
+    config.stop_step = None if stop is None else PipelineStepIndex(stop)
+    config.logging_dir = log_dir
+    config.logging_level = log_level
+    config.logging_step = None if log_step is None else PipelineStepIndex(log_step)
+
+    pipeline = Pipeline(config)
 
     metadata = _get_instance_metadata()
     
@@ -65,21 +91,6 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
 
     print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
-
-    print("Creating pipeline")
-
-    pipeline = Pipeline(PipelineMode.Serve, api, 
-        src_path=user_uploads_bucket, 
-        dest_path=results_bucket,
-        model_path=model_path, 
-        semantic_model_path=semantic_model_path, 
-        fov_model_path=fov_model_path, 
-        hed_model_path=hed_model_path,
-        planes_url=plane_url, 
-        logging_dir=logging_dir, 
-        logging_level=log_level, 
-        logging_step=log_step
-        )
 
     pipeline.start()
 
@@ -99,17 +110,17 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
         total_pipeline_times.append((total_pipeline_time, datetime.datetime.now(dateutil.tz.tzlocal())))
         return results
 
-    print("SQS Queue name:", sqs_queue_name)
-    if sqs_queue_name is not None:
+    print("SQS Queue name:", config.sqs_queue_name)
+    if config.sqs_queue_name is not None:
         if metadata is None:
             raise Exception("sqs_queue name was set but metadata was none")
         
         async def sqs_loop():
             loop = asyncio.get_event_loop()
 
-            print("Getting SQS queue with name", sqs_queue_name)
+            print("Getting SQS queue with name", config.sqs_queue_name)
             sqs = boto3.resource("sqs", region_name=metadata["region"])
-            sqs_queue = sqs.get_queue_by_name(QueueName=sqs_queue_name)
+            sqs_queue = sqs.get_queue_by_name(QueueName=config.sqs_queue_name)
 
             def get_new_messages():
                 return sqs_queue.receive_messages(MaxNumberOfMessages=1, WaitTimeSeconds=10)

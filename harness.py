@@ -14,7 +14,8 @@ import signal
 from concurrent.futures import ThreadPoolExecutor
 from termcolor import colored
 
-from pipeline.core import ask_exit, PipelineMode, PipelineConfig, PipelineStepIndex
+from pipeline.config import PipelineMode, PipelineConfig
+from pipeline.core import ask_exit, PipelineMode, PipelineStepIndex
 from pipeline.pipeline import Pipeline
 from pipeline.data.logging import LogLevel
 
@@ -62,7 +63,7 @@ default_config = PipelineConfig()
 @click.option('--restore', type=int, default=default_config.restore_step, help='Pipeline step to restore from. Data pickle files expected inside input_dir')
 @click.option('--export', type=int, default=default_config.export_step, help='Pipeline step to export')
 @click.option('--stop', type=int, default=default_config.stop_step, help='Stop after step')
-@click.option("--log_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default='logging')
+@click.option("--log_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default=default_config.logging_dir)
 @click.option('--log_level', type=int, default=LogLevel.Default, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=default_config.logging_step, help='Log only a single step in the pipeline')
 def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, hed_model_path, planes_url, \
