@@ -53,13 +53,15 @@ default_config = PipelineConfig()
 @click.argument("user_uploads_bucket", type=click.STRING)
 @click.argument("results_bucket", type=click.STRING)
 @click.argument("planes_url", default=default_config.planes_url, type=click.STRING)
+@click.option("--image-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.option("--results-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--sqs-queue-name", type=click.STRING, default=None)
 @click.option('--api', type=int, default=default_config.api_level, help='api level: 1-4')
 @click.option("--log_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default=default_config.logging_dir)
 @click.option('--log_level', type=int, default=default_config.logging_level, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=default_config.logging_step, help='Log only a single step in the pipeline')
 def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_uploads_bucket, results_bucket, planes_url, 
-        sqs_queue_name, api, log_dir, log_level, log_step):
+        image_local_dir, results_local_dir, sqs_queue_name, api, log_dir, log_level, log_step):
 
     print("Creating pipeline")
 
@@ -102,10 +104,52 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
             print("Warning 'image_s3_key' is no longer being used. Please update this to 'unique_id'")
 
         results = await pipeline.process(input_dict)
+
         total_pipeline_time = time() - total_start_time
         print("Planes total pipeline time: %.2fs" % total_pipeline_time)
         total_pipeline_times.append((total_pipeline_time, datetime.datetime.now(dateutil.tz.tzlocal())))
         return results
+
+    # Setup http server
+    def get_pipeline_handler(pipeline_fn):
+        async def handle(request):
+            print("Handle segment:", request, "(items waiting in pipeline: %d)" %
+                  num_waiting_items(steps))
+
+            # Get image S3 key from GET request
+            image_key = request.match_info.get("id", None)
+            if image_key is None:
+                raise web.HTTPBadRequest()
+
+            data = {"unique_id": image_key}
+
+            # Add local directories to initial data if specified
+            if image_local_dir is not None:
+                print(
+                    "WARNING: Do not use in production: image local dir set to", image_local_dir)
+                data["image_local_dir"] = image_local_dir
+            if results_local_dir is not None:
+                print(
+                    "WARNING: Do not use in production: results local dir set to", results_local_dir)
+                data["results_local_dir"] = results_local_dir
+
+            data = await pipeline_fn(data)
+
+            response_dict = {
+                "lighting_url": data["lighting_url"],
+                "semantic_url": data["semantic_url"],
+                "data_url": data["data_v3_url"],
+                "superpixels_url": data["superpixels_url"],
+            }
+
+            if "data_v2_url" in data:
+                response_dict["data_v2_url"] = data["data_v2_url"]
+
+            if "data_v3_url" in data:
+                response_dict["data_v3_url"] = data["data_v3_url"]
+
+            return web.json_response(response_dict)
+        return handle
 
     print("SQS Queue name:", config.sqs_queue_name)
     if config.sqs_queue_name is not None:
@@ -238,6 +282,23 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
             allow_headers="*",
         )
     })
+
+    # Add public (CORS) routes
+    segment_resource = app.router.add_resource("/segment/{id}")
+    planes_resource = app.router.add_resource("/planes/{id}")
+    cors.add(segment_resource.add_route(
+        "GET", get_pipeline_handler(planes_pipeline)))
+    cors.add(planes_resource.add_route(
+        "GET", get_pipeline_handler(planes_pipeline)))
+
+    # Add endpoint for directly getting and uploading images if local
+    # image input dir was defined
+    if image_local_dir is not None:
+        upload_resource = app.router.add_resource("/upload/{id}")
+        cors.add(upload_resource.add_route("PUT", handle_local_upload))
+
+        get_image_resource = app.router.add_resource("/getimage/{bucket}/{id}")
+        cors.add(get_image_resource.add_route("GET", handle_get_image))
 
     # Add private (non-CORS) routes
     app.add_routes([
