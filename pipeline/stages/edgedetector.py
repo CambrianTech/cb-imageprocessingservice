@@ -20,8 +20,9 @@ from .combineplanemasks import combine_plane_masks, combine_plane_clusters
 from pipeline.core import PipelineStep, PipelineStepIndex
 
 class PipelineEdgeDetector(PipelineStep):
-    def __init__(self, session_config, hed_path: str):
-        super().__init__()
+
+    def __init__(self, pipeline):
+        super().__init__(pipeline)
 
         print("PipelineEdgeDetector", "Initializing")
         assembled_model = HEDModel()
@@ -30,10 +31,10 @@ class PipelineEdgeDetector(PipelineStep):
 
         self.model_hed = OfflinePredictor(PredictConfig(
             model=assembled_model,
-            session_init=SmartInit(hed_path),
+            session_init=SmartInit(self.config.hed_model_path),
             input_names=['image'],
             output_names=['output%d' % k for k in range(1, 7)],
-            session_creator=NewSessionCreator(config=session_config)
+            session_creator=NewSessionCreator(config=self.config.session_config)
         ))
 
         print("PipelineEdgeDetector", "Initialization complete")

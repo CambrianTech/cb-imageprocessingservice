@@ -20,14 +20,15 @@ from .combineplanemasks import combine_plane_masks, combine_plane_clusters
 from pipeline.core import PipelineStep, PipelineStepIndex
 
 class PipelineSemanticSegmentation(PipelineStep):
-    def __init__(self, semantic_path: str):
-        super().__init__()
+    
+    def __init__(self, pipeline):
+        super().__init__(pipeline)
         
         print("PipelineSemanticSegmentation", "Initializing")
         self.mx_ctx = mx.gpu(0)
         self.model_semantic = get_model(
             "deeplab_resnest269_ade", pretrained=True,
-            root=semantic_path, ctx=self.mx_ctx
+            root=self.config.semantic_model_path, ctx=self.mx_ctx
         )
         print("PipelineSemanticSegmentation", "Initialization complete")
 

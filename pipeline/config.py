@@ -20,6 +20,7 @@ class PipelineConfig(SimpleNamespace):
     dest_path=None
 
     sqs_queue_name=None
+    session_config=None
 
     model_path="tensorflow_models"
     semantic_model_path="gluon_models"
