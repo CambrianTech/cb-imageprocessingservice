@@ -13,7 +13,8 @@ from .stages.fileoutput import PipelineFileOutput
 
 from .stages.fov import PipelineCalculateFov
 from .stages.primaryangle import PipelineDeterminePrimaryAngles
-from .stages.runmodels import PipelineRunModels
+from .stages.segmentation import PipelineSemanticSegmentation
+from .stages.edgedetector import PipelineEdgeDetector
 from .stages.superpixels import PipelineSuperpixels
 from .stages.planegeometry import PipelinePlaneGeometry
 from .stages.refineplanemasks import PipelineRefinePlaneMasks
@@ -89,7 +90,8 @@ class Pipeline():
 
         all_steps[PipelineStepIndex.CalculateFov] = PipelineCalculateFov
         all_steps[PipelineStepIndex.PlaneDetector] = PipelinePlaneDetector
-        all_steps[PipelineStepIndex.RunModels] = PipelineRunModels
+        all_steps[PipelineStepIndex.Segmentation] = PipelineSemanticSegmentation
+        all_steps[PipelineStepIndex.EdgeDetector] = PipelineEdgeDetector
         all_steps[PipelineStepIndex.ReverseRenderer] = PipelineReverseRenderer
         all_steps[PipelineStepIndex.DeterminePrimaryAngles] = PipelineDeterminePrimaryAngles
         all_steps[PipelineStepIndex.ExtractSurfaces] = PipelineExtractSurfaces
