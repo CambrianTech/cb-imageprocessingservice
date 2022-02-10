@@ -19,14 +19,6 @@ import mxnet as mx
 from .combineplanemasks import combine_plane_masks, combine_plane_clusters
 from pipeline.core import PipelineStep, PipelineStepIndex
 
-import mxnet as mx
-def gpu_device(gpu_number=0):
-    try:
-        _ = mx.nd.array([1, 2, 3], ctx=mx.gpu(gpu_number))
-    except mx.MXNetError:
-        return None
-    return mx.gpu(gpu_number)
-
 # HED from Tensorpack examples: https://github.com/tensorpack/tensorpack/tree/master/examples/HED
 def class_balanced_sigmoid_cross_entropy(logits, label, name='cross_entropy_loss'):
     """
@@ -201,33 +193,31 @@ class Model(ModelDesc):
 
 
 class PipelineRunModels(PipelineStep):
+
     def __init__(self, pipeline):
         super().__init__(pipeline)
 
         print("Initializing PipelineRunModels")
-        self.gpu_id = gpu_device()
-        if self.config.use_gpu and self.gpu_id is None:
-            print("NO GPU FOUND!")
-            return
 
         print("Starting tensorflow")
-        _ = tf.Session(config=get_session_config(use_gpu=self.config.use_gpu))
+
+        _ = tf.Session(config=get_session_config(use_gpu=True))
 
         print("Starting MXNet")
-        self.mx_ctx = mx.gpu(self.gpu_id) if self.gpu_id is None else mx.cpu()
+        self.mx_ctx = mx.gpu(0)
         self.model_semantic = get_model(
             "deeplab_resnest269_ade", pretrained=True,
             root=self.config.semantic_model_path, ctx=self.mx_ctx
         )
 
-        print("Starting hed model")
+        print("Starting hed OfflinePredictor")
         self.model_hed = OfflinePredictor(PredictConfig(
             model=Model(),
             session_init=SmartInit(self.config.hed_model_path),
             input_names=['image'],
             output_names=['output%d' % k for k in range(1, 7)],
             session_creator=NewSessionCreator(
-                config=get_session_config(use_gpu=self.config.use_gpu))
+                config=get_session_config(use_gpu=True))
         ))
 
         print("PipelineRunModels initialization complete")
