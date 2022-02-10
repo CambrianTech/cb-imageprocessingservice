@@ -1,0 +1,43 @@
+from abc import ABCMeta, abstractmethod
+import typing
+from enum import IntEnum
+from types import SimpleNamespace
+
+class PipelineMode(IntEnum):
+    Serve = 0
+    Process = 1
+    Restore = 2
+
+class PipelineConfig(SimpleNamespace):
+    mode:PipelineMode = PipelineMode.Serve
+    api_level=4
+    use_gpu=True
+    batch_max_wait_time=1.0
+    batch_debounce_time=0.2
+    batch_max_size=1
+
+    src_path=None
+    dest_path=None
+
+    sqs_queue_name=None
+
+    model_path="tensorflow_models"
+    semantic_model_path="gluon_models"
+    fov_model_path = "sklearn_models/fov_classifier_lc128.joblib"
+    hed_model_path = "hed_model/HED_pretrained_bsds.npz"
+    planes_url="http://localhost:8081/"
+
+    restore_step=None
+    export_step=None
+    stop_step=None
+
+    logging_dir="logging"
+    logging_level=None
+    logging_step = None
+
+    cpu_networks_port=8082
+    cpu_networks_script="runcpunetworks.py"
+    
+    @property
+    def cpu_networks_path(self) -> str:
+        return "http://localhost:%d" % self.cpu_networks_port

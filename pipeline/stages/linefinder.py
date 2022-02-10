@@ -1,0 +1,153 @@
+import cv2
+import numpy as np
+import math
+from scipy.spatial import distance
+
+from cambrian.frei_chen import frei_chen
+from time import time
+
+from pipeline.components.line import Line, merge_lines, draw_lines
+from pipeline.core import PipelineStep, PipelineStepIndex
+from pipeline.data.logging import log_image, im_logging_enabled, LogLevel, Timer
+
+def gabor(bw, theta, lambd, gamma = 0.0, psi = 0.0):
+    ksize = lambd
+    sigma = ksize * lambd
+    result = cv2.filter2D(bw, cv2.CV_8UC1, cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_32F))
+    return result
+
+def sharpen(img, alpha=1.5, beta=-1.0, kernel_size = 21):
+    smoothed = cv2.GaussianBlur(img, (kernel_size, kernel_size), kernel_size)
+    return cv2.addWeighted(img, alpha, smoothed, beta, 0)
+
+class PipelineLineFinder(PipelineStep):
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.FindLines
+
+    @property
+    def required_keys(self) -> list:
+        return ["image", "hed", "normals"]
+
+    @property
+    def output_keys(self) -> list:
+        return ["lines"]
+    
+    def run(self, data):
+
+        timer = Timer("line_finder")
+        timer.disable()
+
+#         7) FindLines
+# line_finder.setup took 0.00 seconds
+# line_finder.bw_lines_a took 0.02 seconds
+# line_finder.bw_lines_b took 0.09 seconds
+# line_finder.merge_lines BW took 5.96 seconds
+# line_finder.bilateralFilter took 0.01 seconds
+# line_finder.hed took 0.06 seconds
+# line_finder.merge_lines HED took 0.76 seconds
+# line_finder.normals_lines took 0.01 seconds
+# line_finder.merge_lines normals_lines took 0.01 seconds
+# line_finder.merge_lines final took 4.31 seconds
+# 7) FindLines took 11.25 seconds
+
+        bw = cv2.cvtColor(data["image"], cv2.COLOR_RGB2GRAY)
+
+        self.height, self.width = bw.shape[:2]
+        diagonal = np.hypot(self.width, self.height)
+
+        operating_scale = 1500.0 / diagonal
+        if operating_scale < 1.0:
+            bw = cv2.resize(bw, (int(self.width * operating_scale), int(self.height * operating_scale)), cv2.INTER_CUBIC)
+
+        timer.log_elapsed("setup")
+
+        def log_lines(lines, name):
+            if im_logging_enabled(data, LogLevel.Lines):
+                debug = data["downscaled"].copy()
+                thickness = max(int(math.hypot(debug.shape[0], debug.shape[1]) / 600), 1)
+                draw_lines(debug, lines, thickness=thickness)
+                log_image(data, name, debug)
+
+        def find_lines(image, min_length, use_lsd=False, refine=cv2.LSD_REFINE_NONE, scale=1.0, sigma_scale=1.0, quant=2.0, ang_th=22.5, log_eps=0, density_th=0.7, n_bins=1024):
+            min_length = int(min_length)
+            if use_lsd:
+                lsd = cv2.createLineSegmentDetector(refine=refine, scale=scale, sigma_scale=sigma_scale, quant=quant, ang_th=ang_th, log_eps=log_eps, density_th=density_th, n_bins=n_bins)
+                lines = lsd.detect(image)[0]
+                if lines is not None:
+                    lines = list(filter(lambda line: distance.euclidean((line[0][0], line[0][1]), (line[0][2], line[0][3])) >= min_length, lines))
+            else:
+                fld = cv2.ximgproc.createFastLineDetector(min_length, 1.41, 200, 240, 3, False)
+                lines = fld.detect(image)
+
+            sx = data["downscaled"].shape[1] / image.shape[1]
+            sy = data["downscaled"].shape[0] / image.shape[0]
+            return list(map(lambda line: Line(line[0][0] * sx, line[0][1] * sy, line[0][2] * sx, line[0][3] * sy), lines)) if lines is not None else list()
+
+        min_length = int(diagonal / 80)
+
+        lines = []
+
+        #find lines in BW image
+        bw_lines_a = find_lines(bw, min_length)
+        lines.extend(bw_lines_a)
+
+        timer.log_elapsed("bw_lines_a")
+
+        bw_lines_b = find_lines(bw, min_length, True, ang_th=17) #ang_th=22.5 was getting false positives
+        lines.extend(bw_lines_b)
+
+        timer.log_elapsed("bw_lines_b")
+
+        lines = merge_lines(lines, search_length=1.0, search_width=diagonal/800, angle_threshold=math.radians(3))
+
+        timer.log_elapsed("merge_lines BW")
+
+        #find lines in hed hed edges
+        sx = data["downscaled"].shape[1] / data["hed"].shape[1]
+        sy = data["downscaled"].shape[0] / data["hed"].shape[0]
+
+        hed = data["hed"].copy()
+        hed = cv2.bilateralFilter(hed, 13, 40, 9) #todo: apply non-maxima-suppression (NMS) to image instead
+        timer.log_elapsed("bilateralFilter")
+
+        hed_lines = find_lines(hed, min_length, use_lsd=True, ang_th=12) #ang_th=22.5 was getting false positives
+        timer.log_elapsed("hed")
+
+        hed_lines = merge_lines(hed_lines, search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(3))
+
+        timer.log_elapsed("merge_lines HED")
+
+        if len(hed_lines) > 0: 
+            #log_lines(hed_lines, "hed_lines")
+            lines.extend(hed_lines)
+
+        #find lines in normals
+        min_length = int(diagonal / 20)
+        normals = np.uint8(data["normals"])
+        #log_image(data, "normals", normals)
+        normals = cv2.split(normals)
+        normals_lines = []
+        for i in range(0, 3):
+            normals_lines.extend(find_lines(normals[i], min_length))
+
+        timer.log_elapsed("normals_lines")
+        
+        if len(normals_lines) > 0:
+            #cleanup normals
+            normals_lines = merge_lines(normals_lines, search_width=diagonal/300)
+            timer.log_elapsed("merge_lines normals_lines")
+
+            lines.extend(normals_lines)
+
+        #merge all
+        lines = merge_lines(lines, search_width=min(diagonal/400, 8))
+        timer.log_elapsed("merge_lines final")
+
+        # print("8. elapsed %.2f" % (time() - start)); start = time()
+
+        log_lines(lines, "merged_lines")
+
+        data["lines"] = lines
+

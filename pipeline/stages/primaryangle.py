@@ -1,9 +1,11 @@
-from pipeline.core import PipelineStep
 import cv2
 import numpy as np
 import math
+
 from cambrian import image_processing as ip, transformations as T, geometry as geo
 import pickle
+
+from pipeline.core import PipelineStep, PipelineStepIndex
 
 # Z is UP
 rotX = T.rotation_matrix(0.00, [1, 0, 0])
@@ -86,7 +88,7 @@ def get_candidate_walls(floor_normal, isolated_surfaces, max_angle=20):
         normal = surface[1]
         angle = geo.angle_between(normal, floor_normal)
         vert_diff = abs(angle - RIGHT_ANGLE)
-        # print(vert_diff)
+        print(vert_diff)
 
         if vert_diff < overall_best_diff:
             overall_best_diff = vert_diff
@@ -114,6 +116,11 @@ def get_candidate_walls(floor_normal, isolated_surfaces, max_angle=20):
 
 
 class PipelineDeterminePrimaryAngles(PipelineStep):
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.DeterminePrimaryAngles
+        
     @property
     def required_keys(self) -> list:
         return ["semantic_probs", "normals"]

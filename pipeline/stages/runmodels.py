@@ -3,7 +3,7 @@ from scipy.special import softmax
 import cv2
 import tensorflow as tf
 from modelutils import get_session_config
-from pipeline.core import PipelineStep
+
 import os
 from time import time
 from tensorpack import *
@@ -17,10 +17,17 @@ from mxnet import image
 import mxnet as mx
 
 from .combineplanemasks import combine_plane_masks, combine_plane_clusters
+from pipeline.core import PipelineStep, PipelineStepIndex
+
+import mxnet as mx
+def gpu_device(gpu_number=0):
+    try:
+        _ = mx.nd.array([1, 2, 3], ctx=mx.gpu(gpu_number))
+    except mx.MXNetError:
+        return None
+    return mx.gpu(gpu_number)
 
 # HED from Tensorpack examples: https://github.com/tensorpack/tensorpack/tree/master/examples/HED
-
-
 def class_balanced_sigmoid_cross_entropy(logits, label, name='cross_entropy_loss'):
     """
     The class-balanced cross entropy loss,
@@ -194,25 +201,35 @@ class Model(ModelDesc):
 
 
 class PipelineRunModels(PipelineStep):
-    def __init__(self, semantic_path: str, hed_path: str):
-        super().__init__()
+    def __init__(self, pipeline):
+        super().__init__(pipeline)
 
-        _ = tf.Session(config=get_session_config(use_gpu=True))
+        print("Initialized PipelineRunModels")
+        self.gpu_id = gpu_device()
+        if self.config.use_gpu and self.gpu_id is None:
+            print("NO GPU FOUND!")
+            return
 
-        self.mx_ctx = mx.gpu(0)
+        _ = tf.Session(config=get_session_config(use_gpu=self.config.use_gpu))
+
+        self.mx_ctx = mx.gpu(self.gpu_id) if self.gpu_id is None else mx.cpu()
         self.model_semantic = get_model(
             "deeplab_resnest269_ade", pretrained=True,
-            root=semantic_path, ctx=self.mx_ctx
+            root=self.config.semantic_model_path, ctx=self.mx_ctx
         )
 
         self.model_hed = OfflinePredictor(PredictConfig(
             model=Model(),
-            session_init=SmartInit(hed_path),
+            session_init=SmartInit(self.config.hed_model_path),
             input_names=['image'],
             output_names=['output%d' % k for k in range(1, 7)],
             session_creator=NewSessionCreator(
-                config=get_session_config(use_gpu=True))
+                config=get_session_config(use_gpu=self.config.use_gpu))
         ))
+
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.RunModels
 
     @property
     def required_keys(self) -> list:
@@ -227,6 +244,11 @@ class PipelineRunModels(PipelineStep):
         return True
 
     def run(self, data):
+
+        if self.gpu_id is None:
+            print("No GPU, skipping", self.description)
+            return
+
         images = [datum["image"] for datum in data]
 
         t = time()
@@ -286,6 +308,8 @@ class PipelineRunModels(PipelineStep):
         for i in range(len(images)):
             image = images[i]
             datum = data[i]
+
+            if "hed" in datum: continue
 
             outputs = self.model_hed([image])
             hed = outputs[5][0]
