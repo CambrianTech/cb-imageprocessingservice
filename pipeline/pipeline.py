@@ -167,7 +167,7 @@ class Pipeline():
             if not self.running: break
 
             #consider perhaps passing logging down into steps, trigger off that
-            logging_dir = None if self.config.logging_dir is None else os.path.join(self.config.logging_dir, get_unique_id(data))
+            logging_dir = None if self.config.logging_dir is None else os.path.join(self.config.logging_dir, data["unique_id"])
 
             set_logging_dir(data, logging_dir)
             set_logging_level(data, self.config.logging_level)

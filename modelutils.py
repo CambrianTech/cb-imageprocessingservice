@@ -3,7 +3,7 @@ import cv2
 import tensorflow as tf
 
 
-def get_session_config(use_gpu=True, dynamic_gpu_memory=True) -> tf.ConfigProto:
+def get_session_config(use_gpu=True, dynamic_gpu_memory=True):
     # Allow GPU memory growth so tensorflow doesn't allocate all memory
     if use_gpu:
         config = tf.ConfigProto()

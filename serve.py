@@ -55,17 +55,26 @@ def _get_instance_metadata():
     return metadata
 
 
+default_config = PipelineConfig()
+
 @click.command()
-@click.argument("model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
-@click.argument("semantic_model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
-@click.argument("fov_model_path", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("model_path", default=default_config.model_path, type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("semantic_model_path", default=default_config.semantic_model_path, type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("fov_model_path", default=default_config.fov_model_path, type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("hed_model_path", default=default_config.hed_model_path, type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("user_uploads_bucket", type=click.STRING)
 @click.argument("results_bucket", type=click.STRING)
-@click.argument("plane_url", type=click.STRING)
+@click.argument("planes_url", default=default_config.planes_url, type=click.STRING)
 @click.option("--image-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--results-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--sqs-queue-name", type=click.STRING, default=None)
-def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, results_bucket, plane_url, image_local_dir, results_local_dir, sqs_queue_name):
+@click.option('--api', type=int, default=default_config.api_level, help='api level: 1-4')
+@click.option("--log_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default=None)
+@click.option('--log_level', type=int, default=default_config.logging_level, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
+@click.option('--log_step', type=int, default=default_config.logging_step, help='Log only a single step in the pipeline')
+def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_uploads_bucket, results_bucket, planes_url, 
+        image_local_dir, results_local_dir, sqs_queue_name, api, log_dir, log_level, log_step):
+
     if results_local_dir is None:
         print("Trying to get instance metadata")
         metadata = _get_instance_metadata()
@@ -86,26 +95,27 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
 
     print("Creating pipeline")
 
-    # Create the steps we want to use in the pipelines
-    steps = [
-        PipelineGetData(user_uploads_bucket),
-        PipelineRemoteNetworks("http://localhost:%d" % cpu_networks_port),
-        PipelineCalculateFov(fov_model_path),
-        PipelineRemotePlaneDetector(plane_url),
-        PipelineRunModels(
-            semantic_path=semantic_model_path,
-            hed_path=join("hed_model", "HED_pretrained_bsds.npz")
-        ),
-        PipelineDeterminePrimaryAngles(),
-        PipelineSuperpixels(),
-        PipelineRefinePlaneMasks(results_bucket),
-        PipelineCombinePlaneMasks(),
-        PipelineUploadResults(results_bucket)
-    ]
+    config = PipelineConfig()
+    config.mode = PipelineMode.Serve
+    config.src_path=user_uploads_bucket
+    config.dest_path=results_bucket
+
+    config.model_path = model_path
+    config.semantic_model_path = semantic_model_path
+    config.fov_model_path = fov_model_path
+    config.hed_model_path = hed_model_path
+    config.planes_url = planes_url
+    config.sqs_queue_name = sqs_queue_name
+
+    config.api_level = api
+    config.logging_dir = log_dir
+    config.logging_level = log_level
+    config.logging_step = None if log_step is None else PipelineStepIndex(log_step)
+
+    pipeline = Pipeline(config)
 
     # Start the processing workers for all steps
-    for step in steps:
-        step.start()
+    pipeline.start()
 
     total_pipeline_times = []
 
@@ -120,12 +130,12 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
 
         total_start_time = time()
 
-        for step in steps:
-            input_dict = await schedule_and_wait(step.schedule, input_dict)
+        results = await pipeline.process(input_dict)
+
         total_pipeline_time = time() - total_start_time
         print("Planes total pipeline time: %.2fs" % total_pipeline_time)
         total_pipeline_times.append((total_pipeline_time, datetime.datetime.now(dateutil.tz.tzlocal())))
-        return input_dict
+        return results
 
     print("SQS Queue name:", sqs_queue_name)
     if sqs_queue_name is not None:

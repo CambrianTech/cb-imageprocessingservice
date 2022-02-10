@@ -3,6 +3,8 @@ import typing
 from enum import IntEnum
 from types import SimpleNamespace
 
+from .data.logging import LogLevel
+
 class PipelineMode(IntEnum):
     Serve = 0
     Process = 1
@@ -32,7 +34,7 @@ class PipelineConfig(SimpleNamespace):
     stop_step=None
 
     logging_dir="logging"
-    logging_level=None
+    logging_level=LogLevel.Default
     logging_step = None
 
     cpu_networks_port=8082
