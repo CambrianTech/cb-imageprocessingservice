@@ -105,7 +105,7 @@ def CaffeBilinearUpSample(x, shape):
     return deconv
 
 
-class Model(ModelDesc):
+class HEDModel(ModelDesc):
     def inputs(self):
         return [tf.TensorSpec([None, None, None, 3], tf.float32, 'image'),
                 tf.TensorSpec([None, None, None], tf.int32, 'edgemap')]
@@ -196,28 +196,36 @@ class PipelineRunModels(PipelineStep):
 
     def __init__(self, pipeline):
         super().__init__(pipeline)
+        self.load_models(self.config.semantic_model_path, self.config.hed_model_path)
 
-        print("Initializing PipelineRunModels")
+    def load_models(self, semantic_model_path, hed_model_path, use_gpu=True):
+        print("Initializing PipelineRunModels steps: 1-5 follow")
 
-        print("Starting tensorflow")
+        print("1: Getting tensorflow session")
+        session_config = get_session_config(use_gpu=use_gpu)
 
-        _ = tf.Session(config=get_session_config(use_gpu=True))
+        print("2: Starting tensorflow")
+        _ = tf.Session(config=session_config)
 
-        print("Starting MXNet")
+        print("3: Starting MXNet (gluoncv) at path", semantic_model_path)
         self.mx_ctx = mx.gpu(0)
         self.model_semantic = get_model(
             "deeplab_resnest269_ade", pretrained=True,
-            root=self.config.semantic_model_path, ctx=self.mx_ctx
+            root=semantic_model_path, ctx=self.mx_ctx
         )
 
-        print("Starting hed OfflinePredictor")
+        print("4: Building HED model")
+        assembled_model = HEDModel()
+
+        print("5: Loading HED model weights at path", hed_model_path)
+        session = SmartInit(hed_model_path)
+
         self.model_hed = OfflinePredictor(PredictConfig(
-            model=Model(),
-            session_init=SmartInit(self.config.hed_model_path),
+            model=assembled_model,
+            session_init=session,
             input_names=['image'],
             output_names=['output%d' % k for k in range(1, 7)],
-            session_creator=NewSessionCreator(
-                config=get_session_config(use_gpu=True))
+            session_creator=NewSessionCreator(config=session_config)
         ))
 
         print("PipelineRunModels initialization complete")
@@ -239,10 +247,6 @@ class PipelineRunModels(PipelineStep):
         return True
 
     def run(self, data):
-
-        if self.gpu_id is None:
-            print("No GPU, skipping", self.description)
-            return
 
         images = [datum["image"] for datum in data]
 
