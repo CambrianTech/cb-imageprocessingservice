@@ -17,6 +17,8 @@ import boto3
 import requests
 from gpuinfo import GPUInfo
 
+from modelutils import get_session_config
+
 from pipeline.core import PipelineStepIndex
 from pipeline.config import PipelineMode, PipelineConfig
 from pipeline.pipeline import Pipeline
@@ -79,10 +81,8 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
     print("Setting default executor")
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor())
 
-    print("Starting CPU networks process")
-    cpu_networks_port = 8082
-    subprocess.Popen(["python3", "runcpunetworks.py",
-                      model_path, str(cpu_networks_port)])
+    print("Getting tensorflow config")
+    session_config = get_session_config(use_gpu=True)
 
     print("Creating pipeline")
 
@@ -90,6 +90,7 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
     config.mode = PipelineMode.Serve
     config.src_path=user_uploads_bucket
     config.dest_path=results_bucket
+    config.session_config = session_config
 
     config.model_path = model_path
     config.semantic_model_path = semantic_model_path
