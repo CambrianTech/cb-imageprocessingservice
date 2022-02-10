@@ -16,13 +16,17 @@ import aiohttp_cors
 import boto3
 import requests
 from gpuinfo import GPUInfo
+from modelutils import get_session_config
 
 from pipeline.core import schedule_and_wait, merge_future_dicts, num_waiting_items
 from pipeline.fov import PipelineCalculateFov
 from pipeline.getdata import PipelineGetData
 from pipeline.primaryangle import PipelineDeterminePrimaryAngles
 # from pipeline.refine import PipelineRefineResults
-from pipeline.runmodels import PipelineRunModels
+
+from pipeline.segmentation import PipelineSemanticSegmentation
+from pipeline.edgedetector import PipelineEdgeDetector
+
 from pipeline.superpixels import PipelineSuperpixels
 from pipeline.refineplanemasks import PipelineRefinePlaneMasks
 from pipeline.combineplanemasks import PipelineCombinePlaneMasks
@@ -84,18 +88,21 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
     subprocess.Popen(["python3", "runcpunetworks.py",
                       model_path, str(cpu_networks_port)])
 
+
+    print("Getting tensorflow config")
+    session_config = get_session_config(use_gpu=True)
+
     print("Creating pipeline")
 
     # Create the steps we want to use in the pipelines
+    hed_model_path = join("hed_model", "HED_pretrained_bsds.npz")
     steps = [
         PipelineGetData(user_uploads_bucket),
         PipelineRemoteNetworks("http://localhost:%d" % cpu_networks_port),
         PipelineCalculateFov(fov_model_path),
         PipelineRemotePlaneDetector(plane_url),
-        PipelineRunModels(
-            semantic_path=semantic_model_path,
-            hed_path=join("hed_model", "HED_pretrained_bsds.npz")
-        ),
+        PipelineEdgeDetector(session_config, hed_model_path),
+        PipelineSemanticSegmentation(semantic_model_path),
         PipelineDeterminePrimaryAngles(),
         PipelineSuperpixels(),
         PipelineRefinePlaneMasks(results_bucket),
