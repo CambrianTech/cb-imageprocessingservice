@@ -108,10 +108,9 @@ venv.bak/
 /refinement/output
 /tools/output
 /output
-logging
+/logging
 /tools/split_dataset
 /tools/dataset
-logging*
 
 .vscode/
 
