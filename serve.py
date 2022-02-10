@@ -105,8 +105,12 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
 
     pipeline = Pipeline(config)
 
+    print("Pipeline created. Starting...")
+
     # Start the processing workers for all steps
     pipeline.start()
+
+    print("Pipeline started.")
 
     total_pipeline_times = []
 

@@ -204,20 +204,23 @@ class PipelineRunModels(PipelineStep):
     def __init__(self, pipeline):
         super().__init__(pipeline)
 
-        print("Initialized PipelineRunModels")
+        print("Initializing PipelineRunModels")
         self.gpu_id = gpu_device()
         if self.config.use_gpu and self.gpu_id is None:
             print("NO GPU FOUND!")
             return
 
+        print("Starting tensorflow")
         _ = tf.Session(config=get_session_config(use_gpu=self.config.use_gpu))
 
+        print("Starting MXNet")
         self.mx_ctx = mx.gpu(self.gpu_id) if self.gpu_id is None else mx.cpu()
         self.model_semantic = get_model(
             "deeplab_resnest269_ade", pretrained=True,
             root=self.config.semantic_model_path, ctx=self.mx_ctx
         )
 
+        print("Starting hed model")
         self.model_hed = OfflinePredictor(PredictConfig(
             model=Model(),
             session_init=SmartInit(self.config.hed_model_path),
@@ -226,6 +229,8 @@ class PipelineRunModels(PipelineStep):
             session_creator=NewSessionCreator(
                 config=get_session_config(use_gpu=self.config.use_gpu))
         ))
+
+        print("PipelineRunModels initialization complete")
 
     @property
     def index(self) -> PipelineStepIndex:
