@@ -197,14 +197,20 @@ class PipelineRunModels(PipelineStep):
     def __init__(self, semantic_path: str, hed_path: str):
         super().__init__()
 
+        print("Initializing PipelineRunModels")
+
+        print("Starting tensorflow")
+
         _ = tf.Session(config=get_session_config(use_gpu=True))
 
+        print("Starting MXNet")
         self.mx_ctx = mx.gpu(0)
         self.model_semantic = get_model(
             "deeplab_resnest269_ade", pretrained=True,
             root=semantic_path, ctx=self.mx_ctx
         )
 
+        print("Starting hed OfflinePredictor")
         self.model_hed = OfflinePredictor(PredictConfig(
             model=Model(),
             session_init=SmartInit(hed_path),
@@ -213,6 +219,8 @@ class PipelineRunModels(PipelineStep):
             session_creator=NewSessionCreator(
                 config=get_session_config(use_gpu=True))
         ))
+
+        print("PipelineRunModels initialization complete")
 
     @property
     def required_keys(self) -> list:
