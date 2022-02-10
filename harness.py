@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from termcolor import colored
 
 from pipeline.config import PipelineMode, PipelineConfig
-from pipeline.core import ask_exit, PipelineMode, PipelineStepIndex
+from pipeline.core import ask_exit, PipelineStepIndex
 from pipeline.pipeline import Pipeline
 from pipeline.data.logging import LogLevel
 
