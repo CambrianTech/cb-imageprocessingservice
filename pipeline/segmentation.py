@@ -39,40 +39,46 @@ class PipelineSemanticSegmentation(PipelineStep):
 
     @property
     def is_batched(self) -> bool:
-        return True
+        return False
 
-    def run(self, data):
-
-        images = [datum["image"] for datum in data]
-
-        print("PipelineSemanticSegmentation", "prepare input")
-
-        t = time()
+    def predict(self, images):
 
         # Numpy to mx, resize, test-transform, batch
-        semantic_input = [
-            test_transform(
-                mx.img.resize_short(
-                    mx.nd.array(image, dtype=np.uint8),
-                    480
-                ),
-                self.mx_ctx
-            )
+        semantic_inputs = [
+            test_transform(mx.img.resize_short(mx.nd.array(image, dtype=np.uint8), 480), self.mx_ctx)
             for image in images
         ]
-
-        print("PipelineSemanticSegmentation", "predict")
 
         # Run semantic segmentation model
         # TODO: Batch properly?
         semantic_results = [
             self.model_semantic.predict(inp).asnumpy()
-            for inp in semantic_input
+            for inp in semantic_inputs
         ]
 
-        # Store logit and softmaxed results
-        for datum, result in zip(data, semantic_results):
-            datum["semantic"] = result
-            datum["semantic_probs"] = softmax(result[0], axis=0)
+        return semantic_results
+
+    def run(self, data):
+
+        print("PipelineSemanticSegmentation", "segment")
+
+        t = time()
+
+        if self.is_batched:
+            images = [datum["image"] for datum in data]
+
+            results = self.predict(images)
+
+            # Store logit and softmaxed results
+            for datum, result in zip(data, results):
+                datum["semantic"] = result
+                datum["semantic_probs"] = softmax(result[0], axis=0)
+        else:
+            images = [data["image"]]
+
+            result = self.predict(images)[0]
+
+            data["semantic"] = result
+            data["semantic_probs"] = softmax(result[0], axis=0)
 
         print("PipelineSemanticSegmentation", "Semantic model took %.2f seconds" % (time() - t))

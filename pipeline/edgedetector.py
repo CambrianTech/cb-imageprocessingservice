@@ -218,15 +218,9 @@ class PipelineEdgeDetector(PipelineStep):
 
     @property
     def is_batched(self) -> bool:
-        return True
+        return False
 
-    def run(self, data):
-
-        images = [datum["image"] for datum in data]
-
-        print("PipelineEdgeDetector", "Resize images")
-
-        t = time()
+    def predict(self, images):
 
         for i in range(len(images)):
             w, h, _ = images[i].shape
@@ -242,18 +236,27 @@ class PipelineEdgeDetector(PipelineStep):
                     h = 1024
             images[i] = cv2.resize(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB), (h, w)).astype('float32')
 
-        print("PipelineEdgeDetector", "HED resize took %.2f seconds with %d images" % (time() - t, len(images)))
-
-        t = time()
-
         #with each a different size, these cannot run in parallel:
-        for i in range(len(images)):
-            image = images[i]
-            datum = data[i]
+        results = []
 
+        for image in images:
             outputs = self.model_hed([image])
             hed = outputs[5][0]
-            
-            datum["hed"] = (255 * hed[:, :, 0]).astype("uint8")
+            results.append((255 * hed[:, :, 0]).astype("uint8"))            
+
+        return results
+
+    def run(self, data):
+
+        print("PipelineEdgeDetector", "HED model, find edges")
+        t = time()
+        if self.is_batched:
+            images = [datum["image"] for datum in data]
+            results = self.predict(images)
+            for i in range(len(images)):
+                data[i]["hed"] = results[i]
+        else:
+            images = [data["image"]]
+            data["hed"] = self.predict(images)[0]
 
         print("PipelineEdgeDetector", "HED model took %.2f seconds" % (time() - t))
