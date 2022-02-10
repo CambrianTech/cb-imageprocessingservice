@@ -5,7 +5,7 @@ from termcolor import colored
 
 from .config import PipelineMode, PipelineConfig
 from .core import schedule_and_wait, PipelineStep, PipelineStepIndex
-from .data.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, LogLevel, set_logging_level
+from .data.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, set_logging_level
 
 from .stages.aws.s3client import S3Client
 from .stages.fileinput import PipelineFileInput
