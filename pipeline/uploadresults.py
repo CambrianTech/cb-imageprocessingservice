@@ -92,8 +92,8 @@ def _make_data_v2_dict(data, lighting_url, superpixels_url, semantic_url, planes
 
     return {
         "formatVersion": 2,
-        "name": "Room %s" % data["image_s3_key"],
-        "id": "room-%s" % data["image_s3_key"],
+        "name": "Room %s" % data["unique_id"],
+        "id": "room-%s" % data["unique_id"],
         "floorRotation": data["floor_rotation"],
         "images": {
             "lighting": lighting_url,
@@ -167,8 +167,8 @@ def _make_data_v3_dict(data, lighting_url, superpixels_url, semantic_url, planes
     return {
         "formatVersion": 3,
         "version": "3.0.1",
-        "name": "Room %s" % data["image_s3_key"],
-        "id": "room-%s" % data["image_s3_key"],
+        "name": "Room %s" % data["unique_id"],
+        "id": "room-%s" % data["unique_id"],
         "floorRotation": data["floor_rotation"],
         "images": {
             "lighting": lighting_url,
@@ -224,14 +224,14 @@ class PipelineUploadResults(PipelineStep):
 
     def run(self, data):
 
-        key_semantic = "%s/mask.png" % data["image_s3_key"]
-        key_lighting = "%s/lighting.png" % data["image_s3_key"]
-        key_data = "%s/data.json" % data["image_s3_key"]
-        key_data_v2 = "%s/data_v2.json" % data["image_s3_key"]
-        key_data_v3 = "%s/data_v3.json" % data["image_s3_key"]
-        key_superpixels = "%s/superpixels.png" % data["image_s3_key"]
-        key_planes_index_mask = "%s/planes_index_mask.zz" % data["image_s3_key"]
-        key_planes_alpha_mask = "%s/planes_alpha_mask.png" % data["image_s3_key"]
+        key_semantic = "%s/mask.png" % data["unique_id"]
+        key_lighting = "%s/lighting.png" % data["unique_id"]
+        key_data = "%s/data.json" % data["unique_id"]
+        key_data_v2 = "%s/data_v2.json" % data["unique_id"]
+        key_data_v3 = "%s/data_v3.json" % data["unique_id"]
+        key_superpixels = "%s/superpixels.png" % data["unique_id"]
+        key_planes_index_mask = "%s/planes_index_mask.zz" % data["unique_id"]
+        key_planes_alpha_mask = "%s/planes_alpha_mask.png" % data["unique_id"]
 
         # Use AWS S3 url by default, or local server if one was set.
         base_url = "http://127.0.0.1:8080/getimage" if "results_local_dir" in data else "https://s3.amazonaws.com"
@@ -240,7 +240,7 @@ class PipelineUploadResults(PipelineStep):
             return "%s/%s/%s" % (base_url, self.bucket_name, path)
 
         def _make_plane_mask_url(plane_index):
-            return _make_url("%s/plane_masks/mask_%d.png" % (data["image_s3_key"], plane_index))
+            return _make_url("%s/plane_masks/mask_%d.png" % (data["unique_id"], plane_index))
 
         mask_image = data["mask"]
         lighting_image = data["lighting"]
@@ -295,7 +295,7 @@ class PipelineUploadResults(PipelineStep):
             if "planes" in data:
                 for i, plane_mask in enumerate(data["planes"]["masks"]):
                     _upload_image_to_s3(s3_client, plane_mask, self.bucket_name,
-                                        "%s/plane_masks/mask_%d.png" % (data["image_s3_key"], i))
+                                        "%s/plane_masks/mask_%d.png" % (data["unique_id"], i))
 
             _upload_json_to_s3(s3_client, data_v3_dict, self.bucket_name, key_data_v3)
 
@@ -352,7 +352,7 @@ class PipelineUploadResults(PipelineStep):
             if "planes" in data:
                 for i, plane_mask in enumerate(data["planes"]["masks"]):
                     plane_path = _make_local_url(
-                        "%s/plane_masks/mask_%d.png" % (data["image_s3_key"], i))
+                        "%s/plane_masks/mask_%d.png" % (data["unique_id"], i))
                     os.makedirs(os.path.dirname(plane_path), exist_ok=True)
                     if plane_mask.dtype == np.float32:
                         plane_mask = (255 * plane_mask).astype(np.uint8)

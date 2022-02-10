@@ -111,7 +111,15 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
 
     # Pipeline for finding planes, generating lighting and predicting fov.
     async def planes_pipeline(input_dict: typing.Dict):
+
+        if 'image_s3_key' in input_dict:
+            input_dict['unique_id'] = input_dict['image_s3_key']
+            print("Warning 'image_s3_key' is no longer being used. Please update this to 'unique_id'")
+
+        print("Running image %s through pipeline" % input_dict['unique_id'])
+
         total_start_time = time()
+
         for step in steps:
             input_dict = await schedule_and_wait(step.schedule, input_dict)
         total_pipeline_time = time() - total_start_time
@@ -161,15 +169,15 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
     async def handle_local_upload(request):
         print("Handle local file upload.", request)
 
-        image_s3_key = request.match_info.get("id", None)
-        if image_s3_key is None:
+        unique_id = request.match_info.get("id", None)
+        if unique_id is None:
             raise web.HTTPBadRequest()
 
         output_dir = join(image_local_dir, user_uploads_bucket)
         os.makedirs(output_dir, exist_ok=True)
 
         # Read 1MB chunks into the file
-        with open(join(output_dir, image_s3_key), "wb") as image_file:
+        with open(join(output_dir, unique_id), "wb") as image_file:
             while True:
                 chunk = await request.content.read(1024*1024)
                 if not chunk:
@@ -181,12 +189,12 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
     async def handle_get_image(request):
         print("Handle get image:", request)
 
-        image_s3_key = request.match_info.get("id", None)
+        unique_id = request.match_info.get("id", None)
         bucket = request.match_info.get("bucket", None)
-        if image_s3_key is None or bucket is None:
+        if unique_id is None or bucket is None:
             raise web.HTTPBadRequest()
 
-        return web.FileResponse(os.path.join(results_local_dir, bucket, image_s3_key))
+        return web.FileResponse(os.path.join(results_local_dir, bucket, unique_id))
 
     async def push_metrics_loop():
         loop = asyncio.get_event_loop()

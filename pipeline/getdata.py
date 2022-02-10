@@ -23,7 +23,7 @@ class PipelineGetData(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["image_s3_key"]
+        return ["unique_id"]
 
     @property
     def output_keys(self) -> list:
@@ -36,10 +36,10 @@ class PipelineGetData(PipelineStep):
         # Get image from S3 or local folder if local dir is set.
         if "image_local_dir" not in data:
             data["image"] = _get_image_from_s3(
-                s3_client, self.bucket_name, data["image_s3_key"])
+                s3_client, self.bucket_name, data["unique_id"])
         else:
             local_path = os.path.join(
-                data["image_local_dir"], self.bucket_name, data["image_s3_key"])
+                data["image_local_dir"], self.bucket_name, data["unique_id"])
             data["image"] = imread(local_path)
 
         data["image"] = data["image"][:, :, :3]
