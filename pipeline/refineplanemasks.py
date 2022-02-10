@@ -660,11 +660,10 @@ def ransac_vanishing_point(edgelets, lines, num_ransac_iter=2000, threshold_inli
     if line_indices is not None:
         inlier_indices = line_indices[inlier_indices]
 
-    if best_models is not None:
-        print("ransac 2 line", np.int32(best_models / best_models[2]))
+    # if best_models is not None:
+    #     print("ransac 2 line", np.int32(best_models / best_models[2]))
+
     return best_models, best_votes, inlier_indices
-
-
 
 
 def calcTransformation(points_1, points_2):
@@ -1062,11 +1061,11 @@ def compute_normal_from_vps(edgelets,img, fov, floor_normal, floor_offset, floor
                 lengths = np.linalg.norm(axes_new, axis=-1)
                 axes_new = np.float32(axes_new / np.dstack((lengths, lengths, lengths)))[0]
                 axes = np.float32([axes_new[0], axes_new[1], geometry.unit_vector(np.cross(axes_new[0], axes_new[1]))])
-                print("axes1", axes)
+                # print("axes1", axes)
         floor_normal = axes[2]
         floor_normal = -np.sign(floor_normal[2])*floor_normal
 
-    print("fov", fov, floor_normal)
+    # print("fov", fov, floor_normal)
     new_cam, _ = camera_fov_res_to_intrinsics(fov, np.array([img.shape[1], img.shape[0]]))
 
     plane, depth = calcPlaneXYZ([floor_normal*floor_offset], width=img.shape[1], height=img.shape[0], camera=new_cam, max_depth=10)
@@ -1619,7 +1618,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
                 labels_arg[label_mask] = wall_like_indices[arg[i] - 1] + 1
 
             else:
-                print('we look for a vertical plane instead of wall')
+                #print('we look for a vertical plane instead of wall')
                 vert_means = np.mean(full_planes[vert_not_wall][:, label_mask])
                 vert_arg = np.argmax(vert_means, -1)
 
@@ -1642,8 +1641,8 @@ class PipelineRefinePlaneMasks(PipelineStep):
                         plane_parameters[all_vertical[wall_index]] = plane_normals[all_vertical[wall_index]] * offset
 
                         labels_arg[label_mask] = all_vertical[wall_index] + 1
-                        print("if no good match just take the closest by angle", all_vertical,
-                              plane_parameters[all_vertical[wall_index]], all_vertical[wall_index])
+                        # print("if no good match just take the closest by angle", all_vertical,
+                        #       plane_parameters[all_vertical[wall_index]], all_vertical[wall_index])
 
         plane_XYZ, plane_depth = calcPlaneXYZ(plane_parameters, width=w, height=h, camera=camera, max_depth=10)
         logging_index = _log_segmentation_image(logging_dir, 'labels_arg.png', labels_arg, img_lr,

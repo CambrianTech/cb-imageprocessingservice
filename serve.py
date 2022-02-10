@@ -119,47 +119,6 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
         total_pipeline_times.append((total_pipeline_time, datetime.datetime.now(dateutil.tz.tzlocal())))
         return input_dict
 
-    # Setup http server
-    def get_pipeline_handler(pipeline_fn):
-        async def handle(request):
-            print("Handle segment:", request, "(items waiting in pipeline: %d)" %
-                  num_waiting_items(steps))
-
-            # Get image S3 key from GET request
-            image_s3_key = request.match_info.get("id", None)
-            if image_s3_key is None:
-                raise web.HTTPBadRequest()
-
-            data = {"image_s3_key": image_s3_key}
-
-            # Add local directories to initial data if specified
-            if image_local_dir is not None:
-                print(
-                    "WARNING: Do not use in production: image local dir set to", image_local_dir)
-                data["image_local_dir"] = image_local_dir
-            if results_local_dir is not None:
-                print(
-                    "WARNING: Do not use in production: results local dir set to", results_local_dir)
-                data["results_local_dir"] = results_local_dir
-
-            data = await pipeline_fn(data)
-
-            response_dict = {
-                "lighting_url": data["lighting_url"],
-                "semantic_url": data["semantic_url"],
-                "data_url": data["data_v3_url"],
-                "superpixels_url": data["superpixels_url"],
-            }
-
-            if "data_v2_url" in data:
-                response_dict["data_v2_url"] = data["data_v2_url"]
-
-            if "data_v3_url" in data:
-                response_dict["data_v3_url"] = data["data_v3_url"]
-
-            return web.json_response(response_dict)
-        return handle
-
     print("SQS Queue name:", sqs_queue_name)
     if sqs_queue_name is not None:
         if metadata is None:
@@ -190,7 +149,7 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
                         msg_data = json.loads(msg.body)
                         print("Running message in pipeline", msg_data)
                         result_data = await planes_pipeline(msg_data)
-                        print("Got pipeline results", result_data)
+                        print("Got pipeline results")
                     except Exception as e:
                         print("Error processing SQS message:", e)
         print("Starting SQS loop")
@@ -321,13 +280,6 @@ def main(model_path, semantic_model_path, fov_model_path, user_uploads_bucket, r
         )
     })
 
-    # Add public (CORS) routes
-    segment_resource = app.router.add_resource("/segment/{id}")
-    planes_resource = app.router.add_resource("/planes/{id}")
-    cors.add(segment_resource.add_route(
-        "GET", get_pipeline_handler(planes_pipeline)))
-    cors.add(planes_resource.add_route(
-        "GET", get_pipeline_handler(planes_pipeline)))
 
     # Add endpoint for directly getting and uploading images if local
     # image input dir was defined

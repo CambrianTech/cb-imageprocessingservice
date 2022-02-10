@@ -33,6 +33,8 @@ def main(model_path, port):
             lighting = feed_image_batched(model_lighting, images)
             normals = feed_image_batched(model_normals, images)
 
+            print("Processed request:", request)
+
             return web.Response(body=pickle.dumps({
                 "lighting": lighting,
                 "normals": normals
