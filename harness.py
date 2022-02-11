@@ -121,7 +121,6 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     pipeline.start()
     loop.run_until_complete(process_files(pipeline, files))
-    pipeline.stop()
 
     elapsed = (time.time() - start_time)
     avg = elapsed / len(files)

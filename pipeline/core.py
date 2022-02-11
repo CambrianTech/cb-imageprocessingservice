@@ -85,17 +85,13 @@ class PipelineStep(metaclass=ABCMeta):
 
     def stop(self):
         self._running = False
+        print("Stopping %s" % self.description)
 
     async def run_step_in_background(self):
         loop = asyncio.get_event_loop()
 
         while self._running:
-            #sleep on running and entries
-            if self._input_queue.empty():
-                await asyncio.sleep(0.0001)
-                continue
-
-            datum, result_future = self._input_queue.get_nowait()
+            datum, result_future = await self._input_queue.get()
             self._input_queue.task_done()
 
             if result_future.cancelled():
@@ -136,7 +132,7 @@ class PipelineStep(metaclass=ABCMeta):
                         result_future.set_exception(e)
                 continue
 
-            #print(type(self), "time: %.2fs" % (time() - step_start_time), "data count:", len(data))
+            print(type(self), "time: %.2fs" % (time() - step_start_time), "data count:", len(data))
 
             for result_future, datum in zip(result_futures, data):
                 if not result_future.cancelled():
