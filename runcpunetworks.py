@@ -22,11 +22,11 @@ def main(model_path, port, message):
 
     @routes.post("/healthcheck")
     async def healthcheck(request):
-        print("Received healthcheck request:", request)
+        # print("Received healthcheck request:", request)
         try:
             return web.Response(body=message)
         except Exception as e:
-            print("Error:", e)
+            print("healthcheck request error:", e)
             return web.HTTPInternalServerError()
 
     @routes.post("/")

@@ -17,8 +17,12 @@ class PipelineReverseRenderer(PipelineStep):
 
     def __init__(self, pipeline):
         super().__init__(pipeline)
+
+        self.service_name = "%s:%d" % (self.config.cpu_networks_script, self.config.cpu_networks_port)
         self.child_process = None
         self.health_thread = None
+
+        self.start_remote_process()
 
     @property
     def index(self) -> PipelineStepIndex:
@@ -39,7 +43,7 @@ class PipelineReverseRenderer(PipelineStep):
     def healthchecker(self):  
         try:
             url = "%s/healthcheck" % (self.config.cpu_networks_path)
-            print("Posting data to %s" % url)
+            # print("Posting data to %s" % url)
             resp = requests.post(url)
             resp.raise_for_status()
 
@@ -52,15 +56,17 @@ class PipelineReverseRenderer(PipelineStep):
         print("healthcheck indicated dead process, restarting")
         self.stop_remote_process()
 
-    def start_remote_process(self, timeout=15, debounce=0.5, success_message = "$SUCCESS"):
+    def start_remote_process(self, timeout=15, debounce=0.5, success_message = "$SUCCESS", healthchecker_interval=5):
         start = time.time()
-        service_name = "%s:%d" % (self.config.cpu_networks_script, self.config.cpu_networks_port)
-        print(colored("Connecting to %s" % service_name, 'green'))
+        
+        print(colored("Connecting to %s" % self.service_name, 'green'))
 
         self.child_process = subprocess.Popen(["python3", self.config.cpu_networks_script, self.config.model_path, str(self.config.cpu_networks_port), success_message], \
             stderr=subprocess.PIPE, universal_newlines=True)
         
         stream = self.child_process.stderr
+
+        success = False
 
         y = select.poll()
         y.register(stream, select.POLLIN)
@@ -71,15 +77,21 @@ class PipelineReverseRenderer(PipelineStep):
                 if len(line):
                     line = line.strip()
                     if line == success_message:
-                        print(colored("Connection to %s successful. Received message: %s" % (service_name, line), 'green'))
+                        print(colored("Connection to %s successful. Received message: %s" % (self.service_name, line), 'green'))
+                        success = True
                         break
                     else:
-                        print("subprocess", line)
+                        print(self.service_name, line)
             else:
                 time.sleep(debounce)
 
-        self.health_thread = DaemonStoppableThread(sleep_time=1, target=self.healthchecker, name='health_thread')
-        self.health_thread.start()
+        if success: 
+            self.health_thread = DaemonStoppableThread(sleep_time=healthchecker_interval, target=self.healthchecker, name='health_thread')
+            self.health_thread.start()
+        else:
+            print(colored("Connection to %s unsuccessful." % (self.service_name), 'red'))
+            self.child_process = None
+
 
     def stop_remote_process(self):
         if self.child_process is None: return
@@ -98,7 +110,7 @@ class PipelineReverseRenderer(PipelineStep):
     def remote_networks(self, data):
         
         try:
-            print("Posting data to %s" % self.config.cpu_networks_path)
+            print("Running reverse renderer at", self.config.cpu_networks_path)
             images = [datum["image"] for datum in data]
             resp = requests.post(self.config.cpu_networks_path, data=pickle.dumps(images))
             resp.raise_for_status()
@@ -108,9 +120,10 @@ class PipelineReverseRenderer(PipelineStep):
 
         except requests.exceptions.HTTPError as e:
             error_message = e.response.text
-            print(colored(error_message, 'red', attrs=['bold']))
-        except:
-            self.stop_remote_process()
+            print(colored(error_message, 'red', attrs=['bold']))            
+
+        print("Reverse renderer failed to connect to remote process", self.config.cpu_networks_path)
+        self.stop_remote_process()
 
     def run(self, data: dict) -> None:
 
