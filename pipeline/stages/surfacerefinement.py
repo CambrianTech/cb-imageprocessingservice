@@ -130,7 +130,7 @@ class SurfaceRefinement():
 
         #denoised = rank.median(self.image[:,:,1], disk(5))
         #denoised = cv2.bilateralFilter(self.image[:,:,1], 9, 20, 20)
-        run_watershed(self.image, freedom=0.05, use_cv=True)
+        run_watershed(self.image.copy(), freedom=0.05, use_cv=True)
 
         timer.log_all_events()
 
