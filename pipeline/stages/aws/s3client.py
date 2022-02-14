@@ -2,6 +2,8 @@ from io import BytesIO
 import boto3
 import numpy as np
 import os
+import json
+
 try:
     from imageio import imread, imsave
 except:
