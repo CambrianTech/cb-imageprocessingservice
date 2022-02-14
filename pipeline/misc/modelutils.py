@@ -30,7 +30,7 @@ def feed_images_batched(model, images_batch: list) -> list:
             # done before potentially expanding the
             # channels dimension as it removes it again.
             size = tuple(shape[1:3])
-            img = cv2.resize(img, int(size[0]), int(size[1]))
+            img = cv2.resize(img, (int(size[0]), int(size[1])))
 
             # Make sure we have the channels dimension
             # for 1-channel images.
