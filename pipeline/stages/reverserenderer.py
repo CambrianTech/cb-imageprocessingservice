@@ -21,6 +21,7 @@ class PipelineReverseRenderer(PipelineStep):
         self.service_name = "%s:%d" % (self.config.cpu_networks_script, self.config.cpu_networks_port)
         self.child_process = None
         self.health_thread = None
+        self.failed_attempts = 0
 
         self.start_remote_process()
 
@@ -56,7 +57,7 @@ class PipelineReverseRenderer(PipelineStep):
         print("healthcheck indicated dead process, restarting")
         self.stop_remote_process()
 
-    def start_remote_process(self, timeout=15, debounce=0.5, success_message = "$SUCCESS", healthchecker_interval=5):
+    def start_remote_process(self, timeout=15, debounce=0.5, success_message = "$SUCCESS"):
         start = time.time()
         
         print(colored("Connecting to %s" % self.service_name, 'green'))
@@ -66,6 +67,7 @@ class PipelineReverseRenderer(PipelineStep):
         
         stream = self.child_process.stderr
 
+        self.failed_attempts = 0
         success = False
 
         y = select.poll()
@@ -80,13 +82,15 @@ class PipelineReverseRenderer(PipelineStep):
                         print(colored("Connection to %s successful. Received message: %s" % (self.service_name, line), 'green'))
                         success = True
                         break
-                    else:
+                    elif self.config.cpu_networks_show_stderr:
                         print(self.service_name, line)
             else:
                 time.sleep(debounce)
 
         if success: 
-            self.health_thread = DaemonStoppableThread(sleep_time=healthchecker_interval, target=self.healthchecker, name='health_thread')
+            time.sleep(debounce)
+            print(colored("Starting healthcheck monitor"))
+            self.health_thread = DaemonStoppableThread(sleep_time=self.config.cpu_networks_healthchecker_interval, target=self.healthchecker, name='health_thread')
             self.health_thread.start()
         else:
             print(colored("Connection to %s unsuccessful." % (self.service_name), 'red'))
@@ -122,8 +126,11 @@ class PipelineReverseRenderer(PipelineStep):
             error_message = e.response.text
             print(colored(error_message, 'red', attrs=['bold']))            
 
-        print("Reverse renderer failed to connect to remote process", self.config.cpu_networks_path)
-        self.stop_remote_process()
+        self.failed_attempts += 1
+
+        if self.failed_attempts > self.config.cpu_networks_allotted_failures:
+            print("Reverse renderer failed to connect to remote process for %d times beyond threshold %d" % (self.failed_attempts, self.config.cpu_networks_allotted_failures))
+            self.stop_remote_process()
 
     def run(self, data: dict) -> None:
 

@@ -20,6 +20,8 @@ def main(model_path, port, message):
 
     routes = web.RouteTableDef()
 
+    print("Models successfully loaded from", model_path)
+
     @routes.post("/healthcheck")
     async def healthcheck(request):
         # print("Received healthcheck request:", request)

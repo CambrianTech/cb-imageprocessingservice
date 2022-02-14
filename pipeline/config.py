@@ -38,6 +38,9 @@ class PipelineConfig(SimpleNamespace):
 
     cpu_networks_port=8082
     cpu_networks_script="runcpunetworks.py"
+    cpu_networks_allotted_failures=0
+    cpu_networks_show_stderr=True
+    cpu_networks_healthchecker_interval=5
     
     @property
     def cpu_networks_path(self) -> str:
