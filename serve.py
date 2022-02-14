@@ -17,8 +17,7 @@ import boto3
 import requests
 from gpuinfo import GPUInfo
 
-from modelutils import get_session_config
-
+from pipeline.misc.modelutils import get_session_config
 from pipeline.core import PipelineStepIndex
 from pipeline.config import PipelineMode, PipelineConfig
 from pipeline.pipeline import Pipeline

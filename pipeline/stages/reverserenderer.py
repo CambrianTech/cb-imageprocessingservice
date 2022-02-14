@@ -8,10 +8,11 @@ import os
 import subprocess
 import select
 import threading
+from termcolor import colored
 
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.misc.utils import camera_fov_res_to_intrinsics, DaemonStoppableThread
-from termcolor import colored
+from pipeline.misc.modelutils import feed_image_batched, load_model, get_session_config
 
 class PipelineReverseRenderer(PipelineStep):
 
@@ -22,8 +23,9 @@ class PipelineReverseRenderer(PipelineStep):
         self.child_process = None
         self.health_thread = None
         self.failed_attempts = 0
-
-        self.start_remote_process()
+        self.models_loaded = False
+        self.start_networks()
+        #self.start_remote_process()
 
     @property
     def index(self) -> PipelineStepIndex:
@@ -41,9 +43,9 @@ class PipelineReverseRenderer(PipelineStep):
     def is_batched(self) -> bool:
         return True
 
-    def healthchecker(self):  
+    def healthchecker(self, endpoint="healthcheck"):  
+        url = "%s/%s" % (self.config.cpu_networks_path, endpoint)
         try:
-            url = "%s/healthcheck" % (self.config.cpu_networks_path)
             # print("Posting data to %s" % url)
             resp = requests.post(url)
             resp.raise_for_status()
@@ -51,11 +53,19 @@ class PipelineReverseRenderer(PipelineStep):
             if resp.ok:
                 return
         except Exception as e:
-            print("healthcheck", url, e)
+            print(url, e)
             pass
         
-        print("healthcheck indicated dead process, restarting")
+        print("%s indicated dead process, restarting" % endpoint)
         self.stop_remote_process()
+
+    def start_networks(self, use_gpu=False):
+        print("Loading models from", self.config.model_path)
+        cfg = get_session_config(use_gpu=use_gpu)
+        self.model_lighting = load_model(os.path.join(self.config.model_path, "lighting"), session_config=cfg)
+        self.model_normals = load_model(os.path.join(self.config.model_path, "normals"), session_config=cfg)
+
+        self.models_loaded = True #todo:signal
 
     def start_remote_process(self, timeout=15, debounce=0.5, success_message = "$SUCCESS"):
         start = time.time()
@@ -111,20 +121,24 @@ class PipelineReverseRenderer(PipelineStep):
         if self.health_thread is not None and self.health_thread.is_alive():
             self.health_thread.stop()
 
-    def remote_networks(self, data):
-        
+    def remote_networks(self, images, endpoint="process"):
+        url = "%s/%s" % (self.config.cpu_networks_path, endpoint)
+
         try:
-            print("Running reverse renderer at", self.config.cpu_networks_path)
-            images = [datum["image"] for datum in data]
-            resp = requests.post(self.config.cpu_networks_path, data=pickle.dumps(images))
+            if self.child_process is None:
+                self.start_remote_process() #todo: otherwise wait on thread signal 
+
+            print("Running reverse renderer at", url)            
+
+            resp = requests.post(url, data=pickle.dumps(images))
             resp.raise_for_status()
 
             if resp.ok:
                 return pickle.loads(resp.content)
 
-        except requests.exceptions.HTTPError as e:
-            error_message = e.response.text
-            print(colored(error_message, 'red', attrs=['bold']))            
+        except Exception as e:
+            print(url, e)
+            pass
 
         self.failed_attempts += 1
 
@@ -132,15 +146,36 @@ class PipelineReverseRenderer(PipelineStep):
             print("Reverse renderer failed to connect to remote process for %d times beyond threshold %d" % (self.failed_attempts, self.config.cpu_networks_allotted_failures))
             self.stop_remote_process()
 
-    def run(self, data: dict) -> None:
+    def local_networks(self, images):
 
-        if self.child_process is None:
-            self.start_remote_process() #and wait            
+        print('Waiting on models to load')
+        while not self.models_loaded:
+            time.sleep(debounce)
 
-        response_dict = self.remote_networks(data)
+        print('Models loaded')
 
-        if response_dict is None:
-            return
+        response_dict = {}
+
+        print('Running lighting network')
+        response_dict["lighting"] = feed_image_batched(self.model_lighting, images)
+
+        print('Running normals network')
+        response_dict["normals"] = feed_image_batched(self.model_normals, images)
+
+        return response_dict
+
+    def run(self, data: dict, debounce=0.5) -> None:
+
+        images = [datum["image"] for datum in data]
+        if len(images) == 0: 
+            print("No images to reverse render")
+            return   
+
+        # response_dict = self.remote_networks(images)
+        response_dict = self.local_networks(images)
+
+        # if response_dict is None:
+        #     return
 
         for datum, lighting, normals in zip(data, response_dict["lighting"], response_dict["normals"]):
             datum["lighting"] = lighting

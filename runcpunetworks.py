@@ -5,18 +5,18 @@ import sys
 from aiohttp import web
 import numpy as np
 import click
-from modelutils import feed_image_batched, load_model, get_session_config
+from pipeline.misc.modelutils import feed_image_batched, load_model, get_session_config
 
 @click.command()
 @click.argument("model_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("port", type=click.IntRange(0, 65535))
 @click.argument("message", default="SUCCESS", type=click.STRING)
-def main(model_path, port, message):
-    max_size = 100 * 1024 * 1024  # Max size to receive
+def main(model_path, port, message, use_gpu=False):
+    max_size = 10000 * 1024 * 1024  # Max size to receive
 
     print("Loading models from", model_path)
-    model_lighting = load_model(os.path.join(model_path, "lighting"), session_config=get_session_config(use_gpu=False))
-    model_normals = load_model(os.path.join(model_path, "normals"), session_config=get_session_config(use_gpu=False))
+    model_lighting = load_model(os.path.join(model_path, "lighting"), session_config=get_session_config(use_gpu=use_gpu))
+    model_normals = load_model(os.path.join(model_path, "normals"), session_config=get_session_config(use_gpu=use_gpu))
 
     routes = web.RouteTableDef()
 
@@ -24,16 +24,17 @@ def main(model_path, port, message):
 
     @routes.post("/healthcheck")
     async def healthcheck(request):
-        # print("Received healthcheck request:", request)
+        print("Received healthcheck request")
         try:
             return web.Response(body=message)
         except Exception as e:
-            print("healthcheck request error:", e)
-            return web.HTTPInternalServerError()
+            print("healthcheck had error", e)
+            
+        return web.HTTPInternalServerError()
 
-    @routes.post("/")
+    @routes.post("/process")
     async def index(request):
-        print("Received request:", request)
+        print("Processing process request")
         try:
             data = await request.read()
 
@@ -51,8 +52,9 @@ def main(model_path, port, message):
                 "lighting": lighting,
                 "normals": normals
             }))
+
         except Exception as e:
-            print("Error:", e)
+            print("process had error", e)
         
         return web.HTTPInternalServerError()
 
