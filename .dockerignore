@@ -18,15 +18,15 @@ coverage.xml
 *.log
 .git
 
-planercnn
-sklearn_models
-tensorflow_models
-gluon_models
-images
-results
+/planercnn
+/sklearn_models
+/tensorflow_models
+/gluon_models
 
-output
-data
+/images
+/results
+/output
+/data
 /logging
-scripts
-single
+/scripts
+/single
