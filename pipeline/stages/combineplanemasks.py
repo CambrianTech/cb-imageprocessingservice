@@ -71,8 +71,14 @@ class PipelineCombinePlaneMasks(PipelineStep):
 
     def run(self, data):
         for datum in data:
-            index_mask, alpha_mask = combine_plane_masks(
-                datum["planes"]["masks"])
+            room = datum["room"]
+
+            masks = np.array([(surface.mask if surface.final_mask is None else surface.final_mask) for surface in room.surfaces])
+
+            #temp = datum["planes"]["masks"]
+            #print("\n\nshape shape\n\n", temp.shape, masks.shape)
+
+            index_mask, alpha_mask = combine_plane_masks(masks)
 
             datum["planes_index_mask"] = index_mask
             datum["planes_alpha_mask"] = alpha_mask

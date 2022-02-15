@@ -105,7 +105,7 @@ class Pipeline():
         all_steps[PipelineStepIndex.EstimatePose] = PipelinePoseEstimator
         all_steps[PipelineStepIndex.Refine] = PipelineSurfaceRefinement
         all_steps[PipelineStepIndex.Superpixels] = None
-        all_steps[PipelineStepIndex.CombinePlaneMasks] = None
+        all_steps[PipelineStepIndex.CombinePlaneMasks] = PipelineCombinePlaneMasks
         all_steps[PipelineStepIndex.Output] = output_step
         
 
