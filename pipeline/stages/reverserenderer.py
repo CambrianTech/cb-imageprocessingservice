@@ -23,6 +23,7 @@ class PipelineReverseRenderer(PipelineStep):
         self.child_process = None
         self.health_thread = None
         self.failed_attempts = 0
+        self.debounce = 0.5
         self.models_loaded = False
         self.start_networks()
         #self.start_remote_process()
@@ -59,15 +60,14 @@ class PipelineReverseRenderer(PipelineStep):
         print("%s indicated dead process, restarting" % endpoint)
         self.stop_remote_process()
 
-    def start_networks(self, use_gpu=False):
+    def start_networks(self):
         print("Loading models from", self.config.model_path)
-        cfg = get_session_config(use_gpu=use_gpu)
-        self.model_lighting = load_model(os.path.join(self.config.model_path, "lighting"), session_config=cfg)
-        self.model_normals = load_model(os.path.join(self.config.model_path, "normals"), session_config=cfg)
+        self.model_lighting = load_model(os.path.join(self.config.model_path, "lighting"), session_config=self.config.session_config)
+        self.model_normals = load_model(os.path.join(self.config.model_path, "normals"), session_config=self.config.session_config)
 
         self.models_loaded = True #todo:signal
 
-    def start_remote_process(self, timeout=15, debounce=0.5, success_message = "$SUCCESS"):
+    def start_remote_process(self, timeout=15, success_message = "$SUCCESS"):
         start = time.time()
         
         print(colored("Connecting to %s" % self.service_name, 'green'))
@@ -95,10 +95,10 @@ class PipelineReverseRenderer(PipelineStep):
                     elif self.config.cpu_networks_show_stderr:
                         print(self.service_name, line)
             else:
-                time.sleep(debounce)
+                time.sleep(self.debounce)
 
         if success: 
-            time.sleep(debounce)
+            time.sleep(self.debounce)
             print(colored("Starting healthcheck monitor"))
             self.health_thread = DaemonStoppableThread(sleep_time=self.config.cpu_networks_healthchecker_interval, target=self.healthchecker, name='health_thread')
             self.health_thread.start()
@@ -150,7 +150,7 @@ class PipelineReverseRenderer(PipelineStep):
 
         print('Waiting on models to load')
         while not self.models_loaded:
-            time.sleep(debounce)
+            time.sleep(self.debounce)
 
         print('Models loaded')
 
@@ -164,7 +164,7 @@ class PipelineReverseRenderer(PipelineStep):
 
         return response_dict
 
-    def run(self, data: dict, debounce=0.5) -> None:
+    def run(self, data: dict) -> None:
 
         images = [datum["image"] for datum in data]
         if len(images) == 0: 
