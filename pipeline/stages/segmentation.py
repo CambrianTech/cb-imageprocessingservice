@@ -15,8 +15,6 @@ from gluoncv.data import batchify
 from mxnet import image
 import mxnet as mx
 
-from .combineplanemasks import combine_plane_masks, combine_plane_clusters
-
 from pipeline.core import PipelineStep, PipelineStepIndex
 
 class PipelineSemanticSegmentation(PipelineStep):

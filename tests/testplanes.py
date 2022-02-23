@@ -1,9 +1,7 @@
 import unittest
-from pipeline.combineplanemasks import combine_plane_masks
 from pipeline.uploadresults import get_compressed_index_mask
 import numpy as np
 import zlib
-
 
 class TestPlanePostProcessing(unittest.TestCase):
     def test_combine_plane_masks(self):

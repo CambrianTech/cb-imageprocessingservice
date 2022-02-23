@@ -86,13 +86,6 @@ class PipelineOutput(PipelineStep):
             self.save_image(data["lighting"], filename, lighting_url)
             data["lighting_url"] = lighting_url
 
-            if self.config.api_level == 2:
-                filename = "superpixels.png"
-                superpixels_url = self.make_url(filename)
-                self.save_image(data["superpixels"], filename, superpixels_url)
-                data["superpixels_url"] = self.make_url(superpixels_url)
-
-
             if self.config.api_level == 2 or self.config.api_level == 3:            
                 if "masks" in data:
                     for i, plane_mask in enumerate(data["masks"]):
@@ -105,18 +98,11 @@ class PipelineOutput(PipelineStep):
                     results = self.make_data_v3_dict(data, image_url, lighting_url)
             else:
 
-                if "planes_index_mask" in data:
-                    filename = "planes_index_mask.zz"
-                    planes_index_mask_url = self.make_url(filename)
-                    image = self.get_compressed_index_mask(data["planes_index_mask"])
-                    self.save_file(image, filename, planes_index_mask_url)
+                filename = "index_mask.png"
+                index_mask_url = self.make_url(filename)
+                self.save_image(data["index_mask"], filename, index_mask_url)    
 
-                    filename = "planes_alpha_mask.png"
-                    planes_alpha_mask_url = self.make_url(filename)
-                    self.save_image(data["planes_alpha_mask"], filename, planes_alpha_mask_url)
-
-
-                #save masks independently temporarily
+                #save masks independently TEMPORARILY
                 surfaces = data["room"].surfaces
                 for i in range(len(surfaces)):
                     surface = surfaces[i]
@@ -128,7 +114,7 @@ class PipelineOutput(PipelineStep):
                         mask = cv2.resize(mask, (int(scale * mask.shape[1]), int(scale * mask.shape[0])))
                     self.save_image(mask, filename, mask_url)
 
-                results = self.make_data_v4_dict(data, image_url, lighting_url, planes_index_mask_url, planes_alpha_mask_url)
+                results = self.make_data_v4_dict(data, image_url, lighting_url, index_mask_url)
 
         results["data_url"] = data["data_url"]
 
@@ -292,7 +278,7 @@ class PipelineOutput(PipelineStep):
             "assets": []
         }
 
-    def make_data_v4_dict(self, data, image_url, lighting_url, planes_index_mask_url, planes_alpha_mask_url):
+    def make_data_v4_dict(self, data, image_url, lighting_url, index_mask_url):
 
         # surfaces_json = self.encode_plane_surface_v4(0, data["room"].surfaces[0], self.make_plane_mask_url(0))
         # print("surfaces_json 4:\n", surfaces_json)
@@ -310,10 +296,7 @@ class PipelineOutput(PipelineStep):
             "images": {
                 "main": image_url,
                 "lighting": lighting_url,
-                "planes_alpha_mask": planes_alpha_mask_url
-            },
-            "compressed": {
-                "planes_index_mask": planes_index_mask_url,
+                "index_mask": index_mask_url
             },
             "camera": {
                 "fov": data["fov"],
@@ -328,18 +311,3 @@ class PipelineOutput(PipelineStep):
             },
             "assets": []
         }
-
-
-    def get_compressed_index_mask(self, index_mask):
-        # Convert int16 to two uint8
-        assert index_mask.dtype == np.int16
-        index_mask_bytes = index_mask.tobytes()
-
-        # Compress the bytes with zlib (deflate).
-        compress = zlib.compressobj()
-        compressed_index_mask_bytes = compress.compress(
-            index_mask_bytes
-        )
-        compressed_index_mask_bytes += compress.flush()
-
-        return compressed_index_mask_bytes
