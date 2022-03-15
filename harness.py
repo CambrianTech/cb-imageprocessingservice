@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from termcolor import colored
 
 from pipeline.config import PipelineMode, PipelineConfig
-from pipeline.core import ask_exit, PipelineStepIndex
+from pipeline.core import PipelineStepIndex
 from pipeline.pipeline import Pipeline
 from pipeline.data.logging import LogLevel
 
@@ -115,7 +115,7 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     loop.set_default_executor(ThreadPoolExecutor())
 
     for sig in (signal.SIGINT, signal.SIGTERM):          
-        loop.add_signal_handler(sig, ask_exit)  
+        loop.add_signal_handler(sig, pipeline.stop)  
 
     start_time = time.time()
 

@@ -163,11 +163,4 @@ def exit():
     loop = asyncio.get_event_loop()                      
     print("Stop")                                        
     loop.stop()                                          
-
-
-def ask_exit():                          
-    for task in asyncio.all_tasks():
-        task.cancel()                    
-    asyncio.ensure_future(exit()) 
-
-
+                        
