@@ -103,7 +103,7 @@ class PipelineOutput(PipelineStep):
             "id": str(surface.uniqueId),
             "type": surface.surfaceType.name,
             "name": surface.name,
-            "mask_index": plane_index + 1,
+            "maskIndex": plane_index + 1,
             "normal": plane_normal,
             "offset": plane_offset,
             "axisRotation": -surface.axisRotation if self.y_up else surface.axisRotation
