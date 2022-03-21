@@ -41,7 +41,9 @@ class SurfaceRefinement():
         # refine.cv2.watershed took a total of 0.0255 seconds for 1 iterations, avg: 0.0255
         # refine.set masks took a total of 0.0905 seconds for 1 iterations, avg: 0.0905
 
-        def run_watershed(src, freedom=0.15, use_cv=False):
+        def run_watershed(freedom, use_cv=False):
+
+            src = self.image.copy() if use_cv else self.data["hed"]
 
             watershed_mask = None if use_cv else np.ones(src.shape, dtype=np.int32)
             markers = np.zeros((src.shape[0], src.shape[1]), dtype=np.int32)
@@ -84,7 +86,7 @@ class SurfaceRefinement():
                     draw_barrier_markers(sb.barrier_groups)
                 timer.time_event("draw_barrier_markers")
 
-            elif use_cv:
+            else:
                 #bright green
                 draw_lines(src, self.data["lines"], color=(0,255,0), sx=sx, sy=sy)
                 timer.time_event("draw_lines")
@@ -130,7 +132,8 @@ class SurfaceRefinement():
 
         #denoised = rank.median(self.image[:,:,1], disk(5))
         #denoised = cv2.bilateralFilter(self.image[:,:,1], 9, 20, 20)
-        run_watershed(self.image.copy(), freedom=0.05, use_cv=True)
+
+        run_watershed(freedom=0.01, use_cv=True)
 
         timer.log_all_events()
 
