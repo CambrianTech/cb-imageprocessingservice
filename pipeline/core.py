@@ -6,6 +6,7 @@ from multiprocessing import cpu_count
 from enum import IntEnum
 from termcolor import colored
 from types import SimpleNamespace
+import traceback
 
 from .config import PipelineMode, PipelineConfig
 
@@ -126,7 +127,8 @@ class PipelineStep(metaclass=ABCMeta):
             try:
                 await loop.run_in_executor(None, self.run, data[0] if not self.is_batched else data)
             except Exception as e:
-                print("Exception in run_in_executor for %s:" % type(self), e)
+                traceback.print_exc()
+                
                 for result_future in result_futures:
                     if not result_future.cancelled():
                         result_future.set_exception(e)
