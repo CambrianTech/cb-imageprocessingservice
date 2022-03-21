@@ -304,7 +304,7 @@ class Room(Geometry):
                                 surfaces[i]._alteration = "%.2fm %.2fd" % (distance_between, angle_threshold)
 
         
-    def refine_surfaces(self, min_confidence=None, use_lines=True, debug_suffix=""):
+    def refine_surfaces(self, min_confidence=None, freedom=0.33, use_lines=True, debug_suffix=""):
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
 
         final_masks = {}
@@ -326,7 +326,7 @@ class Room(Geometry):
             for index in range(num_surfaces):
                 surface = surfaces[index]
                 dist_transform = surface.mask_transform
-                markers[dist_transform > 0.15 * dist_transform.max()] = index + 1
+                markers[dist_transform > freedom * dist_transform.max()] = index + 1
 
             markers[disputed_areas > 0] = 0
 

@@ -18,7 +18,6 @@ from .stages.segmentation import PipelineSemanticSegmentation
 from .stages.edgedetector import PipelineEdgeDetector
 from .stages.superpixels import PipelineSuperpixels
 from .stages.planegeometry import PipelinePlaneGeometry
-from .stages.refineplanemasks import PipelineRefinePlaneMasks
 from .stages.linefinder import PipelineLineFinder
 from .stages.combineplanemasks import PipelineCombinePlaneMasks
 from .stages.planedetector import PipelinePlaneDetector
