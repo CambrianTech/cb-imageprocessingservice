@@ -97,7 +97,7 @@ class Pipeline():
         all_steps[PipelineStepIndex.ExtractSurfaces] = PipelineExtractSurfaces
         all_steps[PipelineStepIndex.FindLines] = PipelineLineFinder
         all_steps[PipelineStepIndex.SolveRoom] = PipelineRoomSolver
-        all_steps[PipelineStepIndex.VanishingPoints] = None
+        all_steps[PipelineStepIndex.VanishingPoints] = PipelineVanishingPointFinder
         all_steps[PipelineStepIndex.Barriers] = None
         all_steps[PipelineStepIndex.FindTrim] = None
         all_steps[PipelineStepIndex.FindLegs] = None
