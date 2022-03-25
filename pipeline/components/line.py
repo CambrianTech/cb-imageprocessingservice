@@ -76,8 +76,8 @@ class Line():
     def closest_point(self, point):
         return closest_line_point(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], point[0], point[1])
 
-    def draw(self, img, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
-        draw_line(line, img, (int(self.point_a[0] * sx), int(self.point_a[1] * sy)), (int(self.point_b[0] * sx), int(self.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
+    def draw(self, img, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
+        draw_line(line, img, (int(self.point_a[0] * sx), int(self.point_a[1] * scale)), (int(self.point_b[0] * sx), int(self.point_b[1] * scale)), color, thickness=thickness, lineType=lineType)
 
     def bounding_box(self, width, length_multiplier=1.0):
         return (self.midpoint, (self.length * length_multiplier, width), self.degrees)
@@ -290,15 +290,14 @@ def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
     return p0_x + (t * s1_x), p0_y + (t * s1_y)
 
 @nb.jit(nopython=False)
-def draw_line(line, img, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
-    cv2.line(img, (int(line.point_a[0] * sx), int(line.point_a[1] * sy)), (int(line.point_b[0] * sx), int(line.point_b[1] * sy)), color, thickness=thickness, lineType=lineType)
+def draw_line(line, img, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
+    cv2.line(img, (int(line.point_a[0] * sx), int(line.point_a[1] * scale)), (int(line.point_b[0] * sx), int(line.point_b[1] * scale)), color, thickness=thickness, lineType=lineType)
 
-def draw_lines(img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
+def draw_lines(img, lines, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
     
-    #todo: scale simplified to sx==sy but some programs might mess up <--Derrick fix numpy math for me
     pts = np.array([line.data for line in lines])
-    if sx != 1.0:
-        pts = pts * sx
+    if scale != 1.0:
+        pts = pts * scale
 
     #Important! keep this, very fast: 0.0007 for 512 lines vs iterating is 0.63 seconds, a thousand times slower
     pts = pts.astype(np.int32).reshape((-1,2,2))

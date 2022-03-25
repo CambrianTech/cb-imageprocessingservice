@@ -62,14 +62,16 @@ class SurfaceRefinement():
                 markers[dist_transform > freedom * dist_transform.max()] = color
                 timer.time_event("dist_transform")
 
-            sy = src.shape[0] / self.data["downscaled"].shape[0]
-            sx = src.shape[1] / self.data["downscaled"].shape[1]
+            scale = src.shape[0] / self.data["downscaled"].shape[0]
+
+            def draw_barrier_lines(lines, thickness=1):
+                #draw_lines(lines, markers, color= -1, thickness=thickness, lineType=cv2.LINE_4, scale=scale)
+                if watershed_mask is not None:
+                    draw_lines(lines, watershed_mask, color=0, thickness=thickness, lineType=cv2.LINE_4, scale=scale)
 
             def draw_barrier_markers(barrier_groups):
                 for barrier in barrier_groups:
-                    barrier.line.draw(markers, color= -1, thickness=1, lineType=cv2.LINE_4, sx=sx, sy=sy)
-                    if watershed_mask is not None:
-                        barrier.line.draw(watershed_mask, color=0, thickness=1, lineType=cv2.LINE_4, sx=sx, sy=sy)
+                    draw_barrier_lines([barrier.line])
 
             for index in range(num_surfaces):
                 surface = self.room.surfaces[index]
@@ -86,10 +88,19 @@ class SurfaceRefinement():
                     draw_barrier_markers(sb.barrier_groups)
                 timer.time_event("draw_barrier_markers")
 
-            else:
-                #bright green
-                draw_lines(src, self.data["lines"], color=(0,255,0), sx=sx, sy=sy)
-                timer.time_event("draw_lines")
+            
+            #bright green
+            #draw_lines(src, self.data["lines"], color=(0,255,0), sx=sx, sy=sy)
+
+            if self.room.vertical_vp is not None and len(self.room.vertical_vp) > 0:
+                draw_barrier_lines(self.room.vertical_vp[0].inliers)
+
+            for surface in self.room.surfaces:
+                if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
+                    draw_barrier_lines(surface.horizontal_vp[0].inliers)
+
+                if surface.vp and len(surface.vp):
+                    draw_barrier_lines(surface.vp[0].inliers)
 
             log_markers(self.data, "room_markers", markers)
 

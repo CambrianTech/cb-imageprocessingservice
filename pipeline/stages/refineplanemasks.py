@@ -457,8 +457,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
         final_merged_lines = np.zeros_like(final_labels_hr)
 
         #def draw_lines(img, lines, color=(255,50,255,255), thickness=1, sx=1.0, sy=1.0, lineType=cv2.LINE_8):
-        draw_lines(final_merged_lines, data["lines"], color=1, thickness=6, 
-                   sx=final_labels_hr.shape[1] / img.shape[1], sy=final_labels_hr.shape[0] / img.shape[0], lineType=cv2.LINE_AA)
+        draw_lines(final_merged_lines, data["lines"], color=1, thickness=6, scale=final_labels_hr.shape[1] / img.shape[1], lineType=cv2.LINE_AA)
 
         edges = cv2.Canny(cv2.cvtColor(
             cv2.GaussianBlur(cv2.resize(img, (final_merged_lines.shape[1], final_merged_lines.shape[0])), (3, 3), 2),
