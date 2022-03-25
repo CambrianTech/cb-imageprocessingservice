@@ -23,7 +23,6 @@ class SurfaceRefinement():
 
         self.room = self.data["room"]
         self.masks = [s.mask for s in self.room.surfaces]
-        self.image = self.data["image"]
         self.barriers = self.data["barriers"] if "barriers" in self.data else None
         
     def refine(self, use_HED=False):
@@ -43,7 +42,10 @@ class SurfaceRefinement():
 
         def run_watershed(freedom, use_cv=False):
 
-            src = self.image.copy() if use_cv else self.data["hed"]
+            if use_cv:
+                src = cv2.bilateralFilter(self.data["image"], 31, 31, 61)
+            else:
+                src = self.data["hed"].copy()
 
             watershed_mask = None if use_cv else np.ones(src.shape, dtype=np.int32)
             markers = np.zeros((src.shape[0], src.shape[1]), dtype=np.int32)
@@ -62,17 +64,6 @@ class SurfaceRefinement():
                 markers[dist_transform > freedom * dist_transform.max()] = color
                 timer.time_event("dist_transform")
 
-            scale = src.shape[0] / self.data["downscaled"].shape[0]
-
-            def draw_barrier_lines(lines, thickness=1):
-                #draw_lines(lines, markers, color= -1, thickness=thickness, lineType=cv2.LINE_4, scale=scale)
-                if watershed_mask is not None:
-                    draw_lines(lines, watershed_mask, color=0, thickness=thickness, lineType=cv2.LINE_4, scale=scale)
-
-            def draw_barrier_markers(barrier_groups):
-                for barrier in barrier_groups:
-                    draw_barrier_lines([barrier.line])
-
             for index in range(num_surfaces):
                 surface = self.room.surfaces[index]
                 timer.reset()
@@ -82,37 +73,40 @@ class SurfaceRefinement():
                 timer.time_event("draw_surface_markers")
 
             timer.reset()
-            if self.barriers is not None:
-                #lines_mask = None
-                for sb in self.barriers.values():
-                    draw_barrier_markers(sb.barrier_groups)
-                timer.time_event("draw_barrier_markers")
 
-            
-            #bright green
-            #draw_lines(src, self.data["lines"], color=(0,255,0), sx=sx, sy=sy)
+            lines = []
 
             if self.room.vertical_vp is not None and len(self.room.vertical_vp) > 0:
-                draw_barrier_lines(self.room.vertical_vp[0].inliers)
+                lines.extend(self.room.vertical_vp[0].inliers)
 
             for surface in self.room.surfaces:
                 if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
-                    draw_barrier_lines(surface.horizontal_vp[0].inliers)
+                    lines.extend(surface.horizontal_vp[0].inliers)
 
                 if surface.vp and len(surface.vp):
-                    draw_barrier_lines(surface.vp[0].inliers)
+                    lines.extend(surface.vp[0].inliers)
+
+            #lines = [line.extended(1.2) for line in lines]
+
+            timer.reset()
+
+            src_scale = src.shape[0] / self.data["downscaled"].shape[0]
 
             log_markers(self.data, "room_markers", markers)
 
-            timer.reset()
             if use_cv:
+                draw_lines(src, lines, color=(0, 255, 255), thickness=1, lineType=cv2.LINE_4, scale=src_scale)
                 markers = cv2.watershed(src, markers)
                 timer.time_event("cv2.watershed")
             else:
+                draw_lines(src, lines, color=255, thickness=1, lineType=cv2.LINE_4, scale=src_scale)
+                draw_lines(watershed_mask, lines, color=0, thickness=1, lineType=cv2.LINE_4, scale=src_scale)
                 markers = np.int32(watershed(src, markers, mask=watershed_mask))
                 timer.time_event("watershed")
+
             markers[markers<0] = 0
 
+            log_image(self.data, "room_markers_src", src)
             log_markers(self.data, "room_markers_result", markers)
 
             timer.reset()
@@ -144,7 +138,7 @@ class SurfaceRefinement():
         #denoised = rank.median(self.image[:,:,1], disk(5))
         #denoised = cv2.bilateralFilter(self.image[:,:,1], 9, 20, 20)
 
-        run_watershed(freedom=0.01, use_cv=True)
+        run_watershed(freedom=0.03)
 
         timer.log_all_events()
 

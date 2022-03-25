@@ -296,11 +296,13 @@ def draw_line(line, img, color=(255,50,255,255), thickness=1, scale=1.0, lineTyp
 def draw_lines(img, lines, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
     
     pts = np.array([line.data for line in lines])
+
     if scale != 1.0:
         pts = pts * scale
 
     #Important! keep this, very fast: 0.0007 for 512 lines vs iterating is 0.63 seconds, a thousand times slower
     pts = pts.astype(np.int32).reshape((-1,2,2))
+
     cv2.drawContours(img, pts, -1, color, thickness=thickness, lineType=lineType)
 
 @nb.jit(nopython=True)
