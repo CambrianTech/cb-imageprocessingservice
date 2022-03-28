@@ -518,18 +518,19 @@ class Surface():
         self.determine_surface_type(K)
 
 
-    def debug(self, img, color):
+    def debug(self, img, color, draw_contours=False):
 
         scale = img.shape[0] / self.data["downscaled"].shape[0]
 
-        if scale != 1.0:
-            contours = []
-            for contour in self.contours:
-                contours.append((contour * scale).astype(np.int32))
-        else:
-            contours = self.contours
+        if draw_contours:
+            if scale != 1.0:
+                contours = []
+                for contour in self.contours:
+                    contours.append((contour * scale).astype(np.int32))
+            else:
+                contours = self.contours
 
-        cv2.drawContours(img, contours, -1, color)
+            cv2.drawContours(img, contours, -1, color)
 
         # if self.surfaceType.is_major and self.surfaceType != SurfaceType.Other:
         #     Line.draw_all(img, self.lines, color=color)
