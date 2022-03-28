@@ -16,7 +16,7 @@ from pipeline.misc.utils import convert_color, put_text, sample_at_point
 from .line import line_angle_difference, Line
 from pipeline.data.ade20k import ADE20K
 from pipeline.components.rotated_rect import RotatedRect
-from pipeline.misc.utils import adjust_mask
+from pipeline.misc.utils import adjust_mask, scale_contour
 
 mask_padding = 10
 
@@ -519,7 +519,17 @@ class Surface():
 
 
     def debug(self, img, color):
-        cv2.drawContours(img, self.contours, -1, color)
+
+        scale = img.shape[0] / self.data["downscaled"].shape[0]
+
+        if scale != 1.0:
+            contours = []
+            for contour in self.contours:
+                contours.append((contour * scale).astype(np.int32))
+        else:
+            contours = self.contours
+
+        cv2.drawContours(img, contours, -1, color)
 
         # if self.surfaceType.is_major and self.surfaceType != SurfaceType.Other:
         #     Line.draw_all(img, self.lines, color=color)
@@ -528,16 +538,16 @@ class Surface():
             print("No center found for %s" % self.name)
             return
 
-        pos = self.center
-        pos = put_text(img, self.name, pos, color, size=0.5, shadow=True, highlights=True)
+        pos = self.center[0] * scale, self.center[1] * scale
+        pos = put_text(img, self.name, pos, color, size=0.5 * scale, shadow=True, highlights=True)
 
         if self.cloned_from >= 0:
-            pos = put_text(img, "cloned %d" % self.cloned_from, pos, (255, 0, 0), size=0.33, shadow=True)
+            pos = put_text(img, "cloned %d" % self.cloned_from, pos, (255, 0, 0), size=0.33 * scale, shadow=True)
 
         if self._alteration is not None:
-            pos = put_text(img, self._alteration, pos, color, size=0.33, shadow=True)
+            pos = put_text(img, self._alteration, pos, color, size=0.33 * scale, shadow=True)
 
-        pos = put_text(img, "%.0f deg" % np.degrees(self.angle), pos, (255, 255, 255), size=0.33, shadow=True)
+        pos = put_text(img, "%.0f deg" % np.degrees(self.angle), pos, (255, 255, 255), size=0.33 * scale, shadow=True)
 
         #print("%s has %d lines" % (self.name, len(self.lines)))
 

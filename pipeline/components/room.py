@@ -484,22 +484,29 @@ class Room(Geometry):
 
             child_surface.parent = candidates[0]
         
-    def get_debug_image(self):
+    def get_debug_image(self, hires=False):
         if not im_logging_enabled(self.data): 
             return None
 
-        img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV_FULL)
+        image = self.data["image"] if hires else self.data["downscaled"]
+        img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV_FULL)
         hues = random.sample(range(0, 360), len(self.surfaces))
 
         #overlay probs
         for i in range(len(self.surfaces)):
             surface = self.surfaces[i]
-            mask = surface.mask > 0
+
+            if hires:
+                mask = surface.final_mask > 0
+                probs = cv2.resize(surface.probs, (image.shape[1], image.shape[0]))
+            else:
+                mask = surface.mask > 0
+                probs = surface.probs
 
             max_value = 0.9
             if max_value > 0:
                 img_hsv[:, :, 0][mask] = hues[i]
-                img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.15)
+                img_hsv[:, :, 1][mask] = 255 * np.power(probs[mask], 0.15)
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
