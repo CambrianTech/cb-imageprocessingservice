@@ -38,6 +38,7 @@ class Geometry():
         self._probs = None
         self._index_mask = None
         self._normals = None
+        self.vertical_vp = None
 
         ade_seg_c = np.dstack(tuple(self.data["isolated"]))
         self.isolated_labels = np.int32(np.argmax(ade_seg_c, -1))

@@ -106,8 +106,9 @@ class SurfaceRefinement():
 
             markers[markers<0] = 0
 
-            log_image(self.data, "room_markers_src", src)
-            log_markers(self.data, "room_markers_result", markers)
+            if im_logging_enabled(self.data):
+                log_image(self.data, "room_markers_src", src)
+                log_markers(self.data, "room_markers_result", markers)
 
             timer.reset()
 
@@ -138,7 +139,7 @@ class SurfaceRefinement():
         #denoised = rank.median(self.image[:,:,1], disk(5))
         #denoised = cv2.bilateralFilter(self.image[:,:,1], 9, 20, 20)
 
-        #run_watershed(freedom=0.03, use_cv=True)
+        #run_watershed(freedom=0.01, use_cv=True)
 
         timer.log_all_events()
 
