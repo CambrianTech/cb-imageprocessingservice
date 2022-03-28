@@ -130,8 +130,8 @@ def log_data(data:dict):
     with open(data_filename, 'wb') as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
                 
-def log_image(data:dict, name:str, image, extension=".jpg"):
-    if im_logging_enabled(data, LogLevel.Images):
+def log_image(data:dict, name:str, image, extension=".jpg", primary=False):
+    if im_logging_enabled(data, LogLevel.Images) or (im_logging_enabled(data) and primary):
         _log_image(data, name, image, extension)
 
 def _log_image(data:dict, name:str, image, extension=".jpg", quality=95):
@@ -173,8 +173,8 @@ def draw_legend(data:dict, debug:np.ndarray, legend:tuple):
         x = start_location[0]
         y += line_height
 
-def log_markers(data:dict, name, markers, mask=None, num_labels=None):
-    if im_logging_enabled(data, LogLevel.Markers):
+def log_markers(data:dict, name, markers, mask=None, num_labels=None, primary=False):
+    if im_logging_enabled(data, LogLevel.Markers) or (primary and im_logging_enabled(data)):
         if num_labels is None:
             num_labels = markers.max()
 
@@ -188,9 +188,9 @@ def log_markers(data:dict, name, markers, mask=None, num_labels=None):
 
         _log_image(data, name, debug)
 
-def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", labelset=ADE20K,  opacity=0.5, get_image=False, min_matches=100):
+def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", labelset=ADE20K,  opacity=0.5, get_image=False, min_matches=100, primary=False):
     
-    if get_image or im_logging_enabled(data, LogLevel.Segmentation):
+    if get_image or im_logging_enabled(data, LogLevel.Segmentation) or (primary and im_logging_enabled(data)):
         
         debug = get_segmentation_image(segmentation, image, avg, labelset=labelset, min_matches=min_matches)
 
