@@ -6,6 +6,7 @@ from scipy.spatial import distance
 from cambrian.frei_chen import frei_chen
 from time import time
 
+from pipeline.data.surface_type import SurfaceType
 from pipeline.components.line import Line, merge_lines, draw_lines
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.logging import log_image, im_logging_enabled, LogLevel, Timer
@@ -85,9 +86,36 @@ class PipelineLineFinder(PipelineStep):
             sy = data["downscaled"].shape[0] / image.shape[0]
             return list(map(lambda line: Line(line[0][0] * sx, line[0][1] * sy, line[0][2] * sx, line[0][3] * sy), lines)) if lines is not None else list()
 
+        def extract_lines(poly, min_length):
+            lines = []
+            num_pts = len(poly)
+            for i in range(num_pts):
+                point_a = poly[i][0]
+                point_b = poly[(i+1) % num_pts][0]
+                if distance.euclidean(point_a, point_b) > min_length:
+                    lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1]))
+
+            return lines
+
         min_length = int(diagonal / 80)
 
         lines = []
+
+        #pull lines from semantic contours.
+        for surfaceType in SurfaceType:
+            mask = data["isolated"][surfaceType]
+            isolated = np.zeros(mask.shape, dtype=np.uint8)
+            isolated[mask > 0.9] = 1
+
+            mask_bordered = cv2.copyMakeBorder(isolated, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0) 
+            contours, _ = cv2.findContours(mask_bordered, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            epsilon = 7
+
+            for contour in contours:
+                shape = contour.shape
+                contour = (contour.flatten() - 1).reshape(shape)
+                poly = cv2.approxPolyDP(contour, epsilon, True)
+                lines.extend(extract_lines(poly, min_length))
 
         #find lines in BW image
         bw_lines_a = find_lines(bw, min_length)
