@@ -7,7 +7,7 @@ from cambrian.frei_chen import frei_chen
 from time import time
 
 from pipeline.data.surface_type import SurfaceType
-from pipeline.components.line import Line, merge_lines, draw_lines
+from pipeline.components.line import Line, merge_lines, draw_lines, line_on_image_edge
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.logging import log_image, im_logging_enabled, LogLevel, Timer
 
@@ -92,12 +92,12 @@ class PipelineLineFinder(PipelineStep):
             for i in range(num_pts):
                 point_a = poly[i][0]
                 point_b = poly[(i+1) % num_pts][0]
-                if distance.euclidean(point_a, point_b) > min_length:
+                if distance.euclidean(point_a, point_b) > min_length and not line_on_image_edge(point_a, point_b, data["downscaled"]):
                     lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1]))
 
             return lines
 
-        min_length = int(diagonal / 80)
+        min_length = int(diagonal / 100)
 
         lines = []
 
@@ -170,7 +170,7 @@ class PipelineLineFinder(PipelineStep):
             lines.extend(normals_lines)
 
         #merge all
-        lines = merge_lines(lines, search_width=min(diagonal/400, 8))
+        lines = merge_lines(lines, search_width=min(diagonal/300, 8))
         timer.log_elapsed("merge_lines final")
 
         # print("8. elapsed %.2f" % (time() - start)); start = time()

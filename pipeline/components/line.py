@@ -3,6 +3,7 @@ import numpy as np
 import numba as nb
 import cv2
 import uuid
+from enum import IntEnum
 from numba.experimental import jitclass
 
 from scipy.spatial import distance
@@ -141,22 +142,33 @@ def sqeuclidean(point_a, point_b):
     dy = point_b[1] - point_a[1]
     return dx * dx + dy * dy
 
+class ImageEdge(IntEnum):
+    Top = 0x0001
+    Right = 0x0010
+    Bottom = 0x0100
+    Left = 0x1000
+
 @nb.jit(nopython=True)
 def point_on_image_edge(point, image, min_distance=3):
     edge = 0x0
-    if point[0] <= min_distance:
-        edge |= 0x0001
-    if point[0] >= image.shape[1] - min_distance - 1:
-        edge |= 0x0010
     if point[1] <= min_distance:
-        edge |= 0x0100
+        edge |= ImageEdge.Top
+
+    if point[0] >= image.shape[1] - min_distance - 1:
+        edge |= ImageEdge.Right
+
     if point[1] >= image.shape[0] - min_distance - 1:
-        edge |= 0x1000
+        edge |= ImageEdge.Bottom
+
+    if point[0] <= min_distance:
+        edge |= ImageEdge.Left
+
     return edge
 
 @nb.jit(nopython=True)
 def line_on_image_edge(point_a, point_b, image, min_distance=3):
-    return point_on_image_edge(point_a, image, min_distance) and point_on_image_edge(point_a, image, min_distance) & point_on_image_edge(point_b, image, min_distance) > 0
+    #if A is on the edge and also one of those edges is the same as B is on
+    return point_on_image_edge(point_a, image, min_distance) and (point_on_image_edge(point_a, image, min_distance) & point_on_image_edge(point_b, image, min_distance)) > 0
 
 #(line.midpoint, (line.length * length_multiplier, width), np.degrees(line.angle))
 @nb.jit(nopython=True)
