@@ -25,6 +25,7 @@ from .stages.reverserenderer import PipelineReverseRenderer
 from .stages.poseestimator import PipelinePoseEstimator
 from .stages.extractsurfaces import PipelineExtractSurfaces
 from .stages.surfacerefinement import PipelineSurfaceRefinement
+from .stages.roomgenerator import PipelineRoomGenerator
 from .stages.roomsolver import PipelineRoomSolver
 from .stages.vanishingpointfinder import PipelineVanishingPointFinder
 from .stages.barrierfinder import PipelineBarrierFinder
@@ -96,6 +97,7 @@ class Pipeline():
         all_steps[PipelineStepIndex.DeterminePrimaryAngles] = PipelineDeterminePrimaryAngles
         all_steps[PipelineStepIndex.ExtractSurfaces] = PipelineExtractSurfaces
         all_steps[PipelineStepIndex.FindLines] = PipelineLineFinder
+        all_steps[PipelineStepIndex.GenerateRoom] = PipelineRoomGenerator
         all_steps[PipelineStepIndex.SolveRoom] = PipelineRoomSolver
         all_steps[PipelineStepIndex.VanishingPoints] = PipelineVanishingPointFinder
         all_steps[PipelineStepIndex.Barriers] = None

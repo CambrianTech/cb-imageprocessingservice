@@ -17,27 +17,14 @@ class RoomSolver():
     def __init__(self, data):
         super().__init__()
         self.data = data
-        self.room = Room(data)
+        self.room = self.data["room"]
 
-    def solve(self, confidence=0.95):
+    def solve(self):
         
         #add all the applicable surfaces:
-        for i in range(len(self.room.probs)):
-            self.room.add_surface(Surface(self.data, i))
-
         self.room.analyze()
 
-        if im_logging_enabled(self.data):
-
-            log_segmentation_image(self.data, "room_masks", self.room.index_mask, self.room.image)
-            
-            debug = log_segmentation_image(self.data, "isolated_labels", self.room.isolated_labels, self.room.image, get_image=True, labelset=SurfaceType)
-
-            log_image(self.data, "surfaces", debug)
-
-
         return self.room
-            
 
 
 class PipelineRoomSolver(PipelineStep):
@@ -47,14 +34,13 @@ class PipelineRoomSolver(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["planes", "downscaled", "isolated", "lines", "dimensions"]
+        return ["room"]
 
     @property
     def output_keys(self) -> list:
         return []
 
     def run(self, data):
-
         solver = RoomSolver(data)
         data["room"] = solver.solve()
 

@@ -70,11 +70,6 @@ class Room(Geometry):
 
         timer.time_event("setup")
 
-        self.analyze_surfaces()
-        log_image(self.data, "room_initial", self.get_debug_image())
-
-        timer.time_event("analyze_surfaces")
-
         self.refine_surfaces(min_confidence=0.1) #preserve plane context information i.e. probs < min_confidence are ignored
         log_image(self.data, "room_refined", self.get_debug_image())
 
