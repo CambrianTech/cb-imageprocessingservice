@@ -19,12 +19,13 @@ class RoomGenerator():
     def generate(self):
         
         timer = Timer("room")
-        
+
         #add all the applicable surfaces:
         for i in range(len(self.room.probs)):
             self.room.add_surface(Surface(self.data, i))
 
-        self.room.analyze_surfaces()
+        for surface in self.room.surfaces:
+            surface.analyze()
 
         log_image(self.data, "room_initial", self.room.get_debug_image())
 

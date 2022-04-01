@@ -108,12 +108,6 @@ class Room(Geometry):
 
         timer.log_all_events()
 
-    def analyze_surfaces(self):
-        #perform initial analysis
-        for surface in self.surfaces:
-            surface.analyze()
-        
-
     def find_best_surface(self, surfaceType, mask, mask_center):
 
         candidates = self.get_surfaces([surfaceType])
