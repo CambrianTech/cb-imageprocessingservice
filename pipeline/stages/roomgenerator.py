@@ -22,12 +22,11 @@ class RoomGenerator():
 
         #add all the applicable surfaces:
         for i in range(len(self.room.probs)):
-            self.room.add_surface(Surface(self.data, i))
-
-        for surface in self.room.surfaces:
+            surface = Surface(self.data, i)
+            self.room.add_surface(surface)
             surface.analyze()
 
-        log_image(self.data, "room_initial", self.room.get_debug_image())
+        log_image(self.data, "room_analyzed", self.room.get_debug_image())
 
         timer.time_event("analyze_surfaces")
 
@@ -38,7 +37,6 @@ class RoomGenerator():
             debug = log_segmentation_image(self.data, "isolated_labels", self.room.isolated_labels, self.room.image, get_image=True, labelset=SurfaceType)
 
             log_image(self.data, "surfaces", debug)
-
 
         return self.room
             
