@@ -1,96 +1,61 @@
-from abc import ABCMeta, abstractmethod
 import numpy as np
+from scipy import ndimage
 import cv2
-import uuid
-import random
-import math
-
-import warnings #skimage warnings excessive:
-warnings.filterwarnings("ignore")
-
+from termcolor import colored
+from skimage.morphology import remove_small_objects
 from skimage.segmentation import watershed
-from skimage.color import rgb2gray
-from scipy.stats import mode
 from scipy.spatial import distance
 
-from .geometry import Geometry
+from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
-from .surface import Surface
-from pipeline.misc.utils import convert_color, put_text, overlay_mask, random_color, sample_at_point, scale_contour
-from pipeline.data.logging import im_logging_enabled, log_image, log_segmentation_image, log_markers, Timer
-from .line import line_angle_difference, Line, draw_lines
+from pipeline.misc.utils import resize_array, random_color, overlay_mask, sample_at_point
+from .planegeometry import Dimension
+from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers, Timer
+from pipeline.components.line import Line, draw_lines
+from pipeline.components.surface import Surface
 from pipeline.data.ade20k import ADE20K
 
-from termcolor import colored
+class SurfaceSolver():
 
-#python info on object oriented methods and properties
-#https://stackoverflow.com/questions/2736255/abstract-attributes-in-python
+    def __init__(self, data):
+        super().__init__()
+        self.data = data
+        self.room = self.data["room"]
 
-def narrowness(contour, epsilon_factor=0.06):
-    peri = cv2.arcLength(contour, True)
-    epsilon = epsilon_factor * peri
-    hull = cv2.convexHull(contour)
-    points = cv2.approxPolyDP(hull, epsilon, True)
-    
-    if len(points) < 3:
-        return np.inf
-
-    area = cv2.contourArea(points)
-    square_side_length = math.sqrt(area)
-
-    num_points = len(points)
-    
-    #use np.diff or something better
-    lengths = []
-    for i in range(num_points):
-        point_a = points[i][0]
-        point_b = points[(i+1) % num_points][0]
-        length = distance.euclidean(point_a, point_b)
-        if length > square_side_length:
-            lengths.append(distance.euclidean(point_a, point_b))
-
-    lengths = np.array(lengths)
-    #mean_length = np.mean(lengths)
-    total_length = np.sum(lengths)
-    #mode_length = mode(lengths).mode[0]
-
-    return total_length / square_side_length
-
-class Room(Geometry):
-
-    def analyze(self):
-
+    def solve(self):
+        
+        #add all the applicable surfaces:
         timer = Timer("room")
 
         #prepare
-        self.lines_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+        self.lines_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
         draw_lines(self.lines_mask, self.data["lines"], color=(255,255,255), thickness=1, lineType=cv2.LINE_4)
 
-        log_segmentation_image(self.data, "semantic_labels", self.semantic_labels, self.image, labelset=ADE20K)
+        log_segmentation_image(self.data, "semantic_labels", self.room.semantic_labels, self.room.image, labelset=ADE20K)
 
         timer.time_event("setup")
 
         self.refine_surfaces(min_confidence=0.1) #preserve plane context information i.e. probs < min_confidence are ignored
-        log_image(self.data, "room_refined", self.get_debug_image())
+        log_image(self.data, "room_refined", self.room.get_debug_image())
 
         timer.time_event("refine_surfaces")
 
         invalid_mask = self.remove_invalid_surfaces()
         
         if im_logging_enabled(self.data) and cv2.countNonZero(invalid_mask) > 50:
-            debug = self.image.copy()
+            debug = self.room.image.copy()
             debug[invalid_mask > 0] = [0,255,0]
             log_image(self.data, "room_removed", debug)
 
         timer.time_event("remove_invalid_surfaces")
 
         self.add_missing_surfaces(invalid_mask)
-        log_image(self.data, "room_missing_added", self.get_debug_image())
+        log_image(self.data, "room_missing_added", self.room.get_debug_image())
 
         timer.time_event("add_missing_surfaces")
 
         self.refine_surfaces(debug_suffix="_final")
-        log_image(self.data, "room_expanded", self.get_debug_image())
+        log_image(self.data, "room_expanded", self.room.get_debug_image())
 
         timer.time_event("room.refine_surfaces")
 
@@ -98,7 +63,7 @@ class Room(Geometry):
 
         self.finalize_masks(invalid_mask)
 
-        log_image(self.data, "room", self.get_debug_image())
+        log_image(self.data, "room", self.room.get_debug_image())
 
         timer.time_event("merge_like_surfaces")
 
@@ -108,9 +73,11 @@ class Room(Geometry):
 
         timer.log_all_events()
 
+        return self.room    
+
     def find_best_surface(self, surfaceType, mask, mask_center):
 
-        candidates = self.get_surfaces([surfaceType])
+        candidates = self.room.get_surfaces([surfaceType])
         
         if len(candidates) == 0:
             return None
@@ -120,7 +87,7 @@ class Room(Geometry):
             mask_sample = sample_at_point(mask, point=mask_center)
 
             if cv2.countNonZero(mask_sample) > 0:
-                sample = sample_at_point(self.normals, point=mask_center)
+                sample = sample_at_point(self.room.normals, point=mask_center)
                 normal = cv2.mean(sample, mask_sample)[:3]
                 candidates.sort(key=lambda x: distance.sqeuclidean(mask_center, x.center) * distance.sqeuclidean(normal, x.normals_color))
             else:
@@ -130,17 +97,17 @@ class Room(Geometry):
 
     def add_missing_surfaces(self, invalid_mask=None, min_area=1/1200):
 
-        total_area = self.image.shape[0] * self.image.shape[1]
+        total_area = self.room.image.shape[0] * self.room.image.shape[1]
         area_threshold = int(total_area * min_area)
 
         print("Size threshold: square greater than %d pixels on one side" % np.sqrt(area_threshold))
 
-        if len(self.surfaces) > 0:
-            total_mask = np.sum(np.dstack([s.mask for s in self.surfaces]), axis=-1)
+        if len(self.room.surfaces) > 0:
+            total_mask = np.sum(np.dstack([s.mask for s in self.room.surfaces]), axis=-1)
         else:
             total_mask = None
 
-        room_missing = self.image.copy() if im_logging_enabled(self.data) else None
+        room_missing = self.room.image.copy() if im_logging_enabled(self.data) else None
 
         total_elevation = 3 #todo: get total elevation from highest and lowest objects. Floor or ceiling could be missing
 
@@ -149,8 +116,8 @@ class Room(Geometry):
             color = random_color()
 
             #find missing
-            remaining_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
-            remaining_mask[self.isolated_labels == surfaceType] = 1
+            remaining_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
+            remaining_mask[self.room.isolated_labels == surfaceType] = 1
             if invalid_mask is not None:
                 remaining_mask[invalid_mask > 0] = 0
 
@@ -174,10 +141,10 @@ class Room(Geometry):
             #add missing
             for contour in valid_contours:
 
-                contour_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+                contour_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
                 cv2.drawContours(contour_mask, [contour], 0, (1,1,1), cv2.FILLED)
 
-                matches = self.index_mask[contour_mask > 0]
+                matches = self.room.index_mask[contour_mask > 0]
                 indexes, counts = np.unique(matches, return_counts=True)
                 
                 valid_clusters = indexes[counts > area_threshold]
@@ -189,15 +156,15 @@ class Room(Geometry):
                 #add missing one by one
                 for i in range(max_clusters):
                     index = valid_clusters[i]
-                    if index >= len(self.surfaces):
+                    if index >= len(self.room.surfaces):
                         continue
 
-                    surface = self.surfaces[index]
+                    surface = self.room.surfaces[index]
 
                     if surface.surfaceType == surfaceType or surface.surfaceType.is_pair(surfaceType):
 
                         mask = contour_mask.copy()
-                        mask[self.index_mask != index] = 0
+                        mask[self.room.index_mask != index] = 0
 
                         if cv2.countNonZero(mask) >= area_threshold:
                             reference_surface = surface
@@ -246,17 +213,17 @@ class Room(Geometry):
 
                 if new_surface is not None:
                     print(colored("Creating new %s (%s) using %s as reference" % (surfaceType.name, new_surface.name, reference_surface.name), 'green'))
-                    self.add_surface(new_surface)
+                    self.room.add_surface(new_surface)
                     
 
-        self.invalidate()
+        self.room.invalidate()
 
     def merge_like_surfaces(self, angle_threshold=np.radians(30), angle_threshold_force=np.radians(20)):
 
         for surfaceType in SurfaceType:
                 
             color = random_color()
-            surfaces = self.get_surfaces([surfaceType])
+            surfaces = self.room.get_surfaces([surfaceType])
 
 
             for i in range(len(surfaces)):
@@ -294,12 +261,12 @@ class Room(Geometry):
 
         
     def refine_surfaces(self, min_confidence=None, freedom=0.33, use_lines=True, debug_suffix=""):
-        watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
+        watershed_image = cv2.resize(self.data["hed"], (self.room.image.shape[1], self.room.image.shape[0]))
 
         final_masks = {}
         
         def expand_into_type(surfaceType:SurfaceType):
-            surfaces = self.get_surfaces([surfaceType])
+            surfaces = self.room.get_surfaces([surfaceType])
 
             num_surfaces = len(surfaces)
 
@@ -320,7 +287,7 @@ class Room(Geometry):
             markers[disputed_areas > 0] = 0
 
             watershed_mask = np.zeros(total_mask.shape, dtype=np.int32)
-            watershed_mask[self.isolated_labels == surfaceType.index] = 1
+            watershed_mask[self.room.isolated_labels == surfaceType.index] = 1
             if use_lines:
                 watershed_mask[self.lines_mask > 0] = 0
 
@@ -356,14 +323,14 @@ class Room(Geometry):
 
     def remove_invalid_surfaces(self, min_area_threshold=1/1000, max_area_threshold=1/50, scale=1.2):
 
-        total_area = self.image.shape[0] * self.image.shape[1]
+        total_area = self.room.image.shape[0] * self.room.image.shape[1]
         max_area = total_area * max_area_threshold
         min_area = total_area * min_area_threshold
         
         all_invalid_contours = []
         print("Remove invalid wall parts.")
 
-        for surface in self.get_surfaces([SurfaceType.Wall]):
+        for surface in self.room.get_surfaces([SurfaceType.Wall]):
             invalid_contours = []
 
             if surface.surfaceType == SurfaceType.Wall:
@@ -384,16 +351,16 @@ class Room(Geometry):
                 if area < min_area:
                     invalid_contours.append(contour)
                 else:
-                    inner_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+                    inner_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
                     cv2.drawContours(inner_mask, np.array(contour), 0, 1, cv2.FILLED)
                     
-                    innerMean, innerStd = cv2.meanStdDev(self.image, mask=inner_mask)
+                    innerMean, innerStd = cv2.meanStdDev(self.room.image, mask=inner_mask)
 
-                    outer_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+                    outer_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
                     contour_expanded = scale_contour(contour, scale, moments=M)
                     cv2.drawContours(outer_mask, np.array(contour_expanded), 0, 1, cv2.FILLED)
                     #outer_mask[inner_mask] = 0
-                    outerMean, outerStd = cv2.meanStdDev(self.image, mask=outer_mask)
+                    outerMean, outerStd = cv2.meanStdDev(self.room.image, mask=outer_mask)
 
                     meanDiff = np.max(np.abs(innerMean - outerMean))
 
@@ -419,7 +386,7 @@ class Room(Geometry):
 
                 #todo: look inside contour for validity
 
-        invalid_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+        invalid_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
 
         if len(all_invalid_contours) > 0:
             cv2.drawContours(invalid_mask, np.array(all_invalid_contours), -1, 1, cv2.FILLED)
@@ -430,20 +397,20 @@ class Room(Geometry):
     def finalize_masks(self, invalid_mask=None):
 
         total_mask = []
-        markers = np.zeros((self.image.shape[0], self.image.shape[1]), dtype=np.int32)
+        markers = np.zeros((self.room.image.shape[0], self.room.image.shape[1]), dtype=np.int32)
         if invalid_mask is not None:
             markers[invalid_mask > 0] = -1
 
-        num_surfaces = len(self.surfaces)
+        num_surfaces = len(self.room.surfaces)
         for index in range(num_surfaces):
-            surface = self.surfaces[index]
+            surface = self.room.surfaces[index]
             markers[surface.mask > 0] = index + 1
 
-        markers = cv2.watershed(self.image, markers)
+        markers = cv2.watershed(self.room.image, markers)
         markers[markers<0] = 0
 
         for index in range(num_surfaces):
-            surface = self.surfaces[index]
+            surface = self.room.surfaces[index]
             mask = np.zeros_like(surface.mask)
             mask[markers == (index + 1)] = 1
             # kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
@@ -455,7 +422,7 @@ class Room(Geometry):
 
     def assign_parents(self):
 
-        child_surfaces = self.get_surfaces(surfaceTypes=[SurfaceType.OnWall, SurfaceType.OnFloor, SurfaceType.OnCeiling, SurfaceType.Other])
+        child_surfaces = self.room.get_surfaces(surfaceTypes=[SurfaceType.OnWall, SurfaceType.OnFloor, SurfaceType.OnCeiling, SurfaceType.Other])
 
         for child_surface in child_surfaces:
 
@@ -471,42 +438,23 @@ class Room(Geometry):
             #sort by most interior. May want to look at vanishing points or just lines clustering in angle.
             candidates.sort(key=lambda x:distance.sqeuclidean(child_surface.center, x.center))
 
-            child_surface.parent = candidates[0]
-        
-    def get_debug_image(self, hires=False):
-        if not im_logging_enabled(self.data): 
-            return None
+            child_surface.parent = candidates[0]    
 
-        image = self.data["image"] if hires else self.data["downscaled"]
-        img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV_FULL)
-        hues = random.sample(range(0, 360), len(self.surfaces))
 
-        #overlay probs
-        for i in range(len(self.surfaces)):
-            surface = self.surfaces[i]
+class PipelineSurfaceSolver(PipelineStep):
+    @property
+    def index(self) -> PipelineStepIndex:
+        return PipelineStepIndex.SolveSurfaces
 
-            if hires:
-                mask = cv2.resize(surface.mask, (image.shape[1], image.shape[0]), cv2.INTER_NEAREST) if surface.final_mask is None else surface.final_mask 
-                probs = cv2.resize(surface.probs, (image.shape[1], image.shape[0]))
-            else:
-                mask = surface.mask
-                probs = surface.probs
+    @property
+    def required_keys(self) -> list:
+        return ["room"]
 
-            query = mask > 0 
-            max_value = 0.9
-            if max_value > 0:
-                img_hsv[:, :, 0][query] = hues[i]
-                img_hsv[:, :, 1][query] = 255 * np.power(probs[query], 0.15)
-                    
-        img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
+    @property
+    def output_keys(self) -> list:
+        return []
 
-        #let surface do its debug
-        for i in range(len(self.surfaces)):
-            surface = self.surfaces[i]
-            hue = hues[i]
-            color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
-            surface.debug(img, color)
-
-        return img
-
+    def run(self, data):
+        solver = SurfaceSolver(data)
+        data["room"] = solver.solve()
 

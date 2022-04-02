@@ -21,8 +21,6 @@ from pipeline.data.logging import log_image, log_segmentation_image, im_logging_
 from cambrian.LineFunctions import LineFunctions
 from pipeline.components.line import line_angle_difference, Line, line_on_image_edge
 from pipeline.components.rotated_rect import RotatedRect
-from pipeline.components.room import Room
-from pipeline.components.geometry import Geometry
 from pipeline.components.surface import Surface
 
 debug_indices = [147]

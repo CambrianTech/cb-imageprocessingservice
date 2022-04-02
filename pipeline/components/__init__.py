@@ -1,1 +1,1 @@
-from . import line,	geometry, point, room, rotated_rect, surface
+from . import line,	scene, point, rotated_rect, surface

@@ -6,15 +6,15 @@ from skimage.morphology import remove_small_objects
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, Timer
-from pipeline.components.room import Room
+from pipeline.components.scene import Scene
 from pipeline.components.surface import Surface
 
-class RoomGenerator():
+class SceneGenerator():
 
     def __init__(self, data):
         super().__init__()
         self.data = data
-        self.room = Room(data)
+        self.room = Scene(data)
 
     def generate(self):
         
@@ -41,10 +41,10 @@ class RoomGenerator():
         return self.room
             
 
-class PipelineRoomGenerator(PipelineStep):
+class PipelineSceneGenerator(PipelineStep):
     @property
     def index(self) -> PipelineStepIndex:
-        return PipelineStepIndex.GenerateRoom
+        return PipelineStepIndex.GenerateScene
 
     @property
     def required_keys(self) -> list:
@@ -56,5 +56,5 @@ class PipelineRoomGenerator(PipelineStep):
 
     def run(self, data):
 
-        solver = RoomGenerator(data)
+        solver = SceneGenerator(data)
         data["room"] = solver.generate()

@@ -11,7 +11,6 @@ from termcolor import colored
 import random
 
 from pipeline.data.surface_type import SurfaceType
-from .geometry import Geometry
 from pipeline.misc.utils import convert_color, put_text, sample_at_point
 from .line import line_angle_difference, Line
 from pipeline.data.ade20k import ADE20K
@@ -87,11 +86,11 @@ class Surface():
         return self._index is not None
 
     @property
-    def probs(self) -> Geometry:
+    def probs(self) -> ndimage:
         return self.geometry.probs[self.index]
 
     @property
-    def plane_mask(self) -> Geometry:
+    def plane_mask(self) -> ndimage:
         if self._plane_mask is None:
             self._plane_mask = np.zeros_like(self.geometry.index_mask)
             self._plane_mask[self.geometry.index_mask == self.index] = 1

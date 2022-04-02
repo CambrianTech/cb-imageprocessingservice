@@ -21,8 +21,8 @@ class PipelineStepIndex(IntEnum):
     ExtractSurfaces = 7
     FindLines = 8
     Geometry = 9
-    GenerateRoom = 10
-    SolveRoom = 11
+    GenerateScene = 10
+    SolveSurfaces = 11
     VanishingPoints = 12
     Barriers = 13
     FindTrim = 14
