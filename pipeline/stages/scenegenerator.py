@@ -5,27 +5,30 @@ from skimage.morphology import remove_small_objects
 
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
-from pipeline.misc.utils import resize_array, random_color, overlay_mask
-from .planegeometry import Dimension
-from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled
-from pipeline.components.line import Line
-from pipeline.components.room import Room
+from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, Timer
+from pipeline.components.scene import Scene
 from pipeline.components.surface import Surface
 
-class RoomSolver():
+class SceneGenerator():
 
     def __init__(self, data):
         super().__init__()
         self.data = data
-        self.room = Room(data)
+        self.room = Scene(data)
 
-    def solve(self, confidence=0.95):
+    def generate(self):
         
+        timer = Timer("room")
+
         #add all the applicable surfaces:
         for i in range(len(self.room.probs)):
-            self.room.add_surface(Surface(self.data, i))
+            surface = Surface(self.data, i)
+            self.room.add_surface(surface)
+            surface.analyze()
 
-        self.room.analyze()
+        log_image(self.data, "room_analyzed", self.room.get_debug_image())
+
+        timer.time_event("analyze_surfaces")
 
         if im_logging_enabled(self.data):
 
@@ -35,26 +38,23 @@ class RoomSolver():
 
             log_image(self.data, "surfaces", debug)
 
-
         return self.room
             
 
-
-class PipelineRoomSolver(PipelineStep):
+class PipelineSceneGenerator(PipelineStep):
     @property
     def index(self) -> PipelineStepIndex:
-        return PipelineStepIndex.SolveRoom
+        return PipelineStepIndex.GenerateScene
 
     @property
     def required_keys(self) -> list:
-        return ["planes", "downscaled", "isolated", "lines", "dimensions"]
+        return ["planes", "downscaled", "isolated", "dimensions"]
 
     @property
     def output_keys(self) -> list:
-        return []
+        return ["room"]
 
     def run(self, data):
 
-        solver = RoomSolver(data)
-        data["room"] = solver.solve()
-
+        solver = SceneGenerator(data)
+        data["room"] = solver.generate()

@@ -2,33 +2,16 @@ from abc import ABCMeta, abstractmethod
 import numpy as np
 import cv2
 import uuid
+import random
 from termcolor import colored
 
 from pipeline.data.surface_type import SurfaceType
-from pipeline.misc.utils import resize_array, multi_filter
+from pipeline.misc.utils import resize_array, multi_filter, convert_color
+from pipeline.data.logging import im_logging_enabled
 
 indexed_fields = ["plane_parameters", "plane_normals", "plane_offsets", "plane_clusters"]
 
-class PlanarGroup():
-    def __init__(self, surface):
-        super().__init__()
-        self.uniqueId = uuid.uuid4()
-        self.add_surface(surface)
-
-    def add_surface(self, surface):
-        surface.planar_group = self
-
-    @property
-    def normal(self) -> tuple:
-        #todo: maybe composite such as mode or mean
-        return self.surfaces[0].normal
-
-    @property
-    def offset(self) -> float:
-        #todo: maybe composite such as mode, mean, max, or min
-        return self.surfaces[0].offset
-
-class Geometry():
+class Scene():
 
     def __init__(self, data):
         super().__init__()
@@ -156,3 +139,40 @@ class Geometry():
             self._mask_intersections[key] = np.bitwise_and(surface_a.mask_expanded, surface_b.mask_expanded)
 
         return self._mask_intersections[key]
+
+
+    def get_debug_image(self, hires=False):
+        if not im_logging_enabled(self.data): 
+            return None
+
+        image = self.data["image"] if hires else self.data["downscaled"]
+        img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV_FULL)
+        hues = random.sample(range(0, 360), len(self.surfaces))
+
+        #overlay probs
+        for i in range(len(self.surfaces)):
+            surface = self.surfaces[i]
+
+            if hires:
+                mask = cv2.resize(surface.mask, (image.shape[1], image.shape[0]), cv2.INTER_NEAREST) if surface.final_mask is None else surface.final_mask 
+                probs = cv2.resize(surface.probs, (image.shape[1], image.shape[0]))
+            else:
+                mask = surface.mask
+                probs = surface.probs
+
+            query = mask > 0 
+            max_value = 0.9
+            if max_value > 0:
+                img_hsv[:, :, 0][query] = hues[i]
+                img_hsv[:, :, 1][query] = 255 * np.power(probs[query], 0.15)
+                    
+        img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
+
+        #let surface do its debug
+        for i in range(len(self.surfaces)):
+            surface = self.surfaces[i]
+            hue = hues[i]
+            color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
+            surface.debug(img, color)
+
+        return img

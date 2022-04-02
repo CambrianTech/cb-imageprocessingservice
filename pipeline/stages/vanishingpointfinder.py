@@ -12,7 +12,6 @@ from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled
 from pipeline.components.line import Line, line_angle_difference, line_on_image_edge, merge_lines, draw_lines
-from pipeline.components.room import Room, Surface
 from pipeline.data.ade20k import ADE20K
 
 find_horizontal = True

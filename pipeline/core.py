@@ -21,16 +21,17 @@ class PipelineStepIndex(IntEnum):
     ExtractSurfaces = 7
     FindLines = 8
     Geometry = 9
-    SolveRoom = 10
-    VanishingPoints = 11
-    Barriers = 12
-    FindTrim = 13
-    FindLegs = 14
-    EstimatePose = 15
-    Refine = 16
-    Superpixels = 17
-    CombinePlaneMasks = 18
-    Output = 19
+    GenerateScene = 10
+    SolveSurfaces = 11
+    VanishingPoints = 12
+    Barriers = 13
+    FindTrim = 14
+    FindLegs = 15
+    EstimatePose = 16
+    Refine = 17
+    Superpixels = 18
+    CombinePlaneMasks = 19
+    Output = 20
 
 class PipelineStep(metaclass=ABCMeta):
     def __init__(self, pipeline):

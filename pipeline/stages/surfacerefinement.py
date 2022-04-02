@@ -42,7 +42,7 @@ class SurfaceRefinement():
 
         def run_watershed(freedom):
 
-            src = cv2.bilateralFilter(self.data["image"], 15, 60, 40)
+            src = cv2.bilateralFilter(self.data["image"], 21, 80, 80)
 
             markers = np.zeros((src.shape[0], src.shape[1]), dtype=np.int32)
 
@@ -86,18 +86,19 @@ class SurfaceRefinement():
 
             src_scale = src.shape[0] / self.data["downscaled"].shape[0]
 
-            log_markers(self.data, "room_markers", markers, primary=True)
-
-            draw_lines(src, self.data["lines"], color=(255,0,255), scale=src_scale)
             draw_lines(src, vp_lines, color=(0,0,0), scale=src_scale)
-            draw_lines(markers, vp_lines, color=-1, scale=src_scale, lineType=cv2.LINE_4)
+            draw_lines(src, self.data["lines"], color=(255,0,255), scale=src_scale)
+            draw_lines(markers, vp_lines, color=255, scale=src_scale, lineType=cv2.LINE_4)
+
+            log_markers(self.data, "room_markers", markers, primary=True)
 
             markers = cv2.watershed(src, markers)
             timer.time_event("cv2.watershed")
 
             markers[markers<0] = 0
+            markers[markers==255] = 0
 
-            log_image(self.data, "room_markers_src", src)
+            log_image(self.data, "room_markers_src", src, primary=True)
             log_markers(self.data, "room_markers_result", markers, primary=True)
 
             timer.reset()
@@ -129,9 +130,9 @@ class SurfaceRefinement():
         #denoised = rank.median(self.image[:,:,1], disk(5))
         #denoised = cv2.bilateralFilter(self.image[:,:,1], 9, 20, 20)
 
-        log_image(self.data, "room_refined_pre", self.room.get_debug_image(hires=True))
+        #log_image(self.data, "room_refined_pre", self.room.get_debug_image(hires=True))
 
-        run_watershed(freedom=0.07)
+        #run_watershed(freedom=0.07)
 
         timer.log_all_events()
 
@@ -139,7 +140,7 @@ class SurfaceRefinement():
             surface = self.room.surfaces[index]
             surface.final_mask = self.masks[index]
         
-        log_image(self.data, "room_refined", self.room.get_debug_image(hires=True))
+        #log_image(self.data, "room_refined", self.room.get_debug_image(hires=True))
             
         
         
