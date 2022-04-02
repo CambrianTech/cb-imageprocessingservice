@@ -8,7 +8,7 @@ from scipy.spatial import distance
 
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
-from pipeline.misc.utils import resize_array, random_color, overlay_mask, sample_at_point
+from pipeline.misc.utils import resize_array, random_color, overlay_mask, sample_at_point, scale_contour
 from .planegeometry import Dimension
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers, Timer
 from pipeline.components.line import Line, draw_lines
@@ -390,7 +390,7 @@ class SurfaceSolver():
 
         if len(all_invalid_contours) > 0:
             cv2.drawContours(invalid_mask, np.array(all_invalid_contours), -1, 1, cv2.FILLED)
-            self.refresh_surfaces()
+            self.room.refresh_surfaces()
 
         return invalid_mask
 

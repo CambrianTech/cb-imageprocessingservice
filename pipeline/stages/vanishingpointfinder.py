@@ -4,6 +4,7 @@ import cv2
 import math
 import time
 from enum import IntEnum
+from scipy.spatial import distance
 
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
@@ -236,10 +237,8 @@ class PipelineVanishingPointFinder(PipelineStep):
                 if line_on_image_edge(point_a, point_b, self.image):
                     continue
 
-                line = Line(point_b[0], point_b[1], point_a[0], point_a[1])
-
-                if line.length > min_length:
-                    lines.append(line)
+                if distance.euclidean(point_a, point_b) > min_length:
+                    lines.append(Line(point_b[0], point_b[1], point_a[0], point_a[1]))
         
         return lines
                 
