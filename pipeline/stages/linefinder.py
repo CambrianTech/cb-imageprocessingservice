@@ -128,6 +128,14 @@ class PipelineLineFinder(PipelineStep):
 
         timer.log_elapsed("bw_lines_b")
 
+        edges = (frei_chen(bw) * 3.0 * 255.0).astype(np.uint8)
+        edges_lines = find_lines(edges, min_length * 2.0, True)
+        #edges_lines = merge_lines(edges_lines, search_width=diagonal/400, angle_threshold=math.radians(3))
+
+        log_lines(edges_lines, "edges_lines")
+
+        lines.extend(edges_lines)
+
         lines = merge_lines(lines, search_length=1.0, search_width=diagonal/800, angle_threshold=math.radians(3))
 
         timer.log_elapsed("merge_lines BW")
