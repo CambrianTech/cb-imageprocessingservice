@@ -19,7 +19,7 @@ from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import angle_with_vp
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers
 from cambrian.LineFunctions import LineFunctions
-from pipeline.components.line import line_angle_difference, Line, line_on_image_edge
+from pipeline.components.line import line_angle_difference, Line, line_on_image_edge, merge_lines, get_line_points, draw_line
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.surface import Surface
 
@@ -79,7 +79,7 @@ class Barrier():
                 best_angle = cd_angle
                 best_points = point_c, point_d
             
-            self.shape_line = Line(np.array([best_points[0][0], best_points[0][1], best_points[1][0], best_points[1][1]]))
+            self.shape_line = Line(best_points[0][0], best_points[0][1], best_points[1][0], best_points[1][1])
             self.closest_point = self.shape_line.closest_point(self.line.midpoint)
 
         #get neighbor, if any
@@ -92,7 +92,7 @@ class Barrier():
             distances = range(int(max_distance / 2), int(max_distance), int(max_distance / 5)) if max_distance > 10 else [max_distance]
 
             for distance in distances:
-                line_points = self.line.get_points(self.surface_barrier.image.shape[1], self.surface_barrier.image.shape[0], num_pts)
+                line_points = get_line_points(self.line, self.surface_barrier.image.shape[1], self.surface_barrier.image.shape[0], num_pts)
                 
                 if len(line_points) > 2:
                     line_points = line_points[1:-1]
@@ -122,9 +122,9 @@ class Barrier():
     def debug(self, img, color):
 
         if self.surface_neighbor is not None:
-            self.line.draw(img, color=color, thickness=3)
+            draw_line(self.line, img, color=color, thickness=3)
         else:
-            self.line.draw(img, color=color, thickness=1)
+            draw_line(self.line, img, color=color, thickness=1)
 
         # point_a = (int(self.line.midpoint[0]), int(self.line.midpoint[1]))
         # point_b = (int(self.closest_point[0]), int(self.closest_point[1]))
@@ -324,7 +324,7 @@ class BarrierGroup():
                 for line in lines[1:]:
                     data = LineFunctions.merge_lines(data, (line.point_a, line.point_b))
 
-                self._line = Line(np.array([data[0][0], data[0][1], data[1][0], data[1][1]], dtype=np.int))
+                self._line = Line(data[0][0], data[0][1], data[1][0], data[1][1])
 
         return self._line
 
@@ -338,7 +338,7 @@ class BarrierGroup():
         if show_bounds and thickness > 3:
             cv2.drawContours(img, [self.bounds.points], 0, (255,0,0), 1)
 
-        self.bounds.line.draw(img, color=color)
+        draw_line(self.bounds.line, img, color=color)
 
         if not self.term_a is None:
             self.term_a.debug(img, color)
@@ -497,7 +497,7 @@ class SurfaceBarriers():
 
             bounds_a = RotatedRect(barrier_a.bounds.line.extended(1.05).bounding_box(min_distance))
 
-            line_a = barrier_a.bounds.line.extended(3.0, from_a=a_open, from_b=b_open)
+            line_a = barrier_a.bounds.line.extended(3.0, a_open, b_open)
             rect_a = RotatedRect(line_a.bounding_box(min_distance))
 
             #find closest, either orthagonal or colinear and at the end, that's the one used, others ignored, 
@@ -517,7 +517,7 @@ class SurfaceBarriers():
                 is_virtual = False
 
                 if intersection is None:
-                    rect_b = RotatedRect(barrier_b.bounds.line.extended(1.5, from_a=len(barrier_b.a_terminations)==0, from_b=len(barrier_b.a_terminations)==0).bounding_box(min_distance))
+                    rect_b = RotatedRect(barrier_b.bounds.line.extended(1.5, len(barrier_b.a_terminations)==0, len(barrier_b.a_terminations)==0).bounding_box(min_distance))
                     intersection = get_bounds_intersection(rect_a, rect_b)
                     is_virtual = True
 
@@ -602,7 +602,7 @@ class SurfaceBarriers():
                 #self.candidates.append(line)
                 #print('%s: Search within parent %s' % (self.surface.name, self.surface.parent.name))
 
-        self.candidates = Line.merge(self.candidates, search_width=self.diagonal/200, search_length=1.2)          
+        self.candidates = merge_lines(self.candidates, search_width=self.diagonal/200, search_length=1.2)          
 
         for poly in self.surface.polygons:
             num_pts = len(poly)
@@ -613,10 +613,10 @@ class SurfaceBarriers():
                 if line_on_image_edge(point_a, point_b, self.image):
                     continue
 
-                line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
+                line = Line(point_a[0], point_a[1], point_b[0], point_b[1])
                 self.candidates.append(line)
 
-        self.candidates = Line.merge(self.candidates, search_width=self.diagonal/400, search_length=1.0)
+        self.candidates = merge_lines(self.candidates, search_width=self.diagonal/400, search_length=1.0)
 
         #filter and correct to vp
         barriers = []
@@ -1152,13 +1152,13 @@ class PipelineBarrierFinder(PipelineStep):
 
             contour_lengths = []
             #remove border offset, get lengths:
-            contours = []
+            filtered_contours = []
             for contour in _contours:
                 contour = (contour.flatten() - border_size).reshape(contour.shape) #remove offset
-                contours.append(contour)
+                filtered_contours.append(contour)
                 contour_lengths.append(cv2.arcLength(contour, True))
 
-            contours[surfaceType] = contours, contour_lengths
+            contours[surfaceType] = filtered_contours, contour_lengths
 
         for surface in self.surfaces:
             self.barriers[surface.uniqueId].refine(all_barriers, contours)

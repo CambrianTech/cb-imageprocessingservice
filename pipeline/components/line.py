@@ -11,6 +11,7 @@ from bisect import bisect_left, bisect_right
 from pipeline.misc.utils import normalize
 from pipeline.data.logging import Timer
 
+@nb.jit(nopython=True)
 def out_of_range(x, y, width, height):
     return x < 0 or y < 0 or x >= width or y >= height
 
@@ -59,12 +60,6 @@ class Line():
         else:
             result = np.linalg.norm(self.data - other.data)
             return result < epsilon
-
-    def get_points(self, width, height, num_points=None):
-        if num_points is None:
-            num_points = int(math.ceil(self.length))
-
-        return list(filter(lambda p: not out_of_range(p[0], p[1], width, height), np.linspace(self.point_b, self.point_a, num_points)))
 
     @property
     def normal_a(self):
@@ -303,7 +298,7 @@ def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
 
 @nb.jit(nopython=False)
 def draw_line(line, img, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
-    cv2.line(img, (int(line.point_a[0] * sx), int(line.point_a[1] * scale)), (int(line.point_b[0] * sx), int(line.point_b[1] * scale)), color, thickness=thickness, lineType=lineType)
+    cv2.line(img, (int(line.point_a[0] * scale), int(line.point_a[1] * scale)), (int(line.point_b[0] * scale), int(line.point_b[1] * scale)), color, thickness=thickness, lineType=lineType)
 
 def draw_lines(img, lines, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
     
@@ -405,4 +400,11 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
     timer.log_all_events()
 
     return list(filter(lambda x: not x.dead, lines))
+
+
+def get_line_points(line, width, height, num_points=None):
+    if num_points is None:
+        num_points = int(math.ceil(line.length))
+
+    return list(filter(lambda p: not out_of_range(p[0], p[1], width, height), np.linspace(line.point_b, line.point_a, num_points)))
 

@@ -71,7 +71,7 @@ class RotatedRect(tuple):
                 point_a = (self.points[1][0] + self.points[2][0]) / 2, (self.points[1][1] + self.points[2][1]) / 2
                 point_b = (self.points[3][0] + self.points[0][0]) / 2, (self.points[3][1] + self.points[0][1]) / 2 
 
-            self._line = Line(np.array([point_a[0], point_a[1], point_b[0], point_b[1]]))
+            self._line = Line(point_a[0], point_a[1], point_b[0], point_b[1])
         return self._line
 
     def resized(self, length_factor=1.0, length_offset=0.0, width_factor=1.0, width_offset=0.0):
