@@ -18,6 +18,9 @@ from pipeline.components.rotated_rect import RotatedRect
 from pipeline.misc.utils import adjust_mask, scale_contour
 
 mask_padding = 10
+    
+def surface_surface_key(surface_a, surface_b):
+    return '-'.join(sorted([str(surface_a.uniqueId), str(surface_b.uniqueId)]))
 
 class Surface():
 
@@ -211,6 +214,17 @@ class Surface():
 
         return vps
 
+    _mask_intersections = {}
+
+    @classmethod
+    def surface_surface_intersection(cls, surface_a, surface_b):
+        key = surface_surface_key(surface_a, surface_b)
+
+        if key not in cls._mask_intersections:
+            cls._mask_intersections[key] = np.bitwise_and(surface_a.mask_expanded, surface_b.mask_expanded)
+
+        return cls._mask_intersections[key]
+
     @property
     def neighbors(self) -> list:
 
@@ -222,11 +236,11 @@ class Surface():
             for candidate in self.geometry.surfaces:
                 if candidate == self: continue
         
-                #check for self in candidate to save time, or check for overlap
+                #check for self in candidate to save time
                 if (candidate._neighbors is not None and self in candidate._neighbors):
                     self._neighbors.append(candidate)
-                else:
-                    intersection = self.geometry.surface_surface_intersection(self, candidate)
+                else: #or check for overlap
+                    intersection = self.surface_surface_intersection(self, candidate)
                     if cv2.countNonZero(intersection) > 10: 
                         self._neighbors.append(candidate)
 
@@ -237,7 +251,7 @@ class Surface():
         if surface not in self.neighbors:
             return None
 
-        masks_intersection = self.geometry.surface_surface_intersection(self, surface)
+        masks_intersection = self.surface_surface_intersection(self, surface)
 
         contours, hierarchy = cv2.findContours(masks_intersection, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 

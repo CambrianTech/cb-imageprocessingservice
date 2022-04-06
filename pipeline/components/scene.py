@@ -30,8 +30,6 @@ class Scene():
         self.semantic_labels = np.int32(np.argmax(ade_seg_c, -1))
         self.planar_groups = []
 
-        self._mask_intersections = {}
-
     def add_surface(self, surface):
 
         surface.geometry = self
@@ -127,19 +125,6 @@ class Scene():
             filters.append(lambda surface: surface.dimension == dimension)
 
         return self._surfaces.values() if len(filters) is None else list(multi_filter(filters, self._surfaces.values())) 
-
-    @classmethod
-    def surface_surface_key(cls, surface_a, surface_b):
-        return str(surface_a.uniqueId) + str(surface_b.uniqueId) if surface_a.uniqueId < surface_b.uniqueId else str(surface_b.uniqueId) + str(surface_a.uniqueId)
-
-    def surface_surface_intersection(self, surface_a, surface_b):
-        key = self.surface_surface_key(surface_a, surface_b)
-
-        if key not in self._mask_intersections:
-            self._mask_intersections[key] = np.bitwise_and(surface_a.mask_expanded, surface_b.mask_expanded)
-
-        return self._mask_intersections[key]
-
 
     def get_debug_image(self, hires=False):
         if not im_logging_enabled(self.data): 

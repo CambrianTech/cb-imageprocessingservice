@@ -25,11 +25,14 @@ from pipeline.components.surface import Surface
 
 
 class Barrier():
-    def __init__(self, surface_barrier, line, vanishing_point):
-        self.surface_barrier = surface_barrier
-        self.line = line
-        self.vanishing_point = vanishing_point
-        self.shape_line = None
+    def __init__(self, uniqueId, surface_a, surface_b):
+
+        self.uniqueId = uniqueId
+        self.surface_a = surface_a
+        self.surface_b = surface_b
+
+        self.contours = self.surface_a.intersection(self.surface_b)
+        
         
 class PipelineBarrierFinder(PipelineStep):
     @property
@@ -48,6 +51,17 @@ class PipelineBarrierFinder(PipelineStep):
         self.data = data
         self.image = data["downscaled"]
         self.room = data["room"]
+
+        self.surfaces = self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall])
+
+        self.barriers = {}
+
+        for surface in self.surfaces:
+            for neighbor in surface.neighbors:
+                uniqueId = '-'.join(sorted([str(surface.uniqueId), str(neighbor.uniqueId)]))
+
+                if uniqueId not in self.barriers:
+                    self.barriers[uniqueId] = Barrier(uniqueId, surface, neighbor)
 
         log_image(self.data, "barriers.png", self.get_debug_image())
 
@@ -70,6 +84,10 @@ class PipelineBarrierFinder(PipelineStep):
                 img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.15)
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
+
+        for uniqueId in self.barriers:
+            barrier = self.barriers[uniqueId]
+            cv2.drawContours(img, barrier.contours, -1, (0,255,0))
 
         return img
 
