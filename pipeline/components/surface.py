@@ -18,7 +18,7 @@ from pipeline.components.rotated_rect import RotatedRect
 from pipeline.misc.utils import adjust_mask, scale_contour
 
 mask_padding = 10
-    
+
 def surface_surface_key(surface_a, surface_b):
     return '-'.join(sorted([str(surface_a.uniqueId), str(surface_b.uniqueId)]))
 
@@ -241,7 +241,7 @@ class Surface():
                     self._neighbors.append(candidate)
                 else: #or check for overlap
                     intersection = self.surface_surface_intersection(self, candidate)
-                    if cv2.countNonZero(intersection) > 10: 
+                    if cv2.countNonZero(intersection) > 1: 
                         self._neighbors.append(candidate)
 
         return self._neighbors
@@ -316,22 +316,22 @@ class Surface():
 
         return self._mask_transform
 
-    # @property
-    # def outer_mask(self):
-    #     if self._outer_mask is None:
-    #         trans = cv2.distanceTransform(1 - self.surface_mask, cv2.DIST_L2, 5)
-    #         _, self._outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
-    #         self._outer_mask = self._outer_mask[mask_padding:-mask_padding,mask_padding:-mask_padding].astype(np.uint8)
-
-    #     return self._outer_mask
-
     @property
     def outer_mask(self):
         if self._outer_mask is None:
-            _, result = cv2.threshold(1 - self.mask_transform, 0.05 * self.mask_transform.max(), 1, 0)
-            self._outer_mask = result.astype(np.uint8)
+            trans = cv2.distanceTransform(1 - self.surface_mask, cv2.DIST_L2, 5)
+            _, self._outer_mask = cv2.threshold(trans, 0.03 * trans.max(), 1, 0)
+            self._outer_mask = self._outer_mask[mask_padding:-mask_padding,mask_padding:-mask_padding].astype(np.uint8)
 
         return self._outer_mask
+
+    # @property
+    # def outer_mask(self):
+    #     if self._outer_mask is None:
+    #         _, result = cv2.threshold(1 - self.mask_transform, 0.05 * self.mask_transform.max(), 1, 0)
+    #         self._outer_mask = result.astype(np.uint8)
+
+    #     return self._outer_mask
 
     @property
     def inner_mask(self):

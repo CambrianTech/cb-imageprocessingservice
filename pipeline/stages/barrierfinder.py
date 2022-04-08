@@ -6,23 +6,18 @@ import time
 from enum import IntEnum
 from scipy.spatial import distance
 import math
-from skimage.segmentation import watershed
-from skimage.morphology import disk
-from skimage.filters import rank
+from skimage.morphology import skeletonize
 
-from pipeline.data.ade20k import ADE20K
 from pipeline.data.surface_type import SurfaceType
 from pipeline.core import PipelineStep, PipelineStepIndex
-from pipeline.misc.utils import resize_array, random_color, overlay_mask, normalize, convert_color, put_text, adjust_mask, partition
-from .planegeometry import Dimension
+from pipeline.misc.utils import random_color, overlay_mask, convert_color
 from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import angle_with_vp
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers
 from cambrian.LineFunctions import LineFunctions
 from pipeline.components.line import line_angle_difference, Line, line_on_image_edge, merge_lines, get_line_points, draw_line
 from pipeline.components.rotated_rect import RotatedRect
-from pipeline.components.surface import Surface
-
+from pipeline.components.surface import Surface, surface_surface_key
 
 class Barrier():
     def __init__(self, uniqueId, surface_a, surface_b):
@@ -31,7 +26,31 @@ class Barrier():
         self.surface_a = surface_a
         self.surface_b = surface_b
 
+    def solve(self, img):
         self.contours = self.surface_a.intersection(self.surface_b)
+
+        self.mask = np.zeros(img.shape[:2], dtype=np.uint8)
+        cv2.drawContours(self.mask, self.contours, -1, 1, -1)
+        self.skeleton = skeletonize(self.mask, method='lee')
+
+
+    def debug(self, img, hue=20):
+
+        color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
+
+        cv2.drawContours(img, self.contours, -1, color)
+
+        img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV_FULL)
+
+        pixels = self.skeleton > 0
+
+        img_hsv[:, :, 0][pixels] = hue
+        img_hsv[:, :, 1][pixels] = 255
+        img_hsv[:, :, 2][pixels] = 255
+
+        img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
+
+        return img
         
         
 class PipelineBarrierFinder(PipelineStep):
@@ -52,42 +71,38 @@ class PipelineBarrierFinder(PipelineStep):
         self.image = data["downscaled"]
         self.room = data["room"]
 
-        self.surfaces = self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall])
+        self.surfaces = []
+        self.surfaces.extend(self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.Floor, SurfaceType.Ceiling]))
+        self.surfaces.extend(self.room.get_surfaces(labels=box_like))
 
         self.barriers = {}
 
+        #get all barriers
         for surface in self.surfaces:
             for neighbor in surface.neighbors:
-                uniqueId = '-'.join(sorted([str(surface.uniqueId), str(neighbor.uniqueId)]))
+                if neighbor not in self.surfaces: continue
+
+                uniqueId = surface_surface_key(surface, neighbor)
 
                 if uniqueId not in self.barriers:
                     self.barriers[uniqueId] = Barrier(uniqueId, surface, neighbor)
+
+        #solve
+        for uniqueId in self.barriers:
+            self.barriers[uniqueId].solve(self.image)
+
 
         log_image(self.data, "barriers.png", self.get_debug_image())
 
     def get_debug_image(self):
 
-        img_hsv = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV_FULL)
-        hues = random.sample(range(0, 360), len(self.room.surfaces))
+        img = self.image.copy()
+        hues = random.sample(range(0, 360), len(self.barriers))
 
-        #overlay probs
-
-        for i in range(len(self.room.surfaces)):
-            surface = self.room.surfaces[i]
-            
-            #mask = (self.barriers[surface.uniqueId].mask_edges if surface.uniqueId in self.barriers else surface.mask) > 0
-            mask = surface.mask > 0
-            
-            max_value = 0.9
-            if max_value > 0:
-                img_hsv[:, :, 0][mask] = hues[i]
-                img_hsv[:, :, 1][mask] = 255 * np.power(surface.probs[mask], 0.15)
-                    
-        img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
-
+        index = 0
         for uniqueId in self.barriers:
-            barrier = self.barriers[uniqueId]
-            cv2.drawContours(img, barrier.contours, -1, (0,255,0))
+            img = self.barriers[uniqueId].debug(img, hues[index])
+            index += 1
 
         return img
 

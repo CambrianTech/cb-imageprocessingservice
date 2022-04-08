@@ -29,6 +29,9 @@ class DaemonStoppableThread(threading.Thread):
                 raise Exception('No target function given')
             self.stop_event.wait(self.sleep_time)
 
+def multi_key(keys, separator='-'):
+    return '-'.join(sorted([str(item) for item in keys]))
+
 def partition(pred, iterable):
     trues = []
     falses = []
