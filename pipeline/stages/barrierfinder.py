@@ -30,25 +30,35 @@ class Barrier():
         self.contours = self.surface_a.intersection(self.surface_b)
 
         self.mask = np.zeros(img.shape[:2], dtype=np.uint8)
-        cv2.drawContours(self.mask, self.contours, -1, 1, -1)
-        self.skeleton = skeletonize(self.mask, method='lee')
+        cv2.drawContours(self.mask, self.contours, -1, 1, cv2.FILLED)
+        self.skeleton = skeletonize(self.mask).astype(np.uint8)
+
+        self.skeleton_contours, hierarchy = cv2.findContours(self.skeleton, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+
+        # diagonal = math.hypot(img.shape[0], img.shape[1])
+        # epsilon = diagonal / 300
+        # self.skeleton_contours = list(map(lambda contour: cv2.approxPolyDP(contour, epsilon, False), self.skeleton_contours))
 
 
     def debug(self, img, hue=20):
 
         color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
 
-        cv2.drawContours(img, self.contours, -1, color)
+        cv2.drawContours(img, self.skeleton_contours, -1, color)
 
-        img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV_FULL)
+        #cv2.drawContours(img, self.contours, -1, color)
 
-        pixels = self.skeleton > 0
+        #draw skeleton
+        # img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV_FULL)
 
-        img_hsv[:, :, 0][pixels] = hue
-        img_hsv[:, :, 1][pixels] = 255
-        img_hsv[:, :, 2][pixels] = 255
+        # pixels = self.skeleton > 0
 
-        img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
+        # img_hsv[:, :, 0][pixels] = hue
+        # img_hsv[:, :, 1][pixels] = 255
+        # img_hsv[:, :, 2][pixels] = 255
+
+        # img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
         return img
         
