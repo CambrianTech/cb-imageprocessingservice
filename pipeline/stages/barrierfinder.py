@@ -43,20 +43,7 @@ class Barrier():
 
         color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
 
-        cv2.drawContours(img, self.skeleton_contours, -1, color)
-
-        #cv2.drawContours(img, self.contours, -1, color)
-
-        #draw skeleton
-        # img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV_FULL)
-
-        # pixels = self.skeleton > 0
-
-        # img_hsv[:, :, 0][pixels] = hue
-        # img_hsv[:, :, 1][pixels] = 255
-        # img_hsv[:, :, 2][pixels] = 255
-
-        # img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
+        cv2.drawContours(img, self.skeleton_contours, -1, color, 3)
 
         return img
         
@@ -105,12 +92,30 @@ class PipelineBarrierFinder(PipelineStep):
     def get_debug_image(self):
 
         img = self.image.copy()
+
+        #draw masks
+        img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV_FULL)
+
+        hues = random.sample(range(0, 360), len(self.surfaces))
+
+        index = 0
+        for surface in self.surfaces:
+            pixels = surface.mask > 0
+            img_hsv[:, :, 0][pixels] = hues[index]
+            img_hsv[:, :, 1][pixels] = 127
+            index += 1
+
+        img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
+
         hues = random.sample(range(0, 360), len(self.barriers))
 
         index = 0
         for uniqueId in self.barriers:
             img = self.barriers[uniqueId].debug(img, hues[index])
             index += 1
+
+
+        
 
         return img
 

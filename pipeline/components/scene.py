@@ -146,10 +146,9 @@ class Scene():
                 probs = surface.probs
 
             query = mask > 0 
-            max_value = 0.9
-            if max_value > 0:
-                img_hsv[:, :, 0][query] = hues[i]
-                img_hsv[:, :, 1][query] = 255 * np.power(probs[query], 0.15)
+
+            img_hsv[:, :, 0][query] = hues[i]
+            img_hsv[:, :, 1][query] = 255 * np.power(probs[query], 0.15)
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
