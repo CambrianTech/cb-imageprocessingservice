@@ -33,15 +33,18 @@ class Barrier():
         self.mask = np.zeros(img.shape[:2], dtype=np.uint8)
         cv2.drawContours(self.mask, self.contours, -1, 255, cv2.FILLED)
         self.skeleton = cv2.ximgproc.thinning(self.mask, cv2.ximgproc.THINNING_GUOHALL) #way better than skimage.morphology.skeletonize
-        self.skeleton_contours, hierarchy = cv2.findContours(self.skeleton, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        self.skeleton_contours, hierarchy = cv2.findContours(self.skeleton, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
-        epsilon = diagonal / 150
-        self.skeleton_contours = list(map(lambda contour: cv2.approxPolyDP(contour, epsilon, False), self.skeleton_contours))
+        epsilon = diagonal / 200
+        self.skeleton_contours = list(map(lambda contour: cv2.approxPolyDP(contour, epsilon, True), self.skeleton_contours))
+
 
 
     def debug(self, img, hue=20):
 
         color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
+
+        cv2.drawContours(img, self.contours, -1, color, 1)
 
         cv2.drawContours(img, self.skeleton_contours, -1, color, 3)
 
@@ -75,7 +78,9 @@ class PipelineBarrierFinder(PipelineStep):
         #get all barriers
         for surface in self.surfaces:
             for neighbor in surface.neighbors:
-                if neighbor not in self.surfaces: continue
+
+                if neighbor not in self.surfaces and not neighbor.surfaceType.is_pair(surface.surfaceType): continue
+                #if not (neighbor in self.surfaces or neighbor.surfaceType.is_pair(surface.surfaceType)): continue
 
                 uniqueId = surface_surface_key(surface, neighbor)
 
