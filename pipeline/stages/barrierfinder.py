@@ -6,7 +6,6 @@ import time
 from enum import IntEnum
 from scipy.spatial import distance
 import math
-from skimage.morphology import skeletonize
 
 from pipeline.data.surface_type import SurfaceType
 from pipeline.core import PipelineStep, PipelineStepIndex
@@ -29,16 +28,15 @@ class Barrier():
     def solve(self, img):
         self.contours = self.surface_a.intersection(self.surface_b)
 
+        diagonal = int(math.hypot(img.shape[0], img.shape[1]))
+
         self.mask = np.zeros(img.shape[:2], dtype=np.uint8)
-        cv2.drawContours(self.mask, self.contours, -1, 1, cv2.FILLED)
-        self.skeleton = skeletonize(self.mask).astype(np.uint8)
-
-        self.skeleton_contours, hierarchy = cv2.findContours(self.skeleton, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-
-        # diagonal = math.hypot(img.shape[0], img.shape[1])
-        # epsilon = diagonal / 300
-        # self.skeleton_contours = list(map(lambda contour: cv2.approxPolyDP(contour, epsilon, False), self.skeleton_contours))
+        cv2.drawContours(self.mask, self.contours, -1, 255, cv2.FILLED)
+        self.skeleton = cv2.ximgproc.thinning(self.mask, cv2.ximgproc.THINNING_GUOHALL) #way better than skimage.morphology.skeletonize
+        self.skeleton_contours, hierarchy = cv2.findContours(self.skeleton, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        
+        epsilon = diagonal / 150
+        self.skeleton_contours = list(map(lambda contour: cv2.approxPolyDP(contour, epsilon, False), self.skeleton_contours))
 
 
     def debug(self, img, hue=20):
