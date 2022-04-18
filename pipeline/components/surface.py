@@ -65,6 +65,8 @@ class Surface():
         self.vp = None
         self.planar_group = None
 
+        self._background_mean_stddev = None
+
     @property
     def secondaryType(self) -> SurfaceType:
         return next(filter(lambda t: t != self.surfaceType, self.best_surface_types))
@@ -158,6 +160,21 @@ class Surface():
                 self._normals_color = cv2.mean(self.geometry.normals, self.mask)[:3]
 
         return self._normals_color
+
+    @property
+    def background_mean_stddev(self) -> tuple:
+        if self._background_mean_stddev is None:
+            self._background_mean_stddev = cv2.meanStdDev(self.data["downscaled"], self.mask)
+
+        return self._background_mean_stddev
+
+    @property
+    def background_mean(self) -> tuple:
+        return tuple(self.background_mean_stddev[0].flatten())
+
+    @property
+    def background_stddev(self) -> tuple:
+        return tuple(self.background_mean_stddev[1].flatten())
 
     @property
     def lines(self) -> list:
