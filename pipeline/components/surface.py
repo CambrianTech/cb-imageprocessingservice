@@ -66,6 +66,7 @@ class Surface():
         self.planar_group = None
 
         self._background_mean_stddev = None
+        self._lighting_mean_stddev = None
 
     @property
     def secondaryType(self) -> SurfaceType:
@@ -175,6 +176,21 @@ class Surface():
     @property
     def background_stddev(self) -> tuple:
         return tuple(self.background_mean_stddev[1].flatten())
+
+    @property
+    def lighting_mean_stddev(self) -> tuple:
+        if self._lighting_mean_stddev is None:
+            self._lighting_mean_stddev = cv2.meanStdDev(self.data["lighting"], self.mask)
+
+        return self._lighting_mean_stddev
+
+    @property
+    def lighting_mean(self) -> tuple:
+        return tuple(self.lighting_mean_stddev[0].flatten())
+
+    @property
+    def lighting_stddev(self) -> tuple:
+        return tuple(self.lighting_mean_stddev[1].flatten())
 
     @property
     def lines(self) -> list:

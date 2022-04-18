@@ -108,7 +108,9 @@ class PipelineOutput(PipelineStep):
             "offset": plane_offset,
             "axisRotation": -surface.axisRotation if self.y_up else surface.axisRotation,
             "backgroundMean": surface.background_mean,
-            "backgroundStdDev": surface.background_stddev
+            "backgroundStdDev": surface.background_stddev,
+            "lightingMean": surface.lighting_mean,
+            "lightingStdDev": surface.lighting_stddev
         }
 
     def make_data_dict(self, data, image_url, lighting_url, index_mask_url):
