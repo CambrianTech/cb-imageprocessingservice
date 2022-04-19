@@ -77,7 +77,7 @@ class PipelineLineFinder(PipelineStep):
                 lsd = cv2.createLineSegmentDetector(refine=refine, scale=scale, sigma_scale=sigma_scale, quant=quant, ang_th=ang_th, log_eps=log_eps, density_th=density_th, n_bins=n_bins)
                 lines = lsd.detect(image)[0]
                 if lines is not None:
-                    lines = list(filter(lambda line: distance.euclidean((line[0][0], line[0][1]), (line[0][2], line[0][3])) >= min_length, lines))
+                     lines = list(filter(lambda line: distance.euclidean((line[0][0], line[0][1]), (line[0][2], line[0][3])) >= min_length and not line_on_image_edge((line[0][0], line[0][1]), (line[0][2], line[0][3]), image), lines))
             else:
                 fld = cv2.ximgproc.createFastLineDetector(min_length, 1.41, 200, 240, 3, False)
                 lines = fld.detect(image)
@@ -129,7 +129,7 @@ class PipelineLineFinder(PipelineStep):
         timer.log_elapsed("bw_lines_b")
 
         edges = (frei_chen(bw) * 3.0 * 255.0).astype(np.uint8)
-        edges_lines = find_lines(edges, min_length * 2.0, True)
+        edges_lines = find_lines(edges, min_length * 2.0, True, ang_th=17)
         #edges_lines = merge_lines(edges_lines, search_width=diagonal/400, angle_threshold=math.radians(3))
 
         log_lines(edges_lines, "edges_lines")
