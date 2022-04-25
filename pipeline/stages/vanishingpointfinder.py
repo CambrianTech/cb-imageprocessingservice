@@ -134,7 +134,7 @@ class VanishingPointFinder():
 
         locations = np.array(locations)
         strengths = np.array(strengths)
-        directions = np.array(directions) / np.linalg.norm(directions, axis=1)[:, np.newaxis]
+        directions = np.array(directions)
 
         return Edglets(locations, directions, strengths)
 
@@ -270,14 +270,14 @@ class PipelineVanishingPointFinder(PipelineStep):
         if len(self.vertical_lines) > 1:
             vpf = VanishingPointFinder(self.vertical_lines)
             self.room.vertical_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
-            if len(self.room.vertical_vp) == 0: #go wider
+            if len(self.room.vertical_vp) == 0: #go wider if nothing found.
                 self.room.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
 
         if len(self.horizontal_lines) > 1:
             vpf = VanishingPointFinder(self.horizontal_lines)
-            self.room.horizontal_vp = vpf.solve(threshold_inlier=np.radians(5), max_time=0.5)
-            if len(self.room.horizontal_vp) == 0: #go wider
-                self.room.horizontal_vp = vpf.solve(threshold_inlier=np.radians(11))
+            self.room.horizontal_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
+            if len(self.room.horizontal_vp) == 0: #go wider if nothing found
+                self.room.horizontal_vp = vpf.solve(threshold_inlier=np.radians(7))
 
         if im_logging_enabled(data):
             log_image(data, "vanishing_points", self.get_debug_image(data))
