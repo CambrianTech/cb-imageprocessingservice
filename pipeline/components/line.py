@@ -42,7 +42,7 @@ class Line():
         self.midpoint = ((ax + bx) / 2.0, (ay + by) / 2.0)
         self.angle = math.atan2(self.dy, self.dx)
         self.degrees = np.degrees(self.angle)
-        self.direction = np.array((self.dy / self.length, self.dx / self.length))
+        self.direction = np.array((self.dx / self.length, self.dy / self.length))
 
         #for tracking
         self.dead = False
