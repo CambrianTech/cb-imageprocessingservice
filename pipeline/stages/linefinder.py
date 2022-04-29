@@ -100,7 +100,6 @@ class PipelineLineFinder(PipelineStep):
         min_length = int(diagonal / 100)
 
         lines = []
-        raw_lines = []
 
         #pull lines from semantic contours.
         for surfaceType in SurfaceType:
@@ -121,13 +120,11 @@ class PipelineLineFinder(PipelineStep):
         #find lines in BW image
         bw_lines_a = find_lines(bw, min_length)
         lines.extend(bw_lines_a)
-        raw_lines.extend(bw_lines_a)
 
         timer.log_elapsed("bw_lines_a")
 
         bw_lines_b = find_lines(bw, min_length, True, ang_th=17) #ang_th=22.5 was getting false positives
         lines.extend(bw_lines_b)
-        raw_lines.extend(bw_lines_b)
 
         timer.log_elapsed("bw_lines_b")
 
@@ -138,7 +135,6 @@ class PipelineLineFinder(PipelineStep):
         log_lines(edges_lines, "edges_lines")
 
         lines.extend(edges_lines)
-        raw_lines.extend(edges_lines)
 
         lines = merge_lines(lines, search_length=1.0, search_width=diagonal/800, angle_threshold=math.radians(3))
 
@@ -149,8 +145,6 @@ class PipelineLineFinder(PipelineStep):
         sy = data["downscaled"].shape[0] / data["hed"].shape[0]
 
         hed_lines = find_lines(data["hed"], min_length, use_lsd=True, ang_th=12) #ang_th=22.5 was getting false positives
-        raw_lines.extend(hed_lines)
-
         timer.log_elapsed("hed")
 
         hed_lines = merge_lines(hed_lines, search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(3))
@@ -170,7 +164,6 @@ class PipelineLineFinder(PipelineStep):
         for i in range(0, 3):
             normals_lines.extend(find_lines(normals[i], min_length))
 
-        raw_lines.extend(normals_lines)
         timer.log_elapsed("normals_lines")
         
         if len(normals_lines) > 0:
@@ -189,5 +182,4 @@ class PipelineLineFinder(PipelineStep):
         log_lines(lines, "merged_lines")
 
         data["lines"] = lines
-        data["raw_lines"] = raw_lines
 

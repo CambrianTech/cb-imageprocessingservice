@@ -3,7 +3,7 @@ from time import time
 import asyncio
 import typing
 from multiprocessing import cpu_count
-from enum import IntEnum, auto
+from enum import IntEnum
 from termcolor import colored
 from types import SimpleNamespace
 import traceback
@@ -12,26 +12,26 @@ from .config import PipelineMode, PipelineConfig
 
 class PipelineStepIndex(IntEnum):
     Input = 0
-    CalculateFov = auto()
-    PlaneDetector = auto()
-    EdgeDetector = auto()
-    Segmentation = auto()
-    ReverseRenderer = auto()
-    DeterminePrimaryAngles = auto()
-    ExtractSurfaces = auto()
-    FindLines = auto()
-    Geometry = auto()
-    GenerateScene = auto()
-    VanishingPoints = auto()
-    SolveSurfaces = auto()
-    Barriers = auto()
-    FindTrim = auto()
-    FindLegs = auto()
-    EstimatePose = auto()
-    Refine = auto()
-    Superpixels = auto()
-    CombinePlaneMasks = auto()
-    Output = auto()
+    CalculateFov = 1
+    PlaneDetector = 2
+    EdgeDetector = 3
+    Segmentation = 4
+    ReverseRenderer = 5
+    DeterminePrimaryAngles = 6
+    ExtractSurfaces = 7
+    FindLines = 8
+    Geometry = 9
+    GenerateScene = 10
+    SolveSurfaces = 11
+    VanishingPoints = 12
+    Barriers = 13
+    FindTrim = 14
+    FindLegs = 15
+    EstimatePose = 16
+    Refine = 17
+    Superpixels = 18
+    CombinePlaneMasks = 19
+    Output = 20
 
 class PipelineStep(metaclass=ABCMeta):
     def __init__(self, pipeline):
