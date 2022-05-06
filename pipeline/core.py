@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from time import time
+from time import time, sleep
 import asyncio
 import typing
 from multiprocessing import cpu_count
@@ -7,7 +7,7 @@ from enum import IntEnum
 from termcolor import colored
 from types import SimpleNamespace
 import traceback
-
+import threading, queue
 from .config import PipelineMode, PipelineConfig
 
 class PipelineStepIndex(IntEnum):
@@ -34,11 +34,15 @@ class PipelineStepIndex(IntEnum):
     Output = 20
 
 class PipelineStep(metaclass=ABCMeta):
+
     def __init__(self, pipeline):
         self.pipeline = pipeline
         self.config = pipeline.config
         self._running = False
         self._input_queue = asyncio.Queue()
+
+        self.queue = queue.Queue()
+        self.threads = []
 
     @abstractmethod
     def run(self, data: dict):
@@ -79,15 +83,46 @@ class PipelineStep(metaclass=ABCMeta):
         self.future = future
         self._input_queue.put_nowait((input_dict, future))
 
+        self.queue.put_nowait(input_dict)
+
     def start(self):
         if not self._running:
             self._running = True
             for _ in range(1 if self.is_batched else cpu_count()):
                 asyncio.ensure_future(self.run_step_in_background())
 
+                thread = threading.Thread(target=self.thread_loop, daemon=True)
+                self.threads.append(thread)
+
+                thread.start()
+
+
     def stop(self):
-        self._running = False
         print("Stopping %s" % self.description)
+
+        self._running = False
+
+        for thread in self.threads:
+            thread.join()
+
+        self.threads = []
+
+        print("%s is stopped" % self.description)
+
+    def thread_loop(self):
+        print("thread %s started" % self.description)
+
+        while self._running:
+            try:
+                datum = self.queue.get_nowait()
+                self.queue.task_done()
+                print("processed")
+            except:
+                pass
+
+            sleep(0.1)
+
+        print("thread '%s' stopped" % self.description)
 
     async def run_step_in_background(self):
         loop = asyncio.get_event_loop()
