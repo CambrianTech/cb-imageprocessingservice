@@ -3,6 +3,7 @@ import time
 from enum import IntEnum
 from termcolor import colored
 import asyncio
+import traceback
 
 from .config import PipelineMode, PipelineConfig
 from .core import schedule_and_wait, PipelineStep, PipelineStepIndex
@@ -192,8 +193,12 @@ class Pipeline():
             print(step.description)
 
             step_start = time.time()
-            data = await schedule_and_wait(step.schedule, data)
-            print("%s took %.2f seconds" % (step.description, time.time() - step_start))
+
+            try:
+                data = await schedule_and_wait(step.schedule, data)
+                print("%s took %.2f seconds" % (step.description, time.time() - step_start))
+            except:
+                traceback.print_exc()
 
             if step.index == self.config.export_step and logging_dir is not None:
                 log_data(data)
