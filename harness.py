@@ -11,6 +11,7 @@ import click
 import time
 import asyncio
 import signal
+
 from concurrent.futures import ThreadPoolExecutor
 from termcolor import colored
 
@@ -18,6 +19,9 @@ from pipeline.config import PipelineMode, PipelineConfig
 from pipeline.core import PipelineStepIndex
 from pipeline.pipeline import Pipeline
 from pipeline.data.logging import LogLevel
+
+from guppy import hpy
+import gc
 
 def get_file_paths(input_dir, pattern=None):
     files = []
@@ -29,21 +33,32 @@ def get_file_paths(input_dir, pattern=None):
             files.extend(Path(input_dir).glob('**/*' + ext))
     return files
 
-async def process_files(pipeline, files):
+async def process_files(pipeline, files, iterations):
 
     try:
         index = 1
 
         for path in files:
-            url = Path(path)
-            unique_id = url.parents[0].name if len(url.parents) > 0 else url.name
-            data = {"path": path, "unique_id": unique_id if path.suffix == ".pickle" else url.stem}
 
-            print("\nProcessing file %d of %d\n" % (index, len(files)))
-            await pipeline.process(data)
+            for i in range(iterations): #for memory debug
+                if not pipeline.running:
+                    return
+                url = Path(path)
+                unique_id = url.parents[0].name if len(url.parents) > 0 else url.name
+                data = {"path": path, "unique_id": unique_id if path.suffix == ".pickle" else url.stem}
+
+                iteration_string = "" if iterations == 1 else "(iteration %d of %d)" % (i+1, iterations)
+
+                print("\nProcessing file %d of %d %s\n" % (index, len(files), iteration_string))
+                await pipeline.process(data)
+
             index += 1
-    finally:
+
         pipeline.stop()
+
+    except:
+        pipeline.kill()
+        
 
 
 #For instance, to restore from step 6 (before refinement):
@@ -66,8 +81,9 @@ default_config = PipelineConfig()
 @click.option("--log_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default=default_config.logging_dir)
 @click.option('--log_level', type=int, default=LogLevel.Default, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=default_config.logging_step, help='Log only a single step in the pipeline')
+@click.option('--iterations', type=int, default=1, help='How many times to run, for memory debugging')
 def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, hed_model_path, planes_url, \
-         api, restore, export, stop, log_dir, log_level, log_step):
+         api, restore, export, stop, log_dir, log_level, log_step, iterations):
 
     if not os.path.exists(input_dir):
         raise Exception('The directory does not exist at path {}'.format(input_dir)) 
@@ -88,6 +104,8 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     if len(files) == 0:
         raise Exception('No files found at path {}'.format(input_dir)) 
+
+    hp = hpy()
     
     config = PipelineConfig()
     config.mode = PipelineMode.Restore if restore is not None else PipelineMode.Process
@@ -110,22 +128,28 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     pipeline = Pipeline(config)
 
-
     loop = asyncio.get_event_loop()
     loop.set_default_executor(ThreadPoolExecutor())
 
-    for sig in (signal.SIGINT, signal.SIGTERM):          
-        loop.add_signal_handler(sig, pipeline.stop)  
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, pipeline.kill)
 
     start_time = time.time()
 
     pipeline.start()
-    loop.run_until_complete(process_files(pipeline, files))
+
+    hp.setrelheap()
+    gc.collect()
+
+    loop.run_until_complete(process_files(pipeline, files, iterations))
 
     elapsed = (time.time() - start_time)
-    avg = elapsed / len(files)
+    avg = elapsed / (len(files) * iterations)
     
     print_title("Total processing time: %.2fs, average: %.2fs" % (elapsed, avg))
+
+    gc.collect()
+    print("\n### HEAP FINAL ###\n", hp.heap())
 
 if __name__ == "__main__":
     main()

@@ -140,6 +140,14 @@ class Pipeline():
         for step in self.steps:
             step.start()
 
+    def kill(self):
+        self.stop()
+
+        for task in asyncio.all_tasks():
+            task.cancel()                    
+        
+        asyncio.ensure_future(exit())
+
     def stop(self):
         if not self._running: return
 
@@ -150,11 +158,6 @@ class Pipeline():
             step.stop()
 
         print("Stopped all threads")
-
-        for task in asyncio.all_tasks():
-            task.cancel()                    
-        
-        asyncio.ensure_future(exit())
 
     @property
     def running(self):

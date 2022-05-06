@@ -130,9 +130,8 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         return ["kmeans_normals", "camera_rotation", "camera_elevation", "floor_rotation"]
 
     def run(self, data):
-        print("running primary angle")
-        # with open('results/data.pickle', 'wb') as handle:
-        #     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        
+        
         mask = cv2.resize(np.uint8(255*(data["semantic_probs"][3]+data["semantic_probs"][28])),(512,512))
 
         normals = np.uint8(data["normals"])
