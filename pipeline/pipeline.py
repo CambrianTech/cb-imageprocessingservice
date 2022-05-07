@@ -6,7 +6,7 @@ import asyncio
 import traceback
 
 from .config import PipelineMode, PipelineConfig
-from .core import schedule_and_wait, PipelineStep, PipelineStepIndex
+from .core import PipelineStep, PipelineStepIndex
 from .data.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, set_logging_level
 
 from .stages.aws.s3client import S3Client
@@ -144,11 +144,6 @@ class Pipeline():
     def kill(self):
         self.stop()
 
-        for task in asyncio.all_tasks():
-            task.cancel()                    
-        
-        asyncio.ensure_future(exit())
-
     def stop(self):
         if not self._running: return
 
@@ -195,7 +190,7 @@ class Pipeline():
             step_start = time.time()
 
             try:
-                data = await schedule_and_wait(step.schedule, data)
+                step.schedule_and_wait(data)
                 print("%s took %.2f seconds" % (step.description, time.time() - step_start))
             except:
                 traceback.print_exc()
