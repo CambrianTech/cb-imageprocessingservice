@@ -42,7 +42,7 @@ class PipelineReverseRenderer(PipelineStep):
 
     @property
     def is_batched(self) -> bool:
-        return True
+        return False
 
     def healthchecker(self, endpoint="healthcheck"):  
         url = "%s/%s" % (self.config.cpu_networks_path, endpoint)
@@ -164,7 +164,9 @@ class PipelineReverseRenderer(PipelineStep):
 
         return response_dict
 
-    def run(self, data: dict) -> None:
+    def run(self, datum) -> None:
+
+        data = [datum]
 
         images = [datum["image"] for datum in data]
         if len(images) == 0: 
