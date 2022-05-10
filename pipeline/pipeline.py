@@ -151,10 +151,10 @@ class Pipeline():
 
         print("Stopped all threads")
 
-        for task in asyncio.all_tasks():
-            task.cancel()                    
+        # for task in asyncio.all_tasks():
+        #     task.cancel()                    
         
-        asyncio.ensure_future(exit())
+        #asyncio.ensure_future(exit())
 
     @property
     def running(self):
@@ -189,7 +189,7 @@ class Pipeline():
             print(step.description)
 
             step_start = time.time()
-            data = await schedule_and_wait(step.schedule, data)
+            await schedule_and_wait(step.schedule, data)
             print("%s took %.2f seconds" % (step.description, time.time() - step_start))
 
             if step.index == self.config.export_step and logging_dir is not None:
