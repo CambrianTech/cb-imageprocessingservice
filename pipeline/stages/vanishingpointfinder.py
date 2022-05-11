@@ -55,9 +55,9 @@ class VanishingPoint:
         if self._score is None:
             self._score = sum(self.votes)
 
-            if self.measure_area and len(self.points) > 1:
-                rect = cv2.minAreaRect(self.points)
-                self._score = self._score * np.hypot(rect[1][0], rect[1][1])
+            # if self.measure_area and len(self.points) > 1:
+            #     rect = cv2.minAreaRect(self.points)
+            #     self._score = self._score * np.hypot(rect[1][0], rect[1][1])
 
         return self._score
 
@@ -71,7 +71,7 @@ class VanishingPoint:
     @property
     def points(self):
         if self._points is None:
-            self._points = np.array(list(map(lambda x: x.data, self.inliers))).reshape(len(self.inliers) * 2, 2)
+            self._points = np.array(list(map(lambda x: x.data, self.inliers)), dtype=float).reshape(len(self.inliers) * 2, 2)
         return self._points
 
     @property
@@ -235,7 +235,7 @@ class PipelineVanishingPointFinder(PipelineStep):
                 point_a = poly[i][0]
                 point_b = poly[(i+1) % num_pts][0]
 
-                if line_on_image_edge(point_a, point_b, self.image):
+                if line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0]):
                     continue
 
                 if distance.euclidean(point_a, point_b) > min_length:
