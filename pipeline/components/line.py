@@ -10,9 +10,6 @@ from bisect import bisect_left, bisect_right
 from pipeline.misc.utils import normalize
 from pipeline.data.logging import Timer
 
-def out_of_range(x, y, width, height):
-    return x < 0 or y < 0 or x >= width or y >= height
-
 class Line():
     def __init__(self, ax, ay, bx, by):
 
@@ -355,11 +352,4 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
     timer.log_all_events()
 
     return list(filter(lambda x: not x.dead, lines))
-
-
-def get_line_points(line, width, height, num_points=None):
-    if num_points is None:
-        num_points = int(math.ceil(line.length))
-
-    return list(filter(lambda p: not out_of_range(p[0], p[1], width, height), np.linspace(line.point_b, line.point_a, num_points)))
 
