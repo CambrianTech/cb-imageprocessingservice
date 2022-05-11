@@ -24,24 +24,6 @@ def sharpen(img, alpha=1.5, beta=-1.0, kernel_size = 21):
     smoothed = cv2.GaussianBlur(img, (kernel_size, kernel_size), kernel_size)
     return cv2.addWeighted(img, alpha, smoothed, beta, 0)
 
-class FakeLine():
-    def __init__(self, ax, ay, bx, by):
-
-        self.point_a = int(ax), int(ay)
-        self.point_b = int(bx), int(by)
-        
-        self.dx = bx - ax
-        self.dy = by - ay
-        self.length = math.sqrt(self.dx * self.dx + self.dy * self.dy)
-
-        self.midpoint = ((ax + bx) / 2.0, (ay + by) / 2.0)
-        self.angle = math.atan2(self.dy, self.dx)
-        self.degrees = np.degrees(self.angle)
-        self.direction = np.array((self.dx / self.length, self.dy / self.length))
-
-        #for tracking
-        self.dead = False
-
 class PipelineLineFinder(PipelineStep):
 
     @property
@@ -92,7 +74,6 @@ class PipelineLineFinder(PipelineStep):
 
                 if distance.euclidean(point_a, point_b) > min_length and not line_on_image_edge(point_a, point_b, image.shape[1], image.shape[0]):
                     lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1]))
-                    pass
 
             return lines
 
@@ -134,7 +115,6 @@ class PipelineLineFinder(PipelineStep):
                 lines.extend(contour_lines)
 
         #find lines in BW image
-
         bw_lines_a = find_lines(bw, min_length)
 
         lines.extend(bw_lines_a)

@@ -60,8 +60,6 @@ async def process_files(pipeline, files, iterations):
     except:
         traceback.print_exc()
         pipeline.kill()
-        
-
 
 #For instance, to restore from step 6 (before refinement):
 #python -W ignore harness.py data --restore=6
@@ -107,7 +105,6 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     if len(files) == 0:
         raise Exception('No files found at path {}'.format(input_dir)) 
 
-    hp = hpy()
     
     config = PipelineConfig()
     config.mode = PipelineMode.Restore if restore is not None else PipelineMode.Process
@@ -140,7 +137,7 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     pipeline.start()
 
-    gc.collect()
+    hp = hpy()
     hp.setrelheap()
 
     loop.run_until_complete(process_files(pipeline, files, iterations))
