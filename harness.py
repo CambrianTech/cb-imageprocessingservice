@@ -57,6 +57,7 @@ async def process_files(pipeline, files, iterations):
         pipeline.stop()
 
     except:
+        traceback.print_exc()
         pipeline.kill()
         
 
