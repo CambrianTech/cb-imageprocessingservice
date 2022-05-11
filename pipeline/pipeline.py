@@ -190,11 +190,8 @@ class Pipeline():
 
             step_start = time.time()
 
-            try:
-                step.schedule_and_wait(data)
-                print("%s took %.2f seconds" % (step.description, time.time() - step_start))
-            except:
-                traceback.print_exc()
+            step.schedule_and_wait(data)
+            print("%s took %.2f seconds" % (step.description, time.time() - step_start))
 
             if step.index == self.config.export_step and logging_dir is not None:
                 log_data(data)
