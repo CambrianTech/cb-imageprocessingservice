@@ -1,6 +1,5 @@
 import math
 import numpy as np
-import numba as nb
 import cv2
 import uuid
 from enum import IntEnum
@@ -11,33 +10,19 @@ from bisect import bisect_left, bisect_right
 from pipeline.misc.utils import normalize
 from pipeline.data.logging import Timer
 
-@nb.jit(nopython=True)
 def out_of_range(x, y, width, height):
     return x < 0 or y < 0 or x >= width or y >= height
 
-@jitclass(spec=[
-            ("data", nb.types.float32[:]),
-            ("point_a", nb.types.UniTuple(nb.types.int32, 2)),
-            ("point_b", nb.types.UniTuple(nb.types.int32, 2)), 
-            ("dy", nb.types.float32),
-            ("dx", nb.types.float32),
-            ("length", nb.types.float32),
-            ("midpoint", nb.types.UniTuple(nb.types.float32, 2)),
-            ("angle", nb.types.float32),
-            ("degrees", nb.types.float32),
-            ("direction", nb.types.float32[:]),
-            ("dead", nb.types.boolean),
-            ])
 class Line():
     def __init__(self, ax, ay, bx, by):
-        self.data = np.array((ax, ay, bx, by), dtype=nb.types.float32)
 
+        self.data = np.array((ax, ay, bx, by), dtype=float)
         self.point_a = int(ax), int(ay)
         self.point_b = int(bx), int(by)
         
-        self.dx = self.data[2] - self.data[0]
-        self.dy = self.data[3] - self.data[1]
-        self.length = euclidean(self.point_a, self.point_b)
+        self.dx = bx - ax
+        self.dy = by - ay
+        self.length = math.sqrt(self.dx * self.dx + self.dy * self.dy)
 
         self.midpoint = ((ax + bx) / 2.0, (ay + by) / 2.0)
         self.angle = math.atan2(self.dy, self.dx)
@@ -53,13 +38,6 @@ class Line():
 
     def intersects(self, other):
         return self.get_intersection(other) is not None
-
-    def equals(self, other, epsilon=0):
-        if epsilon == 0:
-            return np.array_equal(self.data, other.data)
-        else:
-            result = np.linalg.norm(self.data - other.data)
-            return result < epsilon
 
     @property
     def normal_a(self):
@@ -85,7 +63,8 @@ class Line():
 
         direction = self.direction
         amount = self.length * ratio
-        data = self.data.copy()
+        
+        data = np.array(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
 
         if from_a:
             data[0] = self.midpoint[0] - direction[0] * amount
@@ -99,14 +78,12 @@ class Line():
 
     def copy(self):
         #todo: ineffcient
-        return Line(self.data[0], self.data[1], self.data[2], self.data[3])
+        return Line(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1])
 
 #jit functions, unused:
-@nb.jit(nopython=True)
 def line_angle(x0, y0, x1, y1):
     return math.atan2(float(y1 - y0), float(x1 - x0))
 
-@nb.jit(nopython=True)
 def line_angle_difference(x, y): #minimum angle between lines segments cannot differ by more than 90 degrees
     diff = abs(math.atan2(math.sin(x-y), math.cos(x-y)))
     if diff > 0.5 * math.pi:
@@ -114,28 +91,14 @@ def line_angle_difference(x, y): #minimum angle between lines segments cannot di
 
     return diff
 
-@nb.jit(nopython=True)
 def closest_line_point(x0, y0, x1, y1, px, py): #minimum angle between lines segments cannot differ by more than 90 degrees
     dx, dy = x1-x0, y1-y0
     det = dx*dx + dy*dy
     a = (dy*(py-y0)+dx*(px-x0))/det
     return (x0+a*dx), (y0+a*dy)
 
-@nb.jit(nopython=True)
 def bounding_box(line, width, length_multiplier=1.0):
     return (line.midpoint, (line.length * length_multiplier, width), line.degrees)
-
-@nb.jit(nopython=True)
-def euclidean(point_a, point_b):
-    dx = point_b[0] - point_a[0]
-    dy = point_b[1] - point_a[1]
-    return math.sqrt(dx * dx + dy * dy)
-
-@nb.jit(nopython=True)
-def sqeuclidean(point_a, point_b):
-    dx = point_b[0] - point_a[0]
-    dy = point_b[1] - point_a[1]
-    return dx * dx + dy * dy
 
 class ImageEdge(IntEnum):
     Top = 0x0001
@@ -143,16 +106,15 @@ class ImageEdge(IntEnum):
     Bottom = 0x0100
     Left = 0x1000
 
-@nb.jit(nopython=True)
-def point_on_image_edge(point, image, min_distance=3):
+def point_on_image_edge(point, width, height, min_distance=3):
     edge = 0x0
     if point[1] <= min_distance:
         edge |= ImageEdge.Top
 
-    if point[0] >= image.shape[1] - min_distance - 1:
+    if point[0] >= width - min_distance - 1:
         edge |= ImageEdge.Right
 
-    if point[1] >= image.shape[0] - min_distance - 1:
+    if point[1] >= height - min_distance - 1:
         edge |= ImageEdge.Bottom
 
     if point[0] <= min_distance:
@@ -160,13 +122,11 @@ def point_on_image_edge(point, image, min_distance=3):
 
     return edge
 
-@nb.jit(nopython=True)
-def line_on_image_edge(point_a, point_b, image, min_distance=3):
+def line_on_image_edge(point_a, point_b, width, height, min_distance=3):
     #if A is on the edge and also one of those edges is the same as B is on
-    return point_on_image_edge(point_a, image, min_distance) and (point_on_image_edge(point_a, image, min_distance) & point_on_image_edge(point_b, image, min_distance)) > 0
+    return point_on_image_edge(point_a, width, height, min_distance) and (point_on_image_edge(point_a, width, height, min_distance) & point_on_image_edge(point_b, width, height, min_distance)) > 0
 
 #(line.midpoint, (line.length * length_multiplier, width), np.degrees(line.angle))
-@nb.jit(nopython=True)
 def rotated_rects_points(center, size, angle):
     b = math.cos(angle)
     a = math.sin(angle)
@@ -185,7 +145,6 @@ def rotated_rects_points(center, size, angle):
     pt[3][1] = 2*center[1] - pt[1][1]
     return pt
 
-@nb.jit(nopython=True)
 def rotated_rects_intersect(pts1, area1, pts2, area2):
     # L2 metric const float samePointEps = std::max(1e-16f, 1e-6f * (float)std::max(rect1.size.area(), rect2.size.area()));
     samePointEps = max(1e-16, 1e-6 * max(area1, area2));
@@ -244,7 +203,6 @@ def rotated_rects_intersect(pts1, area1, pts2, area2):
 
     return verts_inside(pts2, pts1, vec2) or verts_inside(pts1, pts2, vec1)
 
-@nb.jit(nopython=True)
 def verts_inside(pts1, pts2, vec1):
     for i in range(4):
         #// We do a sign test to see which side the point lies.
@@ -277,7 +235,6 @@ def verts_inside(pts1, pts2, vec1):
 EPSILON = np.finfo(float).eps
 
 #https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
-@nb.jit(nopython=True)
 def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
 
     s1_x = p1_x - p0_x;     s1_y = p1_y - p0_y;
@@ -296,7 +253,6 @@ def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
     #Collision detected
     return p0_x + (t * s1_x), p0_y + (t * s1_y)
 
-@nb.jit(nopython=False)
 def draw_line(line, img, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
     cv2.line(img, (int(line.point_a[0] * scale), int(line.point_a[1] * scale)), (int(line.point_b[0] * scale), int(line.point_b[1] * scale)), color, thickness=thickness, lineType=lineType)
 
@@ -312,7 +268,6 @@ def draw_lines(img, lines, color=(255,50,255,255), thickness=1, scale=1.0, lineT
 
     cv2.drawContours(img, pts, -1, color, thickness=thickness, lineType=lineType)
 
-@nb.jit(nopython=True)
 def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy, dljx, dljy):
 
     dlix = bx - ax
@@ -377,7 +332,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
             if line_angle_difference(line_a.angle, line_b.angle) > angle_threshold or line_b.dead or line_a == line_b:
                 continue
 
-            dist_sq = sqeuclidean(line_a.midpoint, line_b.midpoint)
+            dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
 
             if dist_sq <= min_dist_sq:
                 result = 1
