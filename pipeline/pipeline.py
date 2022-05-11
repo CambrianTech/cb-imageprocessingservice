@@ -4,6 +4,8 @@ from enum import IntEnum
 from termcolor import colored
 import asyncio
 import traceback
+from guppy import hpy
+import gc
 
 from .config import PipelineMode, PipelineConfig
 from .core import PipelineStep, PipelineStepIndex
@@ -174,6 +176,8 @@ class Pipeline():
 
         print(colored("Running stages %s through %s" % (self.steps[1].description, self.steps[len(self.steps)-1].description), attrs=['bold']))
 
+        hp = hpy()
+
         for step in self.steps:
 
             if not self.running: break
@@ -190,8 +194,11 @@ class Pipeline():
             step_start = time.time()
 
             try:
+                hp.setrelheap()
                 step.schedule_and_wait(data)
                 print("%s took %.2f seconds" % (step.description, time.time() - step_start))
+                gc.collect()
+                print("\n### HEAP for %s ###\n" % step.description, hp.heap())
             except:
                 traceback.print_exc()
 

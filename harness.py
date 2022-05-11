@@ -11,6 +11,7 @@ import click
 import time
 import asyncio
 import signal
+import traceback
 
 from concurrent.futures import ThreadPoolExecutor
 from termcolor import colored
