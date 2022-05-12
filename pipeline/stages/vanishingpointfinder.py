@@ -222,11 +222,8 @@ class PipelineVanishingPointFinder(PipelineStep):
     def output_keys(self) -> list:
         return []
 
-    def get_contour_lines(self, surface, min_length=None):
+    def get_contour_lines(self, image, surface, min_length):
         lines = []
-
-        if min_length is None:
-            min_length = self.diagonal/80
 
         for poly in surface.polygons:
             num_pts = len(poly)
@@ -235,7 +232,7 @@ class PipelineVanishingPointFinder(PipelineStep):
                 point_a = poly[i][0]
                 point_b = poly[(i+1) % num_pts][0]
 
-                if line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0]):
+                if line_on_image_edge(point_a, point_b, image.shape[1], image.shape[0]):
                     continue
 
                 if distance.euclidean(point_a, point_b) > min_length:
@@ -246,30 +243,30 @@ class PipelineVanishingPointFinder(PipelineStep):
 
     def run(self, data):
 
-        self.room = data["room"]
-        self.image = data["downscaled"]
-        self.diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
+        room = data["room"]
+        image = data["downscaled"]
+        diagonal = math.hypot(image.shape[0], image.shape[1])
 
-        self.surfaces = []
+        surfaces = []
 
-        self.surfaces.extend(data["room"].get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.Wall]))
-        self.surfaces.extend(data["room"].get_surfaces(labels=box_like))
+        surfaces.extend(data["room"].get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.Wall]))
+        surfaces.extend(data["room"].get_surfaces(labels=box_like))
         #self.surfaces.extend(data["room"].get_surfaces(labels=legged_objects))
 
         #find single vertical vanishing point
         pi_2 = np.pi/2
         vertical_threshold = np.radians(15)
         vertical_lines = []
-        self.all_lines = []
+        all_lines = []
 
-        for surface in self.surfaces:
+        for surface in surfaces:
             lines = surface.lines.copy()
-            lines.extend(self.get_contour_lines(surface))
-            self.all_lines.extend(lines)
+            lines.extend(self.get_contour_lines(image, surface, diagonal/80))
+            all_lines.extend(lines)
    
             if surface.surfaceType == SurfaceType.Wall or surface.bestLabel in box_like:                
                 vertical, horizontal = partition(lambda x: line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
-                horizontal = merge_lines(horizontal, search_width=self.diagonal/200, search_length=1.1)
+                horizontal = merge_lines(horizontal, search_width=diagonal/200, search_length=1.1)
 
                 vpf = VanishingPointFinder(horizontal)
                 surface.horizontal_vp = vpf.solve(measure_area=True)
@@ -281,36 +278,37 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         #find vertical vanishing point for entire room
         if len(vertical_lines) > 1:
-            vertical_lines = merge_lines(vertical_lines, search_width=self.diagonal/200, angle_threshold=math.radians(5))
+            vertical_lines = merge_lines(vertical_lines, search_width=diagonal/200, angle_threshold=math.radians(5))
             vpf = VanishingPointFinder(vertical_lines)
-            self.room.vertical_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
-            if len(self.room.vertical_vp) == 0:
-                self.room.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
+            room.vertical_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
+            if len(room.vertical_vp) == 0:
+                room.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
 
-        if self.room.vertical_vp is not None:
-            for surface in self.surfaces:
+        if room.vertical_vp is not None:
+            for surface in surfaces:
                 if surface.vertical_vp is None:
-                    surface.vertical_vp = self.room.vertical_vp
+                    surface.vertical_vp = room.vertical_vp
 
         if im_logging_enabled(data):
-            log_image(data, "vanishing_points", self.get_debug_image(data))
+            log_image(data, "vanishing_points", self.get_debug_image(data, surfaces, all_lines))
 
-    def get_debug_image(self, data):
+    def get_debug_image(self, data, surfaces, all_lines):
            
-        img = self.image.copy()
+        room = data["room"]
+        image = data["downscaled"].copy()
     
         #draw all lines
-        draw_lines(img, self.all_lines, color=(80,80,80))
+        draw_lines(image, all_lines, color=(80,80,80))
 
-        if self.room.vertical_vp is not None and len(self.room.vertical_vp) > 0:
-            draw_lines(img, self.room.vertical_vp[0].inliers, color=(0,255,0), thickness=2)
+        if room.vertical_vp is not None and len(room.vertical_vp) > 0:
+            draw_lines(image, room.vertical_vp[0].inliers, color=(0,255,0), thickness=2)
 
-        for surface in self.surfaces:
+        for surface in surfaces:
             if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
-                draw_lines(img, surface.horizontal_vp[0].inliers, color=random_color(), thickness=2)
+                draw_lines(image, surface.horizontal_vp[0].inliers, color=random_color(), thickness=2)
 
             if surface.vp and len(surface.vp):
-                draw_lines(img, surface.vp[0].inliers, color=random_color(), thickness=2)
+                draw_lines(image, surface.vp[0].inliers, color=random_color(), thickness=2)
             
-        return img
+        return image
 
