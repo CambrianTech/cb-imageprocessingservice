@@ -13,7 +13,17 @@ ARG CUDNN=7.4.1.5-1
 # Needed for string substitution 
 SHELL ["/bin/bash", "-c"]
 # Pick up some TF dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+
+# nvidia messed up their GPG keys: https://github.com/NVIDIA/nvidia-docker/issues/1631
+
+RUN apt-key del 7fa2af80
+RUN apt-key del 3bf863cc
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
+
+RUN apt-get update
+
+RUN     apt-get install -y --no-install-recommends \
         build-essential \
         cuda-command-line-tools-${CUDA/./-} \
         cuda-cublas-${CUDA/./-} \
@@ -21,7 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         cuda-curand-${CUDA/./-} \
         cuda-cusolver-${CUDA/./-} \
         cuda-cusparse-${CUDA/./-} \
-	cuda-nvrtc-${CUDA/./-} \
+        cuda-nvrtc-${CUDA/./-} \
         curl \
         libcudnn7=${CUDNN}+cuda${CUDA} \
         libfreetype6-dev \
