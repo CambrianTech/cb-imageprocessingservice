@@ -3,10 +3,6 @@ import numpy as np
 from pathlib import Path
 import pickle
 
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=RuntimeWarning)
-
 import click
 import time
 import asyncio
@@ -129,7 +125,7 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     loop.set_default_executor(ThreadPoolExecutor())
 
     for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, pipeline.stop)
+        loop.add_signal_handler(sig, pipeline.kill)
 
     start_time = time.time()
 

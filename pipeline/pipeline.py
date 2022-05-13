@@ -3,10 +3,11 @@ import time
 from enum import IntEnum
 from termcolor import colored
 import asyncio
+import typing
 import psutil
 
 from .config import PipelineMode, PipelineConfig
-from .core import schedule_and_wait, PipelineStep, PipelineStepIndex
+from .core import PipelineStep, PipelineStepIndex
 from .data.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, set_logging_level
 from .misc.utils import get_memory_usage_mb
 
@@ -83,10 +84,10 @@ class Pipeline():
         #Important: some devices may not be able to instantiate a class, so a list is first built
         if self.config.mode == PipelineMode.Serve:
             self.s3_client = S3Client()
-            input_step = PipelineS3Input
+            self.input_step = PipelineS3Input
             output_step = PipelineS3Output
         else:
-            input_step = PipelineFileInput
+            self.input_step = PipelineFileInput
             output_step = PipelineFileOutput
 
         all_steps = list([None] * (PipelineStepIndex.Output + 1))
@@ -120,7 +121,7 @@ class Pipeline():
         print("Initializing steps %d through %d" % (self.start_step, self.stop_step))
 
         self.steps = []
-        self.push(input_step(self))
+        self.push(self.input_step(self))
 
         for index in range(self.start_step, self.stop_step + 1):
 
@@ -142,21 +143,23 @@ class Pipeline():
         for step in self.steps:
             step.start()
 
-    def stop(self):
+    async def stop(self):
         if not self._running: return
 
         print("Stopping threads")
         self._running = False
 
         for step in self.steps:
-            step.stop()
+            await step.stop()
 
         print("Stopped all threads")
 
-        # for task in asyncio.all_tasks():
-        #     task.cancel()                    
-        
-        #asyncio.ensure_future(exit())
+    def kill(self):
+
+        for task in asyncio.all_tasks():
+            task.cancel()
+
+        asyncio.get_event_loop().stop()
 
     @property
     def running(self):
@@ -203,3 +206,20 @@ class Pipeline():
         print(colored("All stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
 
         return data
+
+def schedule_and_wait(func: typing.Callable[[typing.Dict, asyncio.Future], None], input_dict: typing.Dict) -> asyncio.Future:
+    """Calls a function and returns a future that the function is supposed to fullfil."""
+    future = asyncio.get_event_loop().create_future()
+    func(input_dict, future)
+    return future
+
+async def merge_future_dicts(*futures) -> typing.Dict:
+    """Merges dict outputs of futures into a single dict."""
+    merged_dict = {}
+    for result in asyncio.as_completed(futures):
+        merged_dict.update(result)
+    return merged_dict
+
+def num_waiting_items(steps: typing.List[PipelineStep]) -> int:
+    """Counts the number of waiting items in a list of pipeline steps."""
+    return sum([step.num_waiting_items for step in steps])
