@@ -204,6 +204,8 @@ class Pipeline():
         for step in self.steps:
 
             if not self.running: break
+
+            if step is None: continue
             
             set_logging_step(data, self.config.logging_step, step.index)
             print(step.description)

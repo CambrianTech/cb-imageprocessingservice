@@ -139,8 +139,6 @@ class PipelineStep(metaclass=ABCMeta):
                         result_future.set_exception(e)
                 continue
 
-            print(type(self), "time: %.2fs" % (time() - step_start_time), "data count:", len(data))
-
             for result_future, datum in zip(result_futures, data):
                 if not result_future.cancelled():
                     result_future.set_result(datum)
