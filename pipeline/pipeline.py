@@ -216,8 +216,12 @@ class Pipeline():
                 step_callback()
 
             log_step(step, step_start)
-            
+
         print(colored("All stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
+
+        #all memory must be cleaned up by this point (data elements may reference each other):
+        for key in data:
+            data[key] = None
 
 def schedule_and_wait(func: typing.Callable[[typing.Dict, asyncio.Future], None], input_dict: typing.Dict) -> asyncio.Future:
     """Calls a function and returns a future that the function is supposed to fullfil."""

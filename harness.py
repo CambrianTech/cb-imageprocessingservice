@@ -95,10 +95,6 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     if len(files) == 0:
         raise Exception('No files found at path {}'.format(input_dir)) 
-
-    hp = hpy()
-    hp.setrelheap()
-    gc.collect()
     
     config = PipelineConfig()
     config.mode = PipelineMode.Restore if restore is not None else PipelineMode.Process
@@ -127,6 +123,10 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, pipeline.kill)
 
+    hp = hpy()
+    hp.setrelheap()
+    gc.collect()
+
     start_time = time.time()
 
     pipeline.start()
@@ -135,17 +135,17 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     loop.run_until_complete(pipeline.stop())
 
+    elapsed = (time.time() - start_time)
+    avg = elapsed / (len(files) * iterations)
+
     pipeline = None
     config = None
     loop = None
 
-    elapsed = (time.time() - start_time)
-    avg = elapsed / (len(files) * iterations)
-    
-    print_title("Total processing time: %.2fs, average: %.2fs" % (elapsed, avg))
-
     gc.collect()
     print("\n### HEAP FINAL ###\n", hp.heap())
+
+    print_title("Total processing time: %.2fs, average: %.2fs" % (elapsed, avg))
 
 if __name__ == "__main__":
     main()
