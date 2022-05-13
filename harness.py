@@ -17,7 +17,6 @@ from pipeline.core import PipelineStepIndex
 from pipeline.pipeline import Pipeline
 from pipeline.data.logging import LogLevel
 
-import traceback
 from guppy import hpy
 import gc
 
