@@ -133,7 +133,8 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     loop.run_until_complete(process_files(pipeline, files, iterations))
 
-    pipeline.stop()
+    loop.run_until_complete(pipeline.stop())
+
     pipeline = None
     config = None
     loop = None
