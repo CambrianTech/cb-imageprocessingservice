@@ -4,26 +4,12 @@ import numba as nb
 import cv2
 import uuid
 from enum import IntEnum
-from numba.experimental import jitclass
 
 from scipy.spatial import distance
 from bisect import bisect_left, bisect_right
 from pipeline.misc.utils import normalize
 from pipeline.data.logging import Timer
 
-# @jitclass(spec=[
-#             ("data", nb.types.float32[:]),
-#             ("point_a", nb.types.UniTuple(nb.types.int32, 2)),
-#             ("point_b", nb.types.UniTuple(nb.types.int32, 2)), 
-#             ("dy", nb.types.float32),
-#             ("dx", nb.types.float32),
-#             ("length", nb.types.float32),
-#             ("midpoint", nb.types.UniTuple(nb.types.float32, 2)),
-#             ("angle", nb.types.float32),
-#             ("degrees", nb.types.float32),
-#             ("direction", nb.types.float32[:]),
-#             ("dead", nb.types.boolean),
-#             ])
 class Line():
 
     def __init__(self, ax, ay, bx, by):
