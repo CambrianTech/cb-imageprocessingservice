@@ -11,22 +11,22 @@ from bisect import bisect_left, bisect_right
 from pipeline.misc.utils import normalize
 from pipeline.data.logging import Timer
 
-@jitclass(spec=[
-            ("data", nb.types.float32[:]),
-            ("point_a", nb.types.UniTuple(nb.types.int32, 2)),
-            ("point_b", nb.types.UniTuple(nb.types.int32, 2)), 
-            ("dy", nb.types.float32),
-            ("dx", nb.types.float32),
-            ("length", nb.types.float32),
-            ("midpoint", nb.types.UniTuple(nb.types.float32, 2)),
-            ("angle", nb.types.float32),
-            ("degrees", nb.types.float32),
-            ("direction", nb.types.float32[:]),
-            ("dead", nb.types.boolean),
-            ])
+# @jitclass(spec=[
+#             ("data", nb.types.float32[:]),
+#             ("point_a", nb.types.UniTuple(nb.types.int32, 2)),
+#             ("point_b", nb.types.UniTuple(nb.types.int32, 2)), 
+#             ("dy", nb.types.float32),
+#             ("dx", nb.types.float32),
+#             ("length", nb.types.float32),
+#             ("midpoint", nb.types.UniTuple(nb.types.float32, 2)),
+#             ("angle", nb.types.float32),
+#             ("degrees", nb.types.float32),
+#             ("direction", nb.types.float32[:]),
+#             ("dead", nb.types.boolean),
+#             ])
 class Line():
     def __init__(self, ax, ay, bx, by):
-        self.data = np.array((ax, ay, bx, by), dtype=nb.types.float32)
+        self.data = np.array((ax, ay, bx, by), dtype=np.float32)
 
         self.point_a = int(ax), int(ay)
         self.point_b = int(bx), int(by)
@@ -97,11 +97,6 @@ class Line():
         #todo: ineffcient
         return Line(self.data[0], self.data[1], self.data[2], self.data[3])
 
-#jit functions, unused:
-@nb.jit(nopython=True)
-def line_angle(x0, y0, x1, y1):
-    return math.atan2(float(y1 - y0), float(x1 - x0))
-
 @nb.jit(nopython=True)
 def line_angle_difference(x, y): #minimum angle between lines segments cannot differ by more than 90 degrees
     diff = abs(math.atan2(math.sin(x-y), math.cos(x-y)))
@@ -116,10 +111,6 @@ def closest_line_point(x0, y0, x1, y1, px, py): #minimum angle between lines seg
     det = dx*dx + dy*dy
     a = (dy*(py-y0)+dx*(px-x0))/det
     return (x0+a*dx), (y0+a*dy)
-
-@nb.jit(nopython=True)
-def bounding_box(line, width, length_multiplier=1.0):
-    return (line.midpoint, (line.length * length_multiplier, width), line.degrees)
 
 class ImageEdge(IntEnum):
     Top = 0x0001
@@ -351,7 +342,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
         line_a = lines[i]
         if line_a.dead: continue
 
-        rect_a = bounding_box(line_a, width=search_width, length_multiplier=search_length)
+        rect_a = line_a.bounding_box(width=search_width, length_multiplier=search_length)
         data = line_a.data.copy()
 
         for line_b in lines:
@@ -365,7 +356,7 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
                 result = 1
             else:
                 timer.reset()
-                rect_b = bounding_box(line_b, width=search_width, length_multiplier=search_length)
+                rect_b = line_b.bounding_box(width=search_width, length_multiplier=search_length)
                 result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
                 timer.time_event("rotatedRectangleIntersection")
 
