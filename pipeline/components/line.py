@@ -381,8 +381,5 @@ def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.ra
 
     timer.log_all_events()
 
-    filtered = list(filter(lambda x: not x.dead, lines))
-    lines = None
-
-    return filtered
+    return list(filter(lambda x: not x.dead, lines))
 
