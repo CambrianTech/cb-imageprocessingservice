@@ -16,11 +16,8 @@ class PipelineInput(PipelineStep, metaclass=abc.ABCMeta):
     def output_keys(self) -> list:
         return ["image"]
 
-    def run():
-        raise Exception("call run() method instead")
-
     @abstractmethod
-    def get(self, info: dict) -> dict:
+    def run(self, info: dict) -> dict:
         pass
 
 

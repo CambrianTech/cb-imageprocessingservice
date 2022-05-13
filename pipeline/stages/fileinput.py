@@ -13,7 +13,11 @@ from termcolor import colored
 
 class PipelineFileInput(PipelineInput):
 
-    def get(self, info: dict) -> dict:
+    @property
+    def required_keys(self) -> list:
+        return ["path"]
+
+    def run(self, info: dict) -> dict:
 
         path = Path(info["path"])
         print("Reading data from", colored(path, 'cyan', attrs=['bold']))

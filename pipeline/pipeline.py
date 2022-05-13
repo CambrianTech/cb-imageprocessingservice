@@ -184,7 +184,7 @@ class Pipeline():
 
         start_time = time.time()
 
-        data = self.input_step.get(data)
+        data = self.input_step.run(data)
 
         if "unique_id" not in data:
             if 'image_s3_key' in data:

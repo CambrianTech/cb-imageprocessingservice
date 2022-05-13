@@ -121,12 +121,11 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
 
         total_start_time = time()
 
-        results = await pipeline.process(input_dict)
+        await pipeline.process(input_dict)
 
         total_pipeline_time = time() - total_start_time
-        print("Planes total pipeline time: %.2fs" % total_pipeline_time)
+        print("Planes total pipeline time: %.2fs for %s" % (total_pipeline_time, input_dict['unique_id']))
         total_pipeline_times.append((total_pipeline_time, datetime.datetime.now(dateutil.tz.tzlocal())))
-        return results
 
     print("SQS Queue name:", sqs_queue_name)
     if sqs_queue_name is not None:
@@ -154,13 +153,11 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
                     print("Received SQS message:", msg)
                     await loop.run_in_executor(None, msg.delete)
                     try:
-                        print("Loading SQS message")
-                        msg_data = json.loads(msg.body)
-                        print("Running message in pipeline", msg_data)
-                        result_data = await planes_pipeline(msg_data)
-                        print("Got pipeline results")
+                        data = json.loads(msg.body)
+                        await planes_pipeline(data)
+                        data = None
                     except Exception as e:
-                        print("Error processing SQS message:", e)
+                        print("Error processing SQS message:", e, msg.body)
         print("Starting SQS loop")
         asyncio.ensure_future(sqs_loop())
         
