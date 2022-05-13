@@ -153,7 +153,7 @@ class PipelineRefinePlaneMasks(PipelineStep):
 
         log_image(data, "image", img)
 
-        output = data["output"]
+        output = data["semantic_probs"]
 
         hed = data["hed"]
         log_image(data, 'hed', hed)

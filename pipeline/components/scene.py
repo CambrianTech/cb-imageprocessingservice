@@ -26,8 +26,9 @@ class Scene():
         ade_seg_c = np.dstack(tuple(self.data["isolated"]))
         self.isolated_labels = np.int32(np.argmax(ade_seg_c, -1))
 
-        ade_seg_c = np.dstack((tuple(self.data["output"])))
+        ade_seg_c = np.dstack((tuple(self.data["semantic_probs"])))
         self.semantic_labels = np.int32(np.argmax(ade_seg_c, -1))
+
         self.planar_groups = []
 
         self._mask_intersections = {}
