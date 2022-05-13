@@ -173,7 +173,7 @@ class Pipeline():
 
         start_time = time.time()
 
-        print(colored("Running stages %s through %s" % (self.steps[1].description, self.steps[len(self.steps)-1].description), attrs=['bold']))
+        print(colored("Running steps %d through %d" % (self.start_step, self.stop_step), attrs=['bold']))
 
         for step in self.steps:
 
