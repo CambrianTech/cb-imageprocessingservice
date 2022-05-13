@@ -84,10 +84,10 @@ class Pipeline():
         #Important: some devices may not be able to instantiate a class, so a list is first built
         if self.config.mode == PipelineMode.Serve:
             self.s3_client = S3Client()
-            self.input_step = PipelineS3Input
+            self.input_step = PipelineS3Input(self)
             output_step = PipelineS3Output
         else:
-            self.input_step = PipelineFileInput
+            self.input_step = PipelineFileInput(self)
             output_step = PipelineFileOutput
 
         all_steps = list([None] * (PipelineStepIndex.Output + 1))
@@ -120,8 +120,7 @@ class Pipeline():
         
         print("Initializing steps %d through %d" % (self.start_step, self.stop_step))
 
-        self.steps = []
-        self.push(self.input_step(self))
+        self.steps = list()
 
         for index in range(self.start_step, self.stop_step + 1):
 
@@ -171,24 +170,32 @@ class Pipeline():
 
     async def process(self, data):
 
-        if (len(self.steps) == 0): return
-
         if self.config.logging_dir is not None and not os.path.exists(self.config.logging_dir):
             os.makedirs(self.config.logging_dir)
 
-        start_time = time.time()
+        logging_dir = None if self.config.logging_dir is None else os.path.join(self.config.logging_dir, data["unique_id"])
+
+        set_logging_dir(data, logging_dir)
+        set_logging_level(data, self.config.logging_level)
+
+        def log_step(step, start):
+            print("%s took %.2f seconds" % (step.description, time.time() - start))
+            print(colored("Current memory at %.2f MB" % get_memory_usage_mb(), attrs=['bold']))
+
+            if step.index == self.config.export_step and logging_dir is not None:
+                log_data(data)
 
         print(colored("Running steps %d through %d" % (self.start_step, self.stop_step), attrs=['bold']))
+
+        start_time = time.time()
+
+        data = self.input_step.get(data)
+
+        log_step(self.input_step, start_time)
 
         for step in self.steps:
 
             if not self.running: break
-
-            #consider perhaps passing logging down into steps, trigger off that
-            logging_dir = None if self.config.logging_dir is None else os.path.join(self.config.logging_dir, data["unique_id"])
-
-            set_logging_dir(data, logging_dir)
-            set_logging_level(data, self.config.logging_level)
             
             set_logging_step(data, self.config.logging_step, step.index)
             print(step.description)
@@ -197,15 +204,9 @@ class Pipeline():
 
             await schedule_and_wait(step.schedule, data)
 
-            print("%s took %.2f seconds" % (step.description, time.time() - step_start))
-            print(colored("Current memory at %.2f MB" % get_memory_usage_mb(), attrs=['bold']))
-
-            if step.index == self.config.export_step and logging_dir is not None:
-                log_data(data)
-
+            log_step(step, step_start)
+            
         print(colored("All stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
-
-        return data
 
 def schedule_and_wait(func: typing.Callable[[typing.Dict, asyncio.Future], None], input_dict: typing.Dict) -> asyncio.Future:
     """Calls a function and returns a future that the function is supposed to fullfil."""

@@ -13,18 +13,16 @@ from termcolor import colored
 
 class PipelineFileInput(PipelineInput):
 
-    def run(self, data):
+    def get(self, info: dict) -> dict:
 
-        path = Path(data["path"])
+        path = Path(info["path"])
+        print("Reading data from", colored(path, 'cyan', attrs=['bold']))
 
         if path.suffix == ".pickle":
-            print("Reading data from", colored(path, 'cyan', attrs=['bold']))
             with open(path, 'rb') as handle:
-                loaded = pickle.load(handle)
-                #todo: maybe there's a deep copy that works instead? 
-                for key in loaded:
-                    data[key] = loaded[key]
+                return pickle.load(handle)
         else:
-            print("Reading image", data["path"])
-            data["image"] = imread(data["path"])
+            data = dict()
+            data["image"] = imread(str(path))
             data["image"] = data["image"][:, :, :3]
+            return data
