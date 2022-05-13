@@ -117,20 +117,15 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
     # Pipeline for finding planes, generating lighting and predicting fov.
     async def planes_pipeline(input_dict: typing.Dict):
 
-        if 'image_s3_key' in input_dict:
-            input_dict['unique_id'] = input_dict['image_s3_key']
-            print("Warning 'image_s3_key' is no longer being used. Please update this to 'unique_id'")
-
         print("Running image %s through pipeline" % input_dict['unique_id'])
 
         total_start_time = time()
 
-        results = await pipeline.process(input_dict)
+        await pipeline.process(input_dict)
 
         total_pipeline_time = time() - total_start_time
-        print("Planes total pipeline time: %.2fs" % total_pipeline_time)
+        print("Planes total pipeline time: %.2fs for %s" % (total_pipeline_time, input_dict['unique_id']))
         total_pipeline_times.append((total_pipeline_time, datetime.datetime.now(dateutil.tz.tzlocal())))
-        return results
 
     print("SQS Queue name:", sqs_queue_name)
     if sqs_queue_name is not None:
@@ -158,13 +153,11 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
                     print("Received SQS message:", msg)
                     await loop.run_in_executor(None, msg.delete)
                     try:
-                        print("Loading SQS message")
-                        msg_data = json.loads(msg.body)
-                        print("Running message in pipeline", msg_data)
-                        result_data = await planes_pipeline(msg_data)
-                        print("Got pipeline results")
+                        data = json.loads(msg.body)
+                        await planes_pipeline(data)
+                        data = None
                     except Exception as e:
-                        print("Error processing SQS message:", e)
+                        print("Error processing SQS message:", e, msg.body)
         print("Starting SQS loop")
         asyncio.ensure_future(sqs_loop())
         
