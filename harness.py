@@ -11,6 +11,7 @@ import click
 import time
 import asyncio
 import signal
+import traceback
 
 from concurrent.futures import ThreadPoolExecutor
 from termcolor import colored
@@ -54,8 +55,8 @@ async def process_files(pipeline, files, iterations):
 
             index += 1
 
-    finally:
-        pipeline.stop()
+    except:
+        traceback()
         
 
 
@@ -104,6 +105,8 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
         raise Exception('No files found at path {}'.format(input_dir)) 
 
     hp = hpy()
+    hp.setrelheap()
+    gc.collect()
     
     config = PipelineConfig()
     config.mode = PipelineMode.Restore if restore is not None else PipelineMode.Process
@@ -136,10 +139,12 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     pipeline.start()
 
-    hp.setrelheap()
-    gc.collect()
-
     loop.run_until_complete(process_files(pipeline, files, iterations))
+
+    pipeline.stop()
+    pipeline = None
+    config = None
+    loop = None
 
     elapsed = (time.time() - start_time)
     avg = elapsed / (len(files) * iterations)
