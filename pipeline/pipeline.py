@@ -3,10 +3,13 @@ import time
 from enum import IntEnum
 from termcolor import colored
 import asyncio
+import typing
+import psutil
 
 from .config import PipelineMode, PipelineConfig
-from .core import schedule_and_wait, PipelineStep, PipelineStepIndex
+from .core import PipelineStep, PipelineStepIndex
 from .data.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, set_logging_level
+from .misc.utils import get_memory_usage_mb
 
 from .stages.aws.s3client import S3Client
 from .stages.fileinput import PipelineFileInput
@@ -81,10 +84,10 @@ class Pipeline():
         #Important: some devices may not be able to instantiate a class, so a list is first built
         if self.config.mode == PipelineMode.Serve:
             self.s3_client = S3Client()
-            input_step = PipelineS3Input
+            self.input_step = PipelineS3Input(self)
             output_step = PipelineS3Output
         else:
-            input_step = PipelineFileInput
+            self.input_step = PipelineFileInput(self)
             output_step = PipelineFileOutput
 
         all_steps = list([None] * (PipelineStepIndex.Output + 1))
@@ -117,8 +120,7 @@ class Pipeline():
         
         print("Initializing steps %d through %d" % (self.start_step, self.stop_step))
 
-        self.steps = []
-        self.push(input_step(self))
+        self.steps = list()
 
         for index in range(self.start_step, self.stop_step + 1):
 
@@ -140,21 +142,23 @@ class Pipeline():
         for step in self.steps:
             step.start()
 
-    def stop(self):
+    async def stop(self):
         if not self._running: return
 
         print("Stopping threads")
         self._running = False
 
         for step in self.steps:
-            step.stop()
+            await step.stop()
 
         print("Stopped all threads")
 
-        # for task in asyncio.all_tasks():
-        #     task.cancel()                    
-        
-        #asyncio.ensure_future(exit())
+    def kill(self):
+
+        for task in asyncio.all_tasks():
+            task.cancel()
+
+        asyncio.get_event_loop().stop()
 
     @property
     def running(self):
@@ -164,37 +168,76 @@ class Pipeline():
         print("Appending step %s" % step.description)
         self.steps.append(step)
 
-    async def process(self, data):
-
-        if (len(self.steps) == 0): return
+    async def process(self, data, step_callback=None):
 
         if self.config.logging_dir is not None and not os.path.exists(self.config.logging_dir):
             os.makedirs(self.config.logging_dir)
 
+        def log_step(step, start):
+            print("%s took %.2f seconds" % (step.description, time.time() - start))
+            print(colored("Current memory at %.2f MB" % get_memory_usage_mb(), attrs=['bold']))
+
+            if step.index == self.config.export_step and logging_dir is not None:
+                log_data(data)
+
+        print(colored("Running steps %d through %d" % (self.start_step, self.stop_step), attrs=['bold']))
+
         start_time = time.time()
 
-        print(colored("Running stages %s through %s" % (self.steps[1].description, self.steps[len(self.steps)-1].description), attrs=['bold']))
+        data = self.input_step.run(data)
+
+        if "unique_id" not in data:
+            if 'image_s3_key' in data:
+                data['unique_id'] = data['image_s3_key']
+                print("Warning 'image_s3_key' is no longer being used. Please update this to 'unique_id'")
+            else:
+                print("Invalid data, unique_id not provided")
+                return None
+
+        logging_dir = None if self.config.logging_dir is None else os.path.join(self.config.logging_dir, data["unique_id"])
+
+        set_logging_dir(data, logging_dir)
+        set_logging_level(data, self.config.logging_level)
+
+        log_step(self.input_step, start_time)
 
         for step in self.steps:
 
             if not self.running: break
 
-            #consider perhaps passing logging down into steps, trigger off that
-            logging_dir = None if self.config.logging_dir is None else os.path.join(self.config.logging_dir, data["unique_id"])
-
-            set_logging_dir(data, logging_dir)
-            set_logging_level(data, self.config.logging_level)
+            if step is None: continue
             
             set_logging_step(data, self.config.logging_step, step.index)
             print(step.description)
 
             step_start = time.time()
-            await schedule_and_wait(step.schedule, data)
-            print("%s took %.2f seconds" % (step.description, time.time() - step_start))
 
-            if step.index == self.config.export_step and logging_dir is not None:
-                log_data(data)
+            await schedule_and_wait(step.schedule, data)
+
+            if step_callback is not None: 
+                step_callback()
+
+            log_step(step, step_start)
 
         print(colored("All stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
 
-        return data
+        #all memory must be cleaned up by this point (data elements may reference each other):
+        for key in data:
+            data[key] = None
+
+def schedule_and_wait(func: typing.Callable[[typing.Dict, asyncio.Future], None], input_dict: typing.Dict) -> asyncio.Future:
+    """Calls a function and returns a future that the function is supposed to fullfil."""
+    future = asyncio.get_event_loop().create_future()
+    func(input_dict, future)
+    return future
+
+async def merge_future_dicts(*futures) -> typing.Dict:
+    """Merges dict outputs of futures into a single dict."""
+    merged_dict = {}
+    for result in asyncio.as_completed(futures):
+        merged_dict.update(result)
+    return merged_dict
+
+def num_waiting_items(steps: typing.List[PipelineStep]) -> int:
+    """Counts the number of waiting items in a list of pipeline steps."""
+    return sum([step.num_waiting_items for step in steps])

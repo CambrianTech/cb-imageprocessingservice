@@ -3,10 +3,6 @@ import numpy as np
 from pathlib import Path
 import pickle
 
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=RuntimeWarning)
-
 import click
 import time
 import asyncio
@@ -21,6 +17,7 @@ from pipeline.core import PipelineStepIndex
 from pipeline.pipeline import Pipeline
 from pipeline.data.logging import LogLevel
 
+import traceback
 from guppy import hpy
 import gc
 
@@ -36,29 +33,24 @@ def get_file_paths(input_dir, pattern=None):
 
 async def process_files(pipeline, files, iterations):
 
-    try:
-        index = 1
+    index = 1
 
-        for path in files:
+    for path in files:
 
-            for i in range(iterations): #for memory debug
-                if not pipeline.running:
-                    return
-                url = Path(path)
-                unique_id = url.parents[0].name if len(url.parents) > 0 else url.name
-                data = {"path": path, "unique_id": unique_id if path.suffix == ".pickle" else url.stem}
+        for i in range(iterations): #for memory debug
+            if not pipeline.running:
+                return
+            url = Path(path)
+            unique_id = url.parents[0].name if len(url.parents) > 0 else url.name
+            data = {"path": path, "unique_id": unique_id if path.suffix == ".pickle" else url.stem}
 
-                iteration_string = "" if iterations == 1 else "(iteration %d of %d)" % (i+1, iterations)
+            iteration_string = "" if iterations == 1 else "(iteration %d of %d)" % (i+1, iterations)
 
-                print("\nProcessing file %d of %d %s\n" % (index, len(files), iteration_string))
-                await pipeline.process(data)
+            print("\nProcessing file %d of %d %s\n" % (index, len(files), iteration_string))
+            await pipeline.process(data, step_callback=gc.collect)
 
-            index += 1
-
-    except:
-        traceback()
+        index += 1
         
-
 
 #For instance, to restore from step 6 (before refinement):
 #python -W ignore harness.py data --restore=6
@@ -103,10 +95,6 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     if len(files) == 0:
         raise Exception('No files found at path {}'.format(input_dir)) 
-
-    hp = hpy()
-    hp.setrelheap()
-    gc.collect()
     
     config = PipelineConfig()
     config.mode = PipelineMode.Restore if restore is not None else PipelineMode.Process
@@ -133,7 +121,11 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     loop.set_default_executor(ThreadPoolExecutor())
 
     for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, pipeline.stop)
+        loop.add_signal_handler(sig, pipeline.kill)
+
+    hp = hpy()
+    hp.setrelheap()
+    gc.collect()
 
     start_time = time.time()
 
@@ -141,18 +133,19 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     loop.run_until_complete(process_files(pipeline, files, iterations))
 
-    pipeline.stop()
+    loop.run_until_complete(pipeline.stop())
+
+    elapsed = (time.time() - start_time)
+    avg = elapsed / (len(files) * iterations)
+
     pipeline = None
     config = None
     loop = None
 
-    elapsed = (time.time() - start_time)
-    avg = elapsed / (len(files) * iterations)
-    
-    print_title("Total processing time: %.2fs, average: %.2fs" % (elapsed, avg))
-
     gc.collect()
     print("\n### HEAP FINAL ###\n", hp.heap())
+
+    print_title("Total processing time: %.2fs, average: %.2fs" % (elapsed, avg))
 
 if __name__ == "__main__":
     main()

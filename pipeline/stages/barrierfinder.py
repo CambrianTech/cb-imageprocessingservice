@@ -19,7 +19,7 @@ from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import angle_with_vp
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers
 from cambrian.LineFunctions import LineFunctions
-from pipeline.components.line import line_angle_difference, Line, line_on_image_edge, merge_lines, get_line_points, draw_line
+from pipeline.components.line import line_angle_difference, Line, line_on_image_edge, merge_lines, draw_line
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.surface import Surface
 
@@ -27,6 +27,15 @@ debug_indices = [147]
 debug_show_indices = False
 
 debug_objects = []
+
+def out_of_range(x, y, width, height):
+    return x < 0 or y < 0 or x >= width or y >= height
+
+def get_line_points(line, width, height, num_points=None):
+    if num_points is None:
+        num_points = int(math.ceil(line.length))
+
+    return list(filter(lambda p: not out_of_range(p[0], p[1], width, height), np.linspace(line.point_b, line.point_a, num_points)))
 
 class Barrier():
     def __init__(self, surface_barrier, line, vanishing_point):

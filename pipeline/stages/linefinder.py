@@ -1,10 +1,13 @@
 import cv2
 import numpy as np
+import numba as nb
 import math
 from scipy.spatial import distance
+from numba.experimental import jitclass
 
 from cambrian.frei_chen import frei_chen
 from time import time
+from scipy.spatial import distance
 
 from pipeline.data.surface_type import SurfaceType
 from pipeline.components.line import Line, merge_lines, draw_lines, line_on_image_edge
@@ -37,21 +40,45 @@ class PipelineLineFinder(PipelineStep):
     
     def run(self, data):
 
+        def log_lines(lines, name):
+            if im_logging_enabled(data, LogLevel.Lines):
+                debug = data["downscaled"].copy()
+                thickness = max(int(math.hypot(debug.shape[0], debug.shape[1]) / 600), 1)
+                draw_lines(debug, lines, thickness=thickness)
+                log_image(data, name, debug)
+
+        def find_lines(image, min_length, use_lsd=False, refine=cv2.LSD_REFINE_NONE, scale=1.0, sigma_scale=1.0, quant=2.0, ang_th=22.5, log_eps=0, density_th=0.7, n_bins=1024):
+            min_length = int(min_length)
+
+            if use_lsd:
+                lsd = cv2.createLineSegmentDetector(refine=refine, scale=scale, sigma_scale=sigma_scale, quant=quant, ang_th=ang_th, log_eps=log_eps, density_th=density_th, n_bins=n_bins)
+                lines = lsd.detect(image)[0]
+                if lines is not None:
+                     lines = list(filter(lambda line: distance.euclidean((line[0][0], line[0][1]), (line[0][2], line[0][3])) >= min_length and not line_on_image_edge((line[0][0], line[0][1]), (line[0][2], line[0][3]), image.shape[1], image.shape[0]), lines))
+            else:
+                fld = cv2.ximgproc.createFastLineDetector(min_length, 1.41, 200, 240, 3, False)
+                lines = fld.detect(image)
+
+            sx = data["downscaled"].shape[1] / image.shape[1]
+            sy = data["downscaled"].shape[0] / image.shape[0]
+
+            return list(map(lambda line: Line(line[0][0] * sx, line[0][1] * sy, line[0][2] * sx, line[0][3] * sy), lines)) if lines is not None else list()
+
+        def extract_lines(image, poly, min_length):
+            lines = []
+            num_pts = len(poly)
+            for i in range(num_pts):
+
+                point_a = poly[i][0]
+                point_b = poly[(i+1) % num_pts][0]
+
+                if distance.euclidean(point_a, point_b) > min_length and not line_on_image_edge(point_a, point_b, image.shape[1], image.shape[0]):
+                    lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1]))
+
+            return lines
+
         timer = Timer("line_finder")
         timer.disable()
-
-#         7) FindLines
-# line_finder.setup took 0.00 seconds
-# line_finder.bw_lines_a took 0.02 seconds
-# line_finder.bw_lines_b took 0.09 seconds
-# line_finder.merge_lines BW took 5.96 seconds
-# line_finder.bilateralFilter took 0.01 seconds
-# line_finder.hed took 0.06 seconds
-# line_finder.merge_lines HED took 0.76 seconds
-# line_finder.normals_lines took 0.01 seconds
-# line_finder.merge_lines normals_lines took 0.01 seconds
-# line_finder.merge_lines final took 4.31 seconds
-# 7) FindLines took 11.25 seconds
 
         bw = cv2.cvtColor(data["image"], cv2.COLOR_RGB2GRAY)
 
@@ -64,44 +91,13 @@ class PipelineLineFinder(PipelineStep):
 
         timer.log_elapsed("setup")
 
-        def log_lines(lines, name):
-            if im_logging_enabled(data, LogLevel.Lines):
-                debug = data["downscaled"].copy()
-                thickness = max(int(math.hypot(debug.shape[0], debug.shape[1]) / 600), 1)
-                draw_lines(debug, lines, thickness=thickness)
-                log_image(data, name, debug)
-
-        def find_lines(image, min_length, use_lsd=False, refine=cv2.LSD_REFINE_NONE, scale=1.0, sigma_scale=1.0, quant=2.0, ang_th=22.5, log_eps=0, density_th=0.7, n_bins=1024):
-            min_length = int(min_length)
-            if use_lsd:
-                lsd = cv2.createLineSegmentDetector(refine=refine, scale=scale, sigma_scale=sigma_scale, quant=quant, ang_th=ang_th, log_eps=log_eps, density_th=density_th, n_bins=n_bins)
-                lines = lsd.detect(image)[0]
-                if lines is not None:
-                     lines = list(filter(lambda line: distance.euclidean((line[0][0], line[0][1]), (line[0][2], line[0][3])) >= min_length and not line_on_image_edge((line[0][0], line[0][1]), (line[0][2], line[0][3]), image), lines))
-            else:
-                fld = cv2.ximgproc.createFastLineDetector(min_length, 1.41, 200, 240, 3, False)
-                lines = fld.detect(image)
-
-            sx = data["downscaled"].shape[1] / image.shape[1]
-            sy = data["downscaled"].shape[0] / image.shape[0]
-            return list(map(lambda line: Line(line[0][0] * sx, line[0][1] * sy, line[0][2] * sx, line[0][3] * sy), lines)) if lines is not None else list()
-
-        def extract_lines(poly, min_length):
-            lines = []
-            num_pts = len(poly)
-            for i in range(num_pts):
-                point_a = poly[i][0]
-                point_b = poly[(i+1) % num_pts][0]
-                if distance.euclidean(point_a, point_b) > min_length and not line_on_image_edge(point_a, point_b, data["downscaled"]):
-                    lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1]))
-
-            return lines
-
         min_length = int(diagonal / 100)
 
         lines = []
 
-        #pull lines from semantic contours.
+        image = data["downscaled"]
+
+        # #pull lines from semantic contours.
         for surfaceType in SurfaceType:
             mask = data["isolated"][surfaceType]
             isolated = np.zeros(mask.shape, dtype=np.uint8)
@@ -115,11 +111,14 @@ class PipelineLineFinder(PipelineStep):
                 shape = contour.shape
                 contour = (contour.flatten() - 1).reshape(shape)
                 poly = cv2.approxPolyDP(contour, epsilon, True)
-                lines.extend(extract_lines(poly, min_length))
+                contour_lines = extract_lines(image, poly, min_length)
+                lines.extend(contour_lines)
 
         #find lines in BW image
         bw_lines_a = find_lines(bw, min_length)
+
         lines.extend(bw_lines_a)
+
 
         timer.log_elapsed("bw_lines_a")
 

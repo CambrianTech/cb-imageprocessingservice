@@ -18,9 +18,9 @@ def isolate_masks(data, output):
 
     isolated = list([None] * (SurfaceType.max_index() + 1))
 
-    isolated[SurfaceType.Floor] = output[ADE20K.floor.index].copy()
-    isolated[SurfaceType.Wall] = output[ADE20K.wall.index].copy()
-    isolated[SurfaceType.Ceiling] = output[ADE20K.ceiling.index].copy()
+    isolated[SurfaceType.Floor] = output[ADE20K.floor.index]
+    isolated[SurfaceType.Wall] = output[ADE20K.wall.index]
+    isolated[SurfaceType.Ceiling] = output[ADE20K.ceiling.index]
     
     def combine_outputs(grouping, labels):
         isolated[grouping] = np.zeros_like(isolated[SurfaceType.Floor])
@@ -54,8 +54,7 @@ class PipelineExtractSurfaces(PipelineStep):
     def run(self, data):
 
         #Consolidate types: Include other types as part of floor: rug, earth, grass
-        output = np.float32(data["semantic_probs"])
-        data["output"] = output
+        output = data["semantic_probs"]
 
         h, w = output[0].shape
         shape = (w, h)

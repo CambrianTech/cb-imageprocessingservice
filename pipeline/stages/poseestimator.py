@@ -496,9 +496,6 @@ def ransac_vanishing_point(edgelets, lines, num_ransac_iter=2000, threshold_inli
     if line_indices is not None:
         inlier_indices = line_indices[inlier_indices]
 
-    if best_models is not None:
-        print("ransac 2 line", np.int32(best_models / best_models[2]))
-
     return best_models, best_votes, inlier_indices
 
 

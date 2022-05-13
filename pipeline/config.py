@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 import typing
 from enum import IntEnum
 from types import SimpleNamespace
