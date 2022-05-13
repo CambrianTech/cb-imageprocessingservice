@@ -168,7 +168,7 @@ class Pipeline():
         print("Appending step %s" % step.description)
         self.steps.append(step)
 
-    async def process(self, data):
+    async def process(self, data, step_callback=None):
 
         if self.config.logging_dir is not None and not os.path.exists(self.config.logging_dir):
             os.makedirs(self.config.logging_dir)
@@ -203,6 +203,9 @@ class Pipeline():
             step_start = time.time()
 
             await schedule_and_wait(step.schedule, data)
+
+            if step_callback is not None: 
+                step_callback()
 
             log_step(step, step_start)
             

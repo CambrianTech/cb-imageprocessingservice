@@ -47,7 +47,7 @@ async def process_files(pipeline, files, iterations):
             iteration_string = "" if iterations == 1 else "(iteration %d of %d)" % (i+1, iterations)
 
             print("\nProcessing file %d of %d %s\n" % (index, len(files), iteration_string))
-            await pipeline.process(data)
+            await pipeline.process(data, step_callback=gc.collect)
 
         index += 1
         
