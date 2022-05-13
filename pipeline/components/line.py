@@ -25,17 +25,19 @@ from pipeline.data.logging import Timer
 #             ("dead", nb.types.boolean),
 #             ])
 class Line():
+
     def __init__(self, ax, ay, bx, by):
         self.data = np.array((ax, ay, bx, by), dtype=np.float32)
 
-        self.point_a = int(ax), int(ay)
-        self.point_b = int(bx), int(by)
+        self.point_a = ax, ay
+        self.point_b = bx, by
         
-        self.dx = self.data[2] - self.data[0]
-        self.dy = self.data[3] - self.data[1]
+        self.dx = bx - ax
+        self.dy = by - ay 
         self.length = math.hypot(self.dx, self.dy)
 
         self.midpoint = ((ax + bx) / 2.0, (ay + by) / 2.0)
+
         self.angle = math.atan2(self.dy, self.dx)
         self.degrees = np.degrees(self.angle)
         self.direction = np.array((self.dx / self.length, self.dy / self.length))
