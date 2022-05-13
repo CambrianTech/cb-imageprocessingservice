@@ -173,11 +173,6 @@ class Pipeline():
         if self.config.logging_dir is not None and not os.path.exists(self.config.logging_dir):
             os.makedirs(self.config.logging_dir)
 
-        logging_dir = None if self.config.logging_dir is None else os.path.join(self.config.logging_dir, data["unique_id"])
-
-        set_logging_dir(data, logging_dir)
-        set_logging_level(data, self.config.logging_level)
-
         def log_step(step, start):
             print("%s took %.2f seconds" % (step.description, time.time() - start))
             print(colored("Current memory at %.2f MB" % get_memory_usage_mb(), attrs=['bold']))
@@ -190,6 +185,19 @@ class Pipeline():
         start_time = time.time()
 
         data = self.input_step.get(data)
+
+        if "unique_id" not in data:
+            if 'image_s3_key' in data:
+                data['unique_id'] = data['image_s3_key']
+                print("Warning 'image_s3_key' is no longer being used. Please update this to 'unique_id'")
+            else:
+                print("Invalid data, unique_id not provided")
+                return None
+
+        logging_dir = None if self.config.logging_dir is None else os.path.join(self.config.logging_dir, data["unique_id"])
+
+        set_logging_dir(data, logging_dir)
+        set_logging_level(data, self.config.logging_level)
 
         log_step(self.input_step, start_time)
 

@@ -127,7 +127,7 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
 
     @property
     def output_keys(self) -> list:
-        return ["kmeans_normals", "camera_rotation", "camera_elevation", "floor_rotation"]
+        return ["camera_rotation", "camera_elevation", "floor_rotation"]
 
     def run(self, data):
 
@@ -136,8 +136,6 @@ class PipelineDeterminePrimaryAngles(PipelineStep):
         normals = np.uint8(data["normals"])
 
         kmeans, labels, centers = ip.kmeans_image(normals, 5)
-
-        data["kmeans_normals"] = kmeans
 
         reduced_normals = kmeans
         reduced_mask = mask.copy()
