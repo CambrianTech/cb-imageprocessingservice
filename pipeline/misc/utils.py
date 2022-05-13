@@ -1,7 +1,9 @@
 import cv2
+import os
 import numpy as np
 import random
 import threading
+import psutil
 from scipy.spatial import distance
 
 #https://stackoverflow.com/questions/33365664/how-to-implement-a-daemon-stoppable-polling-thread-in-python
@@ -28,6 +30,9 @@ class DaemonStoppableThread(threading.Thread):
             else:
                 raise Exception('No target function given')
             self.stop_event.wait(self.sleep_time)
+
+def get_memory_usage_mb():
+    return psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2
 
 def partition(pred, iterable):
     trues = []

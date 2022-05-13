@@ -21,6 +21,7 @@ from pipeline.core import PipelineStepIndex
 from pipeline.pipeline import Pipeline
 from pipeline.data.logging import LogLevel
 
+import traceback
 from guppy import hpy
 import gc
 
@@ -36,29 +37,24 @@ def get_file_paths(input_dir, pattern=None):
 
 async def process_files(pipeline, files, iterations):
 
-    try:
-        index = 1
+    index = 1
 
-        for path in files:
+    for path in files:
 
-            for i in range(iterations): #for memory debug
-                if not pipeline.running:
-                    return
-                url = Path(path)
-                unique_id = url.parents[0].name if len(url.parents) > 0 else url.name
-                data = {"path": path, "unique_id": unique_id if path.suffix == ".pickle" else url.stem}
+        for i in range(iterations): #for memory debug
+            if not pipeline.running:
+                return
+            url = Path(path)
+            unique_id = url.parents[0].name if len(url.parents) > 0 else url.name
+            data = {"path": path, "unique_id": unique_id if path.suffix == ".pickle" else url.stem}
 
-                iteration_string = "" if iterations == 1 else "(iteration %d of %d)" % (i+1, iterations)
+            iteration_string = "" if iterations == 1 else "(iteration %d of %d)" % (i+1, iterations)
 
-                print("\nProcessing file %d of %d %s\n" % (index, len(files), iteration_string))
-                await pipeline.process(data)
+            print("\nProcessing file %d of %d %s\n" % (index, len(files), iteration_string))
+            await pipeline.process(data)
 
-            index += 1
-
-    except:
-        traceback()
+        index += 1
         
-
 
 #For instance, to restore from step 6 (before refinement):
 #python -W ignore harness.py data --restore=6

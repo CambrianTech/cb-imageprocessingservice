@@ -3,10 +3,12 @@ import time
 from enum import IntEnum
 from termcolor import colored
 import asyncio
+import psutil
 
 from .config import PipelineMode, PipelineConfig
 from .core import schedule_and_wait, PipelineStep, PipelineStepIndex
 from .data.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, set_logging_level
+from .misc.utils import get_memory_usage_mb
 
 from .stages.aws.s3client import S3Client
 from .stages.fileinput import PipelineFileInput
@@ -189,8 +191,11 @@ class Pipeline():
             print(step.description)
 
             step_start = time.time()
+
             await schedule_and_wait(step.schedule, data)
+
             print("%s took %.2f seconds" % (step.description, time.time() - step_start))
+            print(colored("Current memory at %.2f MB" % get_memory_usage_mb(), attrs=['bold']))
 
             if step.index == self.config.export_step and logging_dir is not None:
                 log_data(data)
