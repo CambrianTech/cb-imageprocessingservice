@@ -18,6 +18,7 @@ docutils==0.14
 gast==0.2.2
 gpuinfo
 grpcio==1.20.1
+guppy3==3.1.2
 h5py==2.9.0
 idna==2.6
 idna-ssl==1.1.0
