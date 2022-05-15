@@ -202,6 +202,10 @@ class Pipeline():
 
         print(colored("All stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
 
+        #memory cleanup
+        for key in data: 
+            data[key] = None
+
 def schedule_and_wait(func: typing.Callable[[typing.Dict, asyncio.Future], None], input_dict: typing.Dict) -> asyncio.Future:
     """Calls a function and returns a future that the function is supposed to fullfil."""
     future = asyncio.get_event_loop().create_future()
