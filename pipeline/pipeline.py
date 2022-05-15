@@ -152,10 +152,14 @@ class Pipeline():
 
         print("Stopped all threads")
 
+    def kill(self):
+
+        self.stop()
+
         for task in asyncio.all_tasks():
-            task.cancel()                    
-        
-        asyncio.ensure_future(exit())
+            task.cancel()
+
+        asyncio.get_event_loop().stop()
 
     @property
     def running(self):
@@ -165,7 +169,7 @@ class Pipeline():
         print("Appending step %s" % step.description)
         self.steps.append(step)
 
-    async def process(self, data):
+    async def process(self, data, step_callback=None):
 
         if (len(self.steps) == 0): return
 
