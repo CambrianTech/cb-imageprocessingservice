@@ -3,9 +3,10 @@ import time
 from enum import IntEnum
 from termcolor import colored
 import asyncio
+import typing
 
 from .config import PipelineMode, PipelineConfig
-from .core import schedule_and_wait, PipelineStep, PipelineStepIndex
+from .core import PipelineStep, PipelineStepIndex
 from .data.logging import get_unique_id, set_logging_dir, set_logging_step, log_data, set_logging_level
 
 from .stages.aws.s3client import S3Client
@@ -189,7 +190,7 @@ class Pipeline():
             print(step.description)
 
             step_start = time.time()
-            data = await schedule_and_wait(step.schedule, data)
+            await schedule_and_wait(step.schedule, data)
             print("%s took %.2f seconds" % (step.description, time.time() - step_start))
 
             if step.index == self.config.export_step and logging_dir is not None:
@@ -197,4 +198,19 @@ class Pipeline():
 
         print(colored("All stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
 
-        return data
+def schedule_and_wait(func: typing.Callable[[typing.Dict, asyncio.Future], None], input_dict: typing.Dict) -> asyncio.Future:
+    """Calls a function and returns a future that the function is supposed to fullfil."""
+    future = asyncio.get_event_loop().create_future()
+    func(input_dict, future)
+    return future
+
+async def merge_future_dicts(*futures) -> typing.Dict:
+    """Merges dict outputs of futures into a single dict."""
+    merged_dict = {}
+    for result in asyncio.as_completed(futures):
+        merged_dict.update(result)
+    return merged_dict
+
+def num_waiting_items(steps: typing.List[PipelineStep]) -> int:
+    """Counts the number of waiting items in a list of pipeline steps."""
+    return sum([step.num_waiting_items for step in steps])
