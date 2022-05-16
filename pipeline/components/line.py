@@ -21,12 +21,12 @@ class Line():
         self.bx = float(bx)
         self.by = float(by)
         
-        self.dx = self.bx - self.ax
-        self.dy = self.by - self.ay 
+        self.dx = bx - ax
+        self.dy = by - ay 
 
         self.length = math.hypot(self.dx, self.dy)
 
-        self.midpoint = np.array([(ax + bx) / 2.0, (ay + by) / 2.0])
+        self.midpoint = np.array([ax + bx, ay + by]) / 2.0
 
         self.angle = math.atan2(self.dy, self.dx)
         self.degrees = np.degrees(self.angle)
@@ -35,11 +35,18 @@ class Line():
         #for tracking
         self.dead = False
 
-    def __del__(self):
-        del self.data
-        del self.midpoint
-        pass
+    # def __del__(self):
+    #     del self.data
+    #     del self.midpoint
+    #     del self.direction
 
+    @property
+    def point_a(self):
+        return np.array([self.ax, self.ay])
+
+    @property
+    def point_b(self):
+        return np.array([self.bx, self.by])
 
     def get_intersection(self, other):
         return get_line_intersection(self.ax, self.ay, self.bx, self.by, other.ax, other.ay, other.bx, other.by)
@@ -53,14 +60,6 @@ class Line():
         else:
             result = np.linalg.norm(self.data - other.data)
             return result < epsilon
-
-    @property
-    def point_a(self):
-        return self.ax, self.ay
-
-    @property
-    def point_b(self):
-        return self.bx, self.by
 
     @property
     def normal_a(self):
@@ -338,6 +337,8 @@ def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy, dljx, dljy):
 def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.radians(3)):
 
     min_dist_sq = search_width * search_width
+
+    return lines
 
     timer = Timer("merge_lines")
     timer.disable()
