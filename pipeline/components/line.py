@@ -21,8 +21,8 @@ class Line():
         self.bx = float(bx)
         self.by = float(by)
         
-        self.dx = bx - ax
-        self.dy = by - ay 
+        self.dx = self.bx - self.ax
+        self.dy = self.by - self.ay 
 
         self.length = math.hypot(self.dx, self.dy)
 
