@@ -131,7 +131,7 @@ class PipelineLineFinder(PipelineStep):
         edges_lines = find_lines(edges, min_length * 2.0, True, ang_th=17)
         #edges_lines = merge_lines(edges_lines, search_width=diagonal/400, angle_threshold=math.radians(3))
 
-        log_lines(edges_lines, "edges_lines")
+        #log_lines(edges_lines, "edges_lines")
 
         lines.extend(edges_lines)
 
@@ -140,9 +140,6 @@ class PipelineLineFinder(PipelineStep):
         timer.log_elapsed("merge_lines BW")
 
         #find lines in hed hed edges
-        sx = data["downscaled"].shape[1] / data["hed"].shape[1]
-        sy = data["downscaled"].shape[0] / data["hed"].shape[0]
-
         hed_lines = find_lines(data["hed"], min_length, use_lsd=True, ang_th=12) #ang_th=22.5 was getting false positives
         timer.log_elapsed("hed")
 
