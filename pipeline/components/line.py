@@ -13,27 +13,36 @@ from pipeline.data.logging import Timer
 class Line():
 
     def __init__(self, ax, ay, bx, by):
-        self.data = np.array((ax, ay, bx, by), dtype=np.float32)
+        self.data = np.array([ax, ay, bx, by], dtype=np.float32)
 
-        self.point_a = ax, ay
-        self.point_b = bx, by
+        self.ax = float(ax)
+        self.ay = float(ay)
+
+        self.bx = float(bx)
+        self.by = float(by)
         
         self.dx = bx - ax
         self.dy = by - ay 
+
         self.length = math.hypot(self.dx, self.dy)
 
-        self.midpoint = ((ax + bx) / 2.0, (ay + by) / 2.0)
+        self.midpoint = np.array([(ax + bx) / 2.0, (ay + by) / 2.0])
 
         self.angle = math.atan2(self.dy, self.dx)
         self.degrees = np.degrees(self.angle)
-        self.direction = np.array((self.dx / self.length, self.dy / self.length))
+        self.direction = np.array([self.dx, self.dy]) / self.length
 
         #for tracking
         self.dead = False
 
+    def __del__(self):
+        del self.data
+        del self.midpoint
+        pass
+
+
     def get_intersection(self, other):
-        return get_line_intersection(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], \
-                                     other.point_a[0], other.point_a[1], other.point_b[0], other.point_b[1])
+        return get_line_intersection(self.ax, self.ay, self.bx, self.by, other.ax, other.ay, other.bx, other.by)
 
     def intersects(self, other):
         return self.get_intersection(other) is not None
@@ -46,6 +55,14 @@ class Line():
             return result < epsilon
 
     @property
+    def point_a(self):
+        return self.ax, self.ay
+
+    @property
+    def point_b(self):
+        return self.bx, self.by
+
+    @property
     def normal_a(self):
         return np.array((-self.direction[1], self.direction[0]))
 
@@ -54,13 +71,13 @@ class Line():
         return np.array((self.direction[1], -self.direction[0]))
 
     def closest_point(self, point):
-        return closest_line_point(self.point_a[0], self.point_a[1], self.point_b[0], self.point_b[1], point[0], point[1])
+        return closest_line_point(self.ax, self.ay, self.bx, self.by, point[0], point[1])
 
     def draw(self, img, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
-        draw_line(line, img, (int(self.point_a[0] * sx), int(self.point_a[1] * scale)), (int(self.point_b[0] * sx), int(self.point_b[1] * scale)), color, thickness=thickness, lineType=lineType)
+        draw_line(line, img, (int(self.ax * sx), int(self.ay * scale)), (int(self.bx * sx), int(self.by * scale)), color, thickness=thickness, lineType=lineType)
 
     def bounding_box(self, width, length_multiplier=1.0):
-        return (self.midpoint, (self.length * length_multiplier, width), self.degrees)
+        return ((self.midpoint[0], self.midpoint[1]), [self.length * length_multiplier, width], self.degrees)
 
     def extended(self, ratio=1.1, from_a=True, from_b=True):
 
@@ -261,7 +278,7 @@ def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
     return p0_x + (t * s1_x), p0_y + (t * s1_y)
 
 def draw_line(line, img, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
-    cv2.line(img, (int(line.point_a[0] * scale), int(line.point_a[1] * scale)), (int(line.point_b[0] * scale), int(line.point_b[1] * scale)), color, thickness=thickness, lineType=lineType)
+    cv2.line(img, (int(line.ax * scale), int(line.ay * scale)), (int(line.bx * scale), int(line.by * scale)), color, thickness=thickness, lineType=lineType)
 
 def draw_lines(img, lines, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
     
@@ -318,7 +335,7 @@ def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy, dljx, dljy):
             delta2xg * cos_thr + xg, \
             delta2xg * sin_thr + yg
 
-def merge_lines(lines, search_width, search_length=1.01, angle_threshold=math.radians(3)):
+def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.radians(3)):
 
     min_dist_sq = search_width * search_width
 

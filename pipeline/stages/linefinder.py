@@ -40,43 +40,6 @@ class PipelineLineFinder(PipelineStep):
     
     def run(self, data):
 
-        def log_lines(lines, name):
-            if im_logging_enabled(data, LogLevel.Lines):
-                debug = data["downscaled"].copy()
-                thickness = max(int(math.hypot(debug.shape[0], debug.shape[1]) / 600), 1)
-                draw_lines(debug, lines, thickness=thickness)
-                log_image(data, name, debug)
-
-        def find_lines(image, min_length, use_lsd=False, refine=cv2.LSD_REFINE_NONE, scale=1.0, sigma_scale=1.0, quant=2.0, ang_th=22.5, log_eps=0, density_th=0.7, n_bins=1024):
-            min_length = int(min_length)
-
-            if use_lsd:
-                lsd = cv2.createLineSegmentDetector(refine=refine, scale=scale, sigma_scale=sigma_scale, quant=quant, ang_th=ang_th, log_eps=log_eps, density_th=density_th, n_bins=n_bins)
-                lines = lsd.detect(image)[0]
-                if lines is not None:
-                     lines = list(filter(lambda line: distance.euclidean((line[0][0], line[0][1]), (line[0][2], line[0][3])) >= min_length and not line_on_image_edge((line[0][0], line[0][1]), (line[0][2], line[0][3]), image.shape[1], image.shape[0]), lines))
-            else:
-                fld = cv2.ximgproc.createFastLineDetector(min_length, 1.41, 200, 240, 3, False)
-                lines = fld.detect(image)
-
-            sx = data["downscaled"].shape[1] / image.shape[1]
-            sy = data["downscaled"].shape[0] / image.shape[0]
-
-            return list(map(lambda line: Line(line[0][0] * sx, line[0][1] * sy, line[0][2] * sx, line[0][3] * sy), lines)) if lines is not None else list()
-
-        def extract_lines(image, poly, min_length):
-            lines = []
-            num_pts = len(poly)
-            for i in range(num_pts):
-
-                point_a = poly[i][0]
-                point_b = poly[(i+1) % num_pts][0]
-
-                if distance.euclidean(point_a, point_b) > min_length and not line_on_image_edge(point_a, point_b, image.shape[1], image.shape[0]):
-                    lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1]))
-
-            return lines
-
         timer = Timer("line_finder")
         timer.disable()
 
@@ -93,32 +56,41 @@ class PipelineLineFinder(PipelineStep):
 
         min_length = int(diagonal / 100)
 
-        lines = []
+        lines = list()
 
-        image = data["downscaled"]
+        def log_lines(lines, name):
+            if not im_logging_enabled(data, LogLevel.Lines): return
 
-        # #pull lines from semantic contours.
-        for surfaceType in SurfaceType:
-            mask = data["isolated"][surfaceType]
-            isolated = np.zeros(mask.shape, dtype=np.uint8)
-            isolated[mask > 0.9] = 1
+            debug = data["downscaled"].copy()
+            thickness = max(int(math.hypot(debug.shape[0], debug.shape[1]) / 600), 1)
+            draw_lines(debug, lines, thickness=thickness)
+            log_image(data, name, debug)
 
-            mask_bordered = cv2.copyMakeBorder(isolated, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0) 
-            contours, _ = cv2.findContours(mask_bordered, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            epsilon = 7
+        def find_lines(image, min_length, use_lsd=False, refine=cv2.LSD_REFINE_NONE, scale=1.0, sigma_scale=1.0, quant=2.0, ang_th=22.5, log_eps=0, density_th=0.7, n_bins=1024):
+            
+            sx = data["downscaled"].shape[1] / image.shape[1]
+            sy = data["downscaled"].shape[0] / image.shape[0]
 
-            for contour in contours:
-                shape = contour.shape
-                contour = (contour.flatten() - 1).reshape(shape)
-                poly = cv2.approxPolyDP(contour, epsilon, True)
-                contour_lines = extract_lines(image, poly, min_length)
-                lines.extend(contour_lines)
+            lines = list()
 
+            if use_lsd:
+                min_length_sq = (sx * min_length) ** 2
+                lsd = cv2.createLineSegmentDetector(refine=refine, scale=scale, sigma_scale=sigma_scale, quant=quant, ang_th=ang_th, log_eps=log_eps, density_th=density_th, n_bins=n_bins)
+                cv_lines = filter(lambda line: distance.sqeuclidean([line[0][0], line[0][1]], [line[0][2], line[0][3]]) >= min_length_sq, lsd.detect(image)[0])
+            else:
+                fld = cv2.ximgproc.createFastLineDetector(min_length, 1.41, 200, 240, 3, False)
+                cv_lines = fld.detect(image)
+
+            if cv_lines is not None:
+                lines.extend(map(lambda line: Line(line[0][0] * sx, line[0][1] * sy, line[0][2] * sx, line[0][3] * sy), cv_lines))
+
+            return lines
+
+        
         #find lines in BW image
         bw_lines_a = find_lines(bw, min_length)
 
         lines.extend(bw_lines_a)
-
 
         timer.log_elapsed("bw_lines_a")
 
