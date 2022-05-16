@@ -1,5 +1,4 @@
 import abc
-from abc import abstractmethod
 from pipeline.core import PipelineStep, PipelineStepIndex
 
 class PipelineInput(PipelineStep, metaclass=abc.ABCMeta):
@@ -15,9 +14,4 @@ class PipelineInput(PipelineStep, metaclass=abc.ABCMeta):
     @property
     def output_keys(self) -> list:
         return ["image"]
-
-    @abstractmethod
-    def run(self, info: dict) -> dict:
-        pass
-
 

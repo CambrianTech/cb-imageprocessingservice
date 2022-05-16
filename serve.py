@@ -117,14 +117,15 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
     # Pipeline for finding planes, generating lighting and predicting fov.
     async def planes_pipeline(input_dict: typing.Dict):
 
-        print("Running image %s through pipeline" % input_dict['unique_id'])
+        unique_id = input_dict['unique_id']
+        print("Running image %s through pipeline" % unique_id)
 
         total_start_time = time()
 
         await pipeline.process(input_dict)
 
         total_pipeline_time = time() - total_start_time
-        print("Planes total pipeline time: %.2fs for %s" % (total_pipeline_time, input_dict['unique_id']))
+        print("Planes total pipeline time: %.2fs for %s" % (total_pipeline_time, unique_id))
         total_pipeline_times.append((total_pipeline_time, datetime.datetime.now(dateutil.tz.tzlocal())))
 
     print("SQS Queue name:", sqs_queue_name)

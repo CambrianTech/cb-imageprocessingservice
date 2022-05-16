@@ -34,12 +34,9 @@ class PipelinePlaneDetector(PipelineStep):
 
     @property
     def is_batched(self) -> bool:
-        return False
+        return True
 
-    def run(self, datum):
-
-        data = [datum]
-
+    def run(self, data):
         t = time()
         print("Running remote planes", self.config.planes_url)
         plane_rcnn_outputs = _remote_plane_detect(self.config.planes_url, data)

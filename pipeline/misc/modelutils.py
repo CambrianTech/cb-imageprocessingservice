@@ -2,20 +2,17 @@ import numpy as np
 import cv2
 import tensorflow as tf
 
-try:
-    ConfigProto = tf.ConfigProto
-except:
-    ConfigProto = tf.compat.v1.ConfigProto
 
-def get_session_config(use_gpu=True, dynamic_gpu_memory=True) -> ConfigProto:
+def get_session_config(use_gpu=True, dynamic_gpu_memory=True):
     # Allow GPU memory growth so tensorflow doesn't allocate all memory
     if use_gpu:
-        config = ConfigProto()
+        config = tf.ConfigProto()
         config.gpu_options.per_process_gpu_memory_fraction = 0.3
         config.gpu_options.allow_growth = dynamic_gpu_memory
     else:
-        config = ConfigProto(device_count={ "GPU": 0 })
+        config = tf.ConfigProto(device_count={ "GPU": 0 })
     return config
+
 
 def feed_images_batched(model, images_batch: list) -> list:
     inputs = {}
