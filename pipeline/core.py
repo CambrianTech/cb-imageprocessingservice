@@ -79,8 +79,6 @@ class PipelineStep(metaclass=ABCMeta):
         self.future = future
         self._input_queue.put_nowait((input_dict, future))
 
-
-
     def start(self):
         if not self._running:
             self._running = True

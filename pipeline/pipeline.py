@@ -142,20 +142,18 @@ class Pipeline():
         for step in self.steps:
             step.start()
 
-    def stop(self):
+    async def stop(self):
         if not self._running: return
 
         print("Stopping threads")
         self._running = False
 
         for step in self.steps:
-            step.stop()
+            await step.stop()
 
         print("Stopped all threads")
 
     def kill(self):
-
-        self.stop()
 
         for task in asyncio.all_tasks():
             task.cancel()
