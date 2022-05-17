@@ -40,24 +40,6 @@ class PipelineLineFinder(PipelineStep):
     
     def run(self, data):
 
-        timer = Timer("line_finder")
-        timer.disable()
-
-        bw = cv2.cvtColor(data["image"], cv2.COLOR_RGB2GRAY)
-
-        self.height, self.width = bw.shape[:2]
-        diagonal = np.hypot(self.width, self.height)
-
-        operating_scale = 1500.0 / diagonal
-        if operating_scale < 1.0:
-            bw = cv2.resize(bw, (int(self.width * operating_scale), int(self.height * operating_scale)), cv2.INTER_CUBIC)
-
-        timer.log_elapsed("setup")
-
-        min_length = int(diagonal / 100)
-
-        lines = list()
-
         def log_lines(lines, name):
             if not im_logging_enabled(data, LogLevel.Lines): return
 
@@ -86,7 +68,24 @@ class PipelineLineFinder(PipelineStep):
 
             return lines
 
-        
+        timer = Timer("line_finder")
+        timer.disable()
+
+        bw = cv2.cvtColor(data["image"], cv2.COLOR_RGB2GRAY)
+
+        self.height, self.width = bw.shape[:2]
+        diagonal = np.hypot(self.width, self.height)
+
+        operating_scale = 1500.0 / diagonal
+        if operating_scale < 1.0:
+            bw = cv2.resize(bw, (int(self.width * operating_scale), int(self.height * operating_scale)), cv2.INTER_CUBIC)
+
+        timer.log_elapsed("setup")
+
+        min_length = int(diagonal / 50)
+
+        lines = list()
+
         #find lines in BW image
         bw_lines_a = find_lines(bw, min_length)
 
@@ -99,13 +98,11 @@ class PipelineLineFinder(PipelineStep):
 
         timer.log_elapsed("bw_lines_b")
 
-        edges = (frei_chen(bw) * 3.0 * 255.0).astype(np.uint8)
-        edges_lines = find_lines(edges, min_length * 2.0, True, ang_th=17)
+        # edges = (frei_chen(bw) * 3.0 * 255.0).astype(np.uint8)
+        # edges_lines = find_lines(edges, min_length * 2.0, True, ang_th=17)
         #edges_lines = merge_lines(edges_lines, search_width=diagonal/400, angle_threshold=math.radians(3))
-
         #log_lines(edges_lines, "edges_lines")
-
-        lines.extend(edges_lines)
+        #lines.extend(edges_lines)
 
         lines = merge_lines(lines, search_length=1.0, search_width=diagonal/800, angle_threshold=math.radians(3))
 
