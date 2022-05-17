@@ -76,14 +76,12 @@ class PipelineStep(metaclass=ABCMeta):
         return self._input_queue.qsize()
 
     def schedule(self, input_dict, future):
-        self.future = future
         self._input_queue.put_nowait((input_dict, future))
 
     def start(self):
         if not self._running:
             self._running = True
-            for _ in range(1 if self.is_batched else cpu_count()):
-                asyncio.ensure_future(self.run_step_in_background())
+            asyncio.ensure_future(self.run_step_in_background())
 
     async def stop(self):
         print("Stopping %s" % self.description)
