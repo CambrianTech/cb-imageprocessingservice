@@ -154,11 +154,10 @@ class Pipeline():
         print("Stopped all threads")
 
     def kill(self):
+        self._running = False
 
         for task in asyncio.all_tasks():
             task.cancel()
-
-        asyncio.get_event_loop().stop()
 
     @property
     def running(self):
