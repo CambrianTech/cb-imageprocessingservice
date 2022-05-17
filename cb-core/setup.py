@@ -2,7 +2,7 @@ from setuptools import setup
 from Cython.Build import cythonize
 
 setup(name='cambrian',
-      version='0.3',
+      version='0.5',
       description='Cambrian core module',
       url='https://github.com/CambrianTech/cb-core',
       author='Cambrian',

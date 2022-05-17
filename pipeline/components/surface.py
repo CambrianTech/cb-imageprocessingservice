@@ -12,7 +12,7 @@ import random
 
 from pipeline.data.surface_type import SurfaceType
 from pipeline.misc.utils import convert_color, put_text, sample_at_point
-from .line import line_angle_difference, Line
+from .line import Line
 from pipeline.data.ade20k import ADE20K
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.misc.utils import adjust_mask, scale_contour

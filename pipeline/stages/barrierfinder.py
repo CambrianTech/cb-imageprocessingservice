@@ -19,7 +19,7 @@ from .extractsurfaces import box_like, legged_objects
 from .vanishingpointfinder import angle_with_vp
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers
 from cambrian.LineFunctions import LineFunctions
-from pipeline.components.line import line_angle_difference, Line, line_on_image_edge, merge_lines, draw_line
+from pipeline.components.line import Line, line_on_image_edge, merge_lines, draw_line
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.surface import Surface
 
@@ -646,7 +646,7 @@ class SurfaceBarriers():
 
             # #should be fairly perpendicular:
             #barrier_angle = LineFunctions.line_angle(barrier.closest_point[0], barrier.closest_point[1], line.midpoint[0], line.midpoint[1])
-            if line_angle_difference(barrier.shape_line.angle, line.angle) < angle_threshold:
+            if LineFunctions.line_angle_difference(barrier.shape_line.angle, line.angle) < angle_threshold:
                 barriers.append(barrier)
 
         return barriers

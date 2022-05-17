@@ -9,6 +9,7 @@ from scipy.spatial import distance
 from bisect import bisect_left, bisect_right
 from pipeline.misc.utils import normalize
 from pipeline.data.logging import Timer
+from cambrian.LineFunctions import LineFunctions
 
 class Line():
 
@@ -95,13 +96,7 @@ class Line():
         #todo: ineffcient
         return Line(self.data[0], self.data[1], self.data[2], self.data[3])
 
-@nb.jit(nopython=True)
-def line_angle_difference(x, y): #minimum angle between lines segments cannot differ by more than 90 degrees
-    diff = abs(math.atan2(math.sin(x-y), math.cos(x-y)))
-    if diff > 0.5 * math.pi:
-        diff = math.pi - diff
-
-    return diff
+EPSILON = np.finfo(float).eps
 
 @nb.jit(nopython=True)
 def closest_line_point(x0, y0, x1, y1, px, py): #minimum angle between lines segments cannot differ by more than 90 degrees
@@ -248,8 +243,6 @@ def verts_inside(pts1, pts2, vec1):
     return False
 
 
-EPSILON = np.finfo(float).eps
-
 #https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
 @nb.jit(nopython=True)
 def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
@@ -330,8 +323,6 @@ def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy, dljx, dljy):
 
 def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.radians(3)):
 
-    return lines
-
     min_dist_sq = search_width * search_width
 
     timer = Timer("merge_lines")
@@ -343,34 +334,32 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
         if line_a.dead: continue
 
         rect_a = line_a.bounding_box(width=search_width, length_multiplier=search_length)
-        data = line_a.data
+        data = line_a.data.copy()
 
         for line_b in lines:
 
-            if line_angle_difference(line_a.angle, line_b.angle) > angle_threshold or line_b.dead or line_a == line_b:
+            if LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold or line_b.dead or line_a == line_b:
                 continue
 
-            dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
+            # dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
 
-            if dist_sq <= min_dist_sq:
-                result = 1
-            else:
-                timer.reset()
-                rect_b = line_b.bounding_box(width=search_width, length_multiplier=search_length)
-                result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
-                timer.time_event("rotatedRectangleIntersection")
+            # if dist_sq <= min_dist_sq:
+            #     result = 1
+            # else:
+            #     timer.reset()
+            #     rect_b = line_b.bounding_box(width=search_width, length_multiplier=search_length)
+            #     result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+            #     timer.time_event("rotatedRectangleIntersection")
 
-            if result != 0:
-                line_a.dead = True
-                line_b.dead = True
-                timer.reset()
-                data = merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], line_b.dx, line_b.dy)
-                timer.time_event("merge_line_pair")
+            # if result != 0:
+            #     line_a.dead = True
+            #     line_b.dead = True
+            #     timer.reset()
+            #     data = merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], line_b.dx, line_b.dy)
+            #     timer.time_event("merge_line_pair")
 
-        if line_a.dead:
-            lines[i] = Line(data[0], data[1], data[2], data[3])
-
-        data = None
+        # if line_a.dead:
+        #     lines[i] = Line(data[0], data[1], data[2], data[3])
 
     timer.log_all_events()
 

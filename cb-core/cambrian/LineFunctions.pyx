@@ -5,7 +5,9 @@ import sys
 import random
 from scipy.spatial import distance
 
-from libc.math cimport abs, sqrt, atan, pi, sin, cos
+from libc.math cimport abs, sqrt, atan, atan2, pi, sin, cos
+
+cdef double pi_2 = pi * 0.5
 
 cdef tuple _get_parallel_lines(double point_a_x, double point_a_y, double point_b_x, double point_b_y, double length, double distance):
 
@@ -98,6 +100,13 @@ cdef tuple _merge_lines(double ax, double ay, double bx, double by, double cx, d
 cdef _out_of_range(x, y, width, height):
     return x < 0 or y < 0 or x >= width or y >= height
 
+cdef _line_angle_difference(x, y):
+    cdef double diff = y - x
+    diff = abs(math.atan2(sin(diff), cos(diff)))
+    if diff > pi_2:
+        diff = pi - diff
+    return diff
+
 class LineFunctions:
 
     @staticmethod
@@ -132,13 +141,9 @@ class LineFunctions:
         #return np.arctan2(y1 - y0, x1 - x0)
         return math.atan2(float(y1 - y0), float(x1 - x0))
 
-    @staticmethod
-    def line_angle_difference(x, y): #minimum angle between lines segments cannot differ by more than 90 degrees
-        diff = abs(math.atan2(sin(x-y), cos(x-y)))
-        if diff > 0.5 * pi:
-            diff = pi - diff
-
-        return diff
+    @staticmethod #minimum angle between lines segments cannot differ by more than 90 degrees
+    def line_angle_difference(x, y):
+        return _line_angle_difference(x, y)
 
     @staticmethod
     def merge_lines(seg1, seg2):
