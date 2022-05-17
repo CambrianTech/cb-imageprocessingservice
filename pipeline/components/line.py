@@ -326,7 +326,7 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
     min_dist_sq = search_width * search_width
 
     timer = Timer("merge_lines")
-    timer.disable()
+    #timer.disable()
 
     for i in range(len(lines)):
         
@@ -341,25 +341,23 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
             if LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold or line_b.dead or line_a == line_b:
                 continue
 
-            # dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
+            if distance.sqeuclidean(line_a.midpoint, line_b.midpoint) <= min_dist_sq:
+                result = 1
+            else:
+                #timer.reset()
+                rect_b = line_b.bounding_box(width=search_width, length_multiplier=search_length)
+                result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+                #timer.time_event("rotatedRectangleIntersection")
 
-            # if dist_sq <= min_dist_sq:
-            #     result = 1
-            # else:
-            #     timer.reset()
-            #     rect_b = line_b.bounding_box(width=search_width, length_multiplier=search_length)
-            #     result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
-            #     timer.time_event("rotatedRectangleIntersection")
+            if result != 0:
+                line_a.dead = True
+                line_b.dead = True
+                #timer.reset()
+                data = LineFunctions.merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], line_b.dx, line_b.dy)
+                #timer.time_event("merge_line_pair")
 
-            # if result != 0:
-            #     line_a.dead = True
-            #     line_b.dead = True
-            #     timer.reset()
-            #     data = merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], line_b.dx, line_b.dy)
-            #     timer.time_event("merge_line_pair")
-
-        # if line_a.dead:
-        #     lines[i] = Line(data[0], data[1], data[2], data[3])
+        if line_a.dead:
+            lines[i] = Line(data[0], data[1], data[2], data[3])
 
     timer.log_all_events()
 
