@@ -7,7 +7,7 @@ from scipy.spatial import distance
 
 from libc.math cimport abs, sqrt, atan, atan2, pi, sin, cos
 
-cdef double pi_2 = pi * 0.5
+cdef double pi_2 = pi * 0.5;
 
 cdef tuple _get_parallel_lines(double point_a_x, double point_a_y, double point_b_x, double point_b_y, double length, double distance):
 
@@ -49,22 +49,22 @@ cdef tuple _get_intersection(tuple line_a_a, tuple line_a_b, tuple line_b_a, tup
     return (x, y)
 
 #from opencv FastLineDetectorImpl::mergeLines
-cdef tuple _merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy, dljx, dljy):
+cdef tuple _merge_line_pair(double ax, double ay, double bx, double by, double cx, double cy, double dx, double dy, double dljx, double dljy):
     
-    cdef float thi; 
-    cdef float thj; 
-    cdef float thr;
+    cdef double thi = 0.0; 
+    cdef double thj = 0.0; 
+    cdef double thr = 0.0;
 
-    cdef float dlix = (bx - ax);
-    cdef float dliy = (by - ay);
+    cdef double dlix = (bx - ax);
+    cdef double dliy = (by - ay);
     # cdef float dljx = (dx - cx);
     # cdef float dljy = (dy - cy);
 
-    cdef float li = sqrt((dlix * dlix) + (dliy * dliy));
-    cdef float lj = sqrt((dljx * dljx) + (dljy * dljy));
+    cdef double li = sqrt((dlix * dlix) + (dliy * dliy));
+    cdef double lj = sqrt((dljx * dljx) + (dljy * dljy));
 
-    cdef float xg = (li * (ax + bx) + lj * (cx + dx)) / (2.0 * (li + lj));
-    cdef float yg = (li * (ay + by) + lj * (cy + dy)) / (2.0 * (li + lj));
+    cdef double xg = (li * (ax + bx) + lj * (cx + dx)) / (2.0 * (li + lj));
+    cdef double yg = (li * (ay + by) + lj * (cy + dy)) / (2.0 * (li + lj));
 
     if (dlix == 0.0): thi = pi_2;
     else: thi = atan(dliy / dlix);
@@ -79,16 +79,16 @@ cdef tuple _merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy, dljx, dljy):
         thr = li * thi + lj * tmp;
         thr /= (li + lj);
 
-    cdef float sin_thr = sin(thr)
-    cdef float cos_thr = cos(thr)
+    cdef double sin_thr = sin(thr);
+    cdef double cos_thr = cos(thr);
 
-    cdef float axg = (ay - yg) * sin_thr + (ax - xg) * cos_thr;
-    cdef float bxg = (by - yg) * sin_thr + (bx - xg) * cos_thr;
-    cdef float cxg = (cy - yg) * sin_thr + (cx - xg) * cos_thr;
-    cdef float dxg = (dy - yg) * sin_thr + (dx - xg) * cos_thr;
+    cdef double axg = (ay - yg) * sin_thr + (ax - xg) * cos_thr;
+    cdef double bxg = (by - yg) * sin_thr + (bx - xg) * cos_thr;
+    cdef double cxg = (cy - yg) * sin_thr + (cx - xg) * cos_thr;
+    cdef double dxg = (dy - yg) * sin_thr + (dx - xg) * cos_thr;
 
-    cdef float delta1xg = min(axg,min(bxg,min(cxg,dxg)));
-    cdef float delta2xg = max(axg,max(bxg,max(cxg,dxg)));
+    cdef double delta1xg = min(axg,min(bxg,min(cxg,dxg)));
+    cdef double delta2xg = max(axg,max(bxg,max(cxg,dxg)));
 
     return  delta1xg * cos_thr + xg, \
             delta1xg * sin_thr + yg, \
@@ -98,11 +98,11 @@ cdef tuple _merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy, dljx, dljy):
 cdef _out_of_range(x, y, width, height):
     return x < 0 or y < 0 or x >= width or y >= height
 
-cdef _line_angle_difference(x, y):
+cdef _line_angle_difference(double x, double y):
     cdef double diff = y - x
-    diff = abs(math.atan2(sin(diff), cos(diff)))
+    diff = abs(atan2(sin(diff), cos(diff)))
     if diff > pi_2:
-        diff = pi - diff
+        return pi - diff
     return diff
 
 class LineFunctions:
