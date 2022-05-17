@@ -9,24 +9,19 @@ from scipy.spatial import distance
 from bisect import bisect_left, bisect_right
 from pipeline.misc.utils import normalize
 from pipeline.data.logging import Timer
+from cambrian.LineFunctions import LineFunctions
 
 class Line():
 
     def __init__(self, ax, ay, bx, by):
         self.data = np.array([ax, ay, bx, by], dtype=np.float32)
-
-        self.ax = float(ax)
-        self.ay = float(ay)
-
-        self.bx = float(bx)
-        self.by = float(by)
         
-        self.dx = self.bx - self.ax
-        self.dy = self.by - self.ay 
+        self.dx = self.data[2] - self.data[0]
+        self.dy = self.data[3] - self.data[1]
 
         self.length = math.hypot(self.dx, self.dy)
 
-        self.midpoint = np.array([(ax + bx) / 2.0, (ay + by) / 2.0])
+        self.midpoint = np.array([self.data[0] + self.data[2], self.data[1] + self.data[3]]) / 2.0
 
         self.angle = math.atan2(self.dy, self.dx)
         self.degrees = np.degrees(self.angle)
@@ -38,11 +33,18 @@ class Line():
     def __del__(self):
         del self.data
         del self.midpoint
-        pass
+        del self.direction
 
+    @property
+    def point_a(self):
+        return np.array([self.data[0], self.data[1]])
+
+    @property
+    def point_b(self):
+        return np.array([self.data[2], self.data[3]])
 
     def get_intersection(self, other):
-        return get_line_intersection(self.ax, self.ay, self.bx, self.by, other.ax, other.ay, other.bx, other.by)
+        return get_line_intersection(self.data[0], self.data[1], self.data[2], self.data[3], other.data[0], other.data[1], other.data[2], other.data[3])
 
     def intersects(self, other):
         return self.get_intersection(other) is not None
@@ -55,14 +57,6 @@ class Line():
             return result < epsilon
 
     @property
-    def point_a(self):
-        return self.ax, self.ay
-
-    @property
-    def point_b(self):
-        return self.bx, self.by
-
-    @property
     def normal_a(self):
         return np.array((-self.direction[1], self.direction[0]))
 
@@ -71,10 +65,10 @@ class Line():
         return np.array((self.direction[1], -self.direction[0]))
 
     def closest_point(self, point):
-        return closest_line_point(self.ax, self.ay, self.bx, self.by, point[0], point[1])
+        return closest_line_point(self.data[0], self.data[1], self.data[2], self.data[3], point[0], point[1])
 
     def draw(self, img, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
-        draw_line(line, img, (int(self.ax * sx), int(self.ay * scale)), (int(self.bx * sx), int(self.by * scale)), color, thickness=thickness, lineType=lineType)
+        draw_line(line, img, (int(self.data[0] * sx), int(self.data[1] * scale)), (int(self.data[2] * sx), int(self.data[3] * scale)), color, thickness=thickness, lineType=lineType)
 
     def bounding_box(self, width, length_multiplier=1.0):
         return ((self.midpoint[0], self.midpoint[1]), [self.length * length_multiplier, width], self.degrees)
@@ -102,13 +96,7 @@ class Line():
         #todo: ineffcient
         return Line(self.data[0], self.data[1], self.data[2], self.data[3])
 
-@nb.jit(nopython=True)
-def line_angle_difference(x, y): #minimum angle between lines segments cannot differ by more than 90 degrees
-    diff = abs(math.atan2(math.sin(x-y), math.cos(x-y)))
-    if diff > 0.5 * math.pi:
-        diff = math.pi - diff
-
-    return diff
+EPSILON = np.finfo(float).eps
 
 @nb.jit(nopython=True)
 def closest_line_point(x0, y0, x1, y1, px, py): #minimum angle between lines segments cannot differ by more than 90 degrees
@@ -255,8 +243,6 @@ def verts_inside(pts1, pts2, vec1):
     return False
 
 
-EPSILON = np.finfo(float).eps
-
 #https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
 @nb.jit(nopython=True)
 def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
@@ -278,7 +264,7 @@ def get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
     return p0_x + (t * s1_x), p0_y + (t * s1_y)
 
 def draw_line(line, img, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
-    cv2.line(img, (int(line.ax * scale), int(line.ay * scale)), (int(line.bx * scale), int(line.by * scale)), color, thickness=thickness, lineType=lineType)
+    cv2.line(img, (int(line.data[0] * scale), int(line.data[1] * scale)), (int(line.data[2] * scale), int(line.data[3] * scale)), color, thickness=thickness, lineType=lineType)
 
 def draw_lines(img, lines, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
     
@@ -340,7 +326,7 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
     min_dist_sq = search_width * search_width
 
     timer = Timer("merge_lines")
-    timer.disable()
+    #timer.disable()
 
     for i in range(len(lines)):
         
@@ -352,25 +338,23 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
 
         for line_b in lines:
 
-            if line_angle_difference(line_a.angle, line_b.angle) > angle_threshold or line_b.dead or line_a == line_b:
+            if LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold or line_b.dead or line_a == line_b:
                 continue
 
-            dist_sq = distance.sqeuclidean(line_a.midpoint, line_b.midpoint)
-
-            if dist_sq <= min_dist_sq:
+            if distance.sqeuclidean(line_a.midpoint, line_b.midpoint) <= min_dist_sq:
                 result = 1
             else:
-                timer.reset()
+                #timer.reset()
                 rect_b = line_b.bounding_box(width=search_width, length_multiplier=search_length)
                 result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
-                timer.time_event("rotatedRectangleIntersection")
+                #timer.time_event("rotatedRectangleIntersection")
 
             if result != 0:
                 line_a.dead = True
                 line_b.dead = True
-                timer.reset()
-                data = merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], line_b.dx, line_b.dy)
-                timer.time_event("merge_line_pair")
+                #timer.reset()
+                data = LineFunctions.merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], line_b.dx, line_b.dy)
+                #timer.time_event("merge_line_pair")
 
         if line_a.dead:
             lines[i] = Line(data[0], data[1], data[2], data[3])

@@ -7,11 +7,12 @@ import math
 from scipy.spatial import distance
 from operator import attrgetter
 
+from cambrian.LineFunctions import LineFunctions
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
 from pipeline.data.logging import log_image, im_logging_enabled
 from pipeline.misc.utils import convert_color
-from pipeline.components.line import Line, line_angle_difference
+from pipeline.components.line import Line
 from .vanishingpointfinder import angle_with_vp
 
 class TrimLine:
@@ -73,7 +74,7 @@ class TrimFinder():
             line_a = lines[i]
             line_b = lines[j]
 
-            if line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
+            if LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
 
             directions = np.array([line_a.direction, line_b.direction]) 
             directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]

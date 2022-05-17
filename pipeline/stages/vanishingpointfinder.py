@@ -6,13 +6,14 @@ import time
 from enum import IntEnum
 from scipy.spatial import distance
 
+from cambrian.LineFunctions import LineFunctions
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
 from pipeline.misc.utils import resize_array, random_color, overlay_mask, partition
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled
-from pipeline.components.line import Line, line_angle_difference, line_on_image_edge, merge_lines, draw_lines
+from pipeline.components.line import Line, line_on_image_edge, merge_lines, draw_lines
 from pipeline.data.ade20k import ADE20K
 
 find_horizontal = True
@@ -192,10 +193,10 @@ class VanishingPointFinder():
                 line2 = self.lines[ind2]
 
                 if self.direction == Direction.Vertical:
-                    if line_angle_difference(line1.angle, pi_2) > self.angle_threshold or line_angle_difference(line2.angle, pi_2) > self.angle_threshold:
+                    if LineFunctions.line_angle_difference(line1.angle, pi_2) > self.angle_threshold or LineFunctions.line_angle_difference(line2.angle, pi_2) > self.angle_threshold:
                         continue
                 else:
-                    if line_angle_difference(line1.angle, 0) > self.angle_threshold or line_angle_difference(line2.angle, 0) > self.angle_threshold:
+                    if LineFunctions.line_angle_difference(line1.angle, 0) > self.angle_threshold or LineFunctions.line_angle_difference(line2.angle, 0) > self.angle_threshold:
                         continue
 
 
@@ -265,7 +266,7 @@ class PipelineVanishingPointFinder(PipelineStep):
             all_lines.extend(lines)
    
             if surface.surfaceType == SurfaceType.Wall or surface.bestLabel in box_like:                
-                vertical, horizontal = partition(lambda x: line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
+                vertical, horizontal = partition(lambda x: LineFunctions.line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
                 horizontal = merge_lines(horizontal, search_width=diagonal/200, search_length=1.1)
 
                 vpf = VanishingPointFinder(horizontal)

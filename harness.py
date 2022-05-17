@@ -123,6 +123,7 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, pipeline.kill)
 
+    #how to use guppy to find memory leaks: https://quantlane.com/blog/python-memory-profiling/
     hp = hpy()
     hp.setrelheap()
     gc.collect()
@@ -144,6 +145,11 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     gc.collect()
     print("\n### HEAP FINAL ###\n", hp.heap())
+
+    # heap_snapshot = hp.heap()
+    # worst = heap_snapshot[0]
+    # print(worst.byrcs)
+    # print(worst.byid[0].sp)
 
     print_title("Total processing time: %.2fs, average: %.2fs" % (elapsed, avg))
 
