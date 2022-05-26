@@ -38,7 +38,6 @@ class LineFinderProcess(BaseProcess):
         return merge_lines(lines, search_length=search_length, search_width=search_width, angle_threshold=angle_threshold)
 
     def find_and_merge(self, image, min_length, sx, sy, use_lsd, ang_th, search_length, search_width, angle_threshold):
-
         lines = self.find_lines(image, min_length, sx, sy, use_lsd, ang_th)
         return self.merge(lines, search_length, search_width, angle_threshold)
 
@@ -76,26 +75,6 @@ class PipelineLineFinder(PipelineStep):
             draw_lines(debug, lines, thickness=thickness)
             log_image(data, name, debug)
 
-        def find_lines(image, min_length, use_lsd=False, refine=cv2.LSD_REFINE_NONE, scale=1.0, sigma_scale=1.0, quant=2.0, ang_th=22.5, log_eps=0, density_th=0.7, n_bins=1024):
-            
-            sx = data["downscaled"].shape[1] / image.shape[1]
-            sy = data["downscaled"].shape[0] / image.shape[0]
-
-            lines = list()
-
-            if use_lsd:
-                min_length_sq = (sx * min_length) ** 2
-                lsd = cv2.createLineSegmentDetector(refine=refine, scale=scale, sigma_scale=sigma_scale, quant=quant, ang_th=ang_th, log_eps=log_eps, density_th=density_th, n_bins=n_bins)
-                cv_lines = filter(lambda line: distance.sqeuclidean([line[0][0], line[0][1]], [line[0][2], line[0][3]]) >= min_length_sq, lsd.detect(image)[0])
-            else:
-                fld = cv2.ximgproc.createFastLineDetector(min_length, 1.41, 200, 240, 3, False)
-                cv_lines = fld.detect(image)
-
-            if cv_lines is not None:
-                lines.extend(map(lambda line: Line(line[0][0] * sx, line[0][1] * sy, line[0][2] * sx, line[0][3] * sy), cv_lines))
-
-            return lines
-
         bw = cv2.cvtColor(data["image"], cv2.COLOR_RGB2GRAY)
 
         self.height, self.width = bw.shape[:2]
@@ -119,8 +98,6 @@ class PipelineLineFinder(PipelineStep):
         sx = data["downscaled"].shape[1] / data["hed"].shape[1]
         sy = data["downscaled"].shape[0] / data["hed"].shape[0]
         self.mp.schedule('find_and_merge', data["hed"], min_length, sx, sy, True, 12, 0.5, diagonal/200, math.radians(3))
-
-        #hed_lines = merge_lines(hed_lines, search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(3))
 
         results = self.mp.await_completion()
 
@@ -153,11 +130,11 @@ class PipelineLineFinder(PipelineStep):
         
         if len(normals_lines) > 0:
             #cleanup normals
-            normals_lines = self.mp.schedule_and_wait("merge", normals_lines, 1.0, diagonal/300, math.radians(3))
+            normals_lines = self.mp.schedule_and_wait("merge", normals_lines, 1.05, diagonal/300, math.radians(3))
             lines.extend(normals_lines)
 
         #merge all
-        lines = self.mp.schedule_and_wait("merge", lines, 1.0, diagonal/300, math.radians(3))
+        lines = self.mp.schedule_and_wait("merge", lines, 1.05, diagonal/300, math.radians(3))
 
         log_lines(lines, "merged_lines")
 
