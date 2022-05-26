@@ -76,12 +76,17 @@ class Multiprocessor():
         for p in self.subprocesses:
             p.join()
 
+    def schedule_and_wait(self, event, *args):
+        self.schedule(event, *args)
+        results = self.await_completion()
+
+        return results[0]
+
     def await_completion(self):
         completed_tasks_counter = 0
         results = []
         while completed_tasks_counter < self.num_tasks:
             result = self.output_queue.get()
-            print("Got result", result)
             results.append(result)
             completed_tasks_counter += 1
 

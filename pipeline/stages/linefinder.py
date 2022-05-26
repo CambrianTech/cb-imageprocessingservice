@@ -15,10 +15,23 @@ from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.logging import log_image, im_logging_enabled, LogLevel, Timer
 
 class LineFinderProcess(BaseProcess):
-    def find_lines(self, arg1, arg2):
-        print(arg1, arg2)
 
-        return 10
+    def find_lines(self, image, min_length, sx=1.0, sy=1.0, use_lsd=False, ang_th=22.5):
+        
+        lines = list()
+
+        if use_lsd:
+            min_length_sq = (sx * min_length) ** 2
+            lsd = cv2.createLineSegmentDetector(scale=1.0, sigma_scale=1.0, quant=2.0, ang_th=ang_th)
+            cv_lines = filter(lambda line: distance.sqeuclidean([line[0][0], line[0][1]], [line[0][2], line[0][3]]) >= min_length_sq, lsd.detect(image)[0])
+        else:
+            fld = cv2.ximgproc.createFastLineDetector(min_length, 1.41, 200, 240, 3, False)
+            cv_lines = fld.detect(image)
+
+        if cv_lines is not None:
+            lines.extend(map(lambda line: Line(line[0][0] * sx, line[0][1] * sy, line[0][2] * sx, line[0][3] * sy), cv_lines))
+
+        return lines
 
 class PipelineLineFinder(PipelineStep):
 
@@ -91,43 +104,30 @@ class PipelineLineFinder(PipelineStep):
         min_length = int(diagonal / 50)
 
         lines = list()
+
+        sx = data["downscaled"].shape[1] / bw.shape[1]
+        sy = data["downscaled"].shape[0] / bw.shape[0]
         
-        self.mp.schedule('find_lines', 'hello', 'world')
-        self.mp.await_completion()
-
         #find lines in BW image
-        bw_lines_a = find_lines(bw, min_length)
+        self.mp.schedule('find_lines', bw, min_length, sx, sy)
+        self.mp.schedule('find_lines', bw, min_length, sx, sy, True, 17)
 
-        lines.extend(bw_lines_a)
+        sx = data["downscaled"].shape[1] / data["hed"].shape[1]
+        sy = data["downscaled"].shape[0] / data["hed"].shape[0]
+        self.mp.schedule('find_lines', data["hed"], min_length, sx, sy, True, 12)
 
-        timer.log_elapsed("bw_lines_a")
+        #hed_lines = merge_lines(hed_lines, search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(3))
 
-        bw_lines_b = find_lines(bw, min_length, True, ang_th=17) #ang_th=22.5 was getting false positives
-        lines.extend(bw_lines_b)
+        results = self.mp.await_completion()
 
-        timer.log_elapsed("bw_lines_b")
+        for result in results:
+            lines.extend(result)
 
         # edges = (frei_chen(bw) * 3.0 * 255.0).astype(np.uint8)
         # edges_lines = find_lines(edges, min_length * 2.0, True, ang_th=17)
         #edges_lines = merge_lines(edges_lines, search_width=diagonal/400, angle_threshold=math.radians(3))
         #log_lines(edges_lines, "edges_lines")
         #lines.extend(edges_lines)
-
-        lines = merge_lines(lines, search_length=1.0, search_width=diagonal/800, angle_threshold=math.radians(3))
-
-        timer.log_elapsed("merge_lines BW")
-
-        #find lines in hed hed edges
-        hed_lines = find_lines(data["hed"], min_length, use_lsd=True, ang_th=12) #ang_th=22.5 was getting false positives
-        timer.log_elapsed("hed")
-
-        hed_lines = merge_lines(hed_lines, search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(3))
-
-        timer.log_elapsed("merge_lines HED")
-
-        if len(hed_lines) > 0: 
-            #log_lines(hed_lines, "hed_lines")
-            lines.extend(hed_lines)
 
         #find lines in normals
         min_length = int(diagonal / 20)
