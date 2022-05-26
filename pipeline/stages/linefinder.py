@@ -25,9 +25,13 @@ class PipelineLineFinder(PipelineStep):
     def __init__(self, pipeline):
         super().__init__(pipeline)
 
-        self.mp = Multiprocessor(LineFinderProcess, num_workers=2)
+        self.mp = Multiprocessor(LineFinderProcess)
         self.mp.start()
 
+    async def stop(self):
+        self.mp.stop()
+        await super().stop()
+    
     @property
     def index(self) -> PipelineStepIndex:
         return PipelineStepIndex.FindLines

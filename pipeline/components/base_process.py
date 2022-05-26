@@ -2,12 +2,15 @@ import multiprocessing as mp
 import collections
 import time
 import psutil
+import queue
+
+ctx = mp.get_context('spawn')
 
 Msg = collections.namedtuple('Msg', ['event', 'args'])
 
 SENTINEL = None
 
-class BaseProcess(mp.Process):
+class BaseProcess(ctx.Process):
 
     def __init__(self, input_queue, output_queue):
         super().__init__(target=self.loop, args=())
@@ -23,39 +26,36 @@ class BaseProcess(mp.Process):
 
         return handler(*args)
 
-    def stop(self):
-        print("Stop")
-        self.join()
-
     def loop(self):
 
         print("running")
 
         while True:
 
-            if self.input_queue.empty():
-                time.sleep(0.01)
-                continue
+            try: 
+                msg = self.input_queue.get_nowait()
+                if msg == SENTINEL:
+                    break
 
-            msg = self.input_queue.get_nowait()
+                result = self.dispatch(msg)
+                self.output_queue.put(result)
 
-            if msg == SENTINEL:
-                print("Done")
-                return
+            except queue.Empty:
+                pass
 
-            result = self.dispatch(msg)
-            self.output_queue.put(result)
+            time.sleep(0.1)
 
 
 class Multiprocessor():
     def __init__(self, subprocess_cls, num_workers=psutil.cpu_count()):
         self.subprocess_cls = subprocess_cls       
-        self.input_queue = mp.Queue()
-        self.output_queue = mp.Queue()
-        self.num_tasks = 0
+        self.input_queue = ctx.Queue()
+        self.output_queue = ctx.Queue()
+        
         self.num_workers = num_workers
-
         self.subprocesses = []
+
+        self.num_tasks = 0
 
         for i in range(self.num_workers):
             self.subprocesses.append(self.subprocess_cls(self.input_queue, self.output_queue))
@@ -69,7 +69,7 @@ class Multiprocessor():
         self.input_queue.put_nowait(msg)
         self.num_tasks += 1
 
-    def stop_all(self):
+    def stop(self):
         for i in range(self.num_workers):
             self.input_queue.put_nowait(SENTINEL)
 
@@ -84,6 +84,8 @@ class Multiprocessor():
             print("Got result", result)
             results.append(result)
             completed_tasks_counter += 1
+
+        self.num_tasks = 0
         
         return results
             
