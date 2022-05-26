@@ -2,7 +2,6 @@ from abc import ABCMeta, abstractmethod
 from time import time
 import asyncio
 import typing
-from multiprocessing import cpu_count
 from enum import IntEnum, auto
 from termcolor import colored
 from types import SimpleNamespace
