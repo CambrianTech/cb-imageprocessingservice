@@ -22,6 +22,12 @@ class LineFinderProcess(BaseProcess):
 
 class PipelineLineFinder(PipelineStep):
 
+    def __init__(self, pipeline):
+        super().__init__(pipeline)
+
+        self.mp = Multiprocessor(LineFinderProcess, num_workers=2)
+        self.mp.start()
+
     @property
     def index(self) -> PipelineStepIndex:
         return PipelineStepIndex.FindLines
@@ -81,11 +87,9 @@ class PipelineLineFinder(PipelineStep):
         min_length = int(diagonal / 50)
 
         lines = list()
-
-        mp = Multiprocessor(LineFinderProcess)
-        mp.start()
-        mp.schedule('find_lines', 'hello', 'world')
-        mp.await_completion()
+        
+        self.mp.schedule('find_lines', 'hello', 'world')
+        self.mp.await_completion()
 
         #find lines in BW image
         bw_lines_a = find_lines(bw, min_length)
