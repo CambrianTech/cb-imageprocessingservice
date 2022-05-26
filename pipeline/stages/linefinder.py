@@ -3,26 +3,22 @@ import numpy as np
 import numba as nb
 import math
 from scipy.spatial import distance
-from numba.experimental import jitclass
 
 from cambrian.frei_chen import frei_chen
 from time import time
 from scipy.spatial import distance
 
+from pipeline.components.base_process import BaseProcess, Multiprocessor
 from pipeline.data.surface_type import SurfaceType
 from pipeline.components.line import Line, merge_lines, draw_lines, line_on_image_edge
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.logging import log_image, im_logging_enabled, LogLevel, Timer
 
-def gabor(bw, theta, lambd, gamma = 0.0, psi = 0.0):
-    ksize = lambd
-    sigma = ksize * lambd
-    result = cv2.filter2D(bw, cv2.CV_8UC1, cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_32F))
-    return result
+class LineFinderProcess(BaseProcess):
+    def find_lines(self, arg1, arg2):
+        print(arg1, arg2)
 
-def sharpen(img, alpha=1.5, beta=-1.0, kernel_size = 21):
-    smoothed = cv2.GaussianBlur(img, (kernel_size, kernel_size), kernel_size)
-    return cv2.addWeighted(img, alpha, smoothed, beta, 0)
+        return 10
 
 class PipelineLineFinder(PipelineStep):
 
@@ -85,6 +81,11 @@ class PipelineLineFinder(PipelineStep):
         min_length = int(diagonal / 50)
 
         lines = list()
+
+        mp = Multiprocessor(LineFinderProcess)
+        mp.start()
+        mp.schedule('find_lines', 'hello', 'world')
+        mp.await_completion()
 
         #find lines in BW image
         bw_lines_a = find_lines(bw, min_length)
