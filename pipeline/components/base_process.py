@@ -28,8 +28,6 @@ class BaseProcess(ctx.Process):
 
     def loop(self):
 
-        print("running")
-
         while True:
 
             try: 

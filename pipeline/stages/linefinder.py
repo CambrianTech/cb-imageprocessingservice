@@ -33,6 +33,15 @@ class LineFinderProcess(BaseProcess):
 
         return lines
 
+
+    def merge(self, lines, search_length, search_width, angle_threshold):
+        return merge_lines(lines, search_length=search_length, search_width=search_width, angle_threshold=angle_threshold)
+
+    def find_and_merge(self, image, min_length, sx, sy, use_lsd, ang_th, search_length, search_width, angle_threshold):
+
+        lines = self.find_lines(image, min_length, sx, sy, use_lsd, ang_th)
+        return self.merge(lines, search_length, search_width, angle_threshold)
+
 class PipelineLineFinder(PipelineStep):
 
     def __init__(self, pipeline):
@@ -87,9 +96,6 @@ class PipelineLineFinder(PipelineStep):
 
             return lines
 
-        timer = Timer("line_finder")
-        timer.disable()
-
         bw = cv2.cvtColor(data["image"], cv2.COLOR_RGB2GRAY)
 
         self.height, self.width = bw.shape[:2]
@@ -98,8 +104,6 @@ class PipelineLineFinder(PipelineStep):
         operating_scale = 1500.0 / diagonal
         if operating_scale < 1.0:
             bw = cv2.resize(bw, (int(self.width * operating_scale), int(self.height * operating_scale)), cv2.INTER_CUBIC)
-
-        timer.log_elapsed("setup")
 
         min_length = int(diagonal / 50)
 
@@ -114,7 +118,7 @@ class PipelineLineFinder(PipelineStep):
 
         sx = data["downscaled"].shape[1] / data["hed"].shape[1]
         sy = data["downscaled"].shape[0] / data["hed"].shape[0]
-        self.mp.schedule('find_lines', data["hed"], min_length, sx, sy, True, 12)
+        self.mp.schedule('find_and_merge', data["hed"], min_length, sx, sy, True, 12, 0.5, diagonal/200, math.radians(3))
 
         #hed_lines = merge_lines(hed_lines, search_length=0.5, search_width=diagonal/200, angle_threshold=math.radians(3))
 
@@ -134,24 +138,26 @@ class PipelineLineFinder(PipelineStep):
         normals = np.uint8(data["normals"])
         #log_image(data, "normals", normals)
         normals = cv2.split(normals)
-        normals_lines = []
-        for i in range(0, 3):
-            normals_lines.extend(find_lines(normals[i], min_length))
 
-        timer.log_elapsed("normals_lines")
+        sx = data["downscaled"].shape[1] / normals[0].shape[1]
+        sy = data["downscaled"].shape[0] / normals[0].shape[0]
+        
+        for i in range(0, 3):
+            #normals_lines.extend(find_lines(normals[i], min_length))
+            self.mp.schedule('find_lines', normals[i], min_length, sx, sy)
+
+        results = self.mp.await_completion()
+        normals_lines = []
+        for result in results:
+            normals_lines.extend(result)
         
         if len(normals_lines) > 0:
             #cleanup normals
-            normals_lines = merge_lines(normals_lines, search_width=diagonal/300)
-            timer.log_elapsed("merge_lines normals_lines")
-
+            normals_lines = self.mp.schedule_and_wait("merge", normals_lines, 1.0, diagonal/300, math.radians(3))
             lines.extend(normals_lines)
 
         #merge all
-        lines = merge_lines(lines, search_width=min(diagonal/300, 8))
-        timer.log_elapsed("merge_lines final")
-
-        # print("8. elapsed %.2f" % (time() - start)); start = time()
+        lines = self.mp.schedule_and_wait("merge", lines, 1.0, diagonal/300, math.radians(3))
 
         log_lines(lines, "merged_lines")
 
