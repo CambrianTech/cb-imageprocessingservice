@@ -10,13 +10,14 @@ from cambrian.LineFunctions import LineFunctions
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
 from pipeline.misc.utils import resize_array, random_color, overlay_mask, partition
+from pipeline.components.base_process import BaseProcess, Multiprocessor
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled
 from pipeline.components.line import Line, line_on_image_edge, merge_lines, draw_lines
 from pipeline.data.ade20k import ADE20K
 
-find_horizontal = True
+pi_2 = np.pi/2
 
 def angle_with_vp(model, locations, directions):
 
@@ -34,12 +35,11 @@ def angle_with_vp(model, locations, directions):
     return cosine_theta
 
 class VanishingPoint:
-    def __init__(self, lines, model, votes, measure_area=False):
+    def __init__(self, lines, model, votes):
 
         self.lines = lines
         self.model = model
         self.votes = votes
-        self.measure_area = measure_area
 
         self._score = None
         self._inliers = None
@@ -148,7 +148,7 @@ class VanishingPointFinder():
 
         return (cosine_theta > theta_thresh) * self.edgelets.strengths
 
-    def solve(self, max_iterations=2000, threshold_inlier=math.radians(2), max_time=0.33, measure_area=False):
+    def solve(self, max_iterations=2000, threshold_inlier=math.radians(2), max_time=0.33):
 
         self.edgelets = self.compute_edgelets()
 
@@ -164,8 +164,6 @@ class VanishingPointFinder():
         self.best_model = None
         self.vanishing_points = []
         
-        pi_2 = np.pi/2       
-
         max_iterations = min(max_iterations, len(self.lines) * 40)
         start_time = time.time() 
 
@@ -202,7 +200,7 @@ class VanishingPointFinder():
 
             current_model = current_model / current_model[2]
 
-            vp = VanishingPoint(self.lines, current_model, self.compute_votes(current_model, threshold_inlier), measure_area=measure_area)
+            vp = VanishingPoint(self.lines, current_model, self.compute_votes(current_model, threshold_inlier))
             
             self.vanishing_points.append(vp)
 
@@ -210,7 +208,25 @@ class VanishingPointFinder():
 
         return self.vanishing_points
 
+class VpfProcess(BaseProcess):
+    def solve(self, lines, merge_width=0.0, threshold_inlier=math.radians(3), max_iterations=2000, max_time=0.333):
+
+        if merge_width > 0.0:
+            lines = merge_lines(lines, search_width=merge_width, search_length=1.1)
+
+        return VanishingPointFinder(lines).solve(threshold_inlier=threshold_inlier, max_iterations=max_iterations, max_time=max_time)
+
 class PipelineVanishingPointFinder(PipelineStep):
+    def __init__(self, pipeline):
+        super().__init__(pipeline)
+
+        self.mp = Multiprocessor(VpfProcess)
+        self.mp.start()
+
+    async def stop(self):
+        self.mp.stop()
+        await super().stop()
+
     @property
     def index(self) -> PipelineStepIndex:
         return PipelineStepIndex.VanishingPoints
@@ -255,10 +271,11 @@ class PipelineVanishingPointFinder(PipelineStep):
         #self.surfaces.extend(data["room"].get_surfaces(labels=legged_objects))
 
         #find single vertical vanishing point
-        pi_2 = np.pi/2
         vertical_threshold = np.radians(15)
         vertical_lines = []
         all_lines = []
+
+        vpfs = []
 
         for surface in surfaces:
             lines = surface.lines.copy()
@@ -267,28 +284,33 @@ class PipelineVanishingPointFinder(PipelineStep):
    
             if surface.surfaceType == SurfaceType.Wall or surface.bestLabel in box_like:                
                 vertical, horizontal = partition(lambda x: LineFunctions.line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
-                horizontal = merge_lines(horizontal, search_width=diagonal/200, search_length=1.1)
-
-                vpf = VanishingPointFinder(horizontal)
-                surface.horizontal_vp = vpf.solve(measure_area=True)
-
                 vertical_lines.extend(vertical)
+                self.mp.schedule('solve', horizontal, diagonal/200.0)
             else:
-                vpf = VanishingPointFinder(lines)
-                surface.vp = vpf.solve(threshold_inlier=math.radians(5), max_iterations=500, max_time=0.2)
+                self.mp.schedule('solve', lines, 0, math.radians(5), 500, 0.2)
 
         #find vertical vanishing point for entire room
         if len(vertical_lines) > 1:
-            vertical_lines = merge_lines(vertical_lines, search_width=diagonal/200, angle_threshold=math.radians(5))
-            vpf = VanishingPointFinder(vertical_lines)
-            room.vertical_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
-            if len(room.vertical_vp) == 0:
-                room.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
+            self.mp.schedule('solve', vertical_lines, diagonal/200.0, math.radians(3), 2000, 0.5)
 
-        if room.vertical_vp is not None:
-            for surface in surfaces:
-                if surface.vertical_vp is None:
-                    surface.vertical_vp = room.vertical_vp
+        results = self.mp.await_completion()
+
+        room.vertical_vp = results[-1]
+
+        if len(room.vertical_vp) == 0:
+            vpf = VanishingPointFinder(vertical_lines)
+            room.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
+
+        for i in range(len(surfaces)):
+            surface = surfaces[i]
+            vp = results[i]
+            if surface.surfaceType == SurfaceType.Wall or surface.bestLabel in box_like:
+                surface.horizontal_vp = vp
+            else:
+                surface.vp = vp
+
+            if surface.vertical_vp is None:
+                surface.vertical_vp = room.vertical_vp
 
         if im_logging_enabled(data):
             log_image(data, "vanishing_points", self.get_debug_image(data, surfaces, all_lines))
