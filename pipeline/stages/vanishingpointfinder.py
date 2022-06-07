@@ -10,13 +10,12 @@ from cambrian.LineFunctions import LineFunctions
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
 from pipeline.misc.utils import resize_array, random_color, overlay_mask, partition
+from pipeline.components.base_process import BaseProcess, Multiprocessor
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled
 from pipeline.components.line import Line, line_on_image_edge, merge_lines, draw_lines
 from pipeline.data.ade20k import ADE20K
-
-find_horizontal = True
 
 def angle_with_vp(model, locations, directions):
 
@@ -34,12 +33,11 @@ def angle_with_vp(model, locations, directions):
     return cosine_theta
 
 class VanishingPoint:
-    def __init__(self, lines, model, votes, measure_area=False):
+    def __init__(self, lines, model, votes):
 
         self.lines = lines
         self.model = model
         self.votes = votes
-        self.measure_area = measure_area
 
         self._score = None
         self._inliers = None
@@ -148,7 +146,7 @@ class VanishingPointFinder():
 
         return (cosine_theta > theta_thresh) * self.edgelets.strengths
 
-    def solve(self, max_iterations=2000, threshold_inlier=math.radians(2), max_time=0.33, measure_area=False):
+    def solve(self, max_iterations=2000, threshold_inlier=math.radians(2), max_time=0.33):
 
         self.edgelets = self.compute_edgelets()
 
@@ -202,7 +200,7 @@ class VanishingPointFinder():
 
             current_model = current_model / current_model[2]
 
-            vp = VanishingPoint(self.lines, current_model, self.compute_votes(current_model, threshold_inlier), measure_area=measure_area)
+            vp = VanishingPoint(self.lines, current_model, self.compute_votes(current_model, threshold_inlier))
             
             self.vanishing_points.append(vp)
 
@@ -210,7 +208,21 @@ class VanishingPointFinder():
 
         return self.vanishing_points
 
+class VpfProcess(BaseProcess):
+    def solve(self, lines, threshold_inlier=math.radians(3), max_iterations=2000, max_time=0.333):
+        return VanishingPointFinder(lines).solve(threshold_inlier=threshold_inlier, max_iterations=max_iterations, max_time=max_time)
+
 class PipelineVanishingPointFinder(PipelineStep):
+    def __init__(self, pipeline):
+        super().__init__(pipeline)
+
+        self.mp = Multiprocessor(VpfProcess)
+        self.mp.start()
+
+    async def stop(self):
+        self.mp.stop()
+        await super().stop()
+
     @property
     def index(self) -> PipelineStepIndex:
         return PipelineStepIndex.VanishingPoints
@@ -260,6 +272,8 @@ class PipelineVanishingPointFinder(PipelineStep):
         vertical_lines = []
         all_lines = []
 
+        vpfs = []
+
         for surface in surfaces:
             lines = surface.lines.copy()
             lines.extend(self.get_contour_lines(image, surface, diagonal/80))
@@ -269,13 +283,11 @@ class PipelineVanishingPointFinder(PipelineStep):
                 vertical, horizontal = partition(lambda x: LineFunctions.line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
                 horizontal = merge_lines(horizontal, search_width=diagonal/200, search_length=1.1)
 
-                vpf = VanishingPointFinder(horizontal)
-                surface.horizontal_vp = vpf.solve(measure_area=True)
-
+                self.mp.schedule('solve', horizontal)
                 vertical_lines.extend(vertical)
             else:
-                vpf = VanishingPointFinder(lines)
-                surface.vp = vpf.solve(threshold_inlier=math.radians(5), max_iterations=500, max_time=0.2)
+                self.mp.schedule('solve', lines, math.radians(5), 500, 0.2)
+                #surface.vp = vpf.solve(threshold_inlier=math.radians(5), max_iterations=500, max_time=0.2)
 
         #find vertical vanishing point for entire room
         if len(vertical_lines) > 1:
@@ -284,6 +296,15 @@ class PipelineVanishingPointFinder(PipelineStep):
             room.vertical_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
             if len(room.vertical_vp) == 0:
                 room.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
+
+        results = self.mp.await_completion()
+        for i in range(len(surfaces)):
+            surface = surfaces[i]
+            vp = results[i]
+            if surface.surfaceType == SurfaceType.Wall or surface.bestLabel in box_like:
+                surface.horizontal_vp = vp
+            else:
+                surface.vp = vp
 
         if room.vertical_vp is not None:
             for surface in surfaces:
