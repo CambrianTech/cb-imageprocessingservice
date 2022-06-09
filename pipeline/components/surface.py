@@ -90,7 +90,8 @@ class Surface():
 
     @property
     def probs(self) -> ndimage:
-        return self.geometry.probs[self.index]
+        probs_number = len(self.geometry.probs)
+        return self.geometry.probs[self.index] if self.index in range(probs_number) else self.mask
 
     @property
     def plane_mask(self) -> ndimage:
@@ -206,7 +207,7 @@ class Surface():
                     self._min_area = min(area, self._min_area)
                     self._max_area = max(area, self._max_area)
 
-                    padding = math.sqrt(area) / 20
+                    padding = math.sqrt(area) / 10
 
                     #positive (inside), negative (outside), or zero (on an edge)
                     def is_inside(dist):
@@ -260,7 +261,9 @@ class Surface():
                     self._neighbors.append(candidate)
                 else:
                     intersection = self.geometry.surface_surface_intersection(self, candidate)
+                  
                     if cv2.countNonZero(intersection) > 10: 
+                        print("intersection:", cv2.countNonZero(intersection))
                         self._neighbors.append(candidate)
 
         return self._neighbors
@@ -271,7 +274,7 @@ class Surface():
             return None
 
         masks_intersection = self.geometry.surface_surface_intersection(self, surface)
-
+  
         contours, hierarchy = cv2.findContours(masks_intersection, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         if len(contours) == 0:
@@ -370,7 +373,9 @@ class Surface():
 
 
     def mask_changed(self):
+        self._lines = None
         self._contours = None
+        self._moments = None
         self._polygons = None
         self._semantic_labels = None
         self._normals_color = None
@@ -385,7 +390,7 @@ class Surface():
 
     @property
     def contours(self):
-        if self._contours is None:
+        if self._contours is None or self.moments is None:
             #make a 1 pixel border so that edge contours aren't zero area
             mask_bordered = cv2.copyMakeBorder(self.mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0) 
             _contours, self.hierarchy = cv2.findContours(mask_bordered, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -461,6 +466,7 @@ class Surface():
     def center(self) -> tuple:
         #todo: use 2D projection
         if self.moments is None or self.moments["m00"] == 0:
+            print("No moments")
             cX = self.mask.shape[1] // 2
             cY = self.mask.shape[0] // 2
         else:
@@ -542,10 +548,10 @@ class Surface():
         if self._alteration is not None:
             print("Changed %d from %s to %s: %s" % (self.index, self.best_surface_types[0].name, self.surfaceType.name, self._alteration))
 
-    def analyze(self, confidence=0.05, K=3):
+    def analyze(self, confidence=0.04, K=3):
 
         highest = np.max(self.probs)
-        self.confidence = max(min(highest * 0.9, confidence), 0.05)
+        self.confidence = max(min(highest * 0.9, confidence), 0.04)
 
         self.determine_surface_type(K)
 
@@ -553,6 +559,8 @@ class Surface():
     def debug(self, img, color, draw_contours=False):
 
         scale = img.shape[0] / self.data["downscaled"].shape[0]
+
+        self.contours
 
         if draw_contours:
             if scale != 1.0:
@@ -566,10 +574,11 @@ class Surface():
 
         # if self.surfaceType.is_major and self.surfaceType != SurfaceType.Other:
         #     Line.draw_all(img, self.lines, color=color)
-    
+        
         if self.center is None: 
             print("No center found for %s" % self.name)
             return
+                
 
         pos = self.center[0] * scale, self.center[1] * scale
         pos = put_text(img, self.name, pos, color, size=0.5 * scale, shadow=True, highlights=True)

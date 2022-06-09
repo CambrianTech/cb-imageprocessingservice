@@ -1,3 +1,4 @@
+from audioop import reverse
 import math
 import numpy as np
 import numba as nb
@@ -29,6 +30,10 @@ class Line():
 
         #for tracking
         self.dead = False
+        self.cluster = None
+
+        self.score = 0.0
+        self.id = None
 
     def __del__(self):
         del self.data
@@ -73,12 +78,17 @@ class Line():
     def bounding_box(self, width, length_multiplier=1.0):
         return ((self.midpoint[0], self.midpoint[1]), [self.length * length_multiplier, width], self.degrees)
 
-    def extended(self, ratio=1.1, from_a=True, from_b=True):
+    def extended(self, ratio=1.1, from_a=True, from_b=True, vanishing_point=None):
 
         if not from_a and not from_b:
             return self
 
-        direction = self.direction
+        if vanishing_point is None:
+            direction = self.direction
+        else:
+            direction = vanishing_point - self.midpoint
+            direction /= np.linalg.norm(direction)
+
         amount = self.length * ratio
         data = self.data.copy()
 
@@ -316,6 +326,12 @@ def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy, dljx, dljy):
     delta1xg = min(axg, min(bxg, min(cxg,dxg)))
     delta2xg = max(axg, max(bxg, max(cxg,dxg)))
 
+
+    # return  delta1xg * cos_thr + ax, \
+    #         delta1xg * sin_thr + ay, \
+    #         delta2xg * cos_thr + bx, \
+    #         delta2xg * sin_thr + by
+
     return  delta1xg * cos_thr + xg, \
             delta1xg * sin_thr + yg, \
             delta2xg * cos_thr + xg, \
@@ -326,13 +342,22 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
     min_dist_sq = search_width * search_width
 
     timer = Timer("merge_lines")
+    lines.sort(key=lambda line: line.length, reverse=True)
+    # print([line.length for line in lines])
+
     #timer.disable()
+    cluster_index = 0
 
     for i in range(len(lines)):
         
         line_a = lines[i]
         if line_a.dead: continue
 
+        if line_a.cluster is None:
+            line_a.cluster = cluster_index
+        
+        cluster = line_a.cluster
+        
         rect_a = line_a.bounding_box(width=search_width, length_multiplier=search_length)
         data = line_a.data.copy()
 
@@ -352,14 +377,23 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
             if result != 0:
                 line_a.dead = True
                 line_b.dead = True
+                # if line_b.cluster is None:
+                line_b.cluster = cluster
                 #timer.reset()
                 data = LineFunctions.merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], line_b.dx, line_b.dy)
                 #timer.time_event("merge_line_pair")
 
         if line_a.dead:
-            lines[i] = Line(data[0], data[1], data[2], data[3])
+            line = Line(data[0], data[1], data[2], data[3])
+            line.cluster = cluster
+            # lines.append(line)
+            lines[i] = line
+        # line_a.dead = True
+        cluster_index += 1
+            # lines.append(Line(data[0], data[1], data[2], data[3]))
+            
 
     timer.log_all_events()
-
-    return list(filter(lambda x: not x.dead, lines))
+    lines = list(filter(lambda x: not x.dead, lines))
+    return lines
 

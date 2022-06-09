@@ -37,7 +37,7 @@ class Timer():
             print(colored("%s took %.4f seconds total" % (self.prefix, time() - self.start), self.color, attrs=['bold'] if len(names) > 1 else None))
 
     def log_elapsed(self, name, every=None, description=None, disabled_prefix=False):
-        if not self.enabled: return
+        # if not self.enabled: return
 
         elapsed = time() - self.checktime
         self.reset()

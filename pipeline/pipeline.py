@@ -99,9 +99,9 @@ class Pipeline():
         all_steps[PipelineStepIndex.DeterminePrimaryAngles] = PipelineDeterminePrimaryAngles
         all_steps[PipelineStepIndex.ExtractSurfaces] = PipelineExtractSurfaces
         all_steps[PipelineStepIndex.FindLines] = PipelineLineFinder
+        all_steps[PipelineStepIndex.VanishingPoints] = PipelineVanishingPointFinder
         all_steps[PipelineStepIndex.GenerateScene] = PipelineSceneGenerator
         all_steps[PipelineStepIndex.SolveSurfaces] = PipelineSurfaceSolver
-        all_steps[PipelineStepIndex.VanishingPoints] = PipelineVanishingPointFinder
         all_steps[PipelineStepIndex.Barriers] = None
         all_steps[PipelineStepIndex.FindTrim] = None
         all_steps[PipelineStepIndex.FindLegs] = None

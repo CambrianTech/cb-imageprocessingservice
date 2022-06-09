@@ -1,3 +1,5 @@
+from pickle import FALSE
+from random import random
 import numpy as np
 from scipy import ndimage
 import cv2
@@ -33,6 +35,105 @@ def angle_with_vp(model, locations, directions):
 
     return cosine_theta
 
+def compute_votes(edgelets, model, threshold_inlier):
+
+    cosine_theta = angle_with_vp(model, edgelets.locations, edgelets.directions)
+    theta_thresh = np.cos(threshold_inlier)
+
+    return (cosine_theta > theta_thresh) * edgelets.strengths
+
+def get_votes(lines, model, angle_threshold=np.radians(3)):
+    
+    locations = np.array(list(map(lambda x: x.midpoint, lines)))
+    directions = np.array(list(map(lambda x: x.direction, lines)))
+    strengths = np.array(list(map(lambda x: x.length, lines)))
+    #directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
+
+    cosine_thetas = angle_with_vp(model, locations, directions)
+
+    theta_thresh = np.cos(angle_threshold)
+    
+    return (cosine_thetas > theta_thresh) * strengths
+
+def get_angles(lines, model):
+    
+    locations = np.array(list(map(lambda x: x.midpoint, lines)))
+    directions = np.array(list(map(lambda x: x.direction, lines)))
+    strengths = np.array(list(map(lambda x: x.length, lines)))
+    #directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
+
+    cosine_thetas = angle_with_vp(model, locations, directions)
+    
+    return cosine_thetas
+
+def get_inliers(lines, model, angle_threshold=np.radians(3)):
+    
+    locations = np.array(list(map(lambda x: x.midpoint, lines)))
+    directions = np.array(list(map(lambda x: x.direction, lines)))
+    #directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
+
+    cosine_thetas = angle_with_vp(model, locations, directions)
+
+    theta_thresh = np.cos(angle_threshold)
+    indices = np.argwhere(cosine_thetas > theta_thresh).flatten()
+    
+    return [lines[i] for i in indices]
+
+def is_inlier(line, model, angle_threshold=np.radians(3)):
+    return len(get_inliers([line], model, angle_threshold)) > 0
+
+def remove_inliers(lines, model, angle_threshold=np.radians(3)):
+    inliers = get_inliers(lines, model, angle_threshold)
+    return [line for line in lines if line not in inliers]
+
+def compute_edgelets(lines):
+
+    if len(lines) < 2: return None
+
+    locations = []
+    directions = []
+    strengths = []
+
+    for line in lines:
+
+        locations.append(line.midpoint)
+        directions.append(line.direction)
+        strengths.append(line.length)
+
+    locations = np.array(locations)
+    strengths = np.array(strengths)
+    directions = np.array(directions)
+
+    return Edgelets(locations, directions, strengths)
+
+def get_vanishing_point_lines(lines, model, extend=1.0):
+
+    for i in range(len(lines)):
+        line = lines[i]
+        isdead = line.dead
+        midpt = line.midpoint
+        dir  = model[:2]/model[2] - midpt
+        dir /= np.linalg.norm(dir)
+        pt1 = midpt + dir*line.length/2.*extend
+        pt2 = midpt - dir*line.length/2.*extend
+
+        lines[i] = Line(pt1[0], pt1[1], pt2[0], pt2[1])
+        lines[i].dead = isdead
+    
+    return lines
+
+def reestimate_model(model, edgelets, threshold=5):
+    e_lines = edgelets.lines
+    inliers = compute_votes(edgelets, model, threshold) > 0
+    e_lines = e_lines[inliers]
+
+
+    a = e_lines[:, :2]
+    b = -e_lines[:, 2]
+    est_model = np.linalg.lstsq(a, b)[0]
+    return np.concatenate((est_model, [1.]))
+
+
 class VanishingPoint:
     def __init__(self, lines, model, votes, measure_area=False):
 
@@ -56,9 +157,10 @@ class VanishingPoint:
         if self._score is None:
             self._score = sum(self.votes)
 
-            # if self.measure_area and len(self.points) > 1:
-            #     rect = cv2.minAreaRect(self.points)
-            #     self._score = self._score * np.hypot(rect[1][0], rect[1][1])
+            if self.measure_area and len(self.points) > 1:
+                rect = cv2.minAreaRect(np.int32(self.points))
+
+                self._score = self._score * np.sqrt(rect[1][0]*rect[1][1])
 
         return self._score
 
@@ -66,6 +168,12 @@ class VanishingPoint:
     def inliers(self):
         if self._inliers is None:
             self._inliers = np.array(self.lines)[self.votes > 0]
+
+        return self._inliers
+    
+    @inliers.setter
+    def inliers(self, value:list):
+        self._inliers = value
 
         return self._inliers
 
@@ -79,23 +187,8 @@ class VanishingPoint:
     def direction(self):
         return self.model[:2] / self.model[2]
 
-    def get_inliers(self, lines, angle_threshold=np.radians(3)):
         
-        locations = np.array(list(map(lambda x: x.midpoint, lines)))
-        directions = np.array(list(map(lambda x: x.direction, lines)))
-        #directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
-
-        cosine_thetas = angle_with_vp(self.model, locations, directions)
-
-        theta_thresh = np.cos(angle_threshold)
-        indices = np.argwhere(cosine_thetas > theta_thresh).flatten()
-        
-        return [lines[i] for i in indices]
-
-    def is_inlier(self, line, angle_threshold=np.radians(3)):
-        return len(self.get_inliers([line], angle_threshold)) > 0
-        
-class Edglets:
+class Edgelets:
     def __init__(self, locations, directions, strengths):
         self.locations = locations
         self.directions = directions
@@ -114,43 +207,14 @@ class Direction(IntEnum):
 
 class VanishingPointFinder():
 
-    def __init__(self, lines, direction:Direction=None, angle_threshold=np.radians(80)):
+    def __init__(self,  edgelets, lines, direction:Direction=None, angle_threshold=np.radians(80)):
         super().__init__()
-
         self.lines = lines
+        self.edgelets = edgelets
         self.direction = direction
         self.angle_threshold = angle_threshold
 
-    def compute_edgelets(self):
-
-        if len(self.lines) < 2: return None
-
-        locations = []
-        directions = []
-        strengths = []
-
-        for line in self.lines:
-            locations.append(line.midpoint)
-            directions.append(line.direction)
-            strengths.append(line.length)
-
-        locations = np.array(locations)
-        strengths = np.array(strengths)
-        directions = np.array(directions)
-        #directions = np.array(directions) / np.linalg.norm(directions, axis=1)[:, np.newaxis]
-
-        return Edglets(locations, directions, strengths)
-
-    def compute_votes(self, model, threshold_inlier):
-
-        cosine_theta = angle_with_vp(model, self.edgelets.locations, self.edgelets.directions)
-        theta_thresh = np.cos(threshold_inlier)
-
-        return (cosine_theta > theta_thresh) * self.edgelets.strengths
-
     def solve(self, max_iterations=2000, threshold_inlier=math.radians(2), max_time=0.33, measure_area=False):
-
-        self.edgelets = self.compute_edgelets()
 
         if self.edgelets is None:
             return []
@@ -166,7 +230,7 @@ class VanishingPointFinder():
         
         pi_2 = np.pi/2       
 
-        max_iterations = min(max_iterations, len(self.lines) * 40)
+        max_iterations = min(max_iterations, len(self.edgelets.lines) * 40)
         start_time = time.time() 
 
         for ransac_iter in range(max_iterations):
@@ -185,24 +249,26 @@ class VanishingPointFinder():
                 # reject degenerate candidates
                 continue
 
-            # if current_model[1] / current_model[2] > 1000:
-            #     continue
+            if self.lines[ind1].cluster == self.lines[ind2].cluster:
+                # reject lines from the same cluster
+                continue
 
-            if self.direction is not None:
-                line1 = self.lines[ind1]
-                line2 = self.lines[ind2]
 
-                if self.direction == Direction.Vertical:
-                    if LineFunctions.line_angle_difference(line1.angle, pi_2) > self.angle_threshold or LineFunctions.line_angle_difference(line2.angle, pi_2) > self.angle_threshold:
-                        continue
-                else:
-                    if LineFunctions.line_angle_difference(line1.angle, 0) > self.angle_threshold or LineFunctions.line_angle_difference(line2.angle, 0) > self.angle_threshold:
-                        continue
+            # if self.direction is not None:
+            #     line1 = self.lines[ind1]
+            #     line2 = self.lines[ind2]
+
+            #     if self.direction == Direction.Vertical:
+            #         if LineFunctions.line_angle_difference(line1.angle, pi_2) > self.angle_threshold or LineFunctions.line_angle_difference(line2.angle, pi_2) > self.angle_threshold:
+            #             continue
+            #     else:
+            #         if LineFunctions.line_angle_difference(line1.angle, 0) > self.angle_threshold or LineFunctions.line_angle_difference(line2.angle, 0) > self.angle_threshold:
+            #             continue
 
 
             current_model = current_model / current_model[2]
 
-            vp = VanishingPoint(self.lines, current_model, self.compute_votes(current_model, threshold_inlier), measure_area=measure_area)
+            vp = VanishingPoint(self.lines, current_model, compute_votes(self.edgelets, current_model, threshold_inlier), measure_area=measure_area)
             
             self.vanishing_points.append(vp)
 
@@ -221,7 +287,7 @@ class PipelineVanishingPointFinder(PipelineStep):
 
     @property
     def output_keys(self) -> list:
-        return []
+        return ["lines"]
 
     def get_contour_lines(self, image, surface, min_length):
         lines = []
@@ -246,52 +312,209 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         room = data["room"]
         image = data["downscaled"]
+
+        cluster_image = image.copy()
+        for i in range(0, len(data["lines"])):
+            # print(data["lines"][i].cluster)
+
+            cluster_lines = list(filter(lambda x: x.cluster==i, data["lines"]))
+            if len(cluster_lines) > 0:
+                draw_lines(cluster_image, cluster_lines, color=random_color(), thickness=2)
+
+        log_image(data, "cluster_image", cluster_image)
+
         diagonal = math.hypot(image.shape[0], image.shape[1])
-
-        surfaces = []
-
-        surfaces.extend(data["room"].get_surfaces(surfaceTypes=[SurfaceType.Floor, SurfaceType.Wall]))
-        surfaces.extend(data["room"].get_surfaces(labels=box_like))
-        #self.surfaces.extend(data["room"].get_surfaces(labels=legged_objects))
 
         #find single vertical vanishing point
         pi_2 = np.pi/2
-        vertical_threshold = np.radians(15)
-        vertical_lines = []
-        all_lines = []
+        vertical_threshold = np.radians(20)
+        vp_lines = []
+        room.horizontal_vps = []
 
-        for surface in surfaces:
-            lines = surface.lines.copy()
-            lines.extend(self.get_contour_lines(image, surface, diagonal/80))
-            all_lines.extend(lines)
-   
-            if surface.surfaceType == SurfaceType.Wall or surface.bestLabel in box_like:                
-                vertical, horizontal = partition(lambda x: LineFunctions.line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
-                horizontal = merge_lines(horizontal, search_width=diagonal/200, search_length=1.1)
+        vps_horizontal = []
+        vertical_vp = None
+        all_lines = data["lines"]
+        edgelets = compute_edgelets(all_lines)
 
-                vpf = VanishingPointFinder(horizontal)
-                surface.horizontal_vp = vpf.solve(measure_area=True)
+        current_indices = [True]*len(all_lines)
+        current_line_number = len(all_lines)
+        current_lines = all_lines.copy()
+        lines_plus = data["lines"].copy()
+        # lines_plus.extend(data["hed_lines"])
+        # lines_plus.extend(data["normals_lines"])
 
-                vertical_lines.extend(vertical)
+        vertical_lines, horizontal_lines = partition(lambda x: LineFunctions.line_angle_difference(x.angle, pi_2) < vertical_threshold, data["lines"])
+
+        vertical_indices = list([all_lines[i] in vertical_lines for i in range(len(all_lines))])
+       
+        img = image.copy()
+        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
+        for c in range(100):
+            colors.append(random_color())
+
+        cluster_index = 0
+
+        while cluster_index < 3 if cluster_index < 3 else current_line_number > len(all_lines)/6: 
+      
+            if vertical_vp is None:
+                current_indices = vertical_indices
+                current_lines = vertical_lines
+                ransac_threshold = np.radians(2.0)
             else:
-                vpf = VanishingPointFinder(lines)
-                surface.vp = vpf.solve(threshold_inlier=math.radians(5), max_iterations=500, max_time=0.2)
+                ransac_threshold = np.radians(3)
 
-        #find vertical vanishing point for entire room
-        if len(vertical_lines) > 1:
-            vertical_lines = merge_lines(vertical_lines, search_width=diagonal/200, angle_threshold=math.radians(5))
-            vpf = VanishingPointFinder(vertical_lines)
-            room.vertical_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
-            if len(room.vertical_vp) == 0:
-                room.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
+            current_edgelets = Edgelets(edgelets.locations[current_indices], edgelets.directions[current_indices], edgelets.strengths[current_indices])
+            
+            vpf = VanishingPointFinder(current_edgelets, current_lines)
+            current_vps = vpf.solve(threshold_inlier=ransac_threshold, max_iterations=500,max_time=1.,measure_area=False)
 
-        if room.vertical_vp is not None:
-            for surface in surfaces:
-                if surface.vertical_vp is None:
-                    surface.vertical_vp = room.vertical_vp
+            if len(current_vps) == 0:
+                break
 
-        if im_logging_enabled(data):
-            log_image(data, "vanishing_points", self.get_debug_image(data, surfaces, all_lines))
+            vp = current_vps[0]
+
+
+            if vertical_vp is None:
+                current_indices = [True]*len(all_lines)
+                current_lines = all_lines.copy()
+                vertical_vp = vp
+                
+                inliers = list(get_inliers(lines_plus, vp.model, 4*ransac_threshold))
+                
+                for i in range(len(all_lines)):
+                    line = all_lines[i]
+                    if line in inliers and line in current_lines:
+                        current_indices[i] = False
+                        current_lines.remove(line)
+                        current_line_number-=1  
+
+                # vp.inliers = list(filter(lambda x: not x.dead, vp.inliers))
+                # vp.inliers = list(get_vanishing_point_lines(vp.inliers, vp.model,extend=1.0))
+                # vp.inliers.sort(key=lambda x:x.angle%np.pi)
+                # vp.inliers = merge_lines(vp.inliers, diagonal/400,search_length=2.0,angle_threshold=np.radians(0.5))
+                # vp.inliers = list(get_vanishing_point_lines(vp.inliers, vp.model))
+                # vp.inliers.sort(key=lambda x:x.angle%np.pi, reverse=True)
+                
+            else:
+                vps_horizontal.append(vp)
+          
+                # vp.inliers = list(get_inliers(lines_plus, vp.model, ransac_threshold))
+
+                for i in range(len(all_lines)):
+                    line = all_lines[i]
+                    if line in vp.inliers and line in current_lines:
+                        current_indices[i] = False
+                        current_lines.remove(line)
+                        current_line_number-=1  
+                
+     
+                
+                # vp.inliers = list(vp.inliers)
+                # get_vanishing_point_lines(vp.inliers, vp.model)
+
+                # vp.inliers = list(filter(lambda x: not x.dead, vp.inliers))
+                       
+                # vp.inliers = merge_lines(vp.inliers, search_length=1.05, search_width=min(diagonal/300, 8), angle_threshold=math.radians(2.0))
+                # vp.inliers.sort(key=lambda x:x.angle)
+
+                # get_vanishing_point_lines(vp.inliers, vp.model)
+                # vp.inliers = merge_lines(vp.inliers, diagonal/500,search_length=1.0,angle_threshold=np.radians(0.5))
+
+                # vp_pt = reestimate_model(current_vps[0].model, current_edgelets, np.radians(0.5))
+                # vp.model = vp_pt
+                
+
+
+                # vp.inliers = merge_lines(vp.inliers, diagonal/300,search_length=1.0,angle_threshold=np.radians(0.25))
+                # list(get_vanishing_point_lines(vp.inliers, vp.model))
+
+                # vp.inliers = list(get_vanishing_point_lines(vp.inliers, vp.model))
+                # vp.inliers = merge_lines(vp.inliers, diagonal/10,search_length=.75,angle_threshold=np.radians(2.0))        
+
+            vp_lines.extend(vp.inliers)
+
+
+           
+            # draw_lines(img, vp.inliers, color=color, thickness=2,lineType=cv2.LINE_AA)
+            color = colors[cluster_index]
+            for f in range(len(vp.inliers)):
+                l = vp.inliers[f]
+                m = float(f/len(vp.inliers))
+                m = 1
+                draw_lines(img, [l], color=(color[0]*m, color[1]*m, color[2]*m), thickness=1,lineType=cv2.LINE_AA)
+                vp_pt = vp.model
+                vp_pt = vp_pt[:2]/vp_pt[2]
+                # cv2.line(img, (int(l.point_a[0]), int(l.point_b[1])), (int(vp_pt[0]), int(vp_pt[1])), color=color, thickness=1,lineType=cv2.LINE_AA)
+            # print(cluster_index, color)
+            cluster_index+=1
+        print("lines in play: ", current_line_number)
+
+        room.vertical_vp = vertical_vp
+        
+        room.horizontal_vps = vps_horizontal
+        data["lines"] = vp_lines
+
+        log_image(data, "vanishing_pts", img)
+
+
+        
+
+        # vertical_lines_extended = []
+        # vertical_vp_pt = vertical_vp.model[:2]/vertical_vp.model[2]
+        
+        # surface_lines = data["lines"]
+        # vertical_inliers = get_inliers(surface_lines, vertical_vp.model, np.radians(3.0))
+
+        # vertical_inliers = [lines for lines in vertical_inliers if lines in surface_lines]
+        # vertical_inliers = merge_lines(vertical_inliers, diagonal/300,angle_threshold=np.radians(0.5))
+
+        # vertical_inliers_directions = [line.midpoint-vertical_vp_pt for line in vertical_inliers]
+        # vertical_inliers_directions = vertical_inliers_directions/np.linalg.norm(vertical_inliers_directions,axis=1)[:,np.newaxis]
+        
+        # vertical_inliers_angles = np.arctan2(np.sign(vertical_inliers_directions[:,1]),vertical_inliers_directions[:,0])
+        # vertical_inliers_angles = vertical_inliers_angles
+        # angle_ordering = np.argsort(vertical_inliers_angles)
+        # vertical_inliers = [vertical_inliers[i] for i in angle_ordering]
+        # vertical_inliers_angles = vertical_inliers_angles[angle_ordering]
+        # vertical_inliers_angles = np.insert(vertical_inliers_angles,0,vertical_inliers_angles[0] - np.pi/4)
+        # vertical_inliers_angles = np.append(vertical_inliers_angles,vertical_inliers_angles[-1] + np.pi/4)
+
+        # for i in range(len(vertical_inliers)):
+        #     line = vertical_inliers[i]
+        #     color = (255,127/len(vertical_inliers)*i)
+        #     draw_lines(img, [line], color=color, thickness=2,lineType=cv2.LINE_AA)
+
+
+
+        #     if surface.surfaceType == SurfaceType.Wall or surface.bestLabel in box_like:                
+        #         vertical, horizontal = partition(lambda x: LineFunctions.line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
+        #         # horizontal = merge_lines(horizontal, search_width=diagonal/200, search_length=1.1)
+
+        #         vpf = VanishingPointFinder(horizontal)
+        #         surface.horizontal_vp = vpf.solve(measure_area=True)
+        #         # surface.horizontal_vp = vpf.solve()
+
+
+        #         vertical_lines.extend(vertical)
+        #     else:
+        #         vpf = VanishingPointFinder(lines)
+        #         surface.vp = vpf.solve(threshold_inlier=math.radians(5), max_iterations=500, max_time=0.2)
+
+        # #find vertical vanishing point for entire room
+        # if len(vertical_lines) > 1:
+        #     vertical_lines = merge_lines(vertical_lines, search_width=diagonal/200, angle_threshold=math.radians(5))
+        #     vpf = VanishingPointFinder(vertical_lines)
+        #     room.vertical_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
+        #     if len(room.vertical_vp) == 0:
+        #         room.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
+
+        # if room.vertical_vp is not None:
+        #     for surface in surfaces:
+        #         if surface.vertical_vp is None:
+        #             surface.vertical_vp = room.vertical_vp
+
+        # if im_logging_enabled(data):
+        #     log_image(data, "vanishing_points", self.get_debug_image(data, surfaces, all_lines))
 
     def get_debug_image(self, data, surfaces, all_lines):
            

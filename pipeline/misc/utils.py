@@ -97,8 +97,12 @@ def get_segmentation_image(labels, image, avg=False, resize=True, min_matches=10
 
     legend = []
 
+    colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
+
+
     for label in range(0, np.amax(labels) + 1):
-        color = np.random.randint([0, 0, 10], [254, 254, 235])
+        color = colors[label] if label < len(colors) else random_color()
+        
         if avg: color = np.mean(img_seg[labels == label], axis=0)
         img_seg[labels == label] = color
 

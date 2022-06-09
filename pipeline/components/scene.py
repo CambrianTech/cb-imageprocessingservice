@@ -111,6 +111,11 @@ class Scene():
                     return surface
 
         return None
+    
+                            
+
+
+        return self._surfaces.values() if len(filters) is None else list(multi_filter(filters, self._surfaces.values())) 
 
     def get_surfaces(self, surfaceTypes=None, labels=None, dimension=None, point=None):
 
@@ -137,12 +142,14 @@ class Scene():
         key = self.surface_surface_key(surface_a, surface_b)
 
         if key not in self._mask_intersections:
+            surface_a.mask_expanded
+            surface_b.mask_expanded
             self._mask_intersections[key] = np.bitwise_and(surface_a.mask_expanded, surface_b.mask_expanded)
 
         return self._mask_intersections[key]
 
 
-    def get_debug_image(self, hires=False):
+    def get_debug_image(self, hires=False, neighbors=False):
         if not im_logging_enabled(self.data): 
             return None
 
@@ -160,12 +167,14 @@ class Scene():
             else:
                 mask = surface.mask
                 probs = surface.probs
-
+        
             query = mask > 0 
+            img_hsv[query] = np.mean(img_hsv[query], axis=0)
             max_value = 0.9
             if max_value > 0:
                 img_hsv[:, :, 0][query] = hues[i]
                 img_hsv[:, :, 1][query] = 255 * np.power(probs[query], 0.15)
+
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
 
