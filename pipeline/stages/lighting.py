@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 from scipy import ndimage
 from cambrian import image_processing as ip
-from skimage.morphology import watershed, disk
 from skimage import filters
 from skimage.filters import threshold_multiotsu
 
