@@ -9,10 +9,7 @@ from tensorpack import *
 from tensorpack.tfutils import gradproc, optimizer
 from tensorpack.tfutils.sesscreate import NewSessionCreator
 from tensorpack.tfutils.summary import add_moving_summary, add_param_summary
-from gluoncv.model_zoo import get_model
-from gluoncv.data.transforms.presets.segmentation import test_transform
-from gluoncv.data import batchify
-from mxnet import image
+
 import mxnet as mx
 
 from pipeline.core import PipelineStep, PipelineStepIndex
@@ -21,6 +18,8 @@ class PipelineSemanticSegmentation(PipelineStep):
     
     def __init__(self, pipeline):
         super().__init__(pipeline)
+
+        from gluoncv.model_zoo import get_model
         
         print("PipelineSemanticSegmentation", "Initializing")
         self.mx_ctx = mx.gpu(0)
@@ -47,6 +46,8 @@ class PipelineSemanticSegmentation(PipelineStep):
         return False
 
     def predict(self, images):
+
+        from gluoncv.data.transforms.presets.segmentation import test_transform
 
         # Numpy to mx, resize, test-transform, batch
         semantic_inputs = [
