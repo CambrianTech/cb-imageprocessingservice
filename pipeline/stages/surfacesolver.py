@@ -132,6 +132,9 @@ class SurfaceSolver():
                 mask_coor_vp_x = mask_coor[1] - vertical_vp.model[:2][0]
                 mask_coor_vp_y = mask_coor[0] - vertical_vp.model[:2][1]
 
+                if len(mask_coor_vp_x) == 0 or len(mask_coor_vp_y) == 0:
+                    continue
+
                 # inefficient
                 mask_coor_vp_angles = np.arctan2(mask_coor_vp_y, mask_coor_vp_x) % np.pi
 
