@@ -273,3 +273,11 @@ def put_text(img, text, origin, color, shadow_offset=(1,1), font=cv2.FONT_HERSHE
 
     return (loc[0], loc[1] + 3 * dimensions[1] // 2)
 
+def color_to_normal(color):
+
+    normal = (color - 127.5)/127.5
+    normal /= np.linalg.norm(normal)
+    
+    return normal
+
+

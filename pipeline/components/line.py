@@ -99,8 +99,11 @@ class Line():
         if from_b:
             data[2] = self.midpoint[0] + direction[0] * amount
             data[3] = self.midpoint[1] + direction[1] * amount
+        
+        new_line = Line(data[0], data[1], data[2], data[3])   
+        new_line.cluster = self.cluster
 
-        return Line(data[0], data[1], data[2], data[3])        
+        return new_line   
 
     def copy(self):
         #todo: ineffcient
@@ -380,20 +383,27 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
                 # if line_b.cluster is None:
                 line_b.cluster = cluster
                 #timer.reset()
-                data = LineFunctions.merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], line_b.dx, line_b.dy)
+                # data = LineFunctions.merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], line_b.dx, line_b.dy)
                 #timer.time_event("merge_line_pair")
 
         if line_a.dead:
-            line = Line(data[0], data[1], data[2], data[3])
-            line.cluster = cluster
+            # line = Line(data[0], data[1], data[2], data[3])
+            # line.cluster = cluster
             # lines.append(line)
-            lines[i] = line
-        # line_a.dead = True
+            lines[i].cluster = cluster
+            lines[i].length = max(line_a.length, line_b.length)
+            line_a.dead = False
         cluster_index += 1
             # lines.append(Line(data[0], data[1], data[2], data[3]))
             
+    lines.sort(key=lambda line: line.cluster)
+    
+    # for line in lines:
+    #     while line_cluster_index < cluster_index and lines[line_cluster_index].cluster == line.cluster:
+    #         line_cluster_index += 1
+
 
     timer.log_all_events()
-    lines = list(filter(lambda x: not x.dead, lines))
+    # lines = list(filter(lambda x: not x.dead, lines))
     return lines
 

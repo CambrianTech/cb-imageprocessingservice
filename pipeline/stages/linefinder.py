@@ -134,7 +134,7 @@ class PipelineLineFinder(PipelineStep):
 
         if len(hed_lines) > 0: 
             log_lines(hed_lines, "hed_lines")
-            lines.extend(hed_lines)
+            # lines.extend(hed_lines)
 
         #find lines in normals
         min_length = int(diagonal / 20)
@@ -149,14 +149,14 @@ class PipelineLineFinder(PipelineStep):
         
         if len(normals_lines) > 0:
             #cleanup normals
-            normals_lines = merge_lines(normals_lines, search_width=diagonal/300)
+            # normals_lines = merge_lines(normals_lines, search_width=diagonal/300)
             timer.log_elapsed("merge_lines normals_lines")
 
             # lines.extend(normals_lines)
         data["normals_lines"] = normals_lines
 
         #merge all
-        lines = merge_lines(lines, search_length=1.0, search_width=min(diagonal/600, 8), angle_threshold=math.radians(1.5))
+        lines = merge_lines(lines, search_length=1.0, search_width=min(diagonal/150, 16), angle_threshold=math.radians(5.0))
         timer.log_elapsed("merge_lines final")
 
 

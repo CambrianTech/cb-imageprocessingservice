@@ -9,6 +9,7 @@ from enum import IntEnum
 from scipy.spatial import distance
 
 from cambrian.LineFunctions import LineFunctions
+from sklearn import cluster
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
 from pipeline.misc.utils import resize_array, random_color, overlay_mask, partition
@@ -134,6 +135,28 @@ def reestimate_model(model, edgelets, threshold=5):
     return np.concatenate((est_model, [1.]))
 
 
+def get_contour_lines(image, surface, min_length,use_contours=False):
+    lines = []
+    polygons = surface.polygons
+    if use_contours:
+        polygons = surface.contours
+
+    for poly in polygons:
+        num_pts = len(poly)
+
+        for i in range(num_pts):
+            point_a = poly[i][0]
+            point_b = poly[(i+1) % num_pts][0]
+
+            if line_on_image_edge(point_a, point_b, image.shape[1], image.shape[0]):
+                continue
+
+            if distance.euclidean(point_a, point_b) > min_length:
+                lines.append(Line(point_b[0], point_b[1], point_a[0], point_a[1]))
+    
+    return lines
+
+
 class VanishingPoint:
     def __init__(self, lines, model, votes, measure_area=False):
 
@@ -186,6 +209,8 @@ class VanishingPoint:
     @property
     def direction(self):
         return self.model[:2] / self.model[2]
+
+
 
         
 class Edgelets:
@@ -289,23 +314,6 @@ class PipelineVanishingPointFinder(PipelineStep):
     def output_keys(self) -> list:
         return ["lines"]
 
-    def get_contour_lines(self, image, surface, min_length):
-        lines = []
-
-        for poly in surface.polygons:
-            num_pts = len(poly)
-
-            for i in range(num_pts):
-                point_a = poly[i][0]
-                point_b = poly[(i+1) % num_pts][0]
-
-                if line_on_image_edge(point_a, point_b, image.shape[1], image.shape[0]):
-                    continue
-
-                if distance.euclidean(point_a, point_b) > min_length:
-                    lines.append(Line(point_b[0], point_b[1], point_a[0], point_a[1]))
-        
-        return lines
                 
 
     def run(self, data):
@@ -319,6 +327,14 @@ class PipelineVanishingPointFinder(PipelineStep):
 
             cluster_lines = list(filter(lambda x: x.cluster==i, data["lines"]))
             if len(cluster_lines) > 0:
+                # cluster_data = map(lambda x: x.data, cluster_lines)
+                # cluster_data = np.array(list(cluster_data))
+                # cluster_data = cluster_data.reshape(len(cluster_data) * 2, 2)
+
+                # hull = np.int32(cv2.convexHull(cluster_data))
+                # print(hull)
+                # cv2.drawContours(cluster_image, [hull], -1, random_color(), -1)
+
                 draw_lines(cluster_image, cluster_lines, color=random_color(), thickness=2)
 
         log_image(data, "cluster_image", cluster_image)
@@ -327,7 +343,7 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         #find single vertical vanishing point
         pi_2 = np.pi/2
-        vertical_threshold = np.radians(20)
+
         vp_lines = []
         room.horizontal_vps = []
 
@@ -340,28 +356,51 @@ class PipelineVanishingPointFinder(PipelineStep):
         current_line_number = len(all_lines)
         current_lines = all_lines.copy()
         lines_plus = data["lines"].copy()
+        all_indices = [True]*len(all_lines)
+
         # lines_plus.extend(data["hed_lines"])
         # lines_plus.extend(data["normals_lines"])
 
-        vertical_lines, horizontal_lines = partition(lambda x: LineFunctions.line_angle_difference(x.angle, pi_2) < vertical_threshold, data["lines"])
 
-        vertical_indices = list([all_lines[i] in vertical_lines for i in range(len(all_lines))])
+
+   
        
         img = image.copy()
         colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
-        for c in range(100):
+        for c in range(1000):
             colors.append(random_color())
 
         cluster_index = 0
 
-        while cluster_index < 3 if cluster_index < 3 else current_line_number > len(all_lines)/6: 
+        while cluster_index < 3 if cluster_index < 3 else current_line_number > len(all_lines)/10: 
       
+            print("lines in play: ", current_line_number)
+
+
             if vertical_vp is None:
+                vertical_threshold = np.radians(20)
+                vertical_lines, _= partition(lambda x: LineFunctions.line_angle_difference(x.angle, pi_2) < vertical_threshold, data["lines"])
+
+                vertical_indices = list([all_lines[i] in vertical_lines for i in range(len(all_lines))])
                 current_indices = vertical_indices
-                current_lines = vertical_lines
+   
                 ransac_threshold = np.radians(2.0)
             else:
-                ransac_threshold = np.radians(3)
+                ransac_threshold = np.radians(2.5)
+                if len(vps_horizontal) == 0:
+                    horizontal_threshold = np.radians(.5)
+                    horizontal_indices = [False]
+                    while np.count_nonzero(horizontal_indices) < 5:
+                        horizontal_lines, _= partition(lambda x: LineFunctions.line_angle_difference(x.angle, 0) < horizontal_threshold, data["lines"])
+
+                        horizontal_indices = list([all_lines[i] in horizontal_lines for i in range(len(all_lines))])
+                        horizontal_threshold += np.radians(.5)
+
+                    current_indices = horizontal_indices
+                    print("no horizontal vps", np.count_nonzero(horizontal_indices))     
+
+
+            current_lines = list([all_lines[i] for i in range(len(all_lines)) if current_indices[i]])
 
             current_edgelets = Edgelets(edgelets.locations[current_indices], edgelets.directions[current_indices], edgelets.strengths[current_indices])
             
@@ -375,25 +414,19 @@ class PipelineVanishingPointFinder(PipelineStep):
 
 
             if vertical_vp is None:
-                current_indices = [True]*len(all_lines)
-                current_lines = all_lines.copy()
                 vertical_vp = vp
                 
-                inliers = list(get_inliers(lines_plus, vp.model, 4*ransac_threshold))
+                inliers = list(get_inliers(all_lines, vp.model, 4*ransac_threshold))
                 
                 for i in range(len(all_lines)):
                     line = all_lines[i]
-                    if line in inliers and line in current_lines:
-                        current_indices[i] = False
-                        current_lines.remove(line)
-                        current_line_number-=1  
-
+                    if line in inliers:
+                        all_indices[i] = False
+                
                 # vp.inliers = list(filter(lambda x: not x.dead, vp.inliers))
                 # vp.inliers = list(get_vanishing_point_lines(vp.inliers, vp.model,extend=1.0))
                 # vp.inliers.sort(key=lambda x:x.angle%np.pi)
                 # vp.inliers = merge_lines(vp.inliers, diagonal/400,search_length=2.0,angle_threshold=np.radians(0.5))
-                # vp.inliers = list(get_vanishing_point_lines(vp.inliers, vp.model))
-                # vp.inliers.sort(key=lambda x:x.angle%np.pi, reverse=True)
                 
             else:
                 vps_horizontal.append(vp)
@@ -402,11 +435,13 @@ class PipelineVanishingPointFinder(PipelineStep):
 
                 for i in range(len(all_lines)):
                     line = all_lines[i]
-                    if line in vp.inliers and line in current_lines:
-                        current_indices[i] = False
-                        current_lines.remove(line)
-                        current_line_number-=1  
-                
+                    if line in vp.inliers and line in all_lines:
+                        all_indices[i] = False    
+
+                if len(vps_horizontal) > 0:
+                    current_indices = all_indices   
+                    current_line_number = np.count_nonzero(current_indices)
+         
      
                 
                 # vp.inliers = list(vp.inliers)
@@ -422,32 +457,27 @@ class PipelineVanishingPointFinder(PipelineStep):
 
                 # vp_pt = reestimate_model(current_vps[0].model, current_edgelets, np.radians(0.5))
                 # vp.model = vp_pt
-                
-
-
-                # vp.inliers = merge_lines(vp.inliers, diagonal/300,search_length=1.0,angle_threshold=np.radians(0.25))
-                # list(get_vanishing_point_lines(vp.inliers, vp.model))
-
-                # vp.inliers = list(get_vanishing_point_lines(vp.inliers, vp.model))
-                # vp.inliers = merge_lines(vp.inliers, diagonal/10,search_length=.75,angle_threshold=np.radians(2.0))        
 
             vp_lines.extend(vp.inliers)
 
 
-           
             # draw_lines(img, vp.inliers, color=color, thickness=2,lineType=cv2.LINE_AA)
             color = colors[cluster_index]
             for f in range(len(vp.inliers)):
                 l = vp.inliers[f]
-                m = float(f/len(vp.inliers))
+                # color =  colors[l.cluster]
+                # m = float(f/len(vp.inliers))
                 m = 1
-                draw_lines(img, [l], color=(color[0]*m, color[1]*m, color[2]*m), thickness=1,lineType=cv2.LINE_AA)
+                # draw_lines(img, [l], color=(color[0]*m, color[1]*m, color[2]*m), thickness=1,lineType=cv2.LINE_AA)
                 vp_pt = vp.model
                 vp_pt = vp_pt[:2]/vp_pt[2]
-                # cv2.line(img, (int(l.point_a[0]), int(l.point_b[1])), (int(vp_pt[0]), int(vp_pt[1])), color=color, thickness=1,lineType=cv2.LINE_AA)
+                polyline = np.int32([[l.point_a[0], l.point_a[1]],[l.point_b[0], l.point_b[1]], [vp_pt[0], vp_pt[1]]])
+                # cv2.polylines(img, [polyline], False, color=(color[0]*m, color[1]*m, color[2]*m), thickness=1,lineType=cv2.LINE_AA)
+                cv2.line(img, (int(l.point_a[0]), int(l.point_a[1])), (int(l.point_b[0]), int(l.point_b[1])), color=(color[0]*m, color[1]*m, color[2]*m), thickness=2,lineType=cv2.LINE_AA)
             # print(cluster_index, color)
             cluster_index+=1
-        print("lines in play: ", current_line_number)
+
+
 
         room.vertical_vp = vertical_vp
         

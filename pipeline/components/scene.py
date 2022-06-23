@@ -160,7 +160,7 @@ class Scene():
         #overlay probs
         for i in range(len(self.surfaces)):
             surface = self.surfaces[i]
-
+            
             if hires:
                 mask = cv2.resize(surface.mask, (image.shape[1], image.shape[0]), cv2.INTER_NEAREST) if surface.final_mask is None else surface.final_mask 
                 probs = cv2.resize(surface.probs, (image.shape[1], image.shape[0]))
@@ -173,7 +173,8 @@ class Scene():
             max_value = 0.9
             if max_value > 0:
                 img_hsv[:, :, 0][query] = hues[i]
-                img_hsv[:, :, 1][query] = 255 * np.power(probs[query], 0.15)
+                img_hsv[:, :, 1][query] = 255
+                # img_hsv[:, :, 1][query] = 255 * np.power(probs[query], 0.15)
 
                     
         img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)

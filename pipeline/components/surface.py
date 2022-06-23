@@ -64,9 +64,13 @@ class Surface():
         self.vertical_vp = None
         self.vp = None
         self.planar_group = None
+        self.vertical_vp_angles = None
 
         self._background_mean_stddev = None
         self._lighting_mean_stddev = None
+
+        self._normals_accumulated = None
+        self._mask_coordinates = None
 
     @property
     def secondaryType(self) -> SurfaceType:
@@ -91,7 +95,7 @@ class Surface():
     @property
     def probs(self) -> ndimage:
         probs_number = len(self.geometry.probs)
-        return self.geometry.probs[self.index] if self.index in range(probs_number) else self.mask
+        return self.geometry.probs[self.index] if self.index in range(probs_number) else self.geometry.probs[self._cloned_from]
 
     @property
     def plane_mask(self) -> ndimage:
@@ -102,7 +106,7 @@ class Surface():
 
     @property
     def plane_data(self) -> np.ndarray:
-        if self._plane_data is None:
+        if self._plane_data is None and self.index in range(len(self.data["planes"]["detection"])):
             self._plane_data = self.data["planes"]["detection"][self.index]
         return self._plane_data
 
@@ -194,20 +198,27 @@ class Surface():
         return tuple(self.lighting_mean_stddev[1].flatten())
 
     @property
-    def lines(self) -> list:
+    def lines(self, padding_multiplier = 20) -> list:
 
         if self._lines is None:
             self._lines = []
             self._min_area = 1000
             self._max_area = 1
+            clusters = []
             for i in range(len(self.data["lines"])):
                 line = self.data["lines"][i]
-                for contour in self.contours:
+
+                if line.cluster in clusters:
+                    continue
+
+                contours = self.contours
+
+                for contour in contours:
                     area = cv2.contourArea(contour)
                     self._min_area = min(area, self._min_area)
                     self._max_area = max(area, self._max_area)
 
-                    padding = math.sqrt(area) / 10
+                    padding = math.sqrt(area) / padding_multiplier
 
                     #positive (inside), negative (outside), or zero (on an edge)
                     def is_inside(dist):
@@ -222,10 +233,12 @@ class Surface():
                     dist = cv2.pointPolygonTest(contour, line.midpoint, True)
 
                     if is_inside(dist) and (is_inside(dist_a) or is_inside(dist_b)):
-                        self._lines.append(line)
+                        clusters.append(line.cluster)
                         break
-                            
+            self._lines  = [line for line in self.data["lines"] if line.cluster in clusters]
         return self._lines
+
+
 
     @property
     def vanishing_points(self) -> list:
@@ -263,7 +276,7 @@ class Surface():
                     intersection = self.geometry.surface_surface_intersection(self, candidate)
                   
                     if cv2.countNonZero(intersection) > 10: 
-                        print("intersection:", cv2.countNonZero(intersection))
+                        # print("intersection:", cv2.countNonZero(intersection))
                         self._neighbors.append(candidate)
 
         return self._neighbors
@@ -415,14 +428,16 @@ class Surface():
     @property
     def polygons(self):
         if self._polygons is None:
-            epsilon = math.hypot(self.data["downscaled"].shape[0], self.data["downscaled"].shape[1]) / 200
-            self._polygons = list(map(lambda contour: cv2.approxPolyDP(contour, epsilon, True), self.contours))
+            # epsilon = math.hypot(self.data["downscaled"].shape[0], self.data["downscaled"].shape[1]) / 400
+            # epsilon = 0.001*cv2.arcLength(contour,True)
+            self._polygons = list(map(lambda contour: cv2.approxPolyDP(contour, 1, True), self.contours))
 
         return self._polygons
 
     @property
     def semantic_labels(self) -> ndimage:
         if self._semantic_labels is None:
+            # self._semantic_labels = self.get_semantic_labels(self.mask)
             segments, counts = np.unique(self.geometry.semantic_labels[self.mask > 0], return_counts=True)
             segmentList = zip(segments.tolist(), counts.tolist())
             self._semantic_labels = sorted(segmentList, key=lambda x:x[1], reverse=True)
@@ -473,6 +488,16 @@ class Surface():
             cX = int(self.moments["m10"] / self.moments["m00"])
             cY = int(self.moments["m01"] / self.moments["m00"])
         return cX, cY
+
+    
+
+    @property
+    def normals_accumulated(self) -> tuple:
+        if self._normals_accumulated is None and len(self.mask) > 0:
+            self._normals_accumulated = np.sum(self.data["room"].normals[self.mask > 0], axis=0)
+
+        return self._normals_accumulated
+
 
     def get_surface_mask(self, label:SurfaceType, confidence):
         mask = np.zeros(self.probs.shape, dtype="uint8")
@@ -589,7 +614,8 @@ class Surface():
         if self._alteration is not None:
             pos = put_text(img, self._alteration, pos, color, size=0.33 * scale, shadow=True)
 
-        pos = put_text(img, "%.0f deg" % np.degrees(self.angle), pos, (255, 255, 255), size=0.33 * scale, shadow=True)
+        if self._plane_data is not None:
+            pos = put_text(img, "%.0f deg" % np.degrees(self.angle), pos, (255, 255, 255), size=0.33 * scale, shadow=True)
 
         #print("%s has %d lines" % (self.name, len(self.lines)))
 
@@ -599,3 +625,5 @@ class Surface():
         #     text = "%s %.2f to %s %.2f" % (surface.best_surface_types[0].name, best_prob, surface.surfaceType.name, chosen_prob)
 
         #     put_text(img, text, (position[0], position[1] + text_size[1]), (255, 255, 255), size=0.33, shadow=True) 
+
+

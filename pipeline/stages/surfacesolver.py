@@ -1,4 +1,6 @@
+from email.errors import BoundaryError
 from re import M
+from cv2 import threshold
 from matplotlib import lines
 import numpy as np
 from scipy import ndimage
@@ -10,13 +12,13 @@ from scipy.spatial import distance
 
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
-from pipeline.misc.utils import resize_array, random_color, overlay_mask, sample_at_point, scale_contour
+from pipeline.misc.utils import resize_array, random_color, overlay_mask, sample_at_point, scale_contour, color_to_normal
 from .planegeometry import Dimension
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers, Timer
 from pipeline.components.line import Line, draw_lines, line_on_image_edge
 from pipeline.components.surface import Surface
 from pipeline.data.ade20k import ADE20K
-from pipeline.stages.vanishingpointfinder import get_votes
+from pipeline.stages.vanishingpointfinder import get_votes, get_contour_lines
 
 class SurfaceSolver():
 
@@ -30,136 +32,372 @@ class SurfaceSolver():
         #add all the applicable surfaces:
         timer = Timer("room")
 
+        # for surface in self.data["room"].get_surfaces([SurfaceType.OnFloor]):
+        #     print("Solving floor surface:", surface.name)
+        #     surface.surfaceType = SurfaceType.Floor
+        #     labels = self.room.isolated_labels
+  
+        #     labels[surface.mask > 0] = surface.SurfaceType.Floor.value
+        self.room.isolated_labels[self.room.isolated_labels == SurfaceType.OnFloor.value] = SurfaceType.Floor.value
+        log_segmentation_image(self.data, "room_labels_start", self.room.isolated_labels, self.room.image.copy(), get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
+
+        # for surfaceType in SurfaceType:
+        #     surfaces_of_type = self.room.get_surfaces([surfaceType])
+        #     refined_type = np.sum([surface.mask for surface in surfaces_of_type],0)
+        #     labels = self.room.isolated_labels
+        #     # labels[labels == surfaceType.value] = np.amax(labels) + 1
+        #     labels[refined_type > 0] = surfaceType.value
         #prepare
         self.lines_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
-        draw_lines(self.lines_mask, self.data["lines"], color=255, thickness=2, lineType=cv2.LINE_AA)
+        draw_lines(self.lines_mask, self.data["lines"], color=255, thickness=3, lineType=cv2.LINE_4)
 
+        self.height, self.width = self.room.image.shape[:2]
+        self.diagonal = np.hypot(self.width, self.height)
         self.refine_surfaces()
-  
-        #preserve plane context information i.e. probs < min_confidence are ignored
 
+        #preserve plane context information i.e. probs < min_confidence are ignored
         log_image(self.data, "room_refined", self.room.get_debug_image())
         timer.time_event("refine_surfaces")
- 
-        # invalid_mask = self.remove_invalid_surfaces()
-        # invalid_mask[self.lines_mask > 0] = 255
 
-        # if im_logging_enabled(self.data) and cv2.countNonZero(invalid_mask) > 50:
-        #     debug = self.room.image.copy()
-        #     debug[invalid_mask > 0] = [0,255,0]
-        #     log_image(self.data, "room_removed", debug)
+        invalid_mask = self.remove_invalid_surfaces()
+        invalid_mask[self.lines_mask > 0] = 255
+
+        if im_logging_enabled(self.data) and cv2.countNonZero(invalid_mask) > 50:
+            debug = self.room.image.copy()
+            debug[invalid_mask > 0] = [0,255,0]
+            log_image(self.data, "room_removed", debug)
         
-    
-        # timer.time_event("remove_invalid_surfaces")
+        timer.time_event("remove_invalid_surfaces")
 
-        # self.add_missing_surfaces(invalid_mask,1/2400)
-        # log_image(self.data, "room_missing_added", self.room.get_debug_image())
+        self.add_missing_surfaces(invalid_mask,1/1200)
+        self.room.refresh_surfaces()
+        log_image(self.data, "room_missing_added", self.room.get_debug_image())
 
-        # timer.time_event("add_missing_surfaces")
 
-        # self.merge_like_surfaces()
 
-        # log_image(self.data, "room_merged", self.room.get_debug_image())
+        
+        # self.room.refresh_surfaces()
+        # self.lines_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
+        # draw_lines(self.lines_mask, self.data["lines"], color=255, thickness=1, lineType=cv2.LINE_4)
 
         # self.refine_surfaces(debug_suffix="_final")
-        # self.refine_surfaces()
+    
 
         # log_image(self.data, "room_expanded", self.room.get_debug_image())
-      
-        
-        # timer.time_event("room.refine_surfaces")
+        # # self.finalize_masks(invalid_mask)
+        self.merge_like_surfaces() 
+        log_image(self.data, "room_merged", self.room.get_debug_image())
 
-        # self.finalize_masks(invalid_mask)
-       
+
         # log_image(self.data, "room", self.room.get_debug_image())
+        # timer.time_event("add_missing_surfaces")
+  
 
-        surfaces = []
-        for surfaceType in SurfaceType: 
-            surfaces.extend(self.data["room"].get_surfaces([surfaceType]))
+        # surfaces = []
+        # for surfaceType in SurfaceType: 
+        #     surface = self.data["room"].get_surfaces([surfaceType])
+        #     surfaces.extend(surface)
 
         vertical_vp = self.room.vertical_vp
         vertical_lines = vertical_vp.inliers.copy()
 
-        self.height, self.width = self.room.image.shape[:2]
-        diagonal = np.hypot(self.width, self.height)
-
-        surface_image = self.room.image.copy()
- 
         vertical_labels = self.room.isolated_labels.copy()
 
-        # vertical_labels[self.lines_mask > 0] = 0
-        isolated_probs = self.data["isolated"]
+        # # vertical_labels[self.lines_mask > 0] = np.amax(vertical_labels) + 1
 
+        surface_image = self.room.image.copy()
+        surface_probs = np.zeros_like(surface_image)
+
+        # for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall, SurfaceType.Floor, SurfaceType.Ceiling, SurfaceType.OnFloor,SurfaceType.OnCeiling,SurfaceType.Other]:
         for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
-            label = surfaceType.value
-            refined_type = np.sum([surface.mask for surface in surfaces if surface.surfaceType == surfaceType],0)
-            vertical_labels[np.logical_and(vertical_labels == label, refined_type==0)] = -1
-            vertical_labels[refined_type>0]= label
-
-            mask = vertical_labels == label
+        # for surfaceType in [SurfaceType.Wall]:
+            surfaces_of_type = self.room.get_surfaces([surfaceType])
+            refined_type = np.sum([surface.mask for surface in surfaces_of_type],0)
 
             type_surface = Surface(self.data)
-            type_surface.set_mask(np.uint8(mask))
+            type_surface.set_mask(np.uint8(refined_type>0))
             type_lines = type_surface.lines
 
-            type_lines = filter(lambda x: x in vertical_lines, type_lines)
 
-            type_lines =  list(map(lambda line: line.extended(1, vanishing_point=vertical_vp.model[:2]), type_lines))
-            if len(type_lines) == 0:
-                continue
+            for surface in surfaces_of_type:
+                print(np.unique(surface.probs))
 
-            mask_coor = np.nonzero(mask)
-                   
-            mask_coor_vp_x = mask_coor[1] - vertical_vp.model[:2][0]
-            mask_coor_vp_y = mask_coor[0] - vertical_vp.model[:2][1]
-            # innefficient
-            mask_coor_vp_angles = np.arctan2(mask_coor_vp_y, mask_coor_vp_x) % np.pi
+                surface_mask = surface.mask
+                mask_coor = np.nonzero(surface_mask)
+                    
+                mask_coor_vp_x = mask_coor[1] - vertical_vp.model[:2][0]
+                mask_coor_vp_y = mask_coor[0] - vertical_vp.model[:2][1]
 
-            type_lines.sort(key=lambda x:x.angle%np.pi)
-            surface_angles = [line.angle%np.pi for line in type_lines]
-            surface_angles = np.insert(surface_angles,0,np.amin(mask_coor_vp_angles))
-            surface_angles = np.append(surface_angles,np.amax(mask_coor_vp_angles))
-            pixel_angle_width = abs((surface_angles[-1]- surface_angles[0])/(np.amax(mask_coor_vp_x)-np.amin(mask_coor_vp_x)))
-            print("p", np.degrees(pixel_angle_width))
-            start_angle = surface_angles[0]
-            current_normal = None
+                # inefficient
+                mask_coor_vp_angles = np.arctan2(mask_coor_vp_y, mask_coor_vp_x) % np.pi
 
-            for i in range(len(surface_angles)-1):
-                # i = len(surface_angles)-2 - i
+                surface_lines = type_lines.copy()
 
-                good = np.logical_and(mask_coor_vp_angles >=surface_angles[i], mask_coor_vp_angles < surface_angles[i+1]) 
-                if np.count_nonzero(good) > 0:
+                surface_lines = list(filter(lambda x: x in vertical_lines, surface_lines))
+                if len(surface_lines) == 0:
+                    continue
 
+                surface_lines = list(map(lambda line: line.extended(.5, vanishing_point=vertical_vp.model[:2]), surface_lines))
+                         
+                surface_lines.sort(key=lambda x:x.angle%np.pi)
+
+                boundary_lines = []
+
+                current_line = surface_lines[0]
+                boundary_lines.append(current_line)
+
+                for i in range(1, len(surface_lines)-1):
+                    line = surface_lines[i]
+                    # print("cluster", i,line.cluster)
+                    if line.cluster != current_line.cluster:
+                        # print("adding", i-1,i)
+                        boundary_lines.append(current_line)
+                        boundary_lines.append(line)
+                    
+                    current_line = line
+
+                boundary_lines.append(surface_lines[-1])
+                
+                surface_lines = boundary_lines
+                surface_angles = [line.angle%np.pi for line in surface_lines]
+                pixel_angle_width = abs((np.amax(mask_coor_vp_angles) - np.amin(mask_coor_vp_angles))/(np.amax(mask_coor_vp_x)-np.amin(mask_coor_vp_x)))
+                print("pixel_angle_width", np.degrees(pixel_angle_width))
+                surface_angles = [surface_angle for surface_angle in surface_angles if surface_angle >= np.amin(mask_coor_vp_angles) and surface_angle <= np.amax(mask_coor_vp_angles)]
+                surface_angles = np.insert(surface_angles,0,np.amin(mask_coor_vp_angles)- 2*pixel_angle_width)
+                surface_angles = np.append(surface_angles,np.amax(mask_coor_vp_angles)+ 2*pixel_angle_width)
+                surface_angles.sort()
+                # surface_angles = np.insert(surface_angles,0,surface_angles[0] + np.sign(surface_angles[0]-surface_angles[-1])* np.pi/4.)
+                # surface_angles = np.append(surface_angles,surface_angles[-1] - np.sign(surface_angles[0]-surface_angles[-1])* np.pi/4.)
+                print(surface.name)
+                print(surface_angles)
+                
+
+                # surface_angles = mask_coor_vp_angles[surface_mask[mask_coor]>0]
+                # max_surface_angle = np.amax(surface_angles)
+                # min_surface_angle = np.amin(surface_angles)
+
+         
+                # surface_image[surface_mask>0] = color
+                print(surface.name, np.unique(surface.probs))
+
+                surface_color = random_color()
+                for i in range(len(surface_angles)-1):   
+                    # print(surface_angles[i], surface_angles[i+1])
+
+                    good = np.logical_and(mask_coor_vp_angles >= surface_angles[i], mask_coor_vp_angles <= surface_angles[i+1]) 
                     slice = mask_coor[0][good], mask_coor[1][good]
 
-                    ang_diff = abs(surface_angles[i+1] - surface_angles[i])
-                    if ang_diff < 3.*pixel_angle_width:
-                        vertical_labels[slice] = np.amax(vertical_labels)
-                    else:
-                        slice_normal = np.mean(self.room.normals[slice], axis=0)
-                        slice_normal = (slice_normal-127.5)/127.5
-                        slice_normal /= np.linalg.norm(slice_normal)
+                    if  np.count_nonzero(good) > 10:
+                        
+                        index = np.amax(vertical_labels) + 1
+                        slice_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
+                        slice_mask[slice] = 255
 
-                        if current_normal is None:
-                            current_normal = slice_normal
-                        else:
-                            # print(current_normal, slice_normal,np.linalg.norm(current_normal))
-                            cos_normal = np.dot(current_normal, slice_normal)
-                            angle = np.arccos(cos_normal)
-                            if abs(angle) > np.radians(1):
+                        angle_diff = abs(surface_angles[i+1]-surface_angles[i])
+                        print(i, np.degrees(angle_diff))
+
+                        if  angle_diff > 2*pixel_angle_width:
+                    
+                            prob = np.mean(surface.probs[slice_mask>0])
+
+                            normal =  np.mean(self.data["room"].normals[slice_mask > 0], axis=0)
+                            surface_probs[slice_mask>0] = [surface_color[0]*prob, surface_color[1]*prob, surface_color[2]*prob]
+                            # surface_probs[slice_mask>0] = prob
+
+                            if prob<.1:
+                                surface.mask[slice_mask>0]=0
                                 vertical_labels[slice] = np.amax(vertical_labels) + 1
+
+                                # slice_surface = Surface(self.data, None, surfaceType)
+                                slice_surface = surface.clone()
+                                slice_surface.set_mask(slice_mask)
+                        
+                                self.room.add_surface(slice_surface)
+                                slice_surface.bestLabel
+
+                                surface_image[slice_mask>0] = random_color()
+
+                                surface_image[slice_mask>0] = normal
+
                             else:
-                                vertical_labels[slice] = np.amax(vertical_labels)
+                                surface_image[slice_mask>0] = surface_color
+                        else:
+                            surface_angles[i+1] = surface_angles[i]
+                            # surface.mask[slice_mask>0]=0
+                            
+                            # surface_image[surface.mask>0] = np.mean(self.data["room"].normals[surface.mask > 0], axis=0)
+                    else:
+                        surface_angles[i+1] = surface_angles[i]
+                        # surface.mask[slice]=0
 
-                            current_normal = slice_normal
+
+                surface.mask_changed()
+      
+                # draw_lines(surface_probs, surface.lines, color=random_color(), thickness=2, lineType=cv2.LINE_AA)
+                cv2.drawContours(surface_probs, surface.contours, -1, random_color(), -1)
+                # draw_lines(surface_image, surface.lines, color=random_color(), thickness=2, lineType=cv2.LINE_AA)
+
+        # # vertical_labels[self.lines_mask > 0] = np.amax(vertical_labels) + 1
+
+        self.room.refresh_surfaces()
+    
+  
+        log_image(self.data, "room_fan", self.room.get_debug_image())
+
+        log_image(self.data, "room_surface_image", surface_image)
+        log_image(self.data, "room_surface_probs", surface_probs)
+        
 
 
+
+        # isolated_probs = self.data["isolated"]
+        vertical_labels[vertical_labels>=0] = -1
+        normals_accumulated = [0,0,0]
+        normals_count = 0
+        current_normal = None
+        current_index = None
+        current_surface = None
+        for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
+        # for surfaceType in [SurfaceType.Wall]:
+
+            surfaces_of_type = self.room.get_surfaces([surfaceType])
+            for i in range(len(surfaces_of_type)):
+                surface = surfaces_of_type[i]
+
+                if current_surface is not None and current_surface.surfaceType != surface.surfaceType:
+                    normals_accumulated = [0,0,0]
+                    normals_count = 0
+                    current_normal = None
+                    current_index = None
+                    current_surface = None
+
+                surface_normals_accumulated = surface.normals_accumulated
+                surface_normals_count = np.count_nonzero(surface.mask)
+                surface_normal = surface_normals_accumulated/surface_normals_count
+                surface_normal = color_to_normal(surface_normal)
+                
+                if current_surface is None:
+                    current_index = i+1
+                    current_surface = surface
+                    normals_accumulated = surface_normals_accumulated
+                    normals_count = surface_normals_count
+                    current_normal = surface_normal
+                    continue
+                else:
+                    cos_normal = abs(np.dot(current_normal, surface_normal))
+
+                    if cos_normal > np.cos(np.radians(10)) or (surface.surfaceType == SurfaceType.OnWall and surface.bestLabel == current_surface.bestLabel):
+
+                        normals_accumulated += surface.normals_accumulated
+                        normals_count += np.count_nonzero(surface.mask)
+                        current_normal = normals_accumulated / normals_count
+                        current_normal = color_to_normal(current_normal)
+                
+                        current_surface.merge(surface)
+                        
+                    else:
+                        print(surface.name + " is unmerged with " + current_surface.name + " angle between = " + str(np.degrees(np.arccos(cos_normal))))
+                        # surface_image[surface.mask > 0] = (surface_normal+1.0)*127.5
+                        # surface_image[surface.mask > 0] = random_color()
+                        current_index = i+1
+                        normals_accumulated = surface_normals_accumulated
+                        normals_count = surface_normals_count
+                        current_normal = surface_normal
+                        current_surface = surface
+                        
+                    
+                vertical_labels[surface.mask > 0] = current_index
+
+
+        self.room.refresh_surfaces()
         log_segmentation_image(self.data, "isolated_labels_normals", vertical_labels, self.room.normals, get_image=False, labelset=SurfaceType,opacity=1, avg=True)
 
-        log_segmentation_image(self.data, "isolated_labels_image", vertical_labels, self.room.image, get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
+        log_segmentation_image(self.data, "isolated_labels_image", vertical_labels, surface_image, get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
+  
+        log_image(self.data, "room_fan_merged", self.room.get_debug_image())
+
+# *********************************
+
+        # for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
+        #     label = surfaceType.value
+        #     refined_type = np.sum([surface.mask for surface in surfaces if surface.surfaceType == surfaceType],0)
+        #     vertical_labels[np.logical_and(vertical_labels == label, refined_type==0)] = SurfaceType.Other.value
+
+        #     vertical_labels[refined_type>0]= label
+        #     mask = vertical_labels == label
+
+        #     type_surface = Surface(self.data)
+        #     type_surface.set_mask(np.uint8(mask))
+        #     type_lines = type_surface.lines
+
+        #     type_lines = filter(lambda x: x in vertical_lines, type_lines)
+
+        #     type_lines =  list(map(lambda line: line.extended(1, vanishing_point=vertical_vp.model[:2]), type_lines))
+
+        #     if len(type_lines) == 0:
+        #         continue
+
+        #     mask_coor = np.nonzero(mask)
+                   
+        #     mask_coor_vp_x = mask_coor[1] - vertical_vp.model[:2][0]
+        #     mask_coor_vp_y = mask_coor[0] - vertical_vp.model[:2][1]
+        #     # innefficient
+        #     mask_coor_vp_angles = np.arctan2(mask_coor_vp_y, mask_coor_vp_x) % np.pi
+
+        #     type_lines.sort(key=lambda x:x.angle%np.pi)
+        #     surface_angles = [line.angle%np.pi for line in type_lines]
+        #     surface_angles = np.insert(surface_angles,0,np.amin(mask_coor_vp_angles))
+        #     surface_angles = np.append(surface_angles,np.amax(mask_coor_vp_angles))
+        #     pixel_angle_width = abs((surface_angles[-1]- surface_angles[0])/(np.amax(mask_coor_vp_x)-np.amin(mask_coor_vp_x)))
+        #     angle_diffs = np.diff(surface_angles)
+
+        #     surface_angles = [surface_angles[i-1] for i in range(len(surface_angles)-1) if angle_diffs[i] > 4*pixel_angle_width]
+
+        #     # for i in range(len(surface_angles)) pixel_angle_width 
+            
+
+        #             # ang_diff = abs(surface_angles[i+1] - surface_angles[i])
+
+        #             # if ang_diff < 4.*pixel_angle_width:
+        #             #     vertical_labels[slice] = np.amax(vertical_labels)
+
+        #     start_angle = surface_angles[0]
+        #     normals_accumulated = [0,0,0]
+        #     accumulated_count = 0
+        #     current_normal = None
+
+        #     for i in range(len(surface_angles)-1):
+        #         # i = len(surface_angles)-2 - i
+        #         good = np.logical_and(mask_coor_vp_angles >surface_angles[i]+0*pixel_angle_width, mask_coor_vp_angles < surface_angles[i+1]-0*pixel_angle_width) 
+
+        #         if np.count_nonzero(good) > 0:
+
+        #             slice = mask_coor[0][good], mask_coor[1][good]
+        #             slice_normal = np.mean(self.room.normals[slice], axis=0)
+        #             slice_normal = (slice_normal-127.5)/127.5
+        #             slice_normal /= np.linalg.norm(slice_normal)
+        #             if current_normal is None:
+        #                 current_normal = slice_normal
+        #                 vertical_labels[slice] = np.amax(vertical_labels) + 1
+
+        #             else:
+
+        #                 cos_normal = np.dot(current_normal, slice_normal)
+        #                 angle = np.arccos(cos_normal)
+        #                 if abs(angle) > np.radians(1):
+        #                     vertical_labels[slice] = np.amax(vertical_labels) + 1
+        #                 else:
+        #                     vertical_labels[slice] = np.amax(vertical_labels)
+
+        #                 current_normal = slice_normal
+
+
+        # vertical_labels[self.lines_mask > 0] = -1
+
+
 
            
-        timer.time_event("setup")
+        # timer.time_event("setup")
         
 
      
@@ -194,11 +432,10 @@ class SurfaceSolver():
 
         # self.refine_surfaces(min_confidence=.01)
 
-   
 
-    
 
         surfaces = []
+
         for surfaceType in SurfaceType: 
             surfaces.extend(self.data["room"].get_surfaces([surfaceType]))
 
@@ -209,13 +446,17 @@ class SurfaceSolver():
    
         vps =  self.room.horizontal_vps
         vps = np.insert(vps, 0, self.room.vertical_vp)
-        surface_img = self.room.image.copy()
+
 
         for surface in surfaces:
+            surface_img = self.room.image.copy()
             if surface.surfaceType == SurfaceType.Other:
                 continue
 
             lines = surface.lines
+            surface_img[surface.mask>0] = random_color()
+            lines.extend(get_contour_lines(self.room.image,surface,4,use_contours=True))
+
             if len(lines) == 0:
                 continue    
 
@@ -241,7 +482,6 @@ class SurfaceSolver():
                     if score > max_score_2 and i!=0:
                         max_score_2 = score
                         vp_index_2 = i
-        
                         best_lines_2 = [lines[j] for j in range(len(lines)) if votes[j] > 0]
                 elif i>0:
                     if score > max_score_1:
@@ -271,8 +511,10 @@ class SurfaceSolver():
                 mask_coor_vp_y = mask_coor[0] - vp_pt[1]
                 mask_coor_vp_angles = np.arctan2(mask_coor_vp_y, mask_coor_vp_x)
                 surface_angles = [line.angle for line in best_lines_1]
+
                 if len(surface_angles) == 0:
                     continue
+
                 surface_angles = np.insert(surface_angles,0,np.amin(mask_coor_vp_angles))
                 surface_angles = np.append(surface_angles,np.amax(mask_coor_vp_angles))
 
@@ -283,11 +525,10 @@ class SurfaceSolver():
                         slice = mask_coor[0][good], mask_coor[1][good]
 
                         # surface.probs[slice]= np.mean(surface.probs[slice])
-                        surface_img[slice] = np.mean(self.room.normals[slice], axis=0)
+                        # surface_img[slice] = np.mean(self.room.normals[slice], axis=0)
       
-
-                draw_lines(surface_img, best_lines_1, color=0, thickness=4,lineType=cv2.LINE_AA)
-                draw_lines(surface_img, best_lines_1, color=color2, thickness=2)
+                # draw_lines(surface_img, best_lines_1, color=0, thickness=3,lineType=cv2.LINE_AA)
+                # draw_lines(surface_img, best_lines_1, color=color2, thickness=2)
             
             if best_lines_2 is not None:
                 color3 = colors[vp_index_2]
@@ -307,15 +548,15 @@ class SurfaceSolver():
                         slice = mask_coor[0][good], mask_coor[1][good]
 
                         surface.probs[slice]= np.mean(surface.probs[slice])
-                        surface_img[slice] = np.mean(surface_img[slice], axis=0)
+                        # surface_img[slice] = np.mean(surface_img[slice], axis=0)
 
 
                 draw_lines(surface_img, best_lines_2, color=0, thickness=4,lineType=cv2.LINE_AA)
                 draw_lines(surface_img, best_lines_2, color=color3, thickness=2)
-
+            # draw_lines(surface_img, lines, color=0, thickness=2,lineType=cv2.LINE_AA)
         
             log_image(self.data, "surface_img" + str(cluster_index), surface_img)
-            log_image(self.data, "surface_probs_vp_refinded" + str(cluster_index),255.*surface.probs)
+            # log_image(self.data, "surface_probs_vp_refinded" + str(cluster_index),255.*surface.probs)
             cluster_index+=1
 
 
@@ -432,7 +673,7 @@ class SurfaceSolver():
 
         # surface_img= self.room.image.copy()
         # for surface in surfaces:
-        #     # lines.extend(self.get_contour_lines(image, surface, diagonal/80))
+            # lines.extend(self.get_contour_lines(image, surface, diagonal/80))
             
         #     if surface.cloned_from>-1 and surface.surfaceType==SurfaceType.Wall:
         #         mask_coor = np.nonzero(surface.mask)
@@ -471,49 +712,33 @@ class SurfaceSolver():
         
         # log_image(self.data, "cloned", surface_img)
 
+        # self.merge_like_surfaces() 
+
+        # log_image(self.data, "room_merged", self.room.get_debug_image())
+  
+        # self.refine_surfaces(debug_suffix="_final")
 
 
-    
+        # log_image(self.data, "room_expanded", self.room.get_debug_image())
+      
+        # timer.time_event("room.refine_surfaces")
 
-   
-
-
-
+        # self.finalize_masks(invalid_mask)
+       
+        # log_image(self.data, "room", self.room.get_debug_image())
 
         
-   
-       
+        # timer.time_event("merge_like_surfaces")
 
+        # self.assign_parents()
 
-        timer.time_event("merge_like_surfaces")
-
-        self.assign_parents()
-
-        timer.time_event("assign_parents")
+        # timer.time_event("assign_parents")
 
         timer.log_all_events()
 
         return self.room
-    
-    def get_contour_lines(self, image, surface, min_length):
-        lines = []
 
-        for poly in surface.polygons:
-            num_pts = len(poly)
-
-            for i in range(num_pts):
-                point_a = poly[i][0]
-                point_b = poly[(i+1) % num_pts][0]
-
-                if line_on_image_edge(point_a, point_b, image.shape[1], image.shape[0]):
-                    continue
-
-                if distance.euclidean(point_a, point_b) > min_length:
-                    lines.append(Line(point_b[0], point_b[1], point_a[0], point_a[1]))
-    
-        return lines
-
-    def find_best_surface(self, surfaceType, mask, mask_center):
+    def find_best_vanishing_points(self, surfaceType, mask, mask_center):
 
         candidates = self.room.get_surfaces([surfaceType])
         
@@ -521,6 +746,47 @@ class SurfaceSolver():
             return None
 
         if len(candidates) > 1:
+
+            mask_sample = sample_at_point(mask, point=mask_center)
+
+            if cv2.countNonZero(mask_sample) > 0:
+                sample = sample_at_point(self.room.normals, point=mask_center)
+                normal = cv2.mean(sample, mask_sample)[:3]
+                candidates.sort(key=lambda x: distance.sqeuclidean(mask_center, x.center) * distance.sqeuclidean(normal, x.normals_color))
+            else:
+                candidates.sort(key=lambda x: distance.sqeuclidean(mask_center, x.center))
+
+        return candidates[0]
+    
+    # def get_contour_lines(self, image, surface, min_length):
+    #     lines = []
+
+    #     for poly in surface.polygons:
+    #         num_pts = len(poly)
+
+    #         for i in range(num_pts):
+    #             point_a = poly[i][0]
+    #             point_b = poly[(i+1) % num_pts][0]
+
+    #             if line_on_image_edge(point_a, point_b, image.shape[1], image.shape[0]):
+    #                 continue
+
+    #             if distance.euclidean(point_a, point_b) > min_length:
+    #                 lines.append(Line(point_b[0], point_b[1], point_a[0], point_a[1]))
+    
+    #     return lines
+
+    def find_best_surface(self, surfaceType, mask, mask_center=None):
+
+        candidates = self.room.get_surfaces([surfaceType])
+        
+        if len(candidates) == 0:
+            return None
+
+        if len(candidates) > 1:
+            if mask_center is None:
+                # mask_center = np.argmax(np.sum(mask, axis=1))
+                mask_center = np.mean(np.nonzero(mask),0)
 
             mask_sample = sample_at_point(mask, point=mask_center)
 
@@ -550,7 +816,9 @@ class SurfaceSolver():
         total_elevation = 3 #todo: get total elevation from highest and lowest objects. Floor or ceiling could be missing
 
         for surfaceType in SurfaceType:
-            
+            if surfaceType == SurfaceType.Wall:
+                continue
+
             color = random_color()
 
             #find missing
@@ -605,6 +873,7 @@ class SurfaceSolver():
                         # mask[self.room.index_mask != index] = 0
 
                         if cv2.countNonZero(mask) >= area_threshold:
+
                             reference_surface = surface
                             new_surface = reference_surface.clone()
                             new_surface.surfaceType = surfaceType
@@ -618,7 +887,7 @@ class SurfaceSolver():
                 new_normal = None
                 new_offset = None
 
-                if new_surface is None and surfaceType.is_major:
+                if new_surface is None:
 
                     moments = cv2.moments(contour_mask)
 
@@ -656,12 +925,10 @@ class SurfaceSolver():
 
         self.room.invalidate()
 
-    def merge_like_surfaces(self, angle_threshold=np.radians(5), angle_threshold_force=np.radians(5)):
+    def merge_like_surfaces(self, angle_threshold=np.radians(1), angle_threshold_force=np.radians(1)):
+
 
         for surfaceType in SurfaceType:
-
-            # if surfaceType == SurfaceType.Wall or surfaceType == SurfaceType.OnWall:
-            #     continue
 
             color = random_color()
             surfaces = self.room.get_surfaces([surfaceType])
@@ -669,13 +936,18 @@ class SurfaceSolver():
             for i in range(len(surfaces)):
                 
                 if surfaces[i].destroyed: continue
-                # print(surfaces[i].bestLabel)
 
                 distance_i = abs(surfaces[i].offset) #todo: calculate this?
 
                 for j in range(i+1, len(surfaces)):
+                    print(i, j, surfaces[i].bestLabel, surfaces[j].bestLabel)
 
                     if surfaces[j].destroyed: continue
+
+                    if (surfaces[i].surfaceType == SurfaceType.Floor or surfaces[i].surfaceType == SurfaceType.OnFloor) and (surfaces[j].surfaceType == SurfaceType.Floor or surfaces[j].surfaceType == SurfaceType.OnFloor):
+                        surfaces[i].merge(surfaces[j])
+                        print("Merged %s with %s" % (surfaces[i].name, surfaces[j].name))
+                        
 
                     if surfaces[i].bestLabel != surfaces[j].bestLabel: 
                         # print(colored("Surfaces %s and %s are not in the same cluster" % (surfaces[i].name, surfaces[j].name), 'yellow'))
@@ -692,7 +964,7 @@ class SurfaceSolver():
                     distance_error = 0.35 * distance_mean #accuracy degrades by range (maybe use error here, error square?)
 
                     #todo: check for intersection. In elevator image, wall sitting out front is being incorrectly merged. if it's fairly parallel, don't
-                    if surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling or (angle < angle_threshold and distance_between < distance_error):
+                    if surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.OnFloor or surfaceType == SurfaceType.Ceiling or (angle < angle_threshold and distance_between < distance_error):
                         if surfaceType != SurfaceType.Other or surfaces[i].bestLabel == surfaces[j].bestLabel:
                             offset_diff = abs(surfaces[i].offset - surfaces[j].offset) / max(abs(surfaces[i].offset), abs(surfaces[j].offset))
                             
@@ -705,7 +977,8 @@ class SurfaceSolver():
         
     def refine_surfaces(self, min_confidence=None, freedom=0.33, use_lines=True, debug_suffix=""):
         watershed_image = cv2.resize(self.data["hed"], (self.room.image.shape[1], self.room.image.shape[0]))
-
+        diagonal = self.diagonal
+        # print("diagonal", diagonal)
         final_masks = {}
         
         def expand_into_type(surfaceType:SurfaceType):
@@ -745,6 +1018,7 @@ class SurfaceSolver():
             #commit to mask
             for index in range(num_surfaces):
                 surface = surfaces[index]
+
                 mask = np.zeros_like(surface.mask)
                 mask[markers == (index + 1)] = 1
                 mask[self.lines_mask > 0] = 0
@@ -753,14 +1027,81 @@ class SurfaceSolver():
 
                 if min_confidence is not None: 
                     mask[surface.probs < min_confidence] = 0
-  
-                surface.set_mask(mask)
+                
+                if surface.surfaceType == SurfaceType.Wall:
+                    n, mask_components, stats = cv2.connectedComponentsWithStats(mask.astype(np.uint8))[:3]
+                    if n > 1:
+                        max_area = np.amax(stats[1:, cv2.CC_STAT_AREA])
+                
+                        for i in range(1, n):
+
+                            area = stats[i, cv2.CC_STAT_AREA]
+            
+                                # print(colored("%i: %s: %i: %i" % (max_area, surface.name, area, i), 'yellow'))
+                            threshold = min(max_area * 0.1,100)
+
+                            if area > threshold:
+                                new_mask = np.uint8(mask_components==i)
+
+                                new_surface = surface.clone()
+                                new_surface.surfaceType = surface.surfaceType
+                                new_surface.set_mask(new_mask)
+
+                                self.room.add_surface(new_surface)
+
+                else: 
+
+                    new_surface = surface.clone()
+                    new_surface.surfaceType = surface.surfaceType
+                    new_surface.set_mask(mask)
+
+                    print(surface.name)
+          
+
+                    self.room.add_surface(new_surface)
+
+
+
+
+
+                            # lines = new_surface.lines
+                            
+                            # line_samples = list(map(lambda line:np.linspace(line.point_a, line.point_b, 10), lines))
+                            # line_samples = np.int32(line_samples)
+                            # for k in range(len(line_samples)):
+                            #     line_sample = line_samples[k]
+                            #     # line_sample = np.flip(line_sample)
+               
+                            #     prob = np.mean(surface.probs[line_sample[:,1], line_sample[:,0]])
+                            #     line = lines[k]
+                       
+                               
+                            #     if prob > max(line.score,.5):
+                            #         print(line.score)
+                            #         line.score = prob
+                                    # draw_lines(new_surface.mask, [lines[k]],1,thickness=2)
+
+
+                            # new_surface.probs = surface.probs
+
+
+                            # print(new_surface.index, new_surface.was_added, np.unique(new_surface.probs))
+
+                            # print(new_surface.index, np.unique(new_surface.probs),  new_surface.was_added)
+                         
+                      
+
+                surface.destroy()
 
         #expand all surfaces as far as they can go within their segmentation (watershed)
         #and resolve disputes between planes as they intersect by probability (confidence):
 
         for surfaceType in SurfaceType: 
             expand_into_type(surfaceType)
+
+        self.room.refresh_surfaces()
+
+
 
         
 
