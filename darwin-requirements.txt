@@ -1,7 +1,7 @@
 # This file may be used to create an environment using:
 # $ conda create --name <env> --file <this file>
 # platform: osx-arm64
-absl-py=1.1.0=pypi_0
+absl-py=1.1.0
 appnope=0.1.3=pyhd8ed1ab_0
 argon2-cffi=21.3.0=pyhd8ed1ab_0
 argon2-cffi-bindings=21.2.0=py38h33210d7_2
