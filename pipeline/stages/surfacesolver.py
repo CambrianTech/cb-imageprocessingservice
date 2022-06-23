@@ -114,10 +114,14 @@ class SurfaceSolver():
             surfaces_of_type = self.room.get_surfaces([surfaceType])
             refined_type = np.sum([surface.mask for surface in surfaces_of_type],0)
 
-            type_surface = Surface(self.data)
-            type_surface.set_mask(np.uint8(refined_type>0))
-            type_lines = type_surface.lines
+            mask = np.uint8(refined_type>0)
 
+            if len(mask.shape) != 2:
+                continue
+
+            type_surface = Surface(self.data)
+            type_surface.set_mask(mask)
+            type_lines = type_surface.lines
 
             for surface in surfaces_of_type:
                 print(np.unique(surface.probs))
@@ -443,10 +447,12 @@ class SurfaceSolver():
         colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
         for c in range(100):
             colors.append(random_color())
-   
-        vps =  self.room.horizontal_vps
-        vps = np.insert(vps, 0, self.room.vertical_vp)
 
+        if len(self.room.horizontal_vps) > 0:
+            vps = self.room.horizontal_vps
+            vps = np.insert(vps, 0, self.room.vertical_vp)
+        else:
+            vps = [self.room.vertical_vp]
 
         for surface in surfaces:
             surface_img = self.room.image.copy()

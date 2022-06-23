@@ -83,8 +83,11 @@ class PoseEstimator:
                 self.inliers.append(inliers_horizontal1)
 
         horizontal2_edgelet_indices = self.get_edgelets_close_to_dir(self.edgelets, [1, 0], .95)
-        horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices, np.nonzero(compute_votes(self.edgelets,vp_horizontal1,10))[0])
-        horizontal2_edgelet_indices = np.setdiff1d( horizontal2_edgelet_indices, np.nonzero(compute_votes(self.edgelets,vp_vertical,10))[0])
+        if vp_horizontal1 is not None:
+            horizontal2_edgelet_indices = np.setdiff1d(horizontal2_edgelet_indices, np.nonzero(compute_votes(self.edgelets,vp_horizontal1,10))[0])
+
+        if vp_vertical is not None:
+            horizontal2_edgelet_indices = np.setdiff1d( horizontal2_edgelet_indices, np.nonzero(compute_votes(self.edgelets,vp_vertical,10))[0])
 
         if horizontal2_edgelet_indices is not None:
             vp_horizontal2, votes, inliers_horizontal2 = ransac_vanishing_point(self.edgelets, e_lines, 2000, threshold_inlier=2,
