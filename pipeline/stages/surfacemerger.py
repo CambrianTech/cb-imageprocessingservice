@@ -25,6 +25,13 @@ class PipelineSurfaceMerger(PipelineStep):
 
     def run(self, data):
 
-        print("MERGE")
+        print("MERGE walls")
         for surface in data["room"].surfaces:
-            print("surface")
+            if surface.surfaceType != SurfaceType.Wall:
+                continue
+
+            neighbors = list(filter(lambda s: s.surfaceType == SurfaceType.Wall, surface.neighbors))
+
+            if len(neighbors) == 0: continue
+
+            print("surface %s has neighbors" % surface.name, [neighbor.name for neighbor in neighbors])

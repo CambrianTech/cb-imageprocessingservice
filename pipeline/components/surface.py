@@ -604,18 +604,18 @@ class Surface():
             print("No center found for %s" % self.name)
             return
                 
+        if self.surfaceType in [SurfaceType.Wall, SurfaceType.Floor, SurfaceType.Ceiling]:
+            pos = self.center[0] * scale, self.center[1] * scale
+            pos = put_text(img, self.name, pos, color, size=0.5 * scale, shadow=True, highlights=True)
 
-        pos = self.center[0] * scale, self.center[1] * scale
-        pos = put_text(img, self.name, pos, color, size=0.5 * scale, shadow=True, highlights=True)
+        # if self.cloned_from >= 0:
+        #     pos = put_text(img, "cloned %d" % self.cloned_from, pos, (255, 0, 0), size=0.33 * scale, shadow=True)
 
-        if self.cloned_from >= 0:
-            pos = put_text(img, "cloned %d" % self.cloned_from, pos, (255, 0, 0), size=0.33 * scale, shadow=True)
+        # if self._alteration is not None:
+        #     pos = put_text(img, self._alteration, pos, color, size=0.33 * scale, shadow=True)
 
-        if self._alteration is not None:
-            pos = put_text(img, self._alteration, pos, color, size=0.33 * scale, shadow=True)
-
-        if self._plane_data is not None:
-            pos = put_text(img, "%.0f deg" % np.degrees(self.angle), pos, (255, 255, 255), size=0.33 * scale, shadow=True)
+        # if self._plane_data is not None:
+        #     pos = put_text(img, "%.0f deg" % np.degrees(self.angle), pos, (255, 255, 255), size=0.33 * scale, shadow=True)
 
         #print("%s has %d lines" % (self.name, len(self.lines)))
 

@@ -142,8 +142,6 @@ class Scene():
         key = self.surface_surface_key(surface_a, surface_b)
 
         if key not in self._mask_intersections:
-            surface_a.mask_expanded
-            surface_b.mask_expanded
             self._mask_intersections[key] = np.bitwise_and(surface_a.mask_expanded, surface_b.mask_expanded)
 
         return self._mask_intersections[key]
