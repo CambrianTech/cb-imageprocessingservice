@@ -265,7 +265,6 @@ class SurfaceSolver():
                 surface_normal = color_to_normal(surface_normal)
                 
                 if current_surface is None:
-                    current_index = i+1
                     current_surface = surface
                     print("current surface now", current_surface.name)
                     normals_accumulated = surface_normals_accumulated
@@ -274,6 +273,8 @@ class SurfaceSolver():
                     continue
                 else:
                     cos_normal = abs(np.dot(current_normal, surface_normal))
+
+                    #print("checking surface %s with %s" % (current_surface.name, surface.name))
 
                     if cos_normal > np.cos(np.radians(10)) or (surface.surfaceType == SurfaceType.OnWall and surface.bestLabel == current_surface.bestLabel):
 
@@ -288,7 +289,6 @@ class SurfaceSolver():
                         print(surface.name + " is unmerged with " + current_surface.name + " angle between = " + str(np.degrees(np.arccos(cos_normal))))
                         # surface_image[surface.mask > 0] = (surface_normal+1.0)*127.5
                         # surface_image[surface.mask > 0] = random_color()
-                        current_index = i+1
                         normals_accumulated = surface_normals_accumulated
                         normals_count = surface_normals_count
                         current_normal = surface_normal
@@ -297,7 +297,7 @@ class SurfaceSolver():
                         print("Current surface now", current_surface.name)
                         
                     
-                vertical_labels[surface.mask > 0] = current_index
+                vertical_labels[surface.mask > 0] = i+1
 
 
         self.room.refresh_surfaces()
