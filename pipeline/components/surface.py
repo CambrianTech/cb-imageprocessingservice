@@ -330,14 +330,6 @@ class Surface():
         self.mask_changed()
 
     @property
-    def mask_expanded(self):
-
-        if self._mask_expanded is None:
-            self._mask_expanded = adjust_mask(cv2.dilate, self.inner_mask + self.mask_edges, iterations=1)
-
-        return self._mask_expanded
-
-    @property
     def surface_mask(self):
         if self._surface_mask is None:
             self._surface_mask = cv2.copyMakeBorder(self.mask, mask_padding, mask_padding, mask_padding, mask_padding, cv2.BORDER_CONSTANT, value=0)
@@ -351,37 +343,17 @@ class Surface():
 
         return self._mask_transform
 
-    # @property
-    # def outer_mask(self):
-    #     if self._outer_mask is None:
-    #         trans = cv2.distanceTransform(1 - self.surface_mask, cv2.DIST_L2, 5)
-    #         _, self._outer_mask = cv2.threshold(trans, 0.05 * trans.max(), 1, 0)
-    #         self._outer_mask = self._outer_mask[mask_padding:-mask_padding,mask_padding:-mask_padding].astype(np.uint8)
-
-    #     return self._outer_mask
-
     @property
-    def outer_mask(self):
-        if self._outer_mask is None:
-            _, result = cv2.threshold(1 - self.mask_transform, 0.05 * self.mask_transform.max(), 1, 0)
-            self._outer_mask = result.astype(np.uint8)
-
-        return self._outer_mask
-
-    @property
-    def inner_mask(self):
-        if self._inner_mask is None:
-            _, result = cv2.threshold(self.mask_transform, 0.5 * self.mask_transform.max(), 1, 0)
-            self._inner_mask = result.astype(np.uint8)
-
-        return self._inner_mask
+    def mask_expanded(self):
+        if self._mask_expanded is None:
+            self._mask_expanded = cv2.bitwise_or(self.mask, self.mask_edges)
+        return self._mask_expanded
 
     @property
     def mask_edges(self):
         if self._mask_edges is None:
-            self._mask_edges = 1 - self.inner_mask - self.outer_mask
-            self._mask_edges[self._mask_edges < 0] = 0
-
+            self._mask_edges = np.zeros(self.probs.shape, dtype="uint8")
+            cv2.drawContours(self._mask_edges, self.contours, -1, 1, thickness=20)
         return self._mask_edges
 
 

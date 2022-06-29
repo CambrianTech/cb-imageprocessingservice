@@ -52,6 +52,8 @@ class SurfaceSolver():
         draw_lines(self.lines_mask, self.data["lines"], color=255, thickness=3, lineType=cv2.LINE_4)
 
         self.height, self.width = self.room.image.shape[:2]
+        self.area = self.height * self.width
+        min_area = self.area / 1000
         self.diagonal = np.hypot(self.width, self.height)
         self.refine_surfaces()
 
@@ -449,8 +451,6 @@ class SurfaceSolver():
             log_image(self.data, "surface_img" + str(cluster_index), surface_img)
             # log_image(self.data, "surface_probs_vp_refinded" + str(cluster_index),255.*surface.probs)
             cluster_index+=1
-
-        min_area = self.diagonal / 10
 
         for surface in self.room.surfaces:
             if cv2.countNonZero(surface.mask) < min_area:

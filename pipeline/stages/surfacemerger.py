@@ -30,9 +30,9 @@ class PipelineSurfaceMerger(PipelineStep):
             if surface.surfaceType != SurfaceType.Wall:
                 continue
 
-            log_mask(data, surface.name + "_mask", surface.mask)
-            log_mask(data, surface.name + "_inner_mask", surface.inner_mask)
-            log_mask(data, surface.name + "_mask_edges", surface.mask_edges)
+            # log_mask(data, surface.name + "_mask", surface.mask)
+            # log_mask(data, surface.name + "_mask_edges", surface.mask_edges)
+            # log_mask(data, surface.name + "_mask_expanded", surface.mask_expanded)
 
             neighbors = list(filter(lambda s: s.surfaceType == SurfaceType.Wall, surface.neighbors))
 
