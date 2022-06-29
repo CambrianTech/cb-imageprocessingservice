@@ -76,29 +76,10 @@ class SurfaceSolver():
         log_image(self.data, "room_missing_added", self.room.get_debug_image())
 
 
-
-        
-        # self.room.refresh_surfaces()
-        # self.lines_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
-        # draw_lines(self.lines_mask, self.data["lines"], color=255, thickness=1, lineType=cv2.LINE_4)
-
-        # self.refine_surfaces(debug_suffix="_final")
-    
-
-        # log_image(self.data, "room_expanded", self.room.get_debug_image())
-        # # self.finalize_masks(invalid_mask)
         self.merge_like_surfaces() 
+
         log_image(self.data, "room_merged", self.room.get_debug_image())
 
-
-        # log_image(self.data, "room", self.room.get_debug_image())
-        # timer.time_event("add_missing_surfaces")
-  
-
-        # surfaces = []
-        # for surfaceType in SurfaceType: 
-        #     surface = self.data["room"].get_surfaces([surfaceType])
-        #     surfaces.extend(surface)
 
         vertical_vp = self.room.vertical_vp
         vertical_lines = vertical_vp.inliers.copy()
@@ -126,7 +107,7 @@ class SurfaceSolver():
             type_lines = type_surface.lines
 
             for surface in surfaces_of_type:
-                print(np.unique(surface.probs))
+                #print(np.unique(surface.probs))
 
                 surface_mask = surface.mask
                 mask_coor = np.nonzero(surface_mask)
