@@ -453,7 +453,7 @@ class Surface():
     def center(self) -> tuple:
         #todo: use 2D projection
         if self.moments is None or self.moments["m00"] == 0:
-            print("No moments")
+            #print("No moments")
             cX = self.mask.shape[1] // 2
             cY = self.mask.shape[0] // 2
         else:

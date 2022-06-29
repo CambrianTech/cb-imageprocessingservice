@@ -170,15 +170,15 @@ class SurfaceSolver():
                 surface_lines = boundary_lines
                 surface_angles = [line.angle%np.pi for line in surface_lines]
                 pixel_angle_width = abs((np.amax(mask_coor_vp_angles) - np.amin(mask_coor_vp_angles))/(np.amax(mask_coor_vp_x)-np.amin(mask_coor_vp_x)))
-                print("pixel_angle_width", np.degrees(pixel_angle_width))
+                #print("pixel_angle_width", np.degrees(pixel_angle_width))
                 surface_angles = [surface_angle for surface_angle in surface_angles if surface_angle >= np.amin(mask_coor_vp_angles) and surface_angle <= np.amax(mask_coor_vp_angles)]
                 surface_angles = np.insert(surface_angles,0,np.amin(mask_coor_vp_angles)- 2*pixel_angle_width)
                 surface_angles = np.append(surface_angles,np.amax(mask_coor_vp_angles)+ 2*pixel_angle_width)
                 surface_angles.sort()
                 # surface_angles = np.insert(surface_angles,0,surface_angles[0] + np.sign(surface_angles[0]-surface_angles[-1])* np.pi/4.)
                 # surface_angles = np.append(surface_angles,surface_angles[-1] - np.sign(surface_angles[0]-surface_angles[-1])* np.pi/4.)
-                print(surface.name)
-                print(surface_angles)
+                #print(surface.name)
+                #print(surface_angles)
                 
 
                 # surface_angles = mask_coor_vp_angles[surface_mask[mask_coor]>0]
@@ -187,7 +187,7 @@ class SurfaceSolver():
 
          
                 # surface_image[surface_mask>0] = color
-                print(surface.name, np.unique(surface.probs))
+                #print(surface.name, np.unique(surface.probs))
 
                 surface_color = random_color()
                 for i in range(len(surface_angles)-1):   
@@ -203,7 +203,7 @@ class SurfaceSolver():
                         slice_mask[slice] = 255
 
                         angle_diff = abs(surface_angles[i+1]-surface_angles[i])
-                        print(i, np.degrees(angle_diff))
+                        #print(i, np.degrees(angle_diff))
 
                         if  angle_diff > 2*pixel_angle_width:
                     
@@ -389,10 +389,10 @@ class SurfaceSolver():
                         best_lines_2 = [lines[j] for j in range(len(lines)) if votes[j] > 0]
                         vp_index_2 = i
 
-                print("Surface %s has %f votes (max scores %f, %f) from vps %i:" % (surface.name, score,max_score_1, max_score_2, i))
+                #print("Surface %s has %f votes (max scores %f, %f) from vps %i:" % (surface.name, score,max_score_1, max_score_2, i))
             
-            if vp_index_1 is not None and vp_index_2 is not None:
-                print("vp_index_1: %i, vp_index_2: %i" % (vp_index_1, vp_index_2))
+            #if vp_index_1 is not None and vp_index_2 is not None:
+            #    print("vp_index_1: %i, vp_index_2: %i" % (vp_index_1, vp_index_2))
 
             mask_coor = np.nonzero(surface.mask>0)
 
@@ -529,7 +529,7 @@ class SurfaceSolver():
         total_area = self.room.image.shape[0] * self.room.image.shape[1]
         area_threshold = int(total_area * min_area)
 
-        print("Size threshold: square greater than %d pixels on one side" % np.sqrt(area_threshold))
+        #print("Size threshold: square greater than %d pixels on one side" % np.sqrt(area_threshold))
 
         if len(self.room.surfaces) > 0:
             total_mask = np.sum(np.dstack([s.mask for s in self.room.surfaces]), axis=-1)
@@ -665,13 +665,13 @@ class SurfaceSolver():
                 distance_i = abs(surfaces[i].offset) #todo: calculate this?
 
                 for j in range(i+1, len(surfaces)):
-                    print(i, j, surfaces[i].bestLabel, surfaces[j].bestLabel)
+                    #print(i, j, surfaces[i].bestLabel, surfaces[j].bestLabel)
 
                     if surfaces[j].destroyed: continue
 
                     if (surfaces[i].surfaceType == SurfaceType.Floor or surfaces[i].surfaceType == SurfaceType.OnFloor) and (surfaces[j].surfaceType == SurfaceType.Floor or surfaces[j].surfaceType == SurfaceType.OnFloor):
                         surfaces[i].merge(surfaces[j])
-                        print("Merged %s with %s" % (surfaces[i].name, surfaces[j].name))
+                        #print("Merged %s with %s" % (surfaces[i].name, surfaces[j].name))
                         
 
                     if surfaces[i].bestLabel != surfaces[j].bestLabel: 
@@ -780,41 +780,8 @@ class SurfaceSolver():
                     new_surface.surfaceType = surface.surfaceType
                     new_surface.set_mask(mask)
 
-                    print(surface.name)
-          
-
                     self.room.add_surface(new_surface)
 
-
-
-
-
-                            # lines = new_surface.lines
-                            
-                            # line_samples = list(map(lambda line:np.linspace(line.point_a, line.point_b, 10), lines))
-                            # line_samples = np.int32(line_samples)
-                            # for k in range(len(line_samples)):
-                            #     line_sample = line_samples[k]
-                            #     # line_sample = np.flip(line_sample)
-               
-                            #     prob = np.mean(surface.probs[line_sample[:,1], line_sample[:,0]])
-                            #     line = lines[k]
-                       
-                               
-                            #     if prob > max(line.score,.5):
-                            #         print(line.score)
-                            #         line.score = prob
-                                    # draw_lines(new_surface.mask, [lines[k]],1,thickness=2)
-
-
-                            # new_surface.probs = surface.probs
-
-
-                            # print(new_surface.index, new_surface.was_added, np.unique(new_surface.probs))
-
-                            # print(new_surface.index, np.unique(new_surface.probs),  new_surface.was_added)
-                         
-                      
 
                 surface.destroy()
 
@@ -825,9 +792,6 @@ class SurfaceSolver():
             expand_into_type(surfaceType)
 
         self.room.refresh_surfaces()
-
-
-
         
 
     def remove_invalid_surfaces(self, min_area_threshold=1/1000, max_area_threshold=1/50, scale=1.2):
