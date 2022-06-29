@@ -450,6 +450,12 @@ class SurfaceSolver():
             # log_image(self.data, "surface_probs_vp_refinded" + str(cluster_index),255.*surface.probs)
             cluster_index+=1
 
+        min_area = self.diagonal / 10
+
+        for surface in self.room.surfaces:
+            if cv2.countNonZero(surface.mask) < min_area:
+                surface.destroy()
+
         self.room.refresh_surfaces()
         log_image(self.data, "room_solved", self.room.get_debug_image())
 

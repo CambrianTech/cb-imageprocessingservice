@@ -333,7 +333,7 @@ class Surface():
     def mask_expanded(self):
 
         if self._mask_expanded is None:
-            self._mask_expanded = adjust_mask(cv2.dilate, self.inner_mask + self.mask_edges, iterations=2)
+            self._mask_expanded = adjust_mask(cv2.dilate, self.inner_mask + self.mask_edges, iterations=1)
 
         return self._mask_expanded
 

@@ -5,7 +5,7 @@ from skimage.morphology import remove_small_objects
 
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
-from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, Timer
+from pipeline.data.logging import log_image, log_mask, log_segmentation_image, im_logging_enabled, Timer
 from pipeline.components.scene import Scene
 from pipeline.components.surface import Surface
 
@@ -29,6 +29,10 @@ class PipelineSurfaceMerger(PipelineStep):
         for surface in data["room"].surfaces:
             if surface.surfaceType != SurfaceType.Wall:
                 continue
+
+            log_mask(data, surface.name + "_mask", surface.mask)
+            log_mask(data, surface.name + "_inner_mask", surface.inner_mask)
+            log_mask(data, surface.name + "_mask_edges", surface.mask_edges)
 
             neighbors = list(filter(lambda s: s.surfaceType == SurfaceType.Wall, surface.neighbors))
 

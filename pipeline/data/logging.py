@@ -129,6 +129,12 @@ def log_data(data:dict):
     print("Saving data pickle to " + data_filename)
     with open(data_filename, 'wb') as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+def log_mask(data:dict, name:str, mask, extension=".jpg", primary=False):
+    if im_logging_enabled(data, LogLevel.Images) or (im_logging_enabled(data) and primary):
+        image = mask.copy()
+        mask[mask > 0] = 255
+        _log_image(data, name, mask, extension)
                 
 def log_image(data:dict, name:str, image, extension=".jpg", primary=False):
     if im_logging_enabled(data, LogLevel.Images) or (im_logging_enabled(data) and primary):
