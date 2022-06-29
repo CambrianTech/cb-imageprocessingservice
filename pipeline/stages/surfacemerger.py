@@ -9,17 +9,6 @@ from pipeline.data.logging import log_image, log_segmentation_image, im_logging_
 from pipeline.components.scene import Scene
 from pipeline.components.surface import Surface
 
-class SurfaceMerger():
-
-    def __init__(self, data):
-        super().__init__()
-        self.data = data
-        self.room = Scene(data)
-
-    def merge(self):
-        
-        print("MERGE")
-            
 
 class PipelineSurfaceMerger(PipelineStep):
     @property
@@ -36,5 +25,6 @@ class PipelineSurfaceMerger(PipelineStep):
 
     def run(self, data):
 
-        solver = SurfaceMerger(data)
-        solver.merge()
+        print("MERGE")
+        for surface in data["room"].surfaces:
+            print("surface")
