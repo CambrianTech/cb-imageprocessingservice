@@ -244,22 +244,20 @@ class SurfaceSolver():
         vertical_labels[vertical_labels>=0] = -1
         normals_accumulated = [0,0,0]
         normals_count = 0
-        current_normal = None
-        current_index = None
-        current_surface = None
+        
         for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
         # for surfaceType in [SurfaceType.Wall]:
 
             surfaces_of_type = self.room.get_surfaces([surfaceType])
-            for i in range(len(surfaces_of_type)):
-                surface = surfaces_of_type[i]
 
-                if current_surface is not None and current_surface.surfaceType != surface.surfaceType:
-                    normals_accumulated = [0,0,0]
-                    normals_count = 0
-                    current_normal = None
-                    current_index = None
-                    current_surface = None
+            normals_accumulated = [0,0,0]
+            normals_count = 0
+            current_normal = None
+            current_index = None
+            current_surface = None
+
+            for i in range(len(surfaces_of_type)):
+                surface = surfaces_of_type[i]                    
 
                 surface_normals_accumulated = surface.normals_accumulated
                 surface_normals_count = np.count_nonzero(surface.mask)
@@ -269,6 +267,7 @@ class SurfaceSolver():
                 if current_surface is None:
                     current_index = i+1
                     current_surface = surface
+                    print("current surface now", current_surface.name)
                     normals_accumulated = surface_normals_accumulated
                     normals_count = surface_normals_count
                     current_normal = surface_normal
@@ -294,6 +293,8 @@ class SurfaceSolver():
                         normals_count = surface_normals_count
                         current_normal = surface_normal
                         current_surface = surface
+
+                        print("Current surface now", current_surface.name)
                         
                     
                 vertical_labels[surface.mask > 0] = current_index
