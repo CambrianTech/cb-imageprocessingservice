@@ -70,6 +70,7 @@ class Surface():
         self._lighting_mean_stddev = None
 
         self._normals_accumulated = None
+        self._normals_mean = None
         self._mask_coordinates = None
 
     @property
@@ -367,6 +368,8 @@ class Surface():
         self._neighbors = None
         self._mask_edges = None
         self._mask_expanded = None
+        self._normals_accumulated = None
+        self._normals_mean = None
 
         self._surface_mask = None
         self._mask_transform = None
@@ -447,6 +450,7 @@ class Surface():
 
     def destroy(self):
         self.geometry.remove_surface(self) 
+        self.destroyed = True
         #Important! do not add code here, add inside remove_surface, and call public methods on this object
 
     @property
@@ -461,8 +465,6 @@ class Surface():
             cY = int(self.moments["m01"] / self.moments["m00"])
         return cX, cY
 
-    
-
     @property
     def normals_accumulated(self) -> tuple:
         if self._normals_accumulated is None and len(self.mask) > 0:
@@ -470,6 +472,12 @@ class Surface():
 
         return self._normals_accumulated
 
+    @property
+    def normals_mean(self) -> tuple:
+        if self._normals_mean is None and len(self.mask) > 0:
+            self._normals_mean = self.normals_accumulated / cv2.countNonZero(self.mask)
+
+        return self._normals_mean
 
     def get_surface_mask(self, label:SurfaceType, confidence):
         mask = np.zeros(self.probs.shape, dtype="uint8")

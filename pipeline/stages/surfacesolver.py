@@ -236,74 +236,105 @@ class SurfaceSolver():
 
         log_image(self.data, "room_surface_image", surface_image)
         log_image(self.data, "room_surface_probs", surface_probs)
-        
-
 
 
         # isolated_probs = self.data["isolated"]
         vertical_labels[vertical_labels>=0] = -1
         normals_accumulated = [0,0,0]
-        normals_count = 0
-        
+
+        def get_surface_normal(surface):
+            surface_normals_accumulated = surface.normals_accumulated
+            surface_normals_count = np.count_nonzero(surface.mask)
+            surface_normal = surface_normals_accumulated/surface_normals_count
+            return color_to_normal(surface_normal)
+
+        index = 0
+
+        print("performing sweep merge")
+
         for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
-        # for surfaceType in [SurfaceType.Wall]:
 
             surfaces_of_type = self.room.get_surfaces([surfaceType])
 
-            normals_accumulated = [0,0,0]
-            normals_count = 0
-            current_normal = None
-            current_index = None
-            current_surface = None
+            for current_surface in surfaces_of_type:
 
-            for i in range(len(surfaces_of_type)):
-                surface = surfaces_of_type[i]                    
+                if current_surface.destroyed: continue
 
-                surface_normals_accumulated = surface.normals_accumulated
-                surface_normals_count = np.count_nonzero(surface.mask)
-                surface_normal = surface_normals_accumulated/surface_normals_count
-                surface_normal = color_to_normal(surface_normal)
+                index += 1
+
+                current_normal = color_to_normal(current_surface.normals_mean)
+
+                for candidate in surfaces_of_type:
+
+                    if candidate == current_surface or candidate.destroyed: continue
+
+                    candidate_normal = color_to_normal(candidate.normals_mean)
+                    cos_normal = abs(np.dot(current_normal, candidate_normal))
+
+                    if cos_normal > np.cos(np.radians(10)) or (candidate.surfaceType == SurfaceType.OnWall and candidate.bestLabel == current_surface.bestLabel):
+                        current_surface.merge(candidate)
+
+                vertical_labels[current_surface.mask > 0] = index
+        
+        # for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
+        # # for surfaceType in [SurfaceType.Wall]:
+
+        #     surfaces_of_type = self.room.get_surfaces([surfaceType])
+
+        #     normals_accumulated = [0,0,0]
+        #     normals_count = 0
+        #     current_normal = None
+        #     current_index = None
+        #     current_surface = None
+
+        #     for i in range(len(surfaces_of_type)):
+        #         surface = surfaces_of_type[i]                    
+
+        #         surface_normals_accumulated = surface.normals_accumulated
+        #         surface_normals_count = np.count_nonzero(surface.mask)
+        #         surface_normal = surface_normals_accumulated/surface_normals_count
+        #         surface_normal = color_to_normal(surface_normal)
                 
-                if current_surface is None:
-                    current_surface = surface
-                    print("current surface now", current_surface.name)
-                    normals_accumulated = surface_normals_accumulated
-                    normals_count = surface_normals_count
-                    current_normal = surface_normal
-                    continue
-                else:
-                    cos_normal = abs(np.dot(current_normal, surface_normal))
+        #         if current_surface is None:
+        #             current_surface = surface
+        #             print("current surface now", current_surface.name)
+        #             normals_accumulated = surface_normals_accumulated
+        #             normals_count = surface_normals_count
+        #             current_normal = surface_normal
+        #             continue
+        #         else:
+        #             cos_normal = abs(np.dot(current_normal, surface_normal))
 
-                    #print("checking surface %s with %s" % (current_surface.name, surface.name))
+        #             #print("checking surface %s with %s" % (current_surface.name, surface.name))
 
-                    if cos_normal > np.cos(np.radians(10)) or (surface.surfaceType == SurfaceType.OnWall and surface.bestLabel == current_surface.bestLabel):
+        #             if cos_normal > np.cos(np.radians(10)) or (surface.surfaceType == SurfaceType.OnWall and surface.bestLabel == current_surface.bestLabel):
 
-                        normals_accumulated += surface.normals_accumulated
-                        normals_count += np.count_nonzero(surface.mask)
-                        current_normal = normals_accumulated / normals_count
-                        current_normal = color_to_normal(current_normal)
+        #                 normals_accumulated += surface.normals_accumulated
+        #                 normals_count += np.count_nonzero(surface.mask)
+        #                 current_normal = normals_accumulated / normals_count
+        #                 current_normal = color_to_normal(current_normal)
                 
-                        current_surface.merge(surface)
+        #                 current_surface.merge(surface)
                         
-                    else:
-                        print(surface.name + " is unmerged with " + current_surface.name + " angle between = " + str(np.degrees(np.arccos(cos_normal))))
-                        # surface_image[surface.mask > 0] = (surface_normal+1.0)*127.5
-                        # surface_image[surface.mask > 0] = random_color()
-                        normals_accumulated = surface_normals_accumulated
-                        normals_count = surface_normals_count
-                        current_normal = surface_normal
-                        current_surface = surface
+        #             else:
+        #                 print(surface.name + " is unmerged with " + current_surface.name + " angle between = " + str(np.degrees(np.arccos(cos_normal))))
+        #                 # surface_image[surface.mask > 0] = (surface_normal+1.0)*127.5
+        #                 # surface_image[surface.mask > 0] = random_color()
+        #                 normals_accumulated = surface_normals_accumulated
+        #                 normals_count = surface_normals_count
+        #                 current_normal = surface_normal
+        #                 current_surface = surface
 
-                        print("Current surface now", current_surface.name)
+        #                 print("Current surface now", current_surface.name)
                         
                     
-                vertical_labels[surface.mask > 0] = i+1
+        #         vertical_labels[surface.mask > 0] = i+1
 
 
         self.room.refresh_surfaces()
-        log_segmentation_image(self.data, "isolated_labels_normals", vertical_labels, self.room.normals, get_image=False, labelset=SurfaceType,opacity=1, avg=True)
+        #log_segmentation_image(self.data, "isolated_labels_normals", vertical_labels, self.room.normals, get_image=False, labelset=SurfaceType,opacity=1, avg=True)
 
-        log_segmentation_image(self.data, "isolated_labels_image", vertical_labels, surface_image, get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
+        #log_segmentation_image(self.data, "isolated_labels_image", vertical_labels, surface_image, get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
   
         log_image(self.data, "room_fan_merged", self.room.get_debug_image())
 
