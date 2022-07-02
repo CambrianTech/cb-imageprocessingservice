@@ -75,12 +75,33 @@ class SurfaceSolver():
         self.room.refresh_surfaces()
         log_image(self.data, "room_missing_added", self.room.get_debug_image())
 
-
         self.merge_like_surfaces() 
 
         log_image(self.data, "room_merged", self.room.get_debug_image())
 
+        self.build_fan()            
+  
+        log_image(self.data, "room_fan", self.room.get_debug_image())
 
+
+        #log_segmentation_image(self.data, "isolated_labels_normals", vertical_labels, self.room.normals, get_image=False, labelset=SurfaceType,opacity=1, avg=True)
+
+        #log_segmentation_image(self.data, "isolated_labels_image", vertical_labels, surface_image, get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
+
+        self.merge_fan()
+
+        log_image(self.data, "room_fan_merged", self.room.get_debug_image())
+
+        self.surface_vp_refinement()
+
+        self.room.refresh_surfaces()
+        log_image(self.data, "room_solved", self.room.get_debug_image())
+
+        timer.log_all_events()
+
+        return self.room
+
+    def build_fan(self):
         vertical_vp = self.room.vertical_vp
         vertical_lines = vertical_vp.inliers.copy()
 
@@ -89,7 +110,7 @@ class SurfaceSolver():
         # # vertical_labels[self.lines_mask > 0] = np.amax(vertical_labels) + 1
 
         surface_image = self.room.image.copy()
-        surface_probs = np.zeros_like(surface_image)
+        surface_probs = np.zeros_like(self.room.image)
 
         # for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall, SurfaceType.Floor, SurfaceType.Ceiling, SurfaceType.OnFloor,SurfaceType.OnCeiling,SurfaceType.Other]:
         for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
@@ -229,45 +250,24 @@ class SurfaceSolver():
 
         # # vertical_labels[self.lines_mask > 0] = np.amax(vertical_labels) + 1
 
-        self.room.refresh_surfaces()
-    
-  
-        log_image(self.data, "room_fan", self.room.get_debug_image())
-
         log_image(self.data, "room_surface_image", surface_image)
         log_image(self.data, "room_surface_probs", surface_probs)
 
-
-        #log_segmentation_image(self.data, "isolated_labels_normals", vertical_labels, self.room.normals, get_image=False, labelset=SurfaceType,opacity=1, avg=True)
-
-        #log_segmentation_image(self.data, "isolated_labels_image", vertical_labels, surface_image, get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
-    
-        self.merge_fan()
-
-        log_image(self.data, "room_fan_merged", self.room.get_debug_image())
-
-        self.surface_vp_refinement()
-
         self.room.refresh_surfaces()
-        log_image(self.data, "room_solved", self.room.get_debug_image())
-
-        timer.log_all_events()
-
-        return self.room
 
     def merge_fan(self):
 
         print("performing sweep merge")
 
-        def should_merge(current_surface, candidate):
+        def should_merge(surface_a, surface_b):
 
-            if candidate.surfaceType == SurfaceType.OnWall and candidate.bestLabel == current_surface.bestLabel:
+            if surface_b.surfaceType == SurfaceType.OnWall and surface_b.bestLabel == surface_a.bestLabel:
                 return True
 
-            current_normal = color_to_normal(current_surface.normals_mean)
-            candidate_normal = color_to_normal(candidate.normals_mean)
+            surface_a_normal = color_to_normal(surface_a.normals_mean)
+            surface_b_normal = color_to_normal(surface_b.normals_mean)
 
-            cos_normal = abs(np.dot(current_normal, candidate_normal))
+            cos_normal = abs(np.dot(surface_a_normal, surface_b_normal))
 
             if cos_normal > np.cos(np.radians(10)):
                 return True
