@@ -212,9 +212,7 @@ class Surface():
                 if line.cluster in clusters:
                     continue
 
-                contours = self.contours
-
-                for contour in contours:
+                for contour in self.contours:
                     area = cv2.contourArea(contour)
                     self._min_area = min(area, self._min_area)
                     self._max_area = max(area, self._max_area)
@@ -564,8 +562,6 @@ class Surface():
     def debug(self, img, color, draw_contours=False):
 
         scale = img.shape[0] / self.data["downscaled"].shape[0]
-
-        self.contours
 
         if draw_contours:
             if scale != 1.0:

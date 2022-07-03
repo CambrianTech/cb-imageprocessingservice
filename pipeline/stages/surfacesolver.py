@@ -102,6 +102,7 @@ class SurfaceSolver():
         return self.room
 
     def build_fan(self):
+
         vertical_vp = self.room.vertical_vp
         vertical_lines = vertical_vp.inliers.copy()
 
@@ -125,6 +126,7 @@ class SurfaceSolver():
 
             type_surface = Surface(self.data)
             type_surface.set_mask(mask)
+
             type_lines = type_surface.lines
 
             for surface in surfaces_of_type:
@@ -204,10 +206,28 @@ class SurfaceSolver():
                         slice_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
                         slice_mask[slice] = 255
 
+                        contours, hierarchy = cv2.findContours(slice_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+                        sliver_min = 10000
+                        sliver_max = 0
+
+                        for contour in contours:
+                            rect = cv2.minAreaRect(contour)
+
+                            sliver_min = min(rect[1][0], rect[1][1], sliver_min)
+                            sliver_max = max(rect[1][0], rect[1][1], sliver_max)
+
+                        if sliver_max == 0: continue
+
+                        thinness = sliver_min / sliver_max
+
+                        #print("thinness", thinness)
+                        # exit()
+
                         angle_diff = abs(surface_angles[i+1]-surface_angles[i])
                         #print(i, np.degrees(angle_diff))
 
-                        if  angle_diff > 2*pixel_angle_width:
+                        if thinness > 0.15 and angle_diff > 2 * pixel_angle_width:
                     
                             prob = np.mean(surface.probs[slice_mask>0])
 
@@ -222,13 +242,14 @@ class SurfaceSolver():
                                 # slice_surface = Surface(self.data, None, surfaceType)
                                 slice_surface = surface.clone()
                                 slice_surface.set_mask(slice_mask)
-                        
-                                self.room.add_surface(slice_surface)
-                                slice_surface.bestLabel
 
-                                surface_image[slice_mask>0] = random_color()
+                                if len(slice_surface.contours):
+                                    self.room.add_surface(slice_surface)
+                                    slice_surface.bestLabel
 
-                                surface_image[slice_mask>0] = normal
+                                    surface_image[slice_mask>0] = random_color()
+
+                                    surface_image[slice_mask>0] = normal
 
                             else:
                                 surface_image[slice_mask>0] = surface_color
@@ -272,11 +293,18 @@ class SurfaceSolver():
             if cos_normal > np.cos(np.radians(10)):
                 return True
 
+            # thickness = surface_b.bounds[1][0] / surface_b.bounds[1][1]
+            # thickness = min(thickness, 1.0/thickness)
+
+            # if thickness < 0.1: 
+            #     return True
+
             return False
 
         for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
 
             surfaces_of_type = self.room.get_surfaces([surfaceType])
+
 
             for current_surface in surfaces_of_type:
 
@@ -288,6 +316,12 @@ class SurfaceSolver():
 
                     if should_merge(current_surface, candidate):
                         current_surface.merge(candidate)
+
+
+
+                if surfaceType == SurfaceType.Wall:
+                    neighbors = list(filter(lambda s:s.surfaceType == current_surface.surfaceType and not s.destroyed, current_surface.neighbors))
+                    print("surface %s" % current_surface.name, [neighbor.name for neighbor in neighbors])
         
         self.room.refresh_surfaces()
 
