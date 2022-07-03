@@ -280,6 +280,9 @@ class SurfaceSolver():
 
         print("performing sweep merge")
 
+        lines_mask = np.zeros(self.data["downscaled"].shape[:2], dtype="uint8")
+        draw_lines(lines_mask, self.data["lines"], color=255, thickness=1)
+
         def should_merge(surface_a, surface_b):
 
             if surface_b.surfaceType == SurfaceType.OnWall and surface_b.bestLabel == surface_a.bestLabel:
@@ -292,6 +295,30 @@ class SurfaceSolver():
 
             if cos_normal > np.cos(np.radians(10)):
                 return True
+            elif cos_normal > np.cos(np.radians(45)):
+                
+                #see if there's a line through the intersection
+                contours = surface_a.intersection(surface_b) 
+
+                if contours is None:
+                    return False
+
+                mask = np.zeros(self.data["downscaled"].shape[:2], dtype="uint8")
+
+                for contour in contours:
+                    moments = cv2.moments(contour)
+
+                    if moments["m00"] == 0: continue
+
+                    cX = int(moments["m10"] / moments["m00"])
+                    cY = int(moments["m01"] / moments["m00"])
+
+                    cv2.circle(mask, (cX, cY), 10, 255, -1)
+
+                mask = cv2.bitwise_and(mask, lines_mask)
+
+                if cv2.countNonZero(mask) < 5:
+                    return True
 
             # thickness = surface_b.bounds[1][0] / surface_b.bounds[1][1]
             # thickness = min(thickness, 1.0/thickness)

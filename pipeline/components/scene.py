@@ -97,6 +97,8 @@ class Scene():
         num_before = len(self._surfaces)
         self._surfaces = dict(filter(lambda kv:not kv[1].destroyed, self._surfaces.items()))
 
+        self._mask_intersections = {}
+
         num_after = len(self._surfaces)
         if num_after < num_before:
             print(colored("Surfaces reduced from %d to %d" % (num_before, num_after), 'red'))

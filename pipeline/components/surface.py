@@ -359,7 +359,6 @@ class Surface():
     def mask_changed(self):
         self._lines = None
         self._contours = None
-        self._moments = None
         self._polygons = None
         self._semantic_labels = None
         self._normals_color = None
