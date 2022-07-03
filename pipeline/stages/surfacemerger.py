@@ -26,16 +26,16 @@ class PipelineSurfaceMerger(PipelineStep):
     def run(self, data):
 
         print("MERGE walls")
-        for surface in data["room"].surfaces:
-            if surface.surfaceType != SurfaceType.Wall:
-                continue
 
+        for surface in data["room"].get_surfaces([SurfaceType.Wall]):
+            
             # log_mask(data, surface.name + "_mask", surface.mask)
             # log_mask(data, surface.name + "_mask_edges", surface.mask_edges)
             # log_mask(data, surface.name + "_mask_expanded", surface.mask_expanded)
 
-            neighbors = list(filter(lambda s: s.surfaceType == SurfaceType.Wall, surface.neighbors))
+            smaller_neighbors = list(filter(lambda s: s.surfaceType == surface.surfaceType and s.max_area < surface.max_area, surface.neighbors))
 
-            if len(neighbors) == 0: continue
+            if len(smaller_neighbors) == 0: continue
 
-            print("surface %s has neighbors" % surface.name, [neighbor.name for neighbor in neighbors])
+            print("surface %s has smaller neighbors" % surface.name, [neighbor.name for neighbor in smaller_neighbors])
+
