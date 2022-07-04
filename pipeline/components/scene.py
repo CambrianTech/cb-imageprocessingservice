@@ -149,7 +149,7 @@ class Scene():
         return self._mask_intersections[key]
 
 
-    def get_debug_image(self, hires=False, neighbors=False, alpha=0.5):
+    def get_debug_image(self, hires=False, neighbors=False, alpha=0.666):
         if not im_logging_enabled(self.data): 
             return None
 

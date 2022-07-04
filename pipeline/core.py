@@ -24,7 +24,6 @@ class PipelineStepIndex(IntEnum):
     GenerateScene = auto()
     VanishingPoints = auto()
     SolveSurfaces = auto()
-    SurfaceMerger = auto()
     FindTrim = auto()
     FindLegs = auto()
     EstimatePose = auto()

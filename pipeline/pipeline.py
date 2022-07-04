@@ -30,7 +30,6 @@ from .stages.surfacerefinement import PipelineSurfaceRefinement
 from .stages.scenegenerator import PipelineSceneGenerator
 from .stages.surfacesolver import PipelineSurfaceSolver
 from .stages.vanishingpointfinder import PipelineVanishingPointFinder
-from .stages.surfacemerger import PipelineSurfaceMerger
 from .stages.trimfinder import PipelineTrimFinder
 from .stages.legfinder import PipelineLegFinder
 from .stages.aws.s3input import PipelineS3Input
@@ -102,7 +101,6 @@ class Pipeline():
         all_steps[PipelineStepIndex.VanishingPoints] = PipelineVanishingPointFinder
         all_steps[PipelineStepIndex.GenerateScene] = PipelineSceneGenerator
         all_steps[PipelineStepIndex.SolveSurfaces] = PipelineSurfaceSolver
-        all_steps[PipelineStepIndex.SurfaceMerger] = PipelineSurfaceMerger
         all_steps[PipelineStepIndex.FindTrim] = None
         all_steps[PipelineStepIndex.FindLegs] = None
         all_steps[PipelineStepIndex.Geometry] = PipelinePlaneGeometry
