@@ -149,7 +149,7 @@ class Scene():
         return self._mask_intersections[key]
 
 
-    def get_debug_image(self, hires=False, neighbors=False):
+    def get_debug_image(self, hires=False, neighbors=False, alpha=0.5):
         if not im_logging_enabled(self.data): 
             return None
 
@@ -176,8 +176,7 @@ class Scene():
                 img_hsv[:, :, 1][query] = 255
                 # img_hsv[:, :, 1][query] = 255 * np.power(probs[query], 0.15)
 
-                    
-        img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL)
+        img = cv2.addWeighted(cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL), alpha, image, (1.0 - alpha), 0.0)
 
         #let surface do its debug
         for i in range(len(self.surfaces)):
