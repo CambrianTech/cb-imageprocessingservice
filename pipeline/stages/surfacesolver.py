@@ -449,7 +449,7 @@ class SurfaceSolver():
                         # surface.probs[slice]= np.mean(surface.probs[slice])
                         # surface_img[slice] = np.mean(self.room.normals[slice], axis=0)
                 
-                best_lines_1 = merge_lines(best_lines_1, search_width = self.diagonal / 200, search_length=1.2, angle_threshold=np.radians(5))
+                #best_lines_1 = merge_lines(best_lines_1, search_width = self.diagonal / 400, search_length=1.2, angle_threshold=np.radians(5))
                 surface.barriers.append(SurfaceBarrier(vps[vp_index_1], best_lines_1))
 
                 draw_lines(surface_img, best_lines_1, color=0, thickness=3,lineType=cv2.LINE_AA)
@@ -474,7 +474,7 @@ class SurfaceSolver():
 
                         surface.probs[slice]= np.mean(surface.probs[slice])
                         # surface_img[slice] = np.mean(surface_img[slice], axis=0)
-                best_lines_2 = merge_lines(best_lines_2, search_width = self.diagonal / 200, search_length=1.2, angle_threshold=np.radians(5))
+                #best_lines_2 = merge_lines(best_lines_2, search_width = self.diagonal / 400, search_length=1.2, angle_threshold=np.radians(5))
                 surface.barriers.append(SurfaceBarrier(vps[vp_index_2], best_lines_2))
 
                 draw_lines(surface_img, best_lines_2, color=0, thickness=4,lineType=cv2.LINE_AA)
