@@ -32,6 +32,7 @@ class TrimFinder():
         self.surface = surface
         self.barrier = barrier
 
+
     def solve(self, max_iterations=1000, max_time=0.25, angle_threshold=np.radians(7)):
         
         lines = sorted(self.barrier.lines, key=attrgetter('length'), reverse=True)
@@ -77,15 +78,22 @@ class TrimFinder():
             if angles[0] < theta_thresh or angles[1] < theta_thresh:
                 continue
 
-            points = np.array([line_a.point_a, line_a.point_b, line_b.point_a, line_b.point_b])
+            points = np.array([line_a.point_a, line_a.point_b, line_b.point_a, line_b.point_b]).astype(np.int32)
             rect = cv2.minAreaRect(points)
 
             center = rect[0]
             size = rect[1]
             width = min(size[0], size[1])
+            length = max(size[0], size[1])
 
-            if width < min_width or width > max_width:
+            max_length = max(line_a.length, line_b.length)
+
+            if width < min_width or width > max_width or length > 1.5 * max_length:
                 continue
+
+
+            # mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
+            # cv2.drawContours(mask, [points], -1, 1, -1)
 
             trim_lines.append(TrimLine(self.barrier.vp, rect, line_a, line_b))
             
