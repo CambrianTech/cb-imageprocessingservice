@@ -280,9 +280,6 @@ class SurfaceSolver():
 
         print("performing sweep merge")
 
-        lines_mask = np.zeros(self.data["downscaled"].shape[:2], dtype="uint8")
-        draw_lines(lines_mask, self.data["lines"], color=255, thickness=1)
-
         def should_merge(surface_a, surface_b):
 
             if surface_b.surfaceType == SurfaceType.OnWall and surface_b.bestLabel == surface_a.bestLabel:
@@ -315,7 +312,7 @@ class SurfaceSolver():
 
                     cv2.circle(mask, (cX, cY), 10, 255, -1)
 
-                mask = cv2.bitwise_and(mask, lines_mask)
+                mask = cv2.bitwise_and(mask, self.lines_mask)
 
                 if cv2.countNonZero(mask) < 5:
                     return True
@@ -452,7 +449,7 @@ class SurfaceSolver():
                         # surface.probs[slice]= np.mean(surface.probs[slice])
                         # surface_img[slice] = np.mean(self.room.normals[slice], axis=0)
                 
-                best_lines_1 = merge_lines(best_lines_1, search_width = self.diagonal / 100, search_length=1.5, angle_threshold=np.radians(5))
+                best_lines_1 = merge_lines(best_lines_1, search_width = self.diagonal / 200, search_length=1.2, angle_threshold=np.radians(5))
                 surface.barriers.append(SurfaceBarrier(vps[vp_index_1], best_lines_1))
 
                 draw_lines(surface_img, best_lines_1, color=0, thickness=3,lineType=cv2.LINE_AA)
@@ -477,8 +474,9 @@ class SurfaceSolver():
 
                         surface.probs[slice]= np.mean(surface.probs[slice])
                         # surface_img[slice] = np.mean(surface_img[slice], axis=0)
-
-                best_lines_2 = merge_lines(best_lines_2, search_width = self.diagonal / 100, search_length=1.5, angle_threshold=np.radians(5))
+                print("before", len(best_lines_2))
+                best_lines_2 = merge_lines(best_lines_2, search_width = self.diagonal / 200, search_length=1.2, angle_threshold=np.radians(5))
+                print("after", len(best_lines_2))
                 surface.barriers.append(SurfaceBarrier(vps[vp_index_2], best_lines_2))
 
                 draw_lines(surface_img, best_lines_2, color=0, thickness=4,lineType=cv2.LINE_AA)
