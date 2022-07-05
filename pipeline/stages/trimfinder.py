@@ -16,6 +16,8 @@ from pipeline.components.line import draw_lines
 from .vanishingpointfinder import angle_with_vp
 from pipeline.misc.utils import random_color
 
+from pipeline.components.rotated_rect import RotatedRect
+
 class TrimLine:
     def __init__(self, vp, rect, line_a, line_b):
         self.vp = vp
@@ -41,13 +43,12 @@ class TrimFinder():
         if num_lines < 2:
             return []
 
-        ideal_width = self.image.shape[0] * 0.04
+        
+        ideal_thickness = self.surface.height * 0.05    
+        min_thickness = ideal_thickness / 3
+        max_thickness = ideal_thickness * 2
 
-        min_width = ideal_width / 2
-        max_width = ideal_width * 2
-
-        max_midpoint_distance_sq = ideal_width * 5
-        max_midpoint_distance_sq *= max_midpoint_distance_sq
+        min_line_length = ideal_thickness * 3
 
         start_time = time.time()
 
@@ -67,37 +68,29 @@ class TrimFinder():
             line_a = lines[i]
             line_b = lines[j]
 
+            if line_a.length < min_line_length or line_b.length < min_line_length: continue
+
             if LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold: continue
 
-            directions = np.array([line_a.direction, line_b.direction]) 
-            directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
-            locations = np.array([line_a.midpoint, line_b.midpoint])
-
-            angles = angle_with_vp(self.barrier.vp.model, locations, directions)
-
-            if angles[0] < theta_thresh or angles[1] < theta_thresh:
-                continue
-
             points = np.array([line_a.point_a, line_a.point_b, line_b.point_a, line_b.point_b]).astype(np.int32)
-            rect = cv2.minAreaRect(points)
+            rect =  RotatedRect(cv2.minAreaRect(points))
 
             center = rect[0]
             size = rect[1]
             width = min(size[0], size[1])
-            length = max(size[0], size[1])
-
             max_length = max(line_a.length, line_b.length)
 
-            if width < min_width or width > max_width or length > 1.5 * max_length:
+            if width < min_thickness or width > max_thickness or rect.length > 1.6 * max_length:
                 continue
 
+            # if width < min_thickness or width > max_thickness: continue
 
             # mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
             # cv2.drawContours(mask, [points], -1, 1, -1)
 
             trim_lines.append(TrimLine(self.barrier.vp, rect, line_a, line_b))
             
-        
+        return trim_lines
         
             
 class PipelineTrimFinder(PipelineStep):
@@ -128,7 +121,7 @@ class PipelineTrimFinder(PipelineStep):
         for surface in self.surfaces:
             for barrier in surface.barriers:
                 tf = TrimFinder(self.data, surface, barrier)
-                tf.solve()
+                self.trim_lines.extend(tf.solve())
 
         if im_logging_enabled(self.data):
             log_image(self.data, "trim.png", self.get_debug_image())
@@ -140,17 +133,19 @@ class PipelineTrimFinder(PipelineStep):
                     
         img = self.image.copy()
 
-        draw_lines(img, self.data["lines"], color=(50,50,50), thickness=1)
+        #draw_lines(img, self.data["lines"], color=(50,50,50), thickness=1)
 
         # for vp in self.room.horizontal_vps:
         #     draw_lines(img, vp.inliers, color=random_color(), thickness=2)
 
         for surface in self.surfaces:
             for barrier in surface.barriers:
-                draw_lines(img, barrier.lines, color=random_color(), thickness=2)
+                draw_lines(img, barrier.lines, color=(50,50,50), thickness=2)
 
-        # for trim in self.trim_lines:
-        #     draw_lines(img, [trim.line_a, trim.line_b], color=random_color(), thickness=2)
+        for trim in self.trim_lines:
+            cv2.drawContours(img, [trim.rect.points], -1, random_color(), 2)
+
+            #draw_lines(img, [trim.line_a, trim.line_b], color=random_color(), thickness=2)
 
         return img
 

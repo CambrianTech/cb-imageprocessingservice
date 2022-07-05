@@ -15,7 +15,7 @@ from pipeline.data.surface_type import SurfaceType
 from pipeline.misc.utils import resize_array, random_color, overlay_mask, sample_at_point, scale_contour, color_to_normal
 from .planegeometry import Dimension
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers, Timer
-from pipeline.components.line import Line, draw_lines, line_on_image_edge
+from pipeline.components.line import Line, draw_lines, line_on_image_edge, merge_lines
 from pipeline.components.surface import Surface, SurfaceBarrier
 from pipeline.data.ade20k import ADE20K
 from pipeline.stages.vanishingpointfinder import get_votes, get_contour_lines
@@ -452,6 +452,7 @@ class SurfaceSolver():
                         # surface.probs[slice]= np.mean(surface.probs[slice])
                         # surface_img[slice] = np.mean(self.room.normals[slice], axis=0)
                 
+                best_lines_1 = merge_lines(best_lines_1, search_width = self.diagonal / 100, search_length=1.5, angle_threshold=np.radians(5))
                 surface.barriers.append(SurfaceBarrier(vps[vp_index_1], best_lines_1))
 
                 draw_lines(surface_img, best_lines_1, color=0, thickness=3,lineType=cv2.LINE_AA)
@@ -477,6 +478,7 @@ class SurfaceSolver():
                         surface.probs[slice]= np.mean(surface.probs[slice])
                         # surface_img[slice] = np.mean(surface_img[slice], axis=0)
 
+                best_lines_2 = merge_lines(best_lines_2, search_width = self.diagonal / 100, search_length=1.5, angle_threshold=np.radians(5))
                 surface.barriers.append(SurfaceBarrier(vps[vp_index_2], best_lines_2))
 
                 draw_lines(surface_img, best_lines_2, color=0, thickness=4,lineType=cv2.LINE_AA)

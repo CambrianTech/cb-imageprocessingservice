@@ -208,6 +208,10 @@ class Surface():
             self._lines = []
             self._min_area = 1000
             self._max_area = 1
+
+            self._width = 0
+            self._height = 0
+
             clusters = []
             for i in range(len(self.data["lines"])):
                 line = self.data["lines"][i]
@@ -217,6 +221,11 @@ class Surface():
 
                 for contour in self.contours:
                     area = cv2.contourArea(contour)
+
+                    x,y,w,h = cv2.boundingRect(contour)
+                    self._width = max(self._width, w)
+                    self._height = max(self._height, h)
+
                     self._min_area = min(area, self._min_area)
                     self._max_area = max(area, self._max_area)
 
@@ -240,7 +249,15 @@ class Surface():
             self._lines  = [line for line in self.data["lines"] if line.cluster in clusters]
         return self._lines
 
+    @property
+    def width(self):
+        self.lines
+        return self._width
 
+    @property
+    def height(self):
+        self.lines
+        return self._height
 
     @property
     def vanishing_points(self) -> list:

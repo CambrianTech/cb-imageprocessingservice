@@ -24,6 +24,10 @@ class RotatedRect(tuple):
         return self[1][1]
 
     @property
+    def length(self) -> float:
+        return max(self.width, self.height)
+
+    @property
     def area(self) -> float:
         return self.width * self.height
 
