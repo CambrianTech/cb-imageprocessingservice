@@ -1,4 +1,3 @@
-from audioop import reverse
 import math
 import numpy as np
 import numba as nb
@@ -9,12 +8,11 @@ from enum import IntEnum
 from scipy.spatial import distance
 from bisect import bisect_left, bisect_right
 from pipeline.misc.utils import normalize
-from pipeline.data.logging import Timer
 from cambrian.LineFunctions import LineFunctions
 
 class Line():
 
-    def __init__(self, ax, ay, bx, by):
+    def __init__(self, ax, ay, bx, by, cluster=None):
         self.data = np.array([ax, ay, bx, by], dtype=np.float32)
         
         self.dx = self.data[2] - self.data[0]
@@ -30,10 +28,7 @@ class Line():
 
         #for tracking
         self.dead = False
-        self.cluster = None
-
-        self.score = 0.0
-        self.id = None
+        self.cluster = cluster
 
     def __del__(self):
         del self.data
@@ -99,11 +94,8 @@ class Line():
         if from_b:
             data[2] = self.midpoint[0] + direction[0] * amount
             data[3] = self.midpoint[1] + direction[1] * amount
-        
-        new_line = Line(data[0], data[1], data[2], data[3])   
-        new_line.cluster = self.cluster
 
-        return new_line   
+        return Line(data[0], data[1], data[2], data[3], self.cluster)      
 
     def copy(self):
         #todo: ineffcient
@@ -329,12 +321,6 @@ def merge_line_pair(ax, ay, bx, by, cx, cy, dx, dy, dljx, dljy):
     delta1xg = min(axg, min(bxg, min(cxg,dxg)))
     delta2xg = max(axg, max(bxg, max(cxg,dxg)))
 
-
-    # return  delta1xg * cos_thr + ax, \
-    #         delta1xg * sin_thr + ay, \
-    #         delta2xg * cos_thr + bx, \
-    #         delta2xg * sin_thr + by
-
     return  delta1xg * cos_thr + xg, \
             delta1xg * sin_thr + yg, \
             delta2xg * cos_thr + xg, \
@@ -344,11 +330,6 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
 
     min_dist_sq = search_width * search_width
 
-    timer = Timer("merge_lines")
-    lines.sort(key=lambda line: line.length, reverse=True)
-    # print([line.length for line in lines])
-
-    #timer.disable()
     cluster_index = 0
 
     for i in range(len(lines)):
@@ -358,9 +339,7 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
 
         if line_a.cluster is None:
             line_a.cluster = cluster_index
-        
-        cluster = line_a.cluster
-        
+
         rect_a = line_a.bounding_box(width=search_width, length_multiplier=search_length)
         data = line_a.data.copy()
 
@@ -372,38 +351,19 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
             if distance.sqeuclidean(line_a.midpoint, line_b.midpoint) <= min_dist_sq:
                 result = 1
             else:
-                #timer.reset()
                 rect_b = line_b.bounding_box(width=search_width, length_multiplier=search_length)
                 result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
-                #timer.time_event("rotatedRectangleIntersection")
 
             if result != 0:
                 line_a.dead = True
                 line_b.dead = True
-                # if line_b.cluster is None:
-                line_b.cluster = cluster
-                #timer.reset()
-                # data = LineFunctions.merge_line_pair(data[0], data[1], data[2], data[3], line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], line_b.dx, line_b.dy)
-                #timer.time_event("merge_line_pair")
+                data = LineFunctions.merge_line_pair(data[0], data[1], data[2], data[3], \
+                                                     line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], \
+                                                     line_b.dx, line_b.dy)
 
         if line_a.dead:
-            # line = Line(data[0], data[1], data[2], data[3])
-            # line.cluster = cluster
-            # lines.append(line)
-            lines[i].cluster = cluster
-            lines[i].length = max(line_a.length, line_b.length)
-            line_a.dead = False
+            lines[i] = Line(data[0], data[1], data[2], data[3], cluster=line_a.cluster)
+
         cluster_index += 1
-            # lines.append(Line(data[0], data[1], data[2], data[3]))
-            
-    lines.sort(key=lambda line: line.cluster)
-    
-    # for line in lines:
-    #     while line_cluster_index < cluster_index and lines[line_cluster_index].cluster == line.cluster:
-    #         line_cluster_index += 1
 
-
-    timer.log_all_events()
-    # lines = list(filter(lambda x: not x.dead, lines))
-    return lines
-
+    return list(filter(lambda x: not x.dead, lines))
