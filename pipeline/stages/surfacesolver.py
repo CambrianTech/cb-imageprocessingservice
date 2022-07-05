@@ -16,7 +16,7 @@ from pipeline.misc.utils import resize_array, random_color, overlay_mask, sample
 from .planegeometry import Dimension
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers, Timer
 from pipeline.components.line import Line, draw_lines, line_on_image_edge
-from pipeline.components.surface import Surface
+from pipeline.components.surface import Surface, SurfaceBarrier
 from pipeline.data.ade20k import ADE20K
 from pipeline.stages.vanishingpointfinder import get_votes, get_contour_lines
 
@@ -92,7 +92,7 @@ class SurfaceSolver():
 
         log_image(self.data, "room_fan_merged", self.room.get_debug_image())
 
-        self.surface_vp_refinement()
+        self.surface_vp_matching()
 
         self.room.refresh_surfaces()
         log_image(self.data, "room_solved", self.room.get_debug_image())
@@ -352,7 +352,7 @@ class SurfaceSolver():
         
         self.room.refresh_surfaces()
 
-    def surface_vp_refinement(self):
+    def surface_vp_matching(self):
         surfaces = []
         #vertical_labels[vertical_labels>=0] = -1
         normals_accumulated = [0,0,0]
@@ -389,6 +389,8 @@ class SurfaceSolver():
             best_lines_2 = None
             vp_index_1 = None
             vp_index_2 = None
+
+            surface.barriers = []
 
             for i in range(len(vps)):
 
@@ -449,9 +451,11 @@ class SurfaceSolver():
 
                         # surface.probs[slice]= np.mean(surface.probs[slice])
                         # surface_img[slice] = np.mean(self.room.normals[slice], axis=0)
-      
-                # draw_lines(surface_img, best_lines_1, color=0, thickness=3,lineType=cv2.LINE_AA)
-                # draw_lines(surface_img, best_lines_1, color=color2, thickness=2)
+                
+                surface.barriers.append(SurfaceBarrier(vps[vp_index_1], best_lines_1))
+
+                draw_lines(surface_img, best_lines_1, color=0, thickness=3,lineType=cv2.LINE_AA)
+                draw_lines(surface_img, best_lines_1, color=color2, thickness=2)
             
             if best_lines_2 is not None:
                 color3 = colors[vp_index_2]
@@ -473,6 +477,7 @@ class SurfaceSolver():
                         surface.probs[slice]= np.mean(surface.probs[slice])
                         # surface_img[slice] = np.mean(surface_img[slice], axis=0)
 
+                surface.barriers.append(SurfaceBarrier(vps[vp_index_2], best_lines_2))
 
                 draw_lines(surface_img, best_lines_2, color=0, thickness=4,lineType=cv2.LINE_AA)
                 draw_lines(surface_img, best_lines_2, color=color3, thickness=2)

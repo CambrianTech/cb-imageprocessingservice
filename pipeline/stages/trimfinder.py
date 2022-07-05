@@ -23,31 +23,22 @@ class TrimLine:
         self.line_a = line_a
         self.line_b = line_b
 
-
-    @property
-    def inlier_lines(self):
-        if self._inlier_lines is None:
-            self._inlier_lines = list(map(lambda line_data: Line(line_data), self.inliers))
-
-        return self._inlier_lines
-
 class TrimFinder():
-    def __init__(self, data, surface, vp):
+    def __init__(self, data, surface, barrier):
         super().__init__()
         self.data = data
         self.room = data["room"]
         self.image = self.data["downscaled"]
         self.surface = surface
-        self.vp = vp
+        self.barrier = barrier
 
     def solve(self, max_iterations=1000, max_time=0.25, angle_threshold=np.radians(7)):
         
-        lines = sorted(self.surface.lines, key=attrgetter('length'), reverse=True)
+        lines = sorted(self.barrier.lines, key=attrgetter('length'), reverse=True)
         num_lines = len(lines)
 
         if num_lines < 2:
             return []
-
 
         ideal_width = self.image.shape[0] * 0.04
 
@@ -81,7 +72,7 @@ class TrimFinder():
             directions = directions / np.linalg.norm(directions, axis=1)[:, np.newaxis]
             locations = np.array([line_a.midpoint, line_b.midpoint])
 
-            angles = angle_with_vp(self.vp.model, locations, directions)
+            angles = angle_with_vp(self.barrier.vp.model, locations, directions)
 
             if angles[0] < theta_thresh or angles[1] < theta_thresh:
                 continue
@@ -96,13 +87,9 @@ class TrimFinder():
             if width < min_width or width > max_width:
                 continue
 
-            trim_lines.append(TrimLine(self.vp, rect, line_a, line_b))
-
-
-        # for line in self.surface.horizontal_vp[0].inlier_lines:
-        #     surface_barriers.extend(line)
+            trim_lines.append(TrimLine(self.barrier.vp, rect, line_a, line_b))
             
-        return trim_lines
+        
         
             
 class PipelineTrimFinder(PipelineStep):
@@ -126,19 +113,14 @@ class PipelineTrimFinder(PipelineStep):
 
         #detect trim around edges and (1/3rd of center horizontal, around 1 meter high) of walls using horizontal vp inliers.
         #create segmentation category?
-        self.surfaces = self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall])
+        self.surfaces = list(filter(lambda s: s.barriers is not None, self.room.surfaces))
 
+        self.trim_lines = []
 
-        # for surface in self.surfaces:
-        #     surface.horizontal_trim_lines = surface.vertical_trim_lines = []
-
-        #     if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
-        #         tf = TrimFinder(self.data, surface)
-        #         surface.horizontal_trim_lines = tf.solve()
-
-        #     if surface.vertical_vp is not None and len(surface.vertical_vp) > 0:
-        #         tf = TrimFinder(self.data, surface, surface.vertical_vp[0])
-        #         surface.vertical_trim_lines = tf.solve()
+        for surface in self.surfaces:
+            for barrier in surface.barriers:
+                tf = TrimFinder(self.data, surface, barrier)
+                tf.solve()
 
         if im_logging_enabled(self.data):
             log_image(self.data, "trim.png", self.get_debug_image())
@@ -152,8 +134,15 @@ class PipelineTrimFinder(PipelineStep):
 
         draw_lines(img, self.data["lines"], color=(50,50,50), thickness=1)
 
-        for vp in self.room.horizontal_vps:
-            draw_lines(img, vp.inliers, color=random_color(), thickness=2)
+        # for vp in self.room.horizontal_vps:
+        #     draw_lines(img, vp.inliers, color=random_color(), thickness=2)
+
+        for surface in self.surfaces:
+            for barrier in surface.barriers:
+                draw_lines(img, barrier.lines, color=random_color(), thickness=2)
+
+        # for trim in self.trim_lines:
+        #     draw_lines(img, [trim.line_a, trim.line_b], color=random_color(), thickness=2)
 
         return img
 

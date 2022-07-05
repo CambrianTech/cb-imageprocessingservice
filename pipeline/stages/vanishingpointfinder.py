@@ -482,7 +482,8 @@ class PipelineVanishingPointFinder(PipelineStep):
         room.vertical_vp = vertical_vp
         
         room.horizontal_vps = vps_horizontal
-        data["lines"] = vp_lines
+        #data["lines"] = vp_lines
+        data["vp_lines"] = vp_lines
 
         log_image(data, "vanishing_pts", img)
 

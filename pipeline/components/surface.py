@@ -19,6 +19,11 @@ from pipeline.misc.utils import adjust_mask, scale_contour
 
 mask_padding = 10
 
+class SurfaceBarrier():
+    def __init__(self, vp, lines):
+        self.vp = vp
+        self.lines = lines
+
 class Surface():
 
     def __init__(self, data, index=None, surfaceType=None):
