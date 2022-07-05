@@ -63,8 +63,6 @@ class Surface():
         self.horizontal_vp = None
         self.vertical_vp = None
         self.vp = None
-        self.planar_group = None
-        self.vertical_vp_angles = None
 
         self._background_mean_stddev = None
         self._lighting_mean_stddev = None

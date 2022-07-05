@@ -12,8 +12,9 @@ from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
 from pipeline.data.logging import log_image, im_logging_enabled
 from pipeline.misc.utils import convert_color
-from pipeline.components.line import Line
+from pipeline.components.line import draw_lines
 from .vanishingpointfinder import angle_with_vp
+from pipeline.misc.utils import random_color
 
 class TrimLine:
     def __init__(self, vp, rect, line_a, line_b):
@@ -125,18 +126,19 @@ class PipelineTrimFinder(PipelineStep):
 
         #detect trim around edges and (1/3rd of center horizontal, around 1 meter high) of walls using horizontal vp inliers.
         #create segmentation category?
-        self.surfaces = self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall, SurfaceType.OnWall, SurfaceType.Floor, SurfaceType.Ceiling])
+        self.surfaces = self.room.get_surfaces(surfaceTypes=[SurfaceType.Wall])
 
-        for surface in self.surfaces:
-            surface.horizontal_trim_lines = surface.vertical_trim_lines = []
 
-            if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
-                tf = TrimFinder(self.data, surface, surface.horizontal_vp[0])
-                surface.horizontal_trim_lines = tf.solve()
+        # for surface in self.surfaces:
+        #     surface.horizontal_trim_lines = surface.vertical_trim_lines = []
 
-            if surface.vertical_vp is not None and len(surface.vertical_vp) > 0:
-                tf = TrimFinder(self.data, surface, surface.vertical_vp[0])
-                surface.vertical_trim_lines = tf.solve()
+        #     if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
+        #         tf = TrimFinder(self.data, surface)
+        #         surface.horizontal_trim_lines = tf.solve()
+
+        #     if surface.vertical_vp is not None and len(surface.vertical_vp) > 0:
+        #         tf = TrimFinder(self.data, surface, surface.vertical_vp[0])
+        #         surface.vertical_trim_lines = tf.solve()
 
         if im_logging_enabled(self.data):
             log_image(self.data, "trim.png", self.get_debug_image())
@@ -148,20 +150,10 @@ class PipelineTrimFinder(PipelineStep):
                     
         img = self.image.copy()
 
-        Line.draw_all(img, self.data["lines"], color=(50,50,50), thickness=1)
+        draw_lines(img, self.data["lines"], color=(50,50,50), thickness=1)
 
-        for i in range(len(self.surfaces)):
-            surface = self.surfaces[i]
-            color = convert_color((hues[i],127,255), cv2.COLOR_HSV2RGB_FULL)
-
-            if surface.horizontal_trim_lines is not None and len(surface.horizontal_trim_lines) > 0:
-
-                for trim in surface.horizontal_trim_lines:
-                    #trim = surface.horizontal_trim_lines[0]
-                    
-                    trim.line_a.draw(img, color=color, thickness=2)
-                    trim.line_b.draw(img, color=color, thickness=2)
-
+        for vp in self.room.horizontal_vps:
+            draw_lines(img, vp.inliers, color=random_color(), thickness=2)
 
         return img
 

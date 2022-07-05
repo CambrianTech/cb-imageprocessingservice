@@ -29,8 +29,6 @@ class Scene():
         ade_seg_c = np.dstack((tuple(self.data["semantic_probs"])))
         self.semantic_labels = np.int32(np.argmax(ade_seg_c, -1))
 
-        self.planar_groups = []
-
         self._mask_intersections = {}
 
     def add_surface(self, surface):
