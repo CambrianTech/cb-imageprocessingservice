@@ -326,11 +326,11 @@ def draw_lines(img, lines, color=(255,50,255,255), thickness=1, scale=1.0, lineT
 #             delta2xg * cos_thr + xg, \
 #             delta2xg * sin_thr + yg
 
-def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.radians(3)):
+def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.radians(3), remove_matches=True):
 
     min_dist_sq = search_width * search_width
 
-    cluster_index = 1000 #start out of range of vp clusters
+    cluster_index = 0
 
     for i in range(len(lines)):
         
@@ -355,11 +355,13 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
                 result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
 
             if result != 0:
-                line_a.dead = True
-                line_b.dead = True
-                data = LineFunctions.merge_line_pair(data[0], data[1], data[2], data[3], \
-                                                     line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], \
-                                                     line_b.dx, line_b.dy)
+                if remove_matches:
+                    line_a.dead = line_b.dead = True
+                    data = LineFunctions.merge_line_pair(data[0], data[1], data[2], data[3], \
+                                                         line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], \
+                                                         line_b.dx, line_b.dy)
+                else:
+                    line_b.cluster = cluster_index
 
         if line_a.dead:
             lines[i] = Line(data[0], data[1], data[2], data[3], cluster=line_a.cluster)

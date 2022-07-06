@@ -151,9 +151,8 @@ class PipelineLineFinder(PipelineStep):
         lines = merge_lines(lines, search_width=min(diagonal/400, 16), search_length=1.1, angle_threshold=math.radians(5.0))
         timer.log_elapsed("merge_lines final")
 
-
-        # print("8. elapsed %.2f" % (time() - start)); start = time()
-
+        #assign clusters:
+        merge_lines(lines, search_width=min(diagonal/150, 16), search_length=1.0, angle_threshold=math.radians(5.0), remove_matches=False)
 
         log_lines(lines, "merged_lines")
 
