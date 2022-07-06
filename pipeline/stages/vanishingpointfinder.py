@@ -327,14 +327,6 @@ class PipelineVanishingPointFinder(PipelineStep):
 
             cluster_lines = list(filter(lambda x: x.cluster==i, data["lines"]))
             if len(cluster_lines) > 0:
-                # cluster_data = map(lambda x: x.data, cluster_lines)
-                # cluster_data = np.array(list(cluster_data))
-                # cluster_data = cluster_data.reshape(len(cluster_data) * 2, 2)
-
-                # hull = np.int32(cv2.convexHull(cluster_data))
-                # print(hull)
-                # cv2.drawContours(cluster_image, [hull], -1, random_color(), -1)
-
                 draw_lines(cluster_image, cluster_lines, color=random_color(), thickness=2)
 
         log_image(data, "cluster_image", cluster_image)
@@ -357,13 +349,7 @@ class PipelineVanishingPointFinder(PipelineStep):
         current_lines = all_lines.copy()
         lines_plus = data["lines"].copy()
         all_indices = [True]*len(all_lines)
-
-        # lines_plus.extend(data["hed_lines"])
-        # lines_plus.extend(data["normals_lines"])
-
-
-
-   
+ 
        
         img = image.copy()
         colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
@@ -423,16 +409,9 @@ class PipelineVanishingPointFinder(PipelineStep):
                     if line in inliers:
                         all_indices[i] = False
                 
-                # vp.inliers = list(filter(lambda x: not x.dead, vp.inliers))
-                # vp.inliers = list(get_vanishing_point_lines(vp.inliers, vp.model,extend=1.0))
-                # vp.inliers.sort(key=lambda x:x.angle%np.pi)
-                # vp.inliers = merge_lines(vp.inliers, diagonal/400,search_length=2.0,angle_threshold=np.radians(0.5))
-                
             else:
                 vps_horizontal.append(vp)
           
-                # vp.inliers = list(get_inliers(lines_plus, vp.model, ransac_threshold))
-
                 for i in range(len(all_lines)):
                     line = all_lines[i]
                     if line in vp.inliers and line in all_lines:
@@ -441,111 +420,28 @@ class PipelineVanishingPointFinder(PipelineStep):
                 if len(vps_horizontal) > 0:
                     current_indices = all_indices   
                     current_line_number = np.count_nonzero(current_indices)
-         
-     
-                
-                # vp.inliers = list(vp.inliers)
-                # get_vanishing_point_lines(vp.inliers, vp.model)
-
-                # vp.inliers = list(filter(lambda x: not x.dead, vp.inliers))
-                       
-                # vp.inliers = merge_lines(vp.inliers, search_length=1.05, search_width=min(diagonal/300, 8), angle_threshold=math.radians(2.0))
-                # vp.inliers.sort(key=lambda x:x.angle)
-
-                # get_vanishing_point_lines(vp.inliers, vp.model)
-                # vp.inliers = merge_lines(vp.inliers, diagonal/500,search_length=1.0,angle_threshold=np.radians(0.5))
-
-                # vp_pt = reestimate_model(current_vps[0].model, current_edgelets, np.radians(0.5))
-                # vp.model = vp_pt
 
             vp_lines.extend(vp.inliers)
 
-
-            # draw_lines(img, vp.inliers, color=color, thickness=2,lineType=cv2.LINE_AA)
-            color = colors[cluster_index]
-            for f in range(len(vp.inliers)):
-                l = vp.inliers[f]
-                # color =  colors[l.cluster]
-                # m = float(f/len(vp.inliers))
-                m = 1
-                # draw_lines(img, [l], color=(color[0]*m, color[1]*m, color[2]*m), thickness=1,lineType=cv2.LINE_AA)
-                vp_pt = vp.model
-                vp_pt = vp_pt[:2]/vp_pt[2]
-                polyline = np.int32([[l.point_a[0], l.point_a[1]],[l.point_b[0], l.point_b[1]], [vp_pt[0], vp_pt[1]]])
-                # cv2.polylines(img, [polyline], False, color=(color[0]*m, color[1]*m, color[2]*m), thickness=1,lineType=cv2.LINE_AA)
-                cv2.line(img, (int(l.point_a[0]), int(l.point_a[1])), (int(l.point_b[0]), int(l.point_b[1])), color=(color[0]*m, color[1]*m, color[2]*m), thickness=2,lineType=cv2.LINE_AA)
-            # print(cluster_index, color)
             cluster_index+=1
 
 
-
         room.vertical_vp = vertical_vp
-        
         room.horizontal_vps = vps_horizontal
         #data["lines"] = vp_lines
         data["vp_lines"] = vp_lines
 
+        vps = [vertical_vp] 
+        vps.extend(room.horizontal_vps)
+
+        for cluster_index in range(len(vps)):
+            color = colors[cluster_index]
+            vp = vps[cluster_index]
+            draw_lines(img, vp.inliers, color=(color[0], color[1], color[2]), thickness=2,lineType=cv2.LINE_AA)
+                
+
         log_image(data, "vanishing_pts", img)
 
-
-        
-
-        # vertical_lines_extended = []
-        # vertical_vp_pt = vertical_vp.model[:2]/vertical_vp.model[2]
-        
-        # surface_lines = data["lines"]
-        # vertical_inliers = get_inliers(surface_lines, vertical_vp.model, np.radians(3.0))
-
-        # vertical_inliers = [lines for lines in vertical_inliers if lines in surface_lines]
-        # vertical_inliers = merge_lines(vertical_inliers, diagonal/300,angle_threshold=np.radians(0.5))
-
-        # vertical_inliers_directions = [line.midpoint-vertical_vp_pt for line in vertical_inliers]
-        # vertical_inliers_directions = vertical_inliers_directions/np.linalg.norm(vertical_inliers_directions,axis=1)[:,np.newaxis]
-        
-        # vertical_inliers_angles = np.arctan2(np.sign(vertical_inliers_directions[:,1]),vertical_inliers_directions[:,0])
-        # vertical_inliers_angles = vertical_inliers_angles
-        # angle_ordering = np.argsort(vertical_inliers_angles)
-        # vertical_inliers = [vertical_inliers[i] for i in angle_ordering]
-        # vertical_inliers_angles = vertical_inliers_angles[angle_ordering]
-        # vertical_inliers_angles = np.insert(vertical_inliers_angles,0,vertical_inliers_angles[0] - np.pi/4)
-        # vertical_inliers_angles = np.append(vertical_inliers_angles,vertical_inliers_angles[-1] + np.pi/4)
-
-        # for i in range(len(vertical_inliers)):
-        #     line = vertical_inliers[i]
-        #     color = (255,127/len(vertical_inliers)*i)
-        #     draw_lines(img, [line], color=color, thickness=2,lineType=cv2.LINE_AA)
-
-
-
-        #     if surface.surfaceType == SurfaceType.Wall or surface.bestLabel in box_like:                
-        #         vertical, horizontal = partition(lambda x: LineFunctions.line_angle_difference(x.angle, pi_2) < vertical_threshold, lines)
-        #         # horizontal = merge_lines(horizontal, search_width=diagonal/200, search_length=1.1)
-
-        #         vpf = VanishingPointFinder(horizontal)
-        #         surface.horizontal_vp = vpf.solve(measure_area=True)
-        #         # surface.horizontal_vp = vpf.solve()
-
-
-        #         vertical_lines.extend(vertical)
-        #     else:
-        #         vpf = VanishingPointFinder(lines)
-        #         surface.vp = vpf.solve(threshold_inlier=math.radians(5), max_iterations=500, max_time=0.2)
-
-        # #find vertical vanishing point for entire room
-        # if len(vertical_lines) > 1:
-        #     vertical_lines = merge_lines(vertical_lines, search_width=diagonal/200, angle_threshold=math.radians(5))
-        #     vpf = VanishingPointFinder(vertical_lines)
-        #     room.vertical_vp = vpf.solve(threshold_inlier=np.radians(3), max_time=0.5)
-        #     if len(room.vertical_vp) == 0:
-        #         room.vertical_vp = vpf.solve(threshold_inlier=np.radians(5))
-
-        # if room.vertical_vp is not None:
-        #     for surface in surfaces:
-        #         if surface.vertical_vp is None:
-        #             surface.vertical_vp = room.vertical_vp
-
-        # if im_logging_enabled(data):
-        #     log_image(data, "vanishing_points", self.get_debug_image(data, surfaces, all_lines))
 
     def get_debug_image(self, data, surfaces, all_lines):
            
