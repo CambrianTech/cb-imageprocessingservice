@@ -65,10 +65,6 @@ class Surface():
 
         self._rotation = None
 
-        self.horizontal_vp = None
-        self.vertical_vp = None
-        self.vp = None
-
         self._background_mean_stddev = None
         self._lighting_mean_stddev = None
 
@@ -263,19 +259,12 @@ class Surface():
 
     @property
     def vanishing_points(self) -> list:
-        vps = []    
-        if self.horizontal_vp is not None and len(self.horizontal_vp) > 0:
-            vps.append(self.horizontal_vp[0])
+        self.lines
+        vps = [] 
 
-        if self.vertical_vp is not None and len(self.vertical_vp) > 0:
-            vps.append(self.vertical_vp[0])
-
-        if self.vp is not None and len(self.vp) > 0:
-            vps.append(self.vp[0])
-
-        if self.parent is not None:
-            #might need to share between. A picture frame or window would share vanishing points with its parent and vice versa
-            vps.extend(self.parent.vanishing_points)
+        for cluster_index in self.clusters:
+            if cluster_index < len(self.data["room"].vanishing_points):
+                vps.append(self.data["room"].vanishing_points[cluster_index])
 
         return vps
 

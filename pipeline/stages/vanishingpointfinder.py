@@ -358,12 +358,6 @@ class PipelineVanishingPointFinder(PipelineStep):
         current_lines = all_lines.copy()
         lines_plus = data["lines"].copy()
         all_indices = [True]*len(all_lines)
- 
-       
-        img = image.copy()
-        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
-        for c in range(1000):
-            colors.append(random_color())
 
         cluster_index = 0
 
@@ -451,37 +445,36 @@ class PipelineVanishingPointFinder(PipelineStep):
         if after < before:
             print("consolidated vanishing_points from %d to %d" % (before, after))
 
+
         room.vertical_vp = vertical_vp
         room.horizontal_vps = vps_horizontal
         #data["lines"] = vp_lines
         data["vp_lines"] = vp_lines
 
+        #reassign clusters
+        # cluster_index = 0
+        # for vp in room.vanishing_points:
+        #     for line in vp.inliers:
+        #         line.cluster = cluster_index
+
+        #     cluster_index += 1
+
+        log_image(data, "vanishing_pts", self.get_debug_image(data))
+
+
+    def get_debug_image(self, data):
+        
+        room = data["room"]
+        image = data["downscaled"].copy()
+
+        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
+        for c in range(1000):
+            colors.append(random_color())
+    
         for cluster_index in range(len(room.vanishing_points)):
             color = colors[cluster_index]
             vp = room.vanishing_points[cluster_index]
-            draw_lines(img, vp.inliers, color=(color[0], color[1], color[2]), thickness=2,lineType=cv2.LINE_AA)
-                
-
-        log_image(data, "vanishing_pts", img)
-
-
-    def get_debug_image(self, data, surfaces, all_lines):
-           
-        room = data["room"]
-        image = data["downscaled"].copy()
-    
-        #draw all lines
-        draw_lines(image, all_lines, color=(80,80,80))
-
-        if room.vertical_vp is not None and len(room.vertical_vp) > 0:
-            draw_lines(image, room.vertical_vp[0].inliers, color=(0,255,0), thickness=2)
-
-        for surface in surfaces:
-            if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
-                draw_lines(image, surface.horizontal_vp[0].inliers, color=random_color(), thickness=2)
-
-            if surface.vp and len(surface.vp):
-                draw_lines(image, surface.vp[0].inliers, color=random_color(), thickness=2)
+            draw_lines(image, vp.inliers, color=(color[0], color[1], color[2]), thickness=2,lineType=cv2.LINE_AA)
             
         return image
 

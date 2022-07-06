@@ -290,9 +290,18 @@ class SurfaceSolver():
 
             cos_normal = abs(np.dot(surface_a_normal, surface_b_normal))
 
+
             if cos_normal > np.cos(np.radians(10)):
                 return True
             elif cos_normal > np.cos(np.radians(45)):
+
+                # vps_a = surface_a.vanishing_points
+                # vps_b = surface_b.vanishing_points
+
+                # if len(vps_a) > 1 and len(vps_b) > 1:
+                #     intersection = list(set(vps_a[1:]) & set(vps_b[1:]))
+                #     if len(intersection) == 0:
+                #         return False
                 
                 #see if there's a line through the intersection
                 contours = surface_a.intersection(surface_b) 
