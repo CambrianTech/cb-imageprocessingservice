@@ -5,7 +5,6 @@ import math
 from scipy.spatial import distance
 from numba.experimental import jitclass
 
-from cambrian.frei_chen import frei_chen
 from time import time
 from scipy.spatial import distance
 
@@ -111,13 +110,6 @@ class PipelineLineFinder(PipelineStep):
 
         lines.extend(bw_lines_c)
 
-        # edges = (frei_chen(bw) * 3.0 * 255.0).astype(np.uint8)
-        # edges_lines = find_lines(edges, min_length * 2.0, True, ang_th=17)
-        # #edges_lines = merge_lines(edges_lines, search_width=diagonal/400, angle_threshold=math.radians(3))
-        # lines.extend(edges_lines)
-
-        # lines = merge_lines(lines, search_length=1.0, search_width=diagonal/800, angle_threshold=math.radians(3))
-
         log_lines(lines, "image_lines")
 
         timer.log_elapsed("merge_lines BW")
@@ -156,7 +148,7 @@ class PipelineLineFinder(PipelineStep):
         data["normals_lines"] = normals_lines
 
         #merge all
-        lines = merge_lines(lines, search_length=1.0, search_width=min(diagonal/150, 16), angle_threshold=math.radians(5.0))
+        lines = merge_lines(lines, search_width=min(diagonal/400, 16), search_length=1.1, angle_threshold=math.radians(5.0))
         timer.log_elapsed("merge_lines final")
 
 
