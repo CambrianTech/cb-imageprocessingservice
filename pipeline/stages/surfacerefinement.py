@@ -70,15 +70,8 @@ class SurfaceRefinement():
 
             vp_lines = []
 
-            if self.room.vertical_vp is not None and len(self.room.vertical_vp) > 0:
-                vp_lines.extend(self.room.vertical_vp[0].inliers)
-
-            for surface in self.room.surfaces:
-                if surface.horizontal_vp is not None and len(surface.horizontal_vp) > 0:
-                    vp_lines.extend(surface.horizontal_vp[0].inliers)
-
-                if surface.vp and len(surface.vp):
-                    vp_lines.extend(surface.vp[0].inliers)
+            for vp in self.room.vanishing_points:
+                vp_lines.extend(vp.inliers)
 
             #lines = [line.extended(1.2) for line in lines]
 

@@ -76,6 +76,8 @@ class Surface():
         self._normals_mean = None
         self._mask_coordinates = None
 
+        self.clusters = []
+
     @property
     def secondaryType(self) -> SurfaceType:
         return next(filter(lambda t: t != self.surfaceType, self.best_surface_types))
@@ -212,11 +214,11 @@ class Surface():
             self._width = 0
             self._height = 0
 
-            clusters = []
+            self.clusters = []
             for i in range(len(self.data["lines"])):
                 line = self.data["lines"][i]
 
-                if line.cluster in clusters:
+                if line.cluster in self.clusters:
                     continue
 
                 for contour in self.contours:
@@ -244,9 +246,9 @@ class Surface():
                     dist = cv2.pointPolygonTest(contour, line.midpoint, True)
 
                     if is_inside(dist) and (is_inside(dist_a) or is_inside(dist_b)):
-                        clusters.append(line.cluster)
+                        self.clusters.append(line.cluster)
                         break
-            self._lines  = [line for line in self.data["lines"] if line.cluster in clusters]
+            self._lines  = [line for line in self.data["lines"] if line.cluster in self.clusters]
         return self._lines
 
     @property

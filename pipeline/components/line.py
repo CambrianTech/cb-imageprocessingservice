@@ -330,7 +330,7 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
 
     min_dist_sq = search_width * search_width
 
-    cluster_index = 0
+    cluster_index = 1000 #start out of range of vp clusters
 
     for i in range(len(lines)):
         

@@ -22,6 +22,7 @@ class Scene():
         self._index_mask = None
         self._normals = None
         self.vertical_vp = None
+        self.horizontal_vps = None
 
         ade_seg_c = np.dstack(tuple(self.data["isolated"]))
         self.isolated_labels = np.int32(np.argmax(ade_seg_c, -1))
@@ -30,6 +31,16 @@ class Scene():
         self.semantic_labels = np.int32(np.argmax(ade_seg_c, -1))
 
         self._mask_intersections = {}
+
+    @property
+    def vanishing_points(self):
+        vps = []
+        if self.vertical_vp is not None:
+            vps.append(self.vertical_vp)
+        if self.horizontal_vps is not None:
+            vps.extend(self.horizontal_vps)
+
+        return vps
 
     def add_surface(self, surface):
 

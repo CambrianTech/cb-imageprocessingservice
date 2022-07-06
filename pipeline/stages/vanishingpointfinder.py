@@ -456,12 +456,9 @@ class PipelineVanishingPointFinder(PipelineStep):
         #data["lines"] = vp_lines
         data["vp_lines"] = vp_lines
 
-        vps = [vertical_vp] 
-        vps.extend(room.horizontal_vps)
-
-        for cluster_index in range(len(vps)):
+        for cluster_index in range(len(room.vanishing_points)):
             color = colors[cluster_index]
-            vp = vps[cluster_index]
+            vp = room.vanishing_points[cluster_index]
             draw_lines(img, vp.inliers, color=(color[0], color[1], color[2]), thickness=2,lineType=cv2.LINE_AA)
                 
 
