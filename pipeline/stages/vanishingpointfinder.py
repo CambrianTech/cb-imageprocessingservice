@@ -167,9 +167,9 @@ class VanishingPoint:
 
         self._score = None
         self._inliers = None
-        self._inlier_lines = None
-
         self._points = None
+
+        self.deleted = False
         #cv2.minAreaRect(InputArray  points)
 
     def __lt__(self, other):
@@ -210,7 +210,16 @@ class VanishingPoint:
     def direction(self):
         return self.model[:2] / self.model[2]
 
+    def merge(self, other):
 
+        self.lines.extend(other.lines)
+        self.votes = np.concatenate((self.votes, other.votes), axis=0)
+        
+        self._score = None
+        self._inliers = None
+        self._points = None
+
+        other.deleted = True
 
         
 class Edgelets:
@@ -418,13 +427,29 @@ class PipelineVanishingPointFinder(PipelineStep):
                         all_indices[i] = False    
 
                 if len(vps_horizontal) > 0:
-                    current_indices = all_indices   
+                    current_indices = all_indices 
                     current_line_number = np.count_nonzero(current_indices)
 
             vp_lines.extend(vp.inliers)
 
             cluster_index+=1
 
+        #consolidate
+        before = len(vps_horizontal)
+        for vpA in vps_horizontal:
+            for vpB in vps_horizontal:
+                if vpA == vpB or vpA.deleted or vpB.deleted: continue
+
+                intersection = get_inliers(vpB.inliers, vpA.model, np.radians(8.0))
+
+                if len(intersection) > 2 * len(vpB.inliers) / 3:
+                    vpA.merge(vpB)
+                    
+        vps_horizontal = list(filter(lambda x: not x.deleted, vps_horizontal))
+        after = len(vps_horizontal)
+
+        if after < before:
+            print("consolidated vanishing_points from %d to %d" % (before, after))
 
         room.vertical_vp = vertical_vp
         room.horizontal_vps = vps_horizontal
