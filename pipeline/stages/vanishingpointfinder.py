@@ -451,7 +451,7 @@ class PipelineVanishingPointFinder(PipelineStep):
         #data["lines"] = vp_lines
         data["vp_lines"] = vp_lines
 
-        #reassign clusters
+        # #reassign clusters
         # cluster_index = 0
         # for vp in room.vanishing_points:
         #     for line in vp.inliers:

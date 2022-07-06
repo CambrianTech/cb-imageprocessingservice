@@ -285,6 +285,15 @@ class SurfaceSolver():
             if surface_b.surfaceType == SurfaceType.OnWall and surface_b.bestLabel == surface_a.bestLabel:
                 return True
 
+            # vps_a = surface_a.vanishing_points
+            # vps_b = surface_b.vanishing_points
+
+            # if len(vps_a) > 1 and len(vps_b) > 1:
+            #     intersection = list(set(vps_a[1:]) & set(vps_b[1:]))
+            #     if len(intersection) == 0:
+            #         print("Cannot merge surface %s with %s" % (surface_a.name, surface_b.name))
+            #         return False
+
             surface_a_normal = color_to_normal(surface_a.normals_mean)
             surface_b_normal = color_to_normal(surface_b.normals_mean)
 
@@ -294,15 +303,7 @@ class SurfaceSolver():
             if cos_normal > np.cos(np.radians(10)):
                 return True
             elif cos_normal > np.cos(np.radians(45)):
-
-                # vps_a = surface_a.vanishing_points
-                # vps_b = surface_b.vanishing_points
-
-                # if len(vps_a) > 1 and len(vps_b) > 1:
-                #     intersection = list(set(vps_a[1:]) & set(vps_b[1:]))
-                #     if len(intersection) == 0:
-                #         return False
-                
+        
                 #see if there's a line through the intersection
                 contours = surface_a.intersection(surface_b) 
 
@@ -338,12 +339,14 @@ class SurfaceSolver():
 
             surfaces_of_type = self.room.get_surfaces([surfaceType])
 
+            list_a = surfaces_of_type[:len(surfaces_of_type)//2]
+            list_b = surfaces_of_type[len(surfaces_of_type)//2:]
 
-            for current_surface in surfaces_of_type:
+            for current_surface in list_a:
 
                 if current_surface.destroyed: continue
 
-                for candidate in surfaces_of_type:
+                for candidate in list_b:
 
                     if candidate == current_surface or candidate.destroyed: continue
 
