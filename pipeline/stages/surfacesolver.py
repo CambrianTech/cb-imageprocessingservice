@@ -305,7 +305,6 @@ class SurfaceSolver():
 
             if cos_normal > np.cos(np.radians(10)) and (vps_intersection is None or len(vps_intersection) > 0):
                 print("Merge %s with %s due to 10 degree normals" % (surface_a.name, surface_b.name), surface_a_normal, surface_b_normal)
-                print(vps_a, vps_b)
                 return True
             elif cos_normal > np.cos(np.radians(45)):
 

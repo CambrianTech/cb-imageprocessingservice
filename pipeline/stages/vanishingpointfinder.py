@@ -280,23 +280,6 @@ class VanishingPointFinder():
                 # reject degenerate candidates
                 continue
 
-            if self.lines[ind1].cluster == self.lines[ind2].cluster:
-                # reject lines from the same cluster
-                continue
-
-
-            # if self.direction is not None:
-            #     line1 = self.lines[ind1]
-            #     line2 = self.lines[ind2]
-
-            #     if self.direction == Direction.Vertical:
-            #         if LineFunctions.line_angle_difference(line1.angle, pi_2) > self.angle_threshold or LineFunctions.line_angle_difference(line2.angle, pi_2) > self.angle_threshold:
-            #             continue
-            #     else:
-            #         if LineFunctions.line_angle_difference(line1.angle, 0) > self.angle_threshold or LineFunctions.line_angle_difference(line2.angle, 0) > self.angle_threshold:
-            #             continue
-
-
             current_model = current_model / current_model[2]
 
             vp = VanishingPoint(self.lines, current_model, compute_votes(self.edgelets, current_model, threshold_inlier), measure_area=measure_area)

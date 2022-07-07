@@ -272,7 +272,7 @@ class Surface():
         if self._hvps is None:
             self._hvps = [] 
             if len(self.lines) > 1:
-                for vp in self.data["room"].vanishing_points:
+                for vp in self.data["room"].horizontal_vps:
                     matches = get_inliers(self.lines, vp.model, angle_threshold=np.radians(5))
                     if len(matches) > 0:
                         self._hvps.append(vp)
