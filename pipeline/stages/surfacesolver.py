@@ -27,18 +27,14 @@ class SurfaceSolver():
         self.data = data
         self.room = self.data["room"]
 
-    def solve(self):
+    def solve(self, ignore_rugs=False):
         
         #add all the applicable surfaces:
         timer = Timer("room")
 
-        # for surface in self.data["room"].get_surfaces([SurfaceType.OnFloor]):
-        #     print("Solving floor surface:", surface.name)
-        #     surface.surfaceType = SurfaceType.Floor
-        #     labels = self.room.isolated_labels
-  
-        #     labels[surface.mask > 0] = surface.SurfaceType.Floor.value
-        self.room.isolated_labels[self.room.isolated_labels == SurfaceType.OnFloor.value] = SurfaceType.Floor.value
+        if ignore_rugs:
+            self.room.isolated_labels[self.room.isolated_labels == SurfaceType.OnFloor.value] = SurfaceType.Floor.value
+
         log_segmentation_image(self.data, "room_labels_start", self.room.isolated_labels, self.room.image.copy(), get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
 
         # for surfaceType in SurfaceType:
