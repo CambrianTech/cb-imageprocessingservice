@@ -274,7 +274,7 @@ class Surface():
             if len(self.lines) > 1:
                 for vp in self.data["room"].horizontal_vps:
                     matches = get_inliers(self.lines, vp.model, angle_threshold=np.radians(5))
-                    if len(matches) > 0:
+                    if len(matches) > 1:
                         self._hvps.append(vp)
 
         return self._hvps
