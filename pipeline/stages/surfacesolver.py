@@ -58,7 +58,6 @@ class SurfaceSolver():
         timer.time_event("refine_surfaces")
 
         invalid_mask = self.remove_invalid_surfaces()
-        invalid_mask[self.lines_mask > 0] = 255
 
         if im_logging_enabled(self.data) and cv2.countNonZero(invalid_mask) > 50:
             debug = self.room.image.copy()
@@ -67,7 +66,7 @@ class SurfaceSolver():
         
         timer.time_event("remove_invalid_surfaces")
 
-        self.add_missing_surfaces(invalid_mask,1/1200)
+        self.add_missing_surfaces(invalid_mask)
         self.room.refresh_surfaces()
         log_image(self.data, "room_missing_added", self.room.get_debug_image())
 
@@ -583,7 +582,7 @@ class SurfaceSolver():
 
         return candidates[0]
 
-    def add_missing_surfaces(self, invalid_mask=None, min_area=1/1200):
+    def add_missing_surfaces(self, invalid_mask=None, min_area=1/2500):
 
         total_area = self.room.image.shape[0] * self.room.image.shape[1]
         area_threshold = int(total_area * min_area)
@@ -600,8 +599,8 @@ class SurfaceSolver():
         total_elevation = 3 #todo: get total elevation from highest and lowest objects. Floor or ceiling could be missing
 
         for surfaceType in SurfaceType:
-            if surfaceType == SurfaceType.Wall:
-                continue
+            # if surfaceType == SurfaceType.Wall:
+            #     continue
 
             color = random_color()
 
@@ -901,7 +900,7 @@ class SurfaceSolver():
 
                     print("surface %s(%d) %.2f" % (surface.name, i, meanDiff))
 
-                    if meanDiff < 10:
+                    if meanDiff < 5:
                         #print("remove %s" % name, meanDiff)
                         invalid_contours.append(contour)
                    
@@ -919,6 +918,7 @@ class SurfaceSolver():
                 #todo: look inside contour for validity
 
         invalid_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
+        invalid_mask[self.lines_mask > 0] = 255
 
         if len(all_invalid_contours) > 0:
             cv2.drawContours(invalid_mask, np.array(all_invalid_contours), -1, 1, cv2.FILLED)
