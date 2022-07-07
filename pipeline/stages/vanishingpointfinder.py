@@ -304,7 +304,6 @@ class PipelineVanishingPointFinder(PipelineStep):
         return ["lines"]
 
                 
-
     def run(self, data):
 
         room = data["room"]
@@ -430,18 +429,14 @@ class PipelineVanishingPointFinder(PipelineStep):
         #data["lines"] = vp_lines
         data["vp_lines"] = vp_lines
 
-
         log_image(data, "vanishing_pts", self.get_debug_image(data))
 
-
     def get_debug_image(self, data):
-        
+        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
+        for c in range(1000): colors.append(random_color())
+
         room = data["room"]
         image = data["downscaled"].copy()
-
-        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
-        for c in range(1000):
-            colors.append(random_color())
     
         for cluster_index in range(len(room.vanishing_points)):
             color = colors[cluster_index]

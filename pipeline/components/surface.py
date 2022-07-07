@@ -203,7 +203,7 @@ class Surface():
         return tuple(self.lighting_mean_stddev[1].flatten())
 
     @property
-    def lines(self, padding_multiplier = 20) -> list:
+    def lines(self, padding_divisor = 15) -> list:
 
         if self._lines is None:
             self._lines = []
@@ -231,7 +231,7 @@ class Surface():
                     self._min_area = min(area, self._min_area)
                     self._max_area = max(area, self._max_area)
 
-                    padding = math.sqrt(area) / padding_multiplier
+                    padding = math.sqrt(area) / padding_divisor
 
                     #positive (inside), negative (outside), or zero (on an edge)
                     def is_inside(dist):
@@ -248,6 +248,7 @@ class Surface():
                     if is_inside(dist) and (is_inside(dist_a) or is_inside(dist_b)):
                         self._clusters.append(line.cluster)
                         break
+
             self._lines  = [line for line in self.data["lines"] if line.cluster in self._clusters]
         return self._lines
 
@@ -394,6 +395,7 @@ class Surface():
         self._mask_transform = None
         self._outer_mask = None
         self._inner_mask = None
+        self._hvps = None
 
     @property
     def contours(self):

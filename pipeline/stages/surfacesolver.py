@@ -88,6 +88,20 @@ class SurfaceSolver():
 
         #log_segmentation_image(self.data, "isolated_labels_image", vertical_labels, surface_image, get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
 
+        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
+        for c in range(1000): colors.append(random_color())
+
+        for surface in self.room.get_surfaces([SurfaceType.Wall]):
+            debug = self.data["downscaled"].copy()
+            index = 0
+            for vp in surface.horizontal_vanishing_points:
+                color = colors[index]
+                draw_lines(debug, vp.inliers, color=(color[0], color[1], color[2]), thickness=2,lineType=cv2.LINE_AA)
+                index += 1
+
+            if index > 0:
+                log_image(self.data, "vanishing_pts_%s" % surface.name, debug)
+
         self.merge_fan()
 
         log_image(self.data, "room_fan_merged", self.room.get_debug_image())
@@ -288,12 +302,12 @@ class SurfaceSolver():
             vps_a = surface_a.horizontal_vanishing_points
             vps_b = surface_b.horizontal_vanishing_points
 
-            print("Comparing %s to %s" % (surface_a.name, surface_b.name))
+            #print("Comparing %s to %s" % (surface_a.name, surface_b.name))
 
             if len(vps_a) > 0 and len(vps_b) > 0:
                 vps_intersection = list(set(vps_a) & set(vps_b))
                 if len(vps_intersection) == 0:
-                    print("Cannot merge surface %s with %s" % (surface_a.name, surface_b.name))
+                    #print("Cannot merge surface %s with %s" % (surface_a.name, surface_b.name), vps_a, vps_b)
                     return False
             else:
                 vps_intersection = None
@@ -302,21 +316,22 @@ class SurfaceSolver():
             surface_b_normal = color_to_normal(surface_b.normals_mean)
 
             cos_normal = np.dot(surface_a_normal, surface_b_normal)
+            angle = np.arccos(cos_normal)
 
-            if cos_normal > np.cos(np.radians(10)) and (vps_intersection is None or len(vps_intersection) > 0):
-                print("Merge %s with %s due to 10 degree normals" % (surface_a.name, surface_b.name), surface_a_normal, surface_b_normal)
+            if angle <= np.radians(15) and (vps_intersection is None or len(vps_intersection) > 0):
+                #print("Merge %s with %s due to 15 degree normals" % (surface_a.name, surface_b.name), surface_a_normal, surface_b_normal)
                 return True
-            elif cos_normal > np.cos(np.radians(45)):
+            elif angle <= np.radians(45):
 
                 if vps_intersection is not None and len(vps_intersection) == 1:
-                    print("Merge %s with %s due to matching vanishing points" % (surface_a.name, surface_b.name))
+                    #print("Merge %s with %s due to matching vanishing points" % (surface_a.name, surface_b.name))
                     return True
         
                 #see if there's a line through the intersection
                 contours = surface_a.intersection(surface_b) 
 
                 if contours is None:
-                    print("Cannot merge %s with %s due to no line between them" % (surface_a.name, surface_b.name))
+                    #print("Cannot merge %s with %s due to no line between them" % (surface_a.name, surface_b.name))
                     return False
 
                 mask = np.zeros(self.data["downscaled"].shape[:2], dtype="uint8")
@@ -334,7 +349,7 @@ class SurfaceSolver():
                 mask = cv2.bitwise_and(mask, self.lines_mask)
 
                 if cv2.countNonZero(mask) < 5:
-                    print("Merge %s with %s after finding line between them" % (surface_a.name, surface_b.name))
+                    #print("Merge %s with %s after finding line between them" % (surface_a.name, surface_b.name))
                     return True
 
             # thickness = surface_b.bounds[1][0] / surface_b.bounds[1][1]
@@ -343,7 +358,7 @@ class SurfaceSolver():
             # if thickness < 0.1: 
             #     return True
 
-            print("No match for %s with %s" % (surface_a.name, surface_b.name))
+            #print("No match for %s with %s" % (surface_a.name, surface_b.name), angle)
 
             return False
 
