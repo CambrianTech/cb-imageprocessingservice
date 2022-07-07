@@ -80,9 +80,6 @@ def get_inliers(lines, model, angle_threshold=np.radians(3)):
     
     return [lines[i] for i in indices]
 
-def is_inlier(line, model, angle_threshold=np.radians(3)):
-    return len(get_inliers([line], model, angle_threshold)) > 0
-
 def remove_inliers(lines, model, angle_threshold=np.radians(3)):
     inliers = get_inliers(lines, model, angle_threshold)
     return [line for line in lines if line not in inliers]
@@ -363,8 +360,7 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         while cluster_index < 3 if cluster_index < 3 else current_line_number > len(all_lines)/10: 
       
-            print("lines in play: ", current_line_number)
-
+            #print("lines in play: ", current_line_number)
 
             if vertical_vp is None:
                 vertical_threshold = np.radians(20)
@@ -386,7 +382,7 @@ class PipelineVanishingPointFinder(PipelineStep):
                         horizontal_threshold += np.radians(.5)
 
                     current_indices = horizontal_indices
-                    print("no horizontal vps", np.count_nonzero(horizontal_indices))     
+                    #print("no horizontal vps", np.count_nonzero(horizontal_indices))     
 
 
             current_lines = list([all_lines[i] for i in range(len(all_lines)) if current_indices[i]])
@@ -450,6 +446,7 @@ class PipelineVanishingPointFinder(PipelineStep):
         room.horizontal_vps = vps_horizontal
         #data["lines"] = vp_lines
         data["vp_lines"] = vp_lines
+
 
         log_image(data, "vanishing_pts", self.get_debug_image(data))
 

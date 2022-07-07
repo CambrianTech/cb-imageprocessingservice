@@ -17,6 +17,8 @@ from pipeline.data.ade20k import ADE20K
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.misc.utils import adjust_mask, scale_contour
 
+from pipeline.stages.vanishingpointfinder import get_inliers
+
 mask_padding = 10
 
 class SurfaceBarrier():
@@ -72,7 +74,8 @@ class Surface():
         self._normals_mean = None
         self._mask_coordinates = None
 
-        self.clusters = []
+        self._clusters = []
+        self._hvps = None
 
     @property
     def secondaryType(self) -> SurfaceType:
@@ -210,11 +213,12 @@ class Surface():
             self._width = 0
             self._height = 0
 
-            self.clusters = []
+            self._clusters = []
+
             for i in range(len(self.data["lines"])):
                 line = self.data["lines"][i]
 
-                if line.cluster in self.clusters:
+                if line.cluster in self._clusters:
                     continue
 
                 for contour in self.contours:
@@ -242,10 +246,15 @@ class Surface():
                     dist = cv2.pointPolygonTest(contour, line.midpoint, True)
 
                     if is_inside(dist) and (is_inside(dist_a) or is_inside(dist_b)):
-                        self.clusters.append(line.cluster)
+                        self._clusters.append(line.cluster)
                         break
-            self._lines  = [line for line in self.data["lines"] if line.cluster in self.clusters]
+            self._lines  = [line for line in self.data["lines"] if line.cluster in self._clusters]
         return self._lines
+
+    @property
+    def line_clusters(self):
+        self.lines
+        return self._clusters
 
     @property
     def width(self):
@@ -258,15 +267,17 @@ class Surface():
         return self._height
 
     @property
-    def vanishing_points(self) -> list:
-        self.lines
-        vps = [] 
+    def horizontal_vanishing_points(self) -> list:
 
-        for cluster_index in self.clusters:
-            if cluster_index < len(self.data["room"].vanishing_points):
-                vps.append(self.data["room"].vanishing_points[cluster_index])
+        if self._hvps is None:
+            self._hvps = [] 
+            if len(self.lines) > 1:
+                for vp in self.data["room"].vanishing_points:
+                    matches = get_inliers(self.lines, vp.model, angle_threshold=np.radians(5))
+                    if len(matches) > 0:
+                        self._hvps.append(vp)
 
-        return vps
+        return self._hvps
 
     @property
     def neighbors(self) -> list:

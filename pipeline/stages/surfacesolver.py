@@ -278,36 +278,46 @@ class SurfaceSolver():
 
     def merge_fan(self):
 
-        print("performing sweep merge")
+        print(colored("\nPerforming sweep merge", attrs=['bold']))
 
         def should_merge(surface_a, surface_b):
 
             if surface_b.surfaceType == SurfaceType.OnWall and surface_b.bestLabel == surface_a.bestLabel:
                 return True
 
-            # vps_a = surface_a.vanishing_points
-            # vps_b = surface_b.vanishing_points
+            vps_a = surface_a.horizontal_vanishing_points
+            vps_b = surface_b.horizontal_vanishing_points
 
-            # if len(vps_a) > 1 and len(vps_b) > 1:
-            #     intersection = list(set(vps_a[1:]) & set(vps_b[1:]))
-            #     if len(intersection) == 0:
-            #         print("Cannot merge surface %s with %s" % (surface_a.name, surface_b.name))
-            #         return False
+            print("Comparing %s to %s" % (surface_a.name, surface_b.name))
+
+            if len(vps_a) > 0 and len(vps_b) > 0:
+                vps_intersection = list(set(vps_a) & set(vps_b))
+                if len(vps_intersection) == 0:
+                    print("Cannot merge surface %s with %s" % (surface_a.name, surface_b.name))
+                    return False
+            else:
+                vps_intersection = None
 
             surface_a_normal = color_to_normal(surface_a.normals_mean)
             surface_b_normal = color_to_normal(surface_b.normals_mean)
 
-            cos_normal = abs(np.dot(surface_a_normal, surface_b_normal))
+            cos_normal = np.dot(surface_a_normal, surface_b_normal)
 
-
-            if cos_normal > np.cos(np.radians(10)):
+            if cos_normal > np.cos(np.radians(10)) and (vps_intersection is None or len(vps_intersection) > 0):
+                print("Merge %s with %s due to 10 degree normals" % (surface_a.name, surface_b.name), surface_a_normal, surface_b_normal)
+                print(vps_a, vps_b)
                 return True
             elif cos_normal > np.cos(np.radians(45)):
+
+                if vps_intersection is not None and len(vps_intersection) == 1:
+                    print("Merge %s with %s due to matching vanishing points" % (surface_a.name, surface_b.name))
+                    return True
         
                 #see if there's a line through the intersection
                 contours = surface_a.intersection(surface_b) 
 
                 if contours is None:
+                    print("Cannot merge %s with %s due to no line between them" % (surface_a.name, surface_b.name))
                     return False
 
                 mask = np.zeros(self.data["downscaled"].shape[:2], dtype="uint8")
@@ -325,6 +335,7 @@ class SurfaceSolver():
                 mask = cv2.bitwise_and(mask, self.lines_mask)
 
                 if cv2.countNonZero(mask) < 5:
+                    print("Merge %s with %s after finding line between them" % (surface_a.name, surface_b.name))
                     return True
 
             # thickness = surface_b.bounds[1][0] / surface_b.bounds[1][1]
@@ -332,6 +343,8 @@ class SurfaceSolver():
 
             # if thickness < 0.1: 
             #     return True
+
+            print("No match for %s with %s" % (surface_a.name, surface_b.name))
 
             return False
 
@@ -342,11 +355,11 @@ class SurfaceSolver():
             list_a = surfaces_of_type[:len(surfaces_of_type)//2]
             list_b = surfaces_of_type[len(surfaces_of_type)//2:]
 
-            for current_surface in list_a:
+            for current_surface in surfaces_of_type:
 
                 if current_surface.destroyed: continue
 
-                for candidate in list_b:
+                for candidate in surfaces_of_type:
 
                     if candidate == current_surface or candidate.destroyed: continue
 
@@ -360,6 +373,8 @@ class SurfaceSolver():
                     print("surface %s" % current_surface.name, [neighbor.name for neighbor in neighbors])
         
         self.room.refresh_surfaces()
+
+        print(colored("Sweep merge completed\n", attrs=['bold']))
 
     def surface_vp_matching(self):
         surfaces = []
