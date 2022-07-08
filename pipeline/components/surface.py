@@ -203,37 +203,26 @@ class Surface():
         return tuple(self.lighting_mean_stddev[1].flatten())
 
     @property
-    def lines(self, padding_divisor = 15) -> list:
+    def lines(self) -> list:
+
+        def is_inside(point):
+            value = self.mask_expanded[int(point[1]), int(point[0])]
+            return value > 0
 
         if self._lines is None:
             self._lines = []
             self._clusters = []
 
-            for i in range(len(self.data["lines"])):
-                line = self.data["lines"][i]
+            for line in self.data["lines"]:
 
                 if line.cluster in self._clusters:
                     continue
 
-                for contour in self.contours:
-                    
-                    padding = 5
+                midpoint_a = ((line.point_a[0] + line.midpoint[0]) / 2, (line.point_a[1] + line.midpoint[1]) / 2)
+                midpoint_b = ((line.point_b[0] + line.midpoint[0]) / 2, (line.point_b[1] + line.midpoint[1]) / 2)                
 
-                    #positive (inside), negative (outside), or zero (on an edge)
-                    def is_inside(dist):
-                        return dist >= 0 or abs(dist) <= padding
-
-                    midpoint_a = ((line.point_a[0] + line.midpoint[0]) / 2, (line.point_a[1] + line.midpoint[1]) / 2)
-                    dist_a = cv2.pointPolygonTest(contour, midpoint_a, True)
-
-                    midpoint_b = ((line.point_b[0] + line.midpoint[0]) / 2, (line.point_b[1] + line.midpoint[1]) / 2)
-                    dist_b = cv2.pointPolygonTest(contour, midpoint_b, True)
-
-                    dist = cv2.pointPolygonTest(contour, line.midpoint, True)
-
-                    if is_inside(dist) and (is_inside(dist_a) or is_inside(dist_b)):
-                        self._clusters.append(line.cluster)
-                        break
+                if is_inside(line.midpoint) and (is_inside(midpoint_a) or is_inside(midpoint_b)):
+                    self._clusters.append(line.cluster)
 
             self._lines  = [line for line in self.data["lines"] if line.cluster in self._clusters]
         return self._lines
@@ -259,15 +248,23 @@ class Surface():
         return self._max_area
 
     @property
-    def horizontal_vanishing_points(self) -> list:
+    def horizontal_vps(self) -> list:
 
         if self._hvps is None:
-            self._hvps = [] 
+            self._hvps = []
+
+            num_matches = []
             if len(self.lines) > 1:
                 for vp in self.data["room"].horizontal_vps:
                     matches = get_inliers(self.lines, vp.model, angle_threshold=np.radians(5))
-                    if len(matches) > 1:
-                        self._hvps.append(vp)
+                    num_matches.append(len(matches))
+
+            if len(num_matches) > 0:
+                threshold = max(3, 2 * max(num_matches) / 3)
+                
+                for i in range(0, len(self.data["room"].horizontal_vps)):
+                    if num_matches[i] > threshold:
+                        self._hvps.append(self.data["room"].horizontal_vps[i])
 
         return self._hvps
 
@@ -354,9 +351,7 @@ class Surface():
 
     @property
     def mask_edges(self):
-        if self._mask_edges is None:
-            self._mask_edges = np.zeros(self.probs.shape, dtype="uint8")
-            cv2.drawContours(self._mask_edges, self.contours, -1, 1, thickness=20)
+        self.contours
         return self._mask_edges
 
 
@@ -390,6 +385,8 @@ class Surface():
             mask_bordered = cv2.copyMakeBorder(self.mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0) 
             _contours, self.hierarchy = cv2.findContours(mask_bordered, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+            self._mask_edges = np.zeros(self.mask.shape, dtype="uint8")
+
             #remove border offset:
             self._contours = []
             for contour in _contours:
@@ -402,6 +399,10 @@ class Surface():
                 x,y,w,h = cv2.boundingRect(contour)
                 self._width = max(self._width, w)
                 self._height = max(self._height, h)
+
+                padding = max(area / 10, 5)
+
+                cv2.drawContours(self._mask_edges, [contour], -1, 1, thickness=20)
 
                 self._contours.append(contour)
 

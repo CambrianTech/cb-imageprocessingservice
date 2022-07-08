@@ -78,7 +78,6 @@ class SurfaceSolver():
   
         log_image(self.data, "room_fan", self.room.get_debug_image())
 
-
         #log_segmentation_image(self.data, "isolated_labels_normals", vertical_labels, self.room.normals, get_image=False, labelset=SurfaceType,opacity=1, avg=True)
 
         #log_segmentation_image(self.data, "isolated_labels_image", vertical_labels, surface_image, get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
@@ -87,16 +86,20 @@ class SurfaceSolver():
         for c in range(1000): colors.append(random_color())
 
         for surface in self.room.get_surfaces([SurfaceType.Wall]):
-            debug = self.data["downscaled"].copy()
-            debug[surface.mask > 0] = random_color()
-            index = 0
-            for vp in surface.horizontal_vanishing_points:
-                color = colors[index]
-                draw_lines(debug, vp.inliers, color=(color[0], color[1], color[2]), thickness=2,lineType=cv2.LINE_AA)
-                index += 1
 
-            if index > 0:
-                log_image(self.data, "vanishing_pts_%s" % surface.name, debug)
+            if len(surface.horizontal_vps) == 0: continue
+
+            debug = self.data["downscaled"].copy()
+            debug[surface.mask_expanded > 0] = random_color()
+
+            #draw_lines(debug, surface.lines, color=(50, 50, 50), thickness=2,lineType=cv2.LINE_AA)
+
+            for vp in surface.horizontal_vps:
+                index = self.room.horizontal_vps.index(vp) + 1
+                color = colors[index]
+                draw_lines(debug, vp.inliers, color=(color[0], color[1], color[2]), thickness=2, lineType=cv2.LINE_AA)
+
+            log_image(self.data, "vanishing_pts_%s" % surface.name, debug)
 
         self.merge_fan()
 
@@ -293,8 +296,8 @@ class SurfaceSolver():
             if surface_b.surfaceType == SurfaceType.OnWall and surface_b.bestLabel == surface_a.bestLabel:
                 return True
 
-            vps_a = surface_a.horizontal_vanishing_points
-            vps_b = surface_b.horizontal_vanishing_points
+            vps_a = surface_a.horizontal_vps
+            vps_b = surface_b.horizontal_vps
 
             print("Comparing %s to %s" % (surface_a.name, surface_b.name))
 
