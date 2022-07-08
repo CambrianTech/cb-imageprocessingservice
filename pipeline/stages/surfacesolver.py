@@ -287,8 +287,6 @@ class SurfaceSolver():
 
     def merge_fan(self):
 
-        print(colored("\nPerforming sweep merge", attrs=['bold']))
-
         def should_merge(surface_a, surface_b):
 
             if surface_b.surfaceType == SurfaceType.OnWall and surface_b.bestLabel == surface_a.bestLabel:
@@ -297,7 +295,7 @@ class SurfaceSolver():
             vps_a = surface_a.horizontal_vanishing_points
             vps_b = surface_b.horizontal_vanishing_points
 
-            #print("Comparing %s to %s" % (surface_a.name, surface_b.name))
+            print("Comparing %s to %s" % (surface_a.name, surface_b.name))
 
             if len(vps_a) > 0 and len(vps_b) > 0:
                 vps_intersection = list(set(vps_a) & set(vps_b))
@@ -314,7 +312,7 @@ class SurfaceSolver():
             angle = np.arccos(cos_normal)
 
             if angle <= np.radians(15) and (vps_intersection is None or len(vps_intersection) > 0):
-                #print("Merge %s with %s due to 15 degree normals" % (surface_a.name, surface_b.name), surface_a_normal, surface_b_normal)
+                print("Merge %s with %s due to 15 degree normals" % (surface_a.name, surface_b.name), surface_a_normal, surface_b_normal)
                 return True
             elif angle <= np.radians(45):
 
@@ -326,7 +324,7 @@ class SurfaceSolver():
                 contours = surface_a.intersection(surface_b) 
 
                 if contours is None:
-                    #print("Cannot merge %s with %s due to no line between them" % (surface_a.name, surface_b.name))
+                    print("Cannot merge %s with %s due to no line between them" % (surface_a.name, surface_b.name))
                     return False
 
                 mask = np.zeros(self.data["downscaled"].shape[:2], dtype="uint8")
@@ -344,7 +342,7 @@ class SurfaceSolver():
                 mask = cv2.bitwise_and(mask, self.lines_mask)
 
                 if cv2.countNonZero(mask) < 5:
-                    #print("Merge %s with %s after finding line between them" % (surface_a.name, surface_b.name))
+                    print("Merge %s with %s after finding line between them" % (surface_a.name, surface_b.name))
                     return True
 
             # thickness = surface_b.bounds[1][0] / surface_b.bounds[1][1]
@@ -353,9 +351,11 @@ class SurfaceSolver():
             # if thickness < 0.1: 
             #     return True
 
-            #print("No match for %s with %s" % (surface_a.name, surface_b.name), angle)
+            print("No match for %s with %s" % (surface_a.name, surface_b.name), angle)
 
             return False
+
+        print(colored("\nPerforming sweep merge", attrs=['bold']))
 
         for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
 
@@ -861,6 +861,9 @@ class SurfaceSolver():
         all_invalid_contours = []
         print("Remove invalid wall parts.")
 
+        invalid_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
+        invalid_mask[self.lines_mask > 0] = 255
+
         for surface in self.room.get_surfaces([SurfaceType.Wall]):
             invalid_contours = []
 
@@ -917,8 +920,7 @@ class SurfaceSolver():
 
                 #todo: look inside contour for validity
 
-        invalid_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
-        invalid_mask[self.lines_mask > 0] = 255
+
 
         if len(all_invalid_contours) > 0:
             cv2.drawContours(invalid_mask, np.array(all_invalid_contours), -1, 1, cv2.FILLED)
