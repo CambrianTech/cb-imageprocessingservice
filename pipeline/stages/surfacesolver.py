@@ -88,6 +88,7 @@ class SurfaceSolver():
 
         for surface in self.room.get_surfaces([SurfaceType.Wall]):
             debug = self.data["downscaled"].copy()
+            debug[surface.mask > 0] = random_color()
             index = 0
             for vp in surface.horizontal_vanishing_points:
                 color = colors[index]

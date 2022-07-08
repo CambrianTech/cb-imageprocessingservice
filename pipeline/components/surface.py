@@ -207,12 +207,6 @@ class Surface():
 
         if self._lines is None:
             self._lines = []
-            self._min_area = 1000
-            self._max_area = 1
-
-            self._width = 0
-            self._height = 0
-
             self._clusters = []
 
             for i in range(len(self.data["lines"])):
@@ -222,16 +216,8 @@ class Surface():
                     continue
 
                 for contour in self.contours:
-                    area = cv2.contourArea(contour)
-
-                    x,y,w,h = cv2.boundingRect(contour)
-                    self._width = max(self._width, w)
-                    self._height = max(self._height, h)
-
-                    self._min_area = min(area, self._min_area)
-                    self._max_area = max(area, self._max_area)
-
-                    padding = math.sqrt(area) / padding_divisor
+                    
+                    padding = 5
 
                     #positive (inside), negative (outside), or zero (on an edge)
                     def is_inside(dist):
@@ -259,13 +245,18 @@ class Surface():
 
     @property
     def width(self):
-        self.lines
+        self.contours
         return self._width
 
     @property
     def height(self):
-        self.lines
+        self.contours
         return self._height
+
+    @property
+    def max_area(self) -> list:
+        self.contours
+        return self._max_area
 
     @property
     def horizontal_vanishing_points(self) -> list:
@@ -323,16 +314,6 @@ class Surface():
         #     return rect
 
         # return None
-
-    @property
-    def min_area(self) -> float:
-        self.lines
-        return self._min_area
-
-    @property
-    def max_area(self) -> list:
-        self.lines
-        return self._max_area
 
     @property
     def angle(self): #from floor
@@ -400,6 +381,11 @@ class Surface():
     @property
     def contours(self):
         if self._contours is None or self.moments is None:
+
+            self._max_area = 0
+            self._width = 0
+            self._height = 0
+
             #make a 1 pixel border so that edge contours aren't zero area
             mask_bordered = cv2.copyMakeBorder(self.mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0) 
             _contours, self.hierarchy = cv2.findContours(mask_bordered, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -409,6 +395,14 @@ class Surface():
             for contour in _contours:
                 shape = contour.shape
                 contour = (contour.flatten() - 1).reshape(shape)
+
+                area = cv2.contourArea(contour)
+                self._max_area = max(area, self._max_area)
+
+                x,y,w,h = cv2.boundingRect(contour)
+                self._width = max(self._width, w)
+                self._height = max(self._height, h)
+
                 self._contours.append(contour)
 
             self.moments = cv2.moments(self.mask)
