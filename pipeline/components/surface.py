@@ -55,6 +55,7 @@ class Surface():
         self._lines = None
         self._neighbors = None
         self.parent = None
+        self.barriers = None
 
         self._semantic_labels = None
 
