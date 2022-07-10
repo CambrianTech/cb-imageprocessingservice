@@ -54,7 +54,8 @@ class SurfaceSolver():
         self.refine_surfaces()
 
         #preserve plane context information i.e. probs < min_confidence are ignored
-        log_image(self.data, "room_refined", self.room.get_debug_image())
+        if im_logging_enabled(self.data):
+            log_image(self.data, "room_refined", self.room.get_debug_image())
         timer.time_event("refine_surfaces")
 
         invalid_mask = self.remove_invalid_surfaces()
@@ -68,47 +69,53 @@ class SurfaceSolver():
 
         self.add_missing_surfaces(invalid_mask)
         self.room.refresh_surfaces()
-        log_image(self.data, "room_missing_added", self.room.get_debug_image())
+
+        if im_logging_enabled(self.data):
+            log_image(self.data, "room_missing_added", self.room.get_debug_image())
 
         self.merge_like_surfaces() 
 
-        log_image(self.data, "room_merged", self.room.get_debug_image())
+        if im_logging_enabled(self.data):
+            log_image(self.data, "room_merged", self.room.get_debug_image())
 
         self.build_fan()            
-  
-        log_image(self.data, "room_fan", self.room.get_debug_image())
+        
+        if im_logging_enabled(self.data):
+            log_image(self.data, "room_fan", self.room.get_debug_image())
 
         #log_segmentation_image(self.data, "isolated_labels_normals", vertical_labels, self.room.normals, get_image=False, labelset=SurfaceType,opacity=1, avg=True)
 
         #log_segmentation_image(self.data, "isolated_labels_image", vertical_labels, surface_image, get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
 
-        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
-        for c in range(1000): colors.append(random_color())
+        if im_logging_enabled(self.data):
+            colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
+            for c in range(1000): colors.append(random_color())
 
-        for surface in self.room.get_surfaces([SurfaceType.Wall]):
+            for surface in self.room.get_surfaces([SurfaceType.Wall]):
 
-            if len(surface.horizontal_vps) == 0: continue
+                if len(surface.horizontal_vps) == 0: continue
 
-            debug = self.data["downscaled"].copy()
-            debug[surface.mask_expanded > 0] = random_color()
+                debug = self.data["downscaled"].copy()
+                debug[surface.mask_expanded > 0] = random_color()
 
-            #draw_lines(debug, surface.lines, color=(50, 50, 50), thickness=2,lineType=cv2.LINE_AA)
+                #draw_lines(debug, surface.lines, color=(50, 50, 50), thickness=2,lineType=cv2.LINE_AA)
 
-            for vp in surface.horizontal_vps:
-                index = self.room.horizontal_vps.index(vp) + 1
-                color = colors[index]
-                draw_lines(debug, vp.inliers, color=(color[0], color[1], color[2]), thickness=2, lineType=cv2.LINE_AA)
+                for vp in surface.horizontal_vps:
+                    index = self.room.horizontal_vps.index(vp) + 1
+                    color = colors[index]
+                    draw_lines(debug, vp.inliers, color=(color[0], color[1], color[2]), thickness=2, lineType=cv2.LINE_AA)
 
-            log_image(self.data, "vanishing_pts_%s" % surface.name, debug)
+                log_image(self.data, "vanishing_pts_%s" % surface.name, debug)
 
         self.merge_fan()
 
-        log_image(self.data, "room_fan_merged", self.room.get_debug_image())
+        if im_logging_enabled(self.data):
+            log_image(self.data, "room_solved", self.room.get_debug_image(hires=True))
 
         self.surface_vp_matching()
 
         self.room.refresh_surfaces()
-        log_image(self.data, "room_solved", self.room.get_debug_image())
+        
 
         timer.log_all_events()
 
@@ -766,7 +773,6 @@ class SurfaceSolver():
         watershed_image = cv2.resize(self.data["hed"], (self.room.image.shape[1], self.room.image.shape[0]))
         diagonal = self.diagonal
         # print("diagonal", diagonal)
-        final_masks = {}
         
         def expand_into_type(surfaceType:SurfaceType):
             surfaces = self.room.get_surfaces([surfaceType])

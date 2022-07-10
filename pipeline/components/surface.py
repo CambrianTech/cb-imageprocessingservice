@@ -35,7 +35,6 @@ class Surface():
         self.surfaceType = surfaceType
         self.geometry = None
         self._mask = None
-        self.final_mask = None
 
         self._mask_edges = None
         self._mask_expanded = None
@@ -43,6 +42,7 @@ class Surface():
         self._mask_transform = None
         self._outer_mask = None
         self._inner_mask = None
+        self._hires_mask = None
 
         self._alteration = None
         self.destroyed = False
@@ -354,6 +354,14 @@ class Surface():
         self.contours
         return self._mask_edges
 
+    @property
+    def hires_mask(self) -> ndimage:
+        if self._hires_mask is None:
+            self._hires_mask = cv2.resize(self.mask, (self.data["image"].shape[1], self.data["image"].shape[0]), interpolation=cv2.INTER_NEAREST)
+        return self._hires_mask
+
+    def set_hires_mask(self, mask):
+        self._hires_mask = mask
 
     def mask_changed(self):
         self._lines = None
@@ -371,6 +379,8 @@ class Surface():
         self._mask_transform = None
         self._outer_mask = None
         self._inner_mask = None
+        self._hires_mask = None
+        
         self._hvps = None
 
     @property

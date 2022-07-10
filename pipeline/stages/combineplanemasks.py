@@ -27,7 +27,7 @@ class PipelineCombinePlaneMasks(PipelineStep):
 
             for i in range(len(room.surfaces)):
                 surface = room.surfaces[i]
-                mask = surface.final_mask
+                mask = surface.hires_mask
 
                 if index_mask is None:
                     index_mask = np.zeros_like(mask)
