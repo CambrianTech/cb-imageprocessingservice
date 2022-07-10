@@ -379,14 +379,12 @@ class SurfaceSolver():
 
                 if current_surface.destroyed: continue
 
-                for candidate in surfaces_of_type:
+                for candidate in filter(lambda s: s.surfaceType == current_surface.surfaceType, current_surface.neighbors):
 
                     if candidate == current_surface or candidate.destroyed: continue
 
                     if should_merge(current_surface, candidate):
                         current_surface.merge(candidate)
-
-
 
                 if surfaceType == SurfaceType.Wall:
                     neighbors = list(filter(lambda s:s.surfaceType == current_surface.surfaceType and not s.destroyed, current_surface.neighbors))

@@ -73,6 +73,7 @@ class Surface():
         self._normals_accumulated = None
         self._normals_mean = None
         self._mask_coordinates = None
+        self._bestLabel = None
 
         self._clusters = []
         self._hvps = None
@@ -380,7 +381,7 @@ class Surface():
         self._outer_mask = None
         self._inner_mask = None
         self._hires_mask = None
-        
+
         self._hvps = None
 
     @property
@@ -451,6 +452,9 @@ class Surface():
             return ADE20K(self.semantic_labels[0][0] + 1)
         return None
 
+    def set_bestLabel(self, label):
+        self._bestLabel = label
+
     def clone(self):
         new_surface = copy(self)
         new_surface.uniqueId = uuid.uuid4()
@@ -469,8 +473,10 @@ class Surface():
         self._mask[surface.mask > 0] = 1
 
         #average the normals? Take one over the other by area? Do what where?
-
         self.mask_changed()
+
+        if self.bestLabel is None and surface.bestLabel is not None:
+            self.bestLabel = surface.bestLabel
 
         surface.destroy()
 
