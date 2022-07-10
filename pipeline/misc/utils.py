@@ -251,8 +251,9 @@ def convert_color(color, conversion):
     converted = cv2.cvtColor(img, conversion)[0,0]
     return (int(converted[0]), int(converted[1]), int(converted[2]))
 
-def put_text(img, text, origin, color, shadow_offset=(1,1), font=cv2.FONT_HERSHEY_SIMPLEX, size=1, thickness=1, line_type=cv2.LINE_AA, shadow=False, highlights=False):
+def put_text(img, text, origin, color, shadow_offset=(1,1), font=cv2.FONT_HERSHEY_SIMPLEX, size=1, line_type=cv2.LINE_AA, shadow=False, highlights=False):
 
+    thickness = max(int(2 * size), 1)
     dimensions = cv2.getTextSize(text, font, size, thickness)[0]
     origin = (int(origin[0]), int(origin[1]))
 
