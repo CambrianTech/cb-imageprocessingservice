@@ -109,12 +109,22 @@ class SurfaceSolver():
 
         self.merge_fan()
 
+        # min_area = 1/1000
+        # total_area = self.room.image.shape[0] * self.room.image.shape[1]
+        # area_threshold = int(total_area * min_area)
+
+        # for surface in self.room.surfaces:
+        #     if surface.bestLabel is None or surface.max_area < area_threshold:
+        #         surface.destroy()
+
+        self.room.refresh_surfaces()
+
         if im_logging_enabled(self.data):
             log_image(self.data, "room_solved", self.room.get_debug_image(hires=True))
 
         self.surface_vp_matching()
 
-        self.room.refresh_surfaces()
+        
         
 
         timer.log_all_events()
@@ -755,12 +765,18 @@ class SurfaceSolver():
                     distance_mean = 0.5 * (distance_i + distance_j)
                     distance_error = 0.35 * distance_mean #accuracy degrades by range (maybe use error here, error square?)
 
+
                     #todo: check for intersection. In elevator image, wall sitting out front is being incorrectly merged. if it's fairly parallel, don't
                     if surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.OnFloor or surfaceType == SurfaceType.Ceiling or (angle < angle_threshold and distance_between < distance_error):
                         if surfaceType != SurfaceType.Other or surfaces[i].bestLabel == surfaces[j].bestLabel:
                             offset_diff = abs(surfaces[i].offset - surfaces[j].offset) / max(abs(surfaces[i].offset), abs(surfaces[j].offset))
                             
                             #print("angle", angle, "offset", offset_diff)
+
+                            if len(surfaces[i].horizontal_vps) > 0 and len(surfaces[j].horizontal_vps) > 0:
+                                vps_intersection = set(surfaces[i].horizontal_vps) & set(surfaces[j].horizontal_vps)
+                                if len(vps_intersection) == 0: 
+                                    continue
 
                             if offset_diff < 0.05 or angle < angle_threshold_force: 
                                 surfaces[i].merge(surfaces[j])
