@@ -709,9 +709,19 @@ class SurfaceSolver():
                         new_surface.surfaceType = surfaceType
                         new_surface.set_mask(contour_mask)
                         #print("Reference_surface", reference_surface.name, indexes, counts)
-                    elif surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.Ceiling:
-                        complementary_type = SurfaceType.Floor if surfaceType == SurfaceType.Ceiling else SurfaceType.Ceiling
-                        reference_surface = self.find_best_surface(complementary_type, contour_mask, (cX, cY))
+                    elif surfaceType in (SurfaceType.Floor, SurfaceType.OnFloor, SurfaceType.Ceiling):
+                        opposing_type = SurfaceType.Floor if surfaceType == SurfaceType.Ceiling else SurfaceType.Ceiling
+                        reference_surface = self.find_best_surface(opposing_type, contour_mask, (cX, cY))
+
+                        if reference_surface is None:
+                            #use onfloor->floor
+                            reference_surface = self.find_best_surface(surfaceType.complement, contour_mask, (cX, cY))
+                            if reference_surface is not None:
+                                normal = reference_surface.normal
+                                offset = reference_surface.offset
+                        else:
+                            normal = -reference_surface.normal
+                            offset = total_elevation - reference_surface.offset
 
                         if reference_surface is not None:
                             print("Generate %s using %s as opposing surface" % (surfaceType.name, reference_surface.name))
@@ -719,8 +729,8 @@ class SurfaceSolver():
                             new_surface = reference_surface.clone()
                             new_surface.surfaceType = surfaceType
                             new_surface.set_mask(contour_mask)
-                            new_surface.normal = -reference_surface.normal
-                            new_surface.offset = total_elevation - reference_surface.offset
+                            new_surface.normal = normal
+                            new_surface.offset = offset
 
 
                     if reference_surface is None:
