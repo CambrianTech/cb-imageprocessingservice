@@ -34,17 +34,16 @@ class SurfaceRefinement():
 
         color = 1
         scale = self.image.shape[0] / self.data["downscaled"].shape[0]
-        thickness = 5 + int(scale * 3)
+        thickness = 5 + int(scale * 2)
 
         for surface in self.room.surfaces:
-            markers[surface.hires_mask > 0] = color
-            watershed_mask[surface.hires_mask > 0] = 1
-
+            
             contours, hierarchy = cv2.findContours(surface.hires_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-            cv2.drawContours(markers, contours, -1, 0, thickness)
-
+            cv2.drawContours(markers, contours, -1, color, cv2.FILLED)
             cv2.drawContours(watershed_mask, contours, -1, 1, cv2.FILLED)
+
+            cv2.drawContours(markers, contours, -1, 0, thickness)
             cv2.drawContours(watershed_mask, contours, -1, 1, thickness)
 
             color += 1
@@ -64,8 +63,9 @@ class SurfaceRefinement():
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
 
-        log_markers(self.data, "room_markers_final", markers, primary=True, num_labels=len(self.room.surfaces))
+        #markers = np.int32(watershed(watershed_image, markers))
 
+        log_markers(self.data, "room_markers_final", markers, primary=True, num_labels=len(self.room.surfaces))
 
         color = 1
         for surface in self.room.surfaces:
