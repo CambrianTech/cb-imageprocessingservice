@@ -316,7 +316,7 @@ class SurfaceSolver():
 
         def should_merge(surface_a, surface_b):
 
-            if surface_b.surfaceType == SurfaceType.OnWall and surface_b.bestLabel == surface_a.bestLabel:
+            if surface_b.surfaceType == SurfaceType.OnWall and surface_b.bestLabel == surface_a.bestLabel and surface_b in surface_a.neighbors:
                 return True
 
             vps_a = surface_a.horizontal_vps
@@ -745,8 +745,9 @@ class SurfaceSolver():
 
     def merge_like_surfaces(self, angle_threshold=np.radians(1), angle_threshold_force=np.radians(1)):
 
+        surfaceTypes = [SurfaceType.Floor, SurfaceType.OnFloor, SurfaceType.Ceiling]
 
-        for surfaceType in SurfaceType:
+        for surfaceType in surfaceTypes:
 
             color = random_color()
             surfaces = self.room.get_surfaces([surfaceType])
