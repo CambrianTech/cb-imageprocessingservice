@@ -13,7 +13,7 @@ from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
 from pipeline.components.line import Line, draw_lines
 from .planegeometry import Dimension
-from pipeline.misc.utils import get_segmentation_image, random_color, scale_contour
+from pipeline.misc.utils import get_segmentation_image, random_color, adjust_mask
 from pipeline.data.logging import log_segmentation_image, im_logging_enabled, log_image, LogLevel, log_markers, Timer
 
 class SurfaceRefinement():
@@ -60,10 +60,17 @@ class SurfaceRefinement():
 
         log_markers(self.data, "room_markers", markers, primary=True, num_labels=len(self.room.surfaces))
 
+        #watershed_mask = adjust_mask(cv2.dilate, watershed_mask, size=3)
+
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
 
-        #markers = np.int32(watershed(watershed_image, markers))
+        # markers = np.int32(watershed(watershed_image, markers))        
+        # markers[markers<0] = 0
+
+        # watershed_mask = adjust_mask(cv2.dilate, watershed_mask, size=9, scale=0.33)
+        # markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
+        # markers[markers<0] = 0
 
         log_markers(self.data, "room_markers_final", markers, primary=True, num_labels=len(self.room.surfaces))
 

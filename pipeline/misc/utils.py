@@ -73,7 +73,7 @@ def resize_array(array, shape):
 def adjust_mask(func, mask, size=5, iterations=1, scale=0.5, maintain_size=True, interpolation=cv2.INTER_NEAREST):
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(size,size))
     shape = mask.shape
-    result = cv2.resize(mask, (int(shape[1] * scale), int(shape[0] * scale)), interpolation)
+    result = cv2.resize(mask.astype(np.uint8), (int(shape[1] * scale), int(shape[0] * scale)), interpolation)
     result = func(result, kernel, iterations=iterations)
     if maintain_size:
         result = cv2.resize(result, (shape[1], shape[0]), interpolation)
