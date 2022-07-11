@@ -34,7 +34,7 @@ class SurfaceRefinement():
 
         color = 1
         scale = self.image.shape[0] / self.data["downscaled"].shape[0]
-        thickness = 5 + int(max(scale * 3, 2))
+        thickness = 5 + int(scale * 3)
 
         for surface in self.room.surfaces:
             markers[surface.hires_mask > 0] = color
