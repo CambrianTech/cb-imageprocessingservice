@@ -109,13 +109,21 @@ class SurfaceSolver():
 
         self.merge_fan()
 
-        # min_area = 1/1000
-        # total_area = self.room.image.shape[0] * self.room.image.shape[1]
-        # area_threshold = int(total_area * min_area)
+        self.room.refresh_surfaces()
 
-        # for surface in self.room.surfaces:
-        #     if surface.bestLabel is None or surface.max_area < area_threshold:
-        #         surface.destroy()
+        #remove leftover bad ones. Merge in?
+        min_area = 1/300
+        total_area = self.room.image.shape[0] * self.room.image.shape[1]
+        area_threshold = int(total_area * min_area)
+
+        for surface in self.room.surfaces:
+            if surface.bestLabel is None or (surface.max_area < area_threshold and surface.surfaceType == SurfaceType.Wall):
+                neighbors = list(filter(lambda s: s.surfaceType==surface.surfaceType and not s.destroyed and s.bestLabel is not None, surface.neighbors))
+                if len(neighbors) > 0:
+                    best = sorted(neighbors, key=lambda s: s.max_area, reverse=True)
+                    best[0].merge(surface)
+                else:
+                    surface.destroy()
 
         self.room.refresh_surfaces()
 
@@ -124,8 +132,6 @@ class SurfaceSolver():
 
         self.surface_vp_matching()
 
-        
-        
 
         timer.log_all_events()
 

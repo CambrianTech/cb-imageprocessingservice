@@ -84,7 +84,7 @@ class Surface():
 
     @property
     def name(self) -> str:
-        return "%s %d" % ("?" if self.bestLabel is None else self.bestLabel.name, self.index)
+        return "%s %d" % (self.surfaceType.name if self.bestLabel is None else self.bestLabel.name, self.index)
 
     @property #protected or private
     def index(self) -> int:
@@ -361,7 +361,8 @@ class Surface():
             self._hires_mask = cv2.resize(self.mask, (self.data["image"].shape[1], self.data["image"].shape[0]), interpolation=cv2.INTER_NEAREST)
         return self._hires_mask
 
-    def set_hires_mask(self, mask):
+    @hires_mask.setter
+    def hires_mask(self, mask):
         self._hires_mask = mask
 
     def mask_changed(self):
@@ -614,7 +615,7 @@ class Surface():
             print("No center found for %s" % self.name)
             return
                 
-        if self.surfaceType in [SurfaceType.Wall, SurfaceType.Floor, SurfaceType.Ceiling]:
+        if self.surfaceType in [SurfaceType.Wall, SurfaceType.OnWall, SurfaceType.Floor, SurfaceType.OnFloor, SurfaceType.Ceiling, SurfaceType.OnCeiling]:
             pos = self.center[0] * scale, self.center[1] * scale
             pos = put_text(img, self.name, pos, color, size=0.5 * scale, shadow=True, highlights=True)
 
