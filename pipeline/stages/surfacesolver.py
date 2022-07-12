@@ -73,12 +73,12 @@ class SurfaceSolver():
         if im_logging_enabled(self.data):
             log_image(self.data, "room_missing_added", self.room.get_debug_image())
 
-        self.merge_like_surfaces() 
+        #self.merge_like_surfaces() 
 
-        if im_logging_enabled(self.data):
-            log_image(self.data, "room_merged", self.room.get_debug_image())
+        # if im_logging_enabled(self.data):
+        #     log_image(self.data, "room_merged", self.room.get_debug_image())
 
-        self.build_fan()            
+        self.build_fan()
         
         if im_logging_enabled(self.data):
             log_image(self.data, "room_fan", self.room.get_debug_image())
@@ -319,6 +319,10 @@ class SurfaceSolver():
             if surface_b.surfaceType == SurfaceType.OnWall and surface_b.bestLabel == surface_a.bestLabel and surface_b in surface_a.neighbors:
                 return True
 
+
+            if surface_b.surfaceType in [SurfaceType.Floor, SurfaceType.OnFloor, SurfaceType.Ceiling]:
+                return True
+
             vps_a = surface_a.horizontal_vps
             vps_b = surface_b.horizontal_vps
 
@@ -384,18 +388,20 @@ class SurfaceSolver():
 
         print(colored("\nPerforming sweep merge", attrs=['bold']))
 
-        for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
+        for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall, SurfaceType.OnFloor, SurfaceType.Floor, SurfaceType.Ceiling]:
 
             surfaces_of_type = self.room.get_surfaces([surfaceType])
-
-            list_a = surfaces_of_type[:len(surfaces_of_type)//2]
-            list_b = surfaces_of_type[len(surfaces_of_type)//2:]
 
             for current_surface in surfaces_of_type:
 
                 if current_surface.destroyed: continue
 
-                for candidate in filter(lambda s: s.surfaceType == current_surface.surfaceType, current_surface.neighbors):
+                if surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
+                    candidates = filter(lambda s: s.surfaceType == current_surface.surfaceType, current_surface.neighbors)
+                else:
+                    candidates = surfaces_of_type
+
+                for candidate in candidates:
 
                     if candidate == current_surface or candidate.destroyed: continue
 
@@ -744,6 +750,8 @@ class SurfaceSolver():
         self.room.invalidate()
 
     def merge_like_surfaces(self, angle_threshold=np.radians(1), angle_threshold_force=np.radians(1)):
+
+        #TODO: becoming redundant, "merge" in with other function.
 
         surfaceTypes = [SurfaceType.Floor, SurfaceType.OnFloor, SurfaceType.Ceiling]
 
