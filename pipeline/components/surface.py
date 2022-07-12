@@ -306,12 +306,8 @@ class Surface():
 
         return contours
 
-        # rect = RotatedRect(cv2.minAreaRect(cnt))
-
-        # if not rect.empty: 
-        #     return rect
-
-        # return None
+    def is_neighbor(self, surface):
+        return surface in self.neighbors
 
     @property
     def angle(self): #from floor

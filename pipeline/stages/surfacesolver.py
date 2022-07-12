@@ -73,11 +73,6 @@ class SurfaceSolver():
         if im_logging_enabled(self.data):
             log_image(self.data, "room_missing_added", self.room.get_debug_image())
 
-        #self.merge_like_surfaces() 
-
-        # if im_logging_enabled(self.data):
-        #     log_image(self.data, "room_merged", self.room.get_debug_image())
-
         self.build_fan()
         
         if im_logging_enabled(self.data):
@@ -748,65 +743,6 @@ class SurfaceSolver():
                     
 
         self.room.invalidate()
-
-    def merge_like_surfaces(self, angle_threshold=np.radians(1), angle_threshold_force=np.radians(1)):
-
-        #TODO: becoming redundant, "merge" in with other function.
-
-        surfaceTypes = [SurfaceType.Floor, SurfaceType.OnFloor, SurfaceType.Ceiling]
-
-        for surfaceType in surfaceTypes:
-
-            color = random_color()
-            surfaces = self.room.get_surfaces([surfaceType])
-
-            for i in range(len(surfaces)):
-                
-                if surfaces[i].destroyed: continue
-
-                distance_i = abs(surfaces[i].offset) #todo: calculate this?
-
-                for j in range(i+1, len(surfaces)):
-                    #print(i, j, surfaces[i].bestLabel, surfaces[j].bestLabel)
-
-                    if surfaces[j].destroyed: continue
-
-                    if (surfaces[i].surfaceType == SurfaceType.Floor or surfaces[i].surfaceType == SurfaceType.OnFloor) and (surfaces[j].surfaceType == SurfaceType.Floor or surfaces[j].surfaceType == SurfaceType.OnFloor):
-                        surfaces[i].merge(surfaces[j])
-                        #print("Merged %s with %s" % (surfaces[i].name, surfaces[j].name))
-                        
-
-                    if surfaces[i].bestLabel != surfaces[j].bestLabel: 
-                        # print(colored("Surfaces %s and %s are not in the same cluster" % (surfaces[i].name, surfaces[j].name), 'yellow'))
-                        continue
-
-                    dot_product = np.dot(surfaces[i].normal, surfaces[j].normal)
-                    angle = np.arccos(dot_product)
-
-                    #do some planar geometry comparisons, maybe color/texture
-                    distance_j = abs(surfaces[j].offset)
-
-                    distance_between = abs(distance_i - distance_j)
-                    distance_mean = 0.5 * (distance_i + distance_j)
-                    distance_error = 0.35 * distance_mean #accuracy degrades by range (maybe use error here, error square?)
-
-
-                    #todo: check for intersection. In elevator image, wall sitting out front is being incorrectly merged. if it's fairly parallel, don't
-                    if surfaceType == SurfaceType.Floor or surfaceType == SurfaceType.OnFloor or surfaceType == SurfaceType.Ceiling or (angle < angle_threshold and distance_between < distance_error):
-                        if surfaceType != SurfaceType.Other or surfaces[i].bestLabel == surfaces[j].bestLabel:
-                            offset_diff = abs(surfaces[i].offset - surfaces[j].offset) / max(abs(surfaces[i].offset), abs(surfaces[j].offset))
-                            
-                            #print("angle", angle, "offset", offset_diff)
-
-                            if len(surfaces[i].horizontal_vps) > 0 and len(surfaces[j].horizontal_vps) > 0:
-                                vps_intersection = set(surfaces[i].horizontal_vps) & set(surfaces[j].horizontal_vps)
-                                if len(vps_intersection) == 0: 
-                                    continue
-
-                            if offset_diff < 0.05 or angle < angle_threshold_force: 
-                                surfaces[i].merge(surfaces[j])
-                                surfaces[i]._alteration = "%.2fm %.2fd" % (distance_between, angle_threshold)
-
         
     def refine_surfaces(self, min_confidence=None, freedom=0.33, use_lines=True, debug_suffix=""):
         watershed_image = cv2.resize(self.data["hed"], (self.room.image.shape[1], self.room.image.shape[0]))
