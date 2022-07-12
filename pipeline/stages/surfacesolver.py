@@ -78,34 +78,33 @@ class SurfaceSolver():
         if im_logging_enabled(self.data):
             log_image(self.data, "room_fan", self.room.get_debug_image())
 
+
+        self.find_trim()
+
         #log_segmentation_image(self.data, "isolated_labels_normals", vertical_labels, self.room.normals, get_image=False, labelset=SurfaceType,opacity=1, avg=True)
 
         #log_segmentation_image(self.data, "isolated_labels_image", vertical_labels, surface_image, get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
 
         if im_logging_enabled(self.data):
-            colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
-            for c in range(1000): colors.append(random_color())
-
-            for surface in self.room.get_surfaces([SurfaceType.Wall]):
-
-                if len(surface.horizontal_vps) == 0: continue
-
-                debug = self.data["downscaled"].copy()
-                debug[surface.mask_expanded > 0] = random_color()
-
-                #draw_lines(debug, surface.lines, color=(50, 50, 50), thickness=2,lineType=cv2.LINE_AA)
-
-                for vp in surface.horizontal_vps:
-                    index = self.room.horizontal_vps.index(vp) + 1
-                    color = colors[index]
-                    draw_lines(debug, vp.inliers, color=(color[0], color[1], color[2]), thickness=2, lineType=cv2.LINE_AA)
-
-                log_image(self.data, "vanishing_pts_%s" % surface.name, debug)
+            self.debug_vps()
 
         self.merge_fan()
-
         self.room.refresh_surfaces()
 
+        self.surface_cleanup()
+        self.room.refresh_surfaces()
+
+        if im_logging_enabled(self.data):
+            log_image(self.data, "room_solved", self.room.get_debug_image(hires=True))
+
+        self.surface_vp_matching()
+
+
+        timer.log_all_events()
+
+        return self.room
+
+    def surface_cleanup(self):
         #remove leftover bad ones. Merge in?
         min_area = 1/300
         total_area = self.room.image.shape[0] * self.room.image.shape[1]
@@ -120,17 +119,34 @@ class SurfaceSolver():
                 else:
                     surface.destroy()
 
-        self.room.refresh_surfaces()
-
-        if im_logging_enabled(self.data):
-            log_image(self.data, "room_solved", self.room.get_debug_image(hires=True))
-
-        self.surface_vp_matching()
 
 
-        timer.log_all_events()
+    def find_trim(self):
+        for wall in self.room.get_surfaces([SurfaceType.Wall]):
+            for vp in wall.horizontal_vps:
+                print("vps", len(vp.inliers))
 
-        return self.room
+
+
+    def debug_vps(self):
+        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
+        for c in range(1000): colors.append(random_color())
+
+        for surface in self.room.get_surfaces([SurfaceType.Wall]):
+
+            if len(surface.horizontal_vps) == 0: continue
+
+            debug = self.data["downscaled"].copy()
+            debug[surface.mask_expanded > 0] = random_color()
+
+            #draw_lines(debug, surface.lines, color=(50, 50, 50), thickness=2,lineType=cv2.LINE_AA)
+
+            for vp in surface.horizontal_vps:
+                index = self.room.horizontal_vps.index(vp) + 1
+                color = colors[index]
+                draw_lines(debug, vp.inliers, color=(color[0], color[1], color[2]), thickness=2, lineType=cv2.LINE_AA)
+
+            log_image(self.data, "vanishing_pts_%s" % surface.name, debug)
 
     def build_fan(self):
 
@@ -789,7 +805,8 @@ class SurfaceSolver():
 
                 mask = np.zeros_like(surface.mask)
                 mask[markers == (index + 1)] = 1
-                mask[self.lines_mask > 0] = 0
+                if use_lines:
+                    mask[self.lines_mask > 0] = 0
                 kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(2,2))
                 mask = cv2.dilate(mask, kernel)
 
