@@ -118,7 +118,7 @@ class PipelineLineFinder(PipelineStep):
         #find lines in hed hed edges
         hed_lines = find_lines(data["hed"], min_length, use_lsd=False, canny_threshold=3) #ang_th=22.5 was getting false positives
         timer.log_elapsed("hed")
-        # hed_lines = merge_lines(hed_lines, search_length=1.0, search_width=diagonal/200, angle_threshold=math.radians(3))
+        hed_lines = merge_lines(hed_lines, search_width=diagonal/250, angle_threshold=math.radians(3))
 
         data["hed_lines"] = hed_lines
 

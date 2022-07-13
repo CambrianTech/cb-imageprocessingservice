@@ -488,6 +488,9 @@ class Surface():
         if self.bestLabel is None and surface.bestLabel is not None:
             self.bestLabel = surface.bestLabel
 
+        if surface == self:
+            raise Exception("Cannot merge surface with self")
+
         surface.destroy()
 
     def destroy(self):

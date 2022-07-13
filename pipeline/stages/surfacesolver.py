@@ -56,19 +56,15 @@ class SurfaceSolver():
         #preserve plane context information i.e. probs < min_confidence are ignored
         if im_logging_enabled(self.data):
             log_image(self.data, "room_refined", self.room.get_debug_image())
-        timer.time_event("refine_surfaces")
 
-        invalid_mask = self.remove_invalid_surfaces()
+        #invalid_mask = self.remove_invalid_surfaces()
+        # if im_logging_enabled(self.data) and cv2.countNonZero(invalid_mask) > 50:
+        #     debug = self.room.image.copy()
+        #     debug[invalid_mask > 0] = [255,0,0]
+        #     log_image(self.data, "room_removed", debug)
+        #invalid_mask[self.lines_mask > 0] = 255
 
-        if im_logging_enabled(self.data) and cv2.countNonZero(invalid_mask) > 50:
-            debug = self.room.image.copy()
-            debug[invalid_mask > 0] = [255,0,0]
-            log_image(self.data, "room_removed", debug)
-        
-        timer.time_event("remove_invalid_surfaces")
-
-        invalid_mask[self.lines_mask > 0] = 255
-        self.add_missing_surfaces(invalid_mask)
+        self.add_missing_surfaces(self.lines_mask)
         self.room.refresh_surfaces()
 
         if im_logging_enabled(self.data):
@@ -92,6 +88,8 @@ class SurfaceSolver():
         self.merge_fan()
         self.room.refresh_surfaces()
 
+        log_image(self.data, "room_merged", self.room.get_debug_image())
+
         self.surface_cleanup()
         self.room.refresh_surfaces()
 
@@ -99,7 +97,6 @@ class SurfaceSolver():
             log_image(self.data, "room_solved", self.room.get_debug_image(hires=True))
 
         self.surface_vp_matching()
-
 
         timer.log_all_events()
 
@@ -118,7 +115,8 @@ class SurfaceSolver():
                     best = sorted(neighbors, key=lambda s: s.max_area, reverse=True)
                     best[0].merge(surface)
                 else:
-                    best = sorted(self.room.get_surfaces([surface.surfaceType]), key=lambda s: sum(abs(s.normals_mean - surface.normals_mean)))
+                    candidates = list(filter(lambda s:s != surface, self.room.get_surfaces([surface.surfaceType])))
+                    best = sorted(candidates, key=lambda s: sum(abs(s.normals_mean - surface.normals_mean)))
                     best[0].merge(surface)
 
 
@@ -369,9 +367,11 @@ class SurfaceSolver():
 
         def should_merge(surface_a, surface_b):
 
-            if surface_b.surfaceType == SurfaceType.OnWall and surface_b.bestLabel == surface_a.bestLabel and surface_b in surface_a.neighbors:
-                return True
+            if surface_a.bestLabel != surface_b.bestLabel:
+                return False
 
+            if surface_a.surfaceType in [SurfaceType.OnWall, SurfaceType.Other, SurfaceType.OnCeiling] and surface_b in surface_a.neighbors:
+                return True
 
             if surface_b.surfaceType in [SurfaceType.Floor, SurfaceType.OnFloor, SurfaceType.Ceiling]:
                 return True
@@ -441,7 +441,7 @@ class SurfaceSolver():
 
         print(colored("\nPerforming sweep merge", attrs=['bold']))
 
-        for surfaceType in [SurfaceType.Wall, SurfaceType.OnWall, SurfaceType.OnFloor, SurfaceType.Floor, SurfaceType.Ceiling]:
+        for surfaceType in SurfaceType:
 
             surfaces_of_type = self.room.get_surfaces([surfaceType])
 
