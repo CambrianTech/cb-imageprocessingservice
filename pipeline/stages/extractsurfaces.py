@@ -73,4 +73,7 @@ class PipelineExtractSurfaces(PipelineStep):
             isolated_probs = np.dstack(data["isolated"])
             log_segmentation_image(data, "surface_probs", np.argmax(isolated_probs, -1), data["downscaled"], labelset=SurfaceType)
 
+            probs = np.dstack(output)
+            log_segmentation_image(data, "everything", np.argmax(probs, -1), data["downscaled"])
+
         
