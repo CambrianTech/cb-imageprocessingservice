@@ -462,7 +462,8 @@ class Surface():
             return ADE20K(self.semantic_labels[0][0] + 1)
         return None
 
-    def set_bestLabel(self, label):
+    @bestLabel.setter
+    def bestLabel(self, label):
         self._bestLabel = label
 
     def clone(self):
