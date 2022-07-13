@@ -8,12 +8,13 @@ from numba.experimental import jitclass
 from time import time
 from scipy.spatial import distance
 
-from pipeline.misc.utils import random_color
+from pipeline.misc.utils import random_color, partition
 from pipeline.data.surface_type import SurfaceType
 from pipeline.components.line import Line, merge_lines, draw_lines, line_on_image_edge
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.logging import log_image, im_logging_enabled, LogLevel
 from cambrian.LineFunctions import LineFunctions
+
 
 def gabor(bw, theta, lambd, gamma = 0.0, psi = 0.0):
     ksize = lambd
@@ -113,11 +114,19 @@ class PipelineLineFinder(PipelineStep):
 
         bw_lines_c = find_lines(bw, 2*min_length, canny_threshold=7)
         
-        if im_logging_enabled(data):
-            merge_lines(bw_lines_c, search_width=max(diagonal/50, 3), angle_threshold=math.radians(1.0), remove_matches=False)
-            log_image(data, "bw_lines_c_clusters", line_cluster_image(bw_lines_c))
+        bw_lines_c, suspect_lines = partition(lambda x: LineFunctions.line_angle_difference(x.angle, 0) > 0.01 and LineFunctions.line_angle_difference(x.angle, math.pi/2) > 0.01, bw_lines_c)
+
+        merge_lines(suspect_lines, search_width=max(diagonal/50, 3), angle_threshold=math.radians(3.0), remove_matches=False)
+        log_image(data, "bw_lines_c_clusters", line_cluster_image(suspect_lines))
+
+        for line in suspect_lines:
+            cluster_lines = list(filter(lambda x: x.cluster==line.cluster, suspect_lines))
+            if len(cluster_lines) < 3:
+                bw_lines_c.append(line)
+                continue
 
         log_lines(bw_lines_c, "bw_lines_c")
+
         lines.extend(bw_lines_c)
 
 
