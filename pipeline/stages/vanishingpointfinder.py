@@ -309,16 +309,6 @@ class PipelineVanishingPointFinder(PipelineStep):
         room = data["room"]
         image = data["downscaled"]
 
-        cluster_image = image.copy()
-        for i in range(0, len(data["lines"])):
-            # print(data["lines"][i].cluster)
-
-            cluster_lines = list(filter(lambda x: x.cluster==i, data["lines"]))
-            if len(cluster_lines) > 0:
-                draw_lines(cluster_image, cluster_lines, color=random_color(), thickness=2)
-
-        log_image(data, "cluster_image", cluster_image)
-
         diagonal = math.hypot(image.shape[0], image.shape[1])
 
         #find single vertical vanishing point

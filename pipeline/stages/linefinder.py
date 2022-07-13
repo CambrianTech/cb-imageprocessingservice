@@ -8,6 +8,7 @@ from numba.experimental import jitclass
 from time import time
 from scipy.spatial import distance
 
+from pipeline.misc.utils import random_color
 from pipeline.data.surface_type import SurfaceType
 from pipeline.components.line import Line, merge_lines, draw_lines, line_on_image_edge
 from pipeline.core import PipelineStep, PipelineStepIndex
@@ -148,13 +149,28 @@ class PipelineLineFinder(PipelineStep):
         data["normals_lines"] = normals_lines
 
         #merge all
-        lines = merge_lines(lines, search_width=min(diagonal/400, 16), search_length=1.1, angle_threshold=math.radians(5.0))
+        lines = merge_lines(lines, search_width=max(diagonal/500, 3), search_length=1.1, angle_threshold=math.radians(5.0))
         timer.log_elapsed("merge_lines final")
 
         #assign clusters:
-        merge_lines(lines, search_width=min(diagonal/150, 16), search_length=1.0, angle_threshold=math.radians(5.0), remove_matches=False)
-
+        merge_lines(lines, search_width=max(diagonal/100, 3), search_length=1.0, angle_threshold=math.radians(5.0), remove_matches=False)
         log_lines(lines, "merged_lines")
 
-        data["lines"] = lines
+        if im_logging_enabled(data):
+            cluster_image = data["downscaled"].copy()
+
+            draw_lines(cluster_image, lines, color=(0,0,0), thickness=1)
+
+            max_cluster = max(line.cluster for line in lines)
+
+            for i in range(0, max_cluster):
+                # print(data["lines"][i].cluster)
+
+                cluster_lines = list(filter(lambda x: x.cluster==i, lines))
+                if len(cluster_lines) > 0:
+                    draw_lines(cluster_image, cluster_lines, color=random_color(), thickness=2)
+
+            log_image(data, "cluster_image", cluster_image)
+
+        data["lines"] = lines        
 

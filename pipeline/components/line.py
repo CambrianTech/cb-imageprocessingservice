@@ -337,11 +337,13 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
         line_a = lines[i]
         if line_a.dead: continue
 
-        if line_a.cluster is None:
-            line_a.cluster = cluster_index
-
         rect_a = line_a.bounding_box(width=search_width, length_multiplier=search_length)
-        data = line_a.data.copy()
+
+        if remove_matches:
+            data = line_a.data.copy()
+        elif line_a.cluster is None:
+            line_a.cluster = cluster_index
+            cluster_index += 1
 
         for line_b in lines:
 
@@ -356,7 +358,8 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
 
             if result != 0:
                 if remove_matches:
-                    line_a.dead = line_b.dead = True
+                    line_a.dead = True
+                    line_b.dead = True
                     data = LineFunctions.merge_line_pair(data[0], data[1], data[2], data[3], \
                                                          line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], \
                                                          line_b.dx, line_b.dy)
@@ -366,6 +369,5 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
         if line_a.dead:
             lines[i] = Line(data[0], data[1], data[2], data[3], cluster=line_a.cluster)
 
-        cluster_index += 1
 
     return list(filter(lambda x: not x.dead, lines))
