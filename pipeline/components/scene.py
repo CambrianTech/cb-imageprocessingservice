@@ -121,12 +121,7 @@ class Scene():
                 if surface.mask[int(point[1]), int(point[0])] > 0:
                     return surface
 
-        return None
-    
-                            
-
-
-        return self._surfaces.values() if len(filters) is None else list(multi_filter(filters, self._surfaces.values())) 
+        return None 
 
     def get_surfaces(self, surfaceTypes=None, labels=None, dimension=None, point=None):
 

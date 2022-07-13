@@ -394,7 +394,7 @@ class Surface():
         if self._contours is None or self.moments is None:
 
             self._min_area = None
-            self._max_area = None
+            self._max_area = 0
 
             self._width = 0
             self._height = 0
@@ -407,6 +407,7 @@ class Surface():
 
             #remove border offset:
             self._contours = []
+            
             for contour in _contours:
                 shape = contour.shape
                 contour = (contour.flatten() - 1).reshape(shape)
