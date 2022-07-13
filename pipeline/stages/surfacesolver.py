@@ -37,32 +37,18 @@ class SurfaceSolver():
 
         log_segmentation_image(self.data, "room_labels_start", self.room.isolated_labels, self.room.image.copy(), get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
 
-        # for surfaceType in SurfaceType:
-        #     surfaces_of_type = self.room.get_surfaces([surfaceType])
-        #     refined_type = np.sum([surface.mask for surface in surfaces_of_type],0)
-        #     labels = self.room.isolated_labels
-        #     # labels[labels == surfaceType.value] = np.amax(labels) + 1
-        #     labels[refined_type > 0] = surfaceType.value
         #prepare
         self.lines_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
         draw_lines(self.lines_mask, self.data["vp_lines"], color=255, thickness=3, lineType=cv2.LINE_4)
 
         self.height, self.width = self.room.image.shape[:2]
         self.area = self.height * self.width
-        min_area = self.area / 1000
         self.diagonal = np.hypot(self.width, self.height)
         self.refine_surfaces()
 
         #preserve plane context information i.e. probs < min_confidence are ignored
         if im_logging_enabled(self.data):
             log_image(self.data, "room_refined", self.room.get_debug_image())
-
-        #invalid_mask = self.remove_invalid_surfaces()
-        # if im_logging_enabled(self.data) and cv2.countNonZero(invalid_mask) > 50:
-        #     debug = self.room.image.copy()
-        #     debug[invalid_mask > 0] = [255,0,0]
-        #     log_image(self.data, "room_removed", debug)
-        #invalid_mask[self.lines_mask > 0] = 255
 
         self.add_missing_surfaces(self.lines_mask)
         self.room.refresh_surfaces()
