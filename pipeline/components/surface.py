@@ -78,6 +78,9 @@ class Surface():
         self._clusters = []
         self._hvps = None
 
+        self._min_area = None
+        self._max_area = None
+
     @property
     def secondaryType(self) -> SurfaceType:
         return next(filter(lambda t: t != self.surfaceType, self.best_surface_types))
@@ -244,6 +247,11 @@ class Surface():
         return self._height
 
     @property
+    def min_area(self) -> list:
+        self.contours
+        return self._min_area
+
+    @property
     def max_area(self) -> list:
         self.contours
         return self._max_area
@@ -385,7 +393,9 @@ class Surface():
     def contours(self):
         if self._contours is None or self.moments is None:
 
-            self._max_area = 0
+            self._min_area = None
+            self._max_area = None
+
             self._width = 0
             self._height = 0
 
@@ -402,13 +412,15 @@ class Surface():
                 contour = (contour.flatten() - 1).reshape(shape)
 
                 area = cv2.contourArea(contour)
-                self._max_area = max(area, self._max_area)
+
+                self._min_area = area if self._min_area is None else min(area, self._min_area)
+                self._max_area = area if self._max_area is None else max(area, self._max_area)
 
                 x,y,w,h = cv2.boundingRect(contour)
                 self._width = max(self._width, w)
                 self._height = max(self._height, h)
 
-                padding = max(area / 10, 5)
+                padding = max(int(math.sqrt(area) / 10), 20)
 
                 cv2.drawContours(self._mask_edges, [contour], -1, 1, thickness=20)
 

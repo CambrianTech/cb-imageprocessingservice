@@ -6,7 +6,7 @@ import numpy as np
 from scipy import ndimage
 import cv2
 from termcolor import colored
-from skimage.morphology import remove_small_objects
+from skimage.morphology import remove_small_holes
 from skimage.segmentation import watershed
 from scipy.spatial import distance
 
@@ -62,11 +62,12 @@ class SurfaceSolver():
 
         if im_logging_enabled(self.data) and cv2.countNonZero(invalid_mask) > 50:
             debug = self.room.image.copy()
-            debug[invalid_mask > 0] = [0,255,0]
+            debug[invalid_mask > 0] = [255,0,0]
             log_image(self.data, "room_removed", debug)
         
         timer.time_event("remove_invalid_surfaces")
 
+        invalid_mask[self.lines_mask > 0] = 255
         self.add_missing_surfaces(invalid_mask)
         self.room.refresh_surfaces()
 
@@ -807,8 +808,10 @@ class SurfaceSolver():
                 mask[markers == (index + 1)] = 1
                 if use_lines:
                     mask[self.lines_mask > 0] = 0
+
                 kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(2,2))
                 mask = cv2.dilate(mask, kernel)
+                mask = remove_small_holes(mask, area_threshold=surface.max_area/50).astype(np.uint8)
 
                 if min_confidence is not None: 
                     mask[surface.probs < min_confidence] = 0
@@ -864,7 +867,6 @@ class SurfaceSolver():
         print("Remove invalid wall parts.")
 
         invalid_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
-        invalid_mask[self.lines_mask > 0] = 255
 
         for surface in self.room.get_surfaces([SurfaceType.Wall]):
             invalid_contours = []
@@ -886,28 +888,28 @@ class SurfaceSolver():
 
                 if area < min_area:
                     invalid_contours.append(contour)
-                else:
-                    inner_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
-                    cv2.drawContours(inner_mask, np.array(contour), 0, 1, cv2.FILLED)
+                # else:
+                #     inner_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
+                #     cv2.drawContours(inner_mask, np.array(contour), 0, 1, cv2.FILLED)
                     
-                    innerMean, innerStd = cv2.meanStdDev(self.room.image, mask=inner_mask)
+                #     innerMean, innerStd = cv2.meanStdDev(self.room.image, mask=inner_mask)
 
-                    outer_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
-                    contour_expanded = scale_contour(contour, scale, moments=M)
-                    cv2.drawContours(outer_mask, np.array(contour_expanded), 0, 1, cv2.FILLED)
-                    #outer_mask[inner_mask] = 0
-                    outerMean, outerStd = cv2.meanStdDev(self.room.image, mask=outer_mask)
+                #     outer_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
+                #     contour_expanded = scale_contour(contour, scale, moments=M)
+                #     cv2.drawContours(outer_mask, np.array(contour_expanded), 0, 1, cv2.FILLED)
+                #     #outer_mask[inner_mask] = 0
+                #     outerMean, outerStd = cv2.meanStdDev(self.room.image, mask=outer_mask)
 
-                    meanDiff = np.max(np.abs(innerMean - outerMean))
+                #     meanDiff = np.max(np.abs(innerMean - outerMean))
 
-                    #really want the standard deviation here, but opencv is returning ZEROS:
-                    #threshold = meanDiff + innerStd * meanDiff
+                #     #really want the standard deviation here, but opencv is returning ZEROS:
+                #     #threshold = meanDiff + innerStd * meanDiff
 
-                    print("surface %s(%d) %.2f" % (surface.name, i, meanDiff))
+                #     print("surface %s(%d) %.2f" % (surface.name, i, meanDiff))
 
-                    if meanDiff < 5:
-                        #print("remove %s" % name, meanDiff)
-                        invalid_contours.append(contour)
+                #     if meanDiff < 5:
+                #         #print("remove %s" % name, meanDiff)
+                #         invalid_contours.append(contour)
                    
             all_invalid_contours.extend(invalid_contours)
 
@@ -930,31 +932,6 @@ class SurfaceSolver():
 
         return invalid_mask
 
-    def finalize_masks(self, invalid_mask=None):
-
-        total_mask = []
-        markers = np.zeros((self.room.image.shape[0], self.room.image.shape[1]), dtype=np.int32)
-        if invalid_mask is not None:
-            markers[invalid_mask > 0] = -1
-
-        num_surfaces = len(self.room.surfaces)
-        for index in range(num_surfaces):
-            surface = self.room.surfaces[index]
-            markers[surface.mask > 0] = index + 1
-
-        markers = cv2.watershed(self.room.image, markers)
-        markers[markers<0] = 0
-
-        for index in range(num_surfaces):
-            surface = self.room.surfaces[index]
-            mask = np.zeros_like(surface.mask)
-            mask[markers == (index + 1)] = 1
-            # kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
-            # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-
-            surface.set_mask(mask)
-
-        log_markers(self.data, "room_final_markers", markers)
 
     def assign_parents(self):
 
