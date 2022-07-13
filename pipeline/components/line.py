@@ -364,7 +364,13 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
                                                          line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], \
                                                          line_b.dx, line_b.dy)
                 else:
-                    line_b.cluster = line_a.cluster
+                    if line_b.cluster is None:
+                        line_b.cluster = line_a.cluster
+                    else:
+                        cluster_lines = list(filter(lambda x: x.cluster==line_b.cluster, lines))
+                        
+                        for line in cluster_lines:
+                            line.cluster = line_a.cluster
 
         if line_a.dead:
             lines[i] = Line(data[0], data[1], data[2], data[3], cluster=line_a.cluster)

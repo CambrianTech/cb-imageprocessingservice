@@ -153,7 +153,7 @@ class PipelineLineFinder(PipelineStep):
         timer.log_elapsed("merge_lines final")
 
         #assign clusters:
-        merge_lines(lines, search_width=max(diagonal/100, 3), search_length=1.0, angle_threshold=math.radians(5.0), remove_matches=False)
+        merge_lines(lines, search_width=max(diagonal/150, 3), search_length=1.2, angle_threshold=math.radians(5.0), remove_matches=False)
         log_lines(lines, "merged_lines")
 
         if im_logging_enabled(data):
@@ -164,13 +164,11 @@ class PipelineLineFinder(PipelineStep):
             max_cluster = max(line.cluster for line in lines)
 
             for i in range(0, max_cluster):
-                # print(data["lines"][i].cluster)
-
                 cluster_lines = list(filter(lambda x: x.cluster==i, lines))
                 if len(cluster_lines) > 0:
                     draw_lines(cluster_image, cluster_lines, color=random_color(), thickness=2)
 
             log_image(data, "cluster_image", cluster_image)
 
-        data["lines"] = lines        
+        data["lines"] = lines
 
