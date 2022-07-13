@@ -421,9 +421,9 @@ class Surface():
                 self._width = max(self._width, w)
                 self._height = max(self._height, h)
 
-                padding = max(int(math.sqrt(area) / 10), 20)
+                padding = max(int(math.sqrt(area) / 20), 20)
 
-                cv2.drawContours(self._mask_edges, [contour], -1, 1, thickness=20)
+                cv2.drawContours(self._mask_edges, [contour], -1, 1, thickness=padding)
 
                 self._contours.append(contour)
 

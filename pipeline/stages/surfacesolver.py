@@ -118,15 +118,56 @@ class SurfaceSolver():
                     best = sorted(neighbors, key=lambda s: s.max_area, reverse=True)
                     best[0].merge(surface)
                 else:
-                    surface.destroy()
+                    best = sorted(self.room.get_surfaces([surface.surfaceType]), key=lambda s: sum(abs(s.normals_mean - surface.normals_mean)))
+                    best[0].merge(surface)
 
 
 
     def find_trim(self):
-        for wall in self.room.get_surfaces([SurfaceType.Wall]):
-            for vp in wall.horizontal_vps:
-                print("vps", len(vp.inliers))
 
+        candidate_surfaces = []
+        debug = self.room.image.copy()
+
+        min_area = 1/100
+        total_area = self.room.image.shape[0] * self.room.image.shape[1]
+        area_threshold = int(total_area * min_area)
+
+        def is_mask_line(line, mask, num_points=7, num_matches=3):
+            line_points = np.linspace(line.point_a, line.point_b, num_points)
+            count = 0
+            for point in line_points:
+                if point[0] < 0 or point[0] >= mask.shape[1] or point[1] < 0 or point[1] >= mask.shape[0]: continue
+
+                if mask[int(point[1]), int(point[0])] > 0:
+                    count += 1
+
+                if count > num_matches:
+                    return True
+
+            return False
+
+        trim_surfaces = self.room.get_surfaces([SurfaceType.Wall, SurfaceType.OnWall, SurfaceType.Ceiling])
+        trim_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
+
+        for surface in trim_surfaces:
+            trim_mask[surface.mask_edges > 0] = 1
+
+        debug[trim_mask > 0] = [0,0,255]
+        alpha = 0.3
+        debug = cv2.addWeighted(debug, alpha, self.room.image, 1 - alpha, 0)
+
+        for surface in trim_surfaces:
+
+            for contour in surface.contours:
+                if cv2.contourArea(contour) <= area_threshold and surface.surfaceType in [SurfaceType.Wall, SurfaceType.Ceiling]:
+                    cv2.drawContours(debug, [contour], 0, random_color(), -1)            
+
+        line_candidates = list(filter(lambda line: is_mask_line(line, trim_mask), self.data["vp_lines"]))
+
+        draw_lines(debug, self.data["vp_lines"], color=(255, 0, 0), thickness=1,lineType=cv2.LINE_AA)
+        draw_lines(debug, line_candidates, color=(255, 255, 0), thickness=2,lineType=cv2.LINE_AA)
+
+        log_image(self.data, "trim_candidates", debug)
 
 
     def debug_vps(self):
