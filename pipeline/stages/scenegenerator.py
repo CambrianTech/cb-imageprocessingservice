@@ -6,7 +6,7 @@ from skimage.morphology import remove_small_objects
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, Timer
-from pipeline.components.scene import Scene
+from pipeline.components.room import Room
 from pipeline.components.surface import Surface
 
 class SceneGenerator():
@@ -14,7 +14,7 @@ class SceneGenerator():
     def __init__(self, data):
         super().__init__()
         self.data = data
-        self.room = Scene(data)
+        self.room = Room(data)
 
     def generate(self):
         

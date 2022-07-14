@@ -30,21 +30,21 @@ class SurfaceRefinement():
 
         markers = np.zeros(self.image.shape[:2], dtype=np.int32)
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
-        watershed_mask = np.zeros(markers.shape, dtype=np.int32)
+        watershed_mask = np.ones(markers.shape, dtype=np.int32)
 
         color = 1
         scale = self.image.shape[0] / self.data["downscaled"].shape[0]
-        thickness = 5 + int(scale * 2)
+        thickness = 5 + int(scale * 5)
 
         for surface in self.room.surfaces:
             
             contours, hierarchy = cv2.findContours(surface.hires_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
             cv2.drawContours(markers, contours, -1, color, cv2.FILLED)
-            cv2.drawContours(watershed_mask, contours, -1, 1, cv2.FILLED)
+            #cv2.drawContours(watershed_mask, contours, -1, 1, cv2.FILLED)
 
             cv2.drawContours(markers, contours, -1, 0, thickness)
-            cv2.drawContours(watershed_mask, contours, -1, 1, thickness)
+            #cv2.drawContours(watershed_mask, contours, -1, 1, thickness)
 
             color += 1
 
@@ -54,13 +54,15 @@ class SurfaceRefinement():
             vp_lines.extend(vp.inliers)
 
 
-        # draw_lines(src, vp_lines, color=(0,0,0), scale=src_scale)
-        # draw_lines(src, self.data["lines"], color=(255,0,255), scale=src_scale)
-        #draw_lines(markers, vp_lines, color=255, scale=src_scale, lineType=cv2.LINE_4)
+        # draw_lines(src, vp_lines, color=(0,0,0), scale=scale)
+        # draw_lines(src, self.data["lines"], color=(255,0,255), scale=scale)
 
-        log_markers(self.data, "room_markers", markers, primary=True, num_labels=len(self.room.surfaces))
+        barrier_lines = list(map(lambda line: line.extended(1.1), self.room.barrier_lines))
+        draw_lines(watershed_mask, barrier_lines, color=0, scale=scale, lineType=cv2.LINE_4)
 
         #watershed_mask = adjust_mask(cv2.dilate, watershed_mask, size=3)
+
+        log_markers(self.data, "room_markers", markers, primary=True, num_labels=len(self.room.surfaces))
 
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
@@ -78,6 +80,10 @@ class SurfaceRefinement():
         for surface in self.room.surfaces:
             mask = np.zeros_like(surface.hires_mask)
             mask[markers == color] = 1
+
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+            mask = cv2.dilate(mask, kernel)
+
             surface.hires_mask = mask
             color += 1
 

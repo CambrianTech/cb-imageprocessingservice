@@ -11,7 +11,7 @@ from pipeline.data.logging import im_logging_enabled
 
 indexed_fields = ["plane_parameters", "plane_normals", "plane_offsets", "plane_clusters"]
 
-class Scene():
+class Room():
 
     def __init__(self, data):
         super().__init__()
@@ -23,6 +23,7 @@ class Scene():
         self._normals = None
         self.vertical_vp = None
         self.horizontal_vps = None
+        self.barrier_lines = None
 
         ade_seg_c = np.dstack(tuple(self.data["isolated"]))
         self.isolated_labels = np.int32(np.argmax(ade_seg_c, -1))

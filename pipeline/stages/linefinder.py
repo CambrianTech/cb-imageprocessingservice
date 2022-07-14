@@ -15,7 +15,6 @@ from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.logging import log_image, im_logging_enabled, LogLevel
 from cambrian.LineFunctions import LineFunctions
 
-
 def gabor(bw, theta, lambd, gamma = 0.0, psi = 0.0):
     ksize = lambd
     sigma = ksize * lambd
@@ -39,11 +38,16 @@ class PipelineLineFinder(PipelineStep):
     @property
     def output_keys(self) -> list:
         return ["lines", "hed_lines", "normals_lines"]
+
+    """ True will turn on all line logging """
+    @property
+    def detailed_logging(self) -> bool:
+        return False
     
     def run(self, data):
 
-        def log_lines(lines, name):
-            if not im_logging_enabled(data, LogLevel.Lines): return
+        def log_lines(lines, name, primary=False):
+            if not im_logging_enabled(data, LogLevel.Lines) or (not primary and not self.detailed_logging): return
 
             debug = data["downscaled"].copy()
             thickness = max(int(math.hypot(debug.shape[0], debug.shape[1]) / 600), 1)
@@ -117,7 +121,7 @@ class PipelineLineFinder(PipelineStep):
         bw_lines_c, suspect_lines = partition(lambda x: LineFunctions.line_angle_difference(x.angle, 0) > 0.01 and LineFunctions.line_angle_difference(x.angle, math.pi/2) > 0.01, bw_lines_c)
 
         merge_lines(suspect_lines, search_width=max(diagonal/50, 3), angle_threshold=math.radians(3.0), remove_matches=False)
-        log_image(data, "bw_lines_c_clusters", line_cluster_image(suspect_lines))
+        #log_image(data, "bw_lines_c_clusters", line_cluster_image(suspect_lines))
 
         for line in suspect_lines:
             cluster_lines = list(filter(lambda x: x.cluster==line.cluster, suspect_lines))
@@ -154,7 +158,7 @@ class PipelineLineFinder(PipelineStep):
 
         #assign clusters:
         merge_lines(lines, search_width=max(diagonal/150, 3), search_length=1.2, angle_threshold=math.radians(5.0), remove_matches=False)
-        log_lines(lines, "merged_lines")
+        log_lines(lines, "merged_lines", primary=True)
 
         if im_logging_enabled(data):
             cluster_image = line_cluster_image(lines)

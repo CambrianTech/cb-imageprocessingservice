@@ -64,10 +64,6 @@ class SurfaceSolver():
 
         self.find_trim()
 
-        #log_segmentation_image(self.data, "isolated_labels_normals", vertical_labels, self.room.normals, get_image=False, labelset=SurfaceType,opacity=1, avg=True)
-
-        #log_segmentation_image(self.data, "isolated_labels_image", vertical_labels, surface_image, get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
-
         if im_logging_enabled(self.data):
             self.debug_vps()
 
@@ -150,6 +146,8 @@ class SurfaceSolver():
 
         draw_lines(debug, self.data["vp_lines"], color=(255, 0, 0), thickness=1,lineType=cv2.LINE_AA)
         draw_lines(debug, line_candidates, color=(255, 255, 0), thickness=2,lineType=cv2.LINE_AA)
+
+        self.room.barrier_lines = line_candidates
 
         log_image(self.data, "trim_candidates", debug)
 

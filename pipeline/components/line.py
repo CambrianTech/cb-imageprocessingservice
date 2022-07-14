@@ -84,7 +84,7 @@ class Line():
             direction = vanishing_point - self.midpoint
             direction /= np.linalg.norm(direction)
 
-        amount = self.length * ratio
+        amount = self.length * ratio * 0.5
         data = self.data.copy()
 
         if from_a:
