@@ -25,9 +25,6 @@ class SurfaceRefinement():
         
     def refine(self, use_HED=False):
 
-        self.data["lighting"] = cv2.edgePreservingFilter(np.uint8(self.data["lighting"]), flags=1, sigma_s=10, sigma_r=1.0)
-        log_image(self.data, 'lighting_smooth', self.data["lighting"])
-
         markers = np.zeros(self.image.shape[:2], dtype=np.int32)
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
         watershed_mask = np.ones(markers.shape, dtype=np.int32)

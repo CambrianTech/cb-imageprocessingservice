@@ -53,6 +53,9 @@ class PipelineExtractSurfaces(PipelineStep):
 
     def run(self, data):
 
+        data["lighting"] = cv2.edgePreservingFilter(np.uint8(data["lighting"]), flags=1, sigma_s=10, sigma_r=1.0)
+        log_image(data, 'lighting_smooth', data["lighting"])
+
         #Consolidate types: Include other types as part of floor: rug, earth, grass
         output = data["semantic_probs"]
 
