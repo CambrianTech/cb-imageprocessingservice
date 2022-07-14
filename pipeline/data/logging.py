@@ -179,19 +179,34 @@ def draw_legend(data:dict, debug:np.ndarray, legend:tuple):
         x = start_location[0]
         y += line_height
 
+def get_markers_image(data:dict, markers, mask=None, num_labels=None):
+    if num_labels is None:
+        num_labels = markers.max()
+
+    alpha = 255 * (num_labels + 1) / (num_labels + 2)
+    debug = markers * alpha
+
+    if mask is not None:
+        debug[mask == 0] = 255
+
+    debug[markers == -1] = 128
+    return debug
+
+def overlay_image(foreground, background, opacity=0.5):
+    _foreground = foreground.astype(np.uint8)
+    _background = background.astype(np.uint8)
+
+    if len(_foreground.shape) != len(_background.shape):
+        if len(_foreground.shape) == 2:
+            _foreground = cv2.cvtColor(_foreground, cv2.COLOR_GRAY2RGB)
+        elif len(_background.shape) == 2:
+            _background = cv2.cvtColor(_background, cv2.COLOR_GRAY2RGB)
+            
+    return cv2.addWeighted(_background, opacity, _foreground, 1.0 - opacity, 0)
+
 def log_markers(data:dict, name, markers, mask=None, num_labels=None, primary=False):
     if im_logging_enabled(data, LogLevel.Markers) or (primary and im_logging_enabled(data)):
-        if num_labels is None:
-            num_labels = markers.max()
-
-        alpha = 255 * (num_labels + 1) / (num_labels + 2)
-        debug = markers * alpha
-
-        if mask is not None:
-            debug[mask == 0] = 255
-
-        debug[markers == -1] = 128
-
+        debug = get_markers_image(data, markers, mask, num_labels)
         _log_image(data, name, debug)
 
 def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", labelset=ADE20K,  opacity=0.5, get_image=False, min_matches=100, primary=False):
