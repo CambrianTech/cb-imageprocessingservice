@@ -87,7 +87,8 @@ class PipelineBarrierFinder(PipelineStep):
         else:
             log_mask(self.data, "%s_mask" % name, watershed_mask)
 
-        log_markers(self.data, "%s_markers" % name, markers, primary=True, num_labels=color)
+
+        log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"])
 
         markers = np.int32(watershed(watershed_image, markers, mask=None if outside_freedom > 0 else watershed_mask))
         markers[markers<0] = 0
@@ -100,7 +101,7 @@ class PipelineBarrierFinder(PipelineStep):
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
 
-        self.refine_semantics([ ([ADE20K.ceiling], 0.2), ([ADE20K.wall], 0.2), (box_like, 0.03),  (on_wall, 0.1), ([ADE20K.fan, ADE20K.light, ADE20K.lamp, ADE20K.chandelier], 0.01) ], name="major")
+        self.refine_semantics([ ([ADE20K.ceiling], 0.2), ([ADE20K.wall], 0.2), (box_like, 0.03),  (on_wall, 0.1) ], name="major")
 
         #self.refine_semantics([ ([ADE20K.ceiling, ADE20K.wall], 0.0), (on_wall, 0.1), (on_ceiling, 0.1) ], outside_freedom=0.1, name="on_ceiling_walls")
 
