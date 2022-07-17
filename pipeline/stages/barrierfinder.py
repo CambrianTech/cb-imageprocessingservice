@@ -11,7 +11,7 @@ from skimage.segmentation import watershed
 from cambrian.LineFunctions import LineFunctions
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
-from pipeline.data.logging import log_image, im_logging_enabled, log_markers, log_segmentation_image
+from pipeline.data.logging import log_image, im_logging_enabled, log_markers, log_segmentation_image, log_mask
 from pipeline.misc.utils import convert_color
 from pipeline.components.line import draw_lines
 from .vanishingpointfinder import angle_with_vp
@@ -33,21 +33,21 @@ class PipelineBarrierFinder(PipelineStep):
     def output_keys(self) -> list:
         return []
 
-    def refine_semantics(self, label_freedoms:list):
+    def refine_semantics(self, label_freedoms:list, outside_freedom=0, name="semantic"):
 
         output = self.data["semantic_probs"]
         labels = np.argmax(np.dstack(output), -1)
 
         image = self.data["downscaled"]
         markers = np.zeros(image.shape[:2], dtype=np.int32)
-        
+
         watershed_image = cv2.resize(self.data["hed"], (image.shape[1], image.shape[0]))
         watershed_mask = np.zeros(markers.shape, dtype=np.int32)
 
         min_matches = 100
         num_labels = np.amax(labels) + 1
 
-        color = 1
+        color = 2
         for label in range(0, num_labels):
 
             label_mask = labels == label
@@ -72,12 +72,27 @@ class PipelineBarrierFinder(PipelineStep):
                 markers[dist_transform > freedom * dist_transform.max()] = color
                 color += 1
 
-        log_markers(self.data, "semantic_refinement_markers", markers, primary=True, num_labels=color)
+        if outside_freedom > 0:
+            inverted = np.ones(watershed_mask.shape, dtype=np.uint8)
+            inverted[watershed_mask > 0] = 0
+            inverted = cv2.copyMakeBorder(inverted, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=1)
 
-        markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
+            #log_mask(self.data, "%s_inverted" % name, inverted)
+
+            dist_transform = cv2.distanceTransform(inverted, cv2.DIST_L2, 5)
+            dist_transform = dist_transform[1:-1,1:-1]
+            watershed_mask[dist_transform < outside_freedom * dist_transform.max()] = 1
+
+            markers[watershed_mask == 0] = 1
+        else:
+            log_mask(self.data, "%s_mask" % name, watershed_mask)
+
+        log_markers(self.data, "%s_markers" % name, markers, primary=True, num_labels=color)
+
+        markers = np.int32(watershed(watershed_image, markers, mask=None if outside_freedom > 0 else watershed_mask))
         markers[markers<0] = 0
 
-        log_segmentation_image(self.data, "semantic_refinement", markers, self.data["downscaled"])
+        log_segmentation_image(self.data, "%s_refined" % name, markers, self.data["downscaled"])
 
     def run(self, data):
 
@@ -85,18 +100,7 @@ class PipelineBarrierFinder(PipelineStep):
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
 
-        # if value in [ADE20K.ceiling, ADE20K.wall]:
-        #     freedom = 0.2
-        # elif value in on_wall:
-        #     freedom = 0.05
-        # elif value in [ADE20K.floor]:
-        #     freedom = 0.03
-        # elif value in on_floor:
-        #     freedom = 0.03
-        # elif value in box_like:
-        #     freedom = 0.03
-        # elif value in on_ceiling:
-        #     freedom = 0.05
+        self.refine_semantics([ ([ADE20K.ceiling], 0.2), ([ADE20K.wall], 0.2), (box_like, 0.03),  (on_wall, 0.1), ([ADE20K.fan, ADE20K.light, ADE20K.lamp, ADE20K.chandelier], 0.01) ], name="major")
 
-        self.refine_semantics([ ([ADE20K.ceiling, ADE20K.wall], 0.2), ([ADE20K.floor, box_like], 0.03) ])
+        #self.refine_semantics([ ([ADE20K.ceiling, ADE20K.wall], 0.0), (on_wall, 0.1), (on_ceiling, 0.1) ], outside_freedom=0.1, name="on_ceiling_walls")
 

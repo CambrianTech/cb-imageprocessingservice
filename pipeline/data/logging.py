@@ -132,9 +132,9 @@ def log_data(data:dict):
 
 def log_mask(data:dict, name:str, mask, extension=".jpg", primary=False):
     if im_logging_enabled(data, LogLevel.Images) or (im_logging_enabled(data) and primary):
-        image = mask.copy()
-        mask[mask > 0] = 255
-        _log_image(data, name, mask, extension)
+        image = np.zeros_like(mask)
+        image[mask > 0] = 255
+        _log_image(data, name, image, extension)
                 
 def log_image(data:dict, name:str, image, extension=".jpg", primary=False):
     if im_logging_enabled(data, LogLevel.Images) or (im_logging_enabled(data) and primary):
