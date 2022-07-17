@@ -40,12 +40,12 @@ class PipelineBarrierFinder(PipelineStep):
 
         image = self.data["downscaled"]
         markers = np.zeros(image.shape[:2], dtype=np.int32)
+        
         watershed_image = cv2.resize(self.data["hed"], (image.shape[1], image.shape[0]))
-        watershed_mask = np.ones(markers.shape, dtype=np.int32)
+        watershed_mask = np.zeros(markers.shape, dtype=np.int32)
 
         min_matches = 100
         num_labels = np.amax(labels) + 1
-        freedom = 0.07
 
         color = 1
         for label in range(0, num_labels):
@@ -67,21 +67,7 @@ class PipelineBarrierFinder(PipelineStep):
                 dist_transform = cv2.distanceTransform(mask_padded, cv2.DIST_L2, 5)
                 dist_transform = dist_transform[1:-1,1:-1]
 
-                # if value in [ADE20K.ceiling, ADE20K.wall]:
-                #     freedom = 0.2
-                # elif value in on_wall:
-                #     freedom = 0.05
-                # elif value in [ADE20K.floor]:
-                #     freedom = 0.03
-                # elif value in on_floor:
-                #     freedom = 0.03
-                # elif value in box_like:
-                #     freedom = 0.03
-                # elif value in on_ceiling:
-                #     freedom = 0.05
-                # else:
-                #     watershed_mask[label_mask] = 0
-                #    continue
+                watershed_mask[label_mask] = 1
 
                 markers[dist_transform > freedom * dist_transform.max()] = color
                 color += 1
@@ -98,6 +84,19 @@ class PipelineBarrierFinder(PipelineStep):
         self.data = data
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
+
+        # if value in [ADE20K.ceiling, ADE20K.wall]:
+        #     freedom = 0.2
+        # elif value in on_wall:
+        #     freedom = 0.05
+        # elif value in [ADE20K.floor]:
+        #     freedom = 0.03
+        # elif value in on_floor:
+        #     freedom = 0.03
+        # elif value in box_like:
+        #     freedom = 0.03
+        # elif value in on_ceiling:
+        #     freedom = 0.05
 
         self.refine_semantics([ ([ADE20K.ceiling, ADE20K.wall], 0.2), ([ADE20K.floor, box_like], 0.03) ])
 
