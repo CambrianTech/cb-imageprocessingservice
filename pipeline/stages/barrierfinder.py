@@ -33,7 +33,7 @@ class PipelineBarrierFinder(PipelineStep):
     def output_keys(self) -> list:
         return []
 
-    def refine_semantics(self, label_freedoms:list, outside_freedom=0, name="semantic"):
+    def refine_semantics(self, label_freedoms:list, name="semantic"):
 
         output = self.data["semantic_probs"]
         labels = np.argmax(np.dstack(output), -1)
@@ -64,44 +64,33 @@ class PipelineBarrierFinder(PipelineStep):
                 mask[label_mask] = 1
                 watershed_mask[label_mask] = 1
 
+                mask_padded = cv2.copyMakeBorder(mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
                 contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
                 for contour in contours:
+                    shape = contour.shape
+                    contour = (contour.flatten() - 1).reshape(shape)
 
-                    #sub_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+                    sub_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+                    cv2.drawContours(sub_mask, [contour], -1, 1, thickness=cv2.FILLED)
                     cv2.drawContours(markers, [contour], -1, color, thickness=cv2.FILLED)
 
                     thickness = int(np.sqrt(cv2.contourArea(contour)) / 15)
                     cv2.drawContours(markers, [contour], -1, 0, thickness=thickness)
 
                     # # #padded transform
-                    # mask_padded = cv2.copyMakeBorder(sub_mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
-                    # dist_transform = cv2.distanceTransform(mask_padded, cv2.DIST_L2, 5)
-                    # dist_transform = dist_transform[1:-1,1:-1]
+                    mask_padded = cv2.copyMakeBorder(sub_mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
+                    dist_transform = cv2.distanceTransform(mask_padded, cv2.DIST_L2, 5)
+                    dist_transform = dist_transform[1:-1,1:-1]
 
-                    # markers[dist_transform > freedom * dist_transform.max()] = color
+                    markers[dist_transform > freedom * dist_transform.max()] = color
 
                 color += 1
 
-        if outside_freedom > 0:
-            inverted = np.ones(watershed_mask.shape, dtype=np.uint8)
-            inverted[watershed_mask > 0] = 0
-            inverted = cv2.copyMakeBorder(inverted, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=1)
-
-            #log_mask(self.data, "%s_inverted" % name, inverted)
-
-            dist_transform = cv2.distanceTransform(inverted, cv2.DIST_L2, 5)
-            dist_transform = dist_transform[1:-1,1:-1]
-            watershed_mask[dist_transform < outside_freedom * dist_transform.max()] = 1
-
-            markers[watershed_mask == 0] = 1
-        else:
-            log_mask(self.data, "%s_mask" % name, watershed_mask)
-
-
+        log_mask(self.data, "%s_mask" % name, watershed_mask)
         log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"])
 
-        markers = np.int32(watershed(watershed_image, markers, mask=None if outside_freedom > 0 else watershed_mask))
+        markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
 
         log_segmentation_image(self.data, "%s_refined" % name, markers, self.data["downscaled"])
@@ -112,7 +101,7 @@ class PipelineBarrierFinder(PipelineStep):
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
 
-        self.refine_semantics([ ([ADE20K.ceiling], 0.2), ([ADE20K.wall], 0.2), (box_like, 0.03),  (on_wall, 0.1) ], name="major")
+        self.refine_semantics([ ([ADE20K.ceiling], 0.2), ([ADE20K.wall], 0.2), (box_like, 0.03), (on_wall, 0.1)], name="wall_ceiling")
 
-        #self.refine_semantics([ ([ADE20K.ceiling, ADE20K.wall], 0.0), (on_wall, 0.1), (on_ceiling, 0.1) ], outside_freedom=0.1, name="on_ceiling_walls")
+        self.refine_semantics([ ([ADE20K.wall], 0.03), (box_like, 0.03), ([ADE20K.floor], 0.05), (on_floor, 0.05), (legged_objects, 0.05)], name="floor")
 
