@@ -9,6 +9,7 @@ from operator import attrgetter
 from skimage.segmentation import watershed
 
 from cambrian.LineFunctions import LineFunctions
+
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
 from pipeline.data.logging import log_image, im_logging_enabled, log_markers, log_segmentation_image, log_mask
@@ -19,6 +20,7 @@ from pipeline.misc.utils import random_color
 from pipeline.data.ade20k import ADE20K
 from pipeline.stages.extractsurfaces import on_floor, on_wall, on_ceiling, box_like, legged_objects
 from pipeline.components.rotated_rect import RotatedRect
+from pipeline.components.line import extend_lines
 
 class PipelineBarrierFinder(PipelineStep):
     @property
@@ -103,7 +105,8 @@ class PipelineBarrierFinder(PipelineStep):
             return False
         
         line_candidates = list(filter(lambda line: is_barrier_line(line, markers), self.data["vp_lines"]))
-        line_candidates = list(map(lambda x: x.extended(1.1), line_candidates))
+        line_candidates = extend_lines(line_candidates)
+
         draw_lines(watershed_mask, line_candidates, color=0, thickness=1, lineType=cv2.LINE_4)
 
 

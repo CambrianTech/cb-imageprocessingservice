@@ -377,3 +377,41 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
 
 
     return list(filter(lambda x: not x.dead, lines))
+
+
+def extend_lines(lines, search_width=1.0, search_length=1.33, orthagonal_threshold=np.radians(30)):
+
+    min_dist_sq = search_width * search_width
+
+    #list(map(lambda x: x.extended(1.05), line_candidates))
+
+    def set_closest_point(line, point):
+        data = line.data.copy()
+
+        if distance.sqeuclidean(line.point_a, point) < distance.sqeuclidean(line.point_b, point):
+            return Line(point[0], point[1], line.data[2], line.data[3])
+        else:
+            return Line(line.data[0], line.data[1], point[0], point[1])
+
+    for i in range(len(lines)):
+
+        rect_a = lines[i].bounding_box(width=search_width, length_multiplier=search_length)
+
+        for j in range(len(lines)):
+
+            if i == j: continue
+
+            if LineFunctions.line_angle_difference(lines[i].angle, lines[j].angle + 0.5 * np.pi) > orthagonal_threshold:
+                continue
+
+            rect_b = lines[j].bounding_box(width=search_width, length_multiplier=search_length)
+            result, intersection = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+
+            if result != 0:
+
+                point = np.mean(intersection, axis=0)[0]
+                
+                lines[i] = set_closest_point(lines[i], point)
+                lines[j] = set_closest_point(lines[j], point)
+
+    return lines
