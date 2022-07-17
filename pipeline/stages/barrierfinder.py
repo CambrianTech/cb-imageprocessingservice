@@ -103,8 +103,9 @@ class PipelineBarrierFinder(PipelineStep):
             return False
         
         line_candidates = list(filter(lambda line: is_barrier_line(line, markers), self.data["vp_lines"]))
+        line_candidates = list(map(lambda x: x.extended(1.1), line_candidates))
         draw_lines(watershed_mask, line_candidates, color=0, thickness=1, lineType=cv2.LINE_4)
-        
+
 
         log_mask(self.data, "%s_mask" % name, watershed_mask)
         log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"])
@@ -113,7 +114,7 @@ class PipelineBarrierFinder(PipelineStep):
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
 
-        
+
 
         log_segmentation_image(self.data, "%s_refined" % name, markers, self.data["downscaled"])
 
