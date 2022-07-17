@@ -65,7 +65,7 @@ class PipelineBarrierFinder(PipelineStep):
                 watershed_mask[label_mask] = 1
 
                 mask_padded = cv2.copyMakeBorder(mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
-                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                contours, _ = cv2.findContours(mask_padded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
                 for contour in contours:
                     shape = contour.shape
@@ -102,6 +102,5 @@ class PipelineBarrierFinder(PipelineStep):
         self.room = self.data["room"]
 
         self.refine_semantics([ ([ADE20K.ceiling], 0.2), ([ADE20K.wall], 0.2), (box_like, 0.03), (on_wall, 0.1)], name="wall_ceiling")
-
         self.refine_semantics([ ([ADE20K.wall], 0.03), (box_like, 0.03), ([ADE20K.floor], 0.05), (on_floor, 0.05), (legged_objects, 0.05)], name="floor")
 
