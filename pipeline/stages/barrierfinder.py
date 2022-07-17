@@ -87,11 +87,33 @@ class PipelineBarrierFinder(PipelineStep):
 
                 color += 1
 
+
+        def is_barrier_line(line, mask, num_points=7, num_matches=3):
+            line_points = np.linspace(line.point_a, line.point_b, num_points)
+            count = 0
+            for point in line_points:
+                if point[0] < 0 or point[0] >= mask.shape[1] or point[1] < 0 or point[1] >= mask.shape[0]: continue
+
+                if mask[int(point[1]), int(point[0])] == 0:
+                    count += 1
+
+                if count > num_matches:
+                    return True
+
+            return False
+        
+        line_candidates = list(filter(lambda line: is_barrier_line(line, markers), self.data["vp_lines"]))
+        draw_lines(watershed_mask, line_candidates, color=0, thickness=1, lineType=cv2.LINE_4)
+        
+
         log_mask(self.data, "%s_mask" % name, watershed_mask)
         log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"])
 
+
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
+
+        
 
         log_segmentation_image(self.data, "%s_refined" % name, markers, self.data["downscaled"])
 
@@ -102,5 +124,5 @@ class PipelineBarrierFinder(PipelineStep):
         self.room = self.data["room"]
 
         self.refine_semantics([ ([ADE20K.ceiling], 0.2), ([ADE20K.wall], 0.2), (box_like, 0.03), (on_wall, 0.1)], name="wall_ceiling")
-        self.refine_semantics([ ([ADE20K.wall], 0.03), (box_like, 0.03), ([ADE20K.floor], 0.05), (on_floor, 0.05), (legged_objects, 0.05)], name="floor")
+        self.refine_semantics([ ([ADE20K.wall], 0.02), (box_like, 0.03), ([ADE20K.floor], 0.05), ([ADE20K.stairs, ADE20K.stairway], 0.05), (on_floor, 0.05), (legged_objects, 0.05)], name="floor")
 

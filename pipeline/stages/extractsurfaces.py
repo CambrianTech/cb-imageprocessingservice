@@ -9,7 +9,7 @@ from pipeline.data.ade20k import ADE20K
 from pipeline.data.semanticlabel import SemanticLabel
 
 on_floor = [ADE20K.earth, ADE20K.grass, ADE20K.rug]
-on_wall = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.mirror, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen, ADE20K.radiator, ADE20K.sconce]
+on_wall = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.mirror, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen, ADE20K.radiator, ADE20K.sconce, ADE20K.towel]
 on_ceiling = [ADE20K.light, ADE20K.chandelier]
 lights = [ADE20K.light, ADE20K.lamp]
 box_like = [ADE20K.cabinet, ADE20K.dishwasher, ADE20K.oven, ADE20K.fireplace, ADE20K.kitchen]
