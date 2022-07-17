@@ -1,9 +1,6 @@
 from enum import Enum
 import numpy as np
 import cv2
-from skimage.segmentation import watershed
-from skimage.filters import rank
-from skimage.morphology import disk
 
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
@@ -54,61 +51,6 @@ class PipelineExtractSurfaces(PipelineStep):
     def output_keys(self) -> list:
         return ["output", "isolated"]
 
-    def refine_semantics(self, data):
-
-        output = data["semantic_probs"]
-        labels = np.argmax(np.dstack(output), -1)
-
-        image = data["downscaled"]
-        markers = np.zeros(image.shape[:2], dtype=np.int32)
-        watershed_image = cv2.resize(data["hed"], (image.shape[1], image.shape[0]))
-        watershed_mask = np.ones(markers.shape, dtype=np.int32)
-
-        min_matches = 100
-        num_labels = np.amax(labels) + 1
-        freedom = 0.07
-
-        color = 1
-        for label in range(0, num_labels):
-
-            label_mask = labels == label
-
-            if len(labels[label_mask]) > min_matches:
-                mask = np.zeros(image.shape[:2], dtype=np.uint8)
-                mask[label_mask] = 1
-
-                #padded transform
-                mask_padded = cv2.copyMakeBorder(mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
-                dist_transform = cv2.distanceTransform(mask_padded, cv2.DIST_L2, 5)
-                dist_transform = dist_transform[1:-1,1:-1]
-
-                value = label + 1
-                if value in [ADE20K.ceiling, ADE20K.wall]:
-                    freedom = 0.2
-                elif value in on_wall:
-                    freedom = 0.05
-                elif value in [ADE20K.floor]:
-                    freedom = 0.03
-                elif value in on_floor:
-                    freedom = 0.03
-                elif value in box_like:
-                    freedom = 0.03
-                elif value in on_ceiling:
-                    freedom = 0.05
-                else:
-                    watershed_mask[label_mask] = 0
-                    continue
-
-                markers[dist_transform > freedom * dist_transform.max()] = color
-                color += 1
-
-        log_markers(data, "label_markers", markers, primary=True, num_labels=color)
-
-        markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
-        markers[markers<0] = 0
-
-        log_segmentation_image(data, "semantic_refinement", markers, data["downscaled"])
-
 
     def run(self, data):
 
@@ -138,7 +80,3 @@ class PipelineExtractSurfaces(PipelineStep):
             log_segmentation_image(data, "surface_probs", np.argmax(isolated_probs, -1), data["downscaled"], labelset=SurfaceType)
 
             log_segmentation_image(data, "everything", labels, data["downscaled"])
-
-
-        self.refine_semantics(data)
-
