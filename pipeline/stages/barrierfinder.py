@@ -33,7 +33,7 @@ class PipelineBarrierFinder(PipelineStep):
     def output_keys(self) -> list:
         return []
 
-    def refine_semantics(self):
+    def refine_semantics(self, label_freedoms:list):
 
         output = self.data["semantic_probs"]
         labels = np.argmax(np.dstack(output), -1)
@@ -52,7 +52,13 @@ class PipelineBarrierFinder(PipelineStep):
 
             label_mask = labels == label
 
-            if len(labels[label_mask]) > min_matches:
+            value = label + 1
+
+            match = next(filter(lambda x: value in x[0], label_freedoms), None)
+
+            freedom = match[1] if match is not None else None
+
+            if freedom is not None and len(labels[label_mask]) > min_matches:
                 mask = np.zeros(image.shape[:2], dtype=np.uint8)
                 mask[label_mask] = 1
 
@@ -61,22 +67,21 @@ class PipelineBarrierFinder(PipelineStep):
                 dist_transform = cv2.distanceTransform(mask_padded, cv2.DIST_L2, 5)
                 dist_transform = dist_transform[1:-1,1:-1]
 
-                value = label + 1
-                if value in [ADE20K.ceiling, ADE20K.wall]:
-                    freedom = 0.2
-                elif value in on_wall:
-                    freedom = 0.05
-                elif value in [ADE20K.floor]:
-                    freedom = 0.03
-                elif value in on_floor:
-                    freedom = 0.03
-                elif value in box_like:
-                    freedom = 0.03
-                elif value in on_ceiling:
-                    freedom = 0.05
-                else:
-                    watershed_mask[label_mask] = 0
-                    continue
+                # if value in [ADE20K.ceiling, ADE20K.wall]:
+                #     freedom = 0.2
+                # elif value in on_wall:
+                #     freedom = 0.05
+                # elif value in [ADE20K.floor]:
+                #     freedom = 0.03
+                # elif value in on_floor:
+                #     freedom = 0.03
+                # elif value in box_like:
+                #     freedom = 0.03
+                # elif value in on_ceiling:
+                #     freedom = 0.05
+                # else:
+                #     watershed_mask[label_mask] = 0
+                #    continue
 
                 markers[dist_transform > freedom * dist_transform.max()] = color
                 color += 1
@@ -94,5 +99,5 @@ class PipelineBarrierFinder(PipelineStep):
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
 
-        self.refine_semantics()
+        self.refine_semantics([ ([ADE20K.ceiling, ADE20K.wall], 0.2), ([ADE20K.floor, box_like], 0.03) ])
 
