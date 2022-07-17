@@ -59,17 +59,25 @@ class PipelineBarrierFinder(PipelineStep):
             freedom = match[1] if match is not None else None
 
             if freedom is not None and len(labels[label_mask]) > min_matches:
+
                 mask = np.zeros(image.shape[:2], dtype=np.uint8)
                 mask[label_mask] = 1
-
-                #padded transform
-                mask_padded = cv2.copyMakeBorder(mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
-                dist_transform = cv2.distanceTransform(mask_padded, cv2.DIST_L2, 5)
-                dist_transform = dist_transform[1:-1,1:-1]
-
                 watershed_mask[label_mask] = 1
 
-                markers[dist_transform > freedom * dist_transform.max()] = color
+                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+                for contour in contours:
+
+                    sub_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+                    cv2.drawContours(sub_mask, [contour], -1, 1, thickness=cv2.FILLED)
+
+                    #padded transform
+                    mask_padded = cv2.copyMakeBorder(sub_mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
+                    dist_transform = cv2.distanceTransform(mask_padded, cv2.DIST_L2, 5)
+                    dist_transform = dist_transform[1:-1,1:-1]
+
+                    markers[dist_transform > freedom * dist_transform.max()] = color
+
                 color += 1
 
         if outside_freedom > 0:
