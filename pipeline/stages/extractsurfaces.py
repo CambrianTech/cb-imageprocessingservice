@@ -12,9 +12,15 @@ from pipeline.data.semanticlabel import SemanticLabel
 from pipeline.misc.utils import list_flatten
 from pipeline.components.line import extend_lines, draw_lines
 
-on_floor = [ADE20K.earth, ADE20K.grass, ADE20K.rug]
+floor = [ADE20K.floor, ADE20K.grass, ADE20K.earth, ADE20K.sidewalk]
+on_floor = [ADE20K.rug]
+
+wall = [ADE20K.wall]
 on_wall = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.mirror, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen, ADE20K.radiator, ADE20K.sconce, ADE20K.towel]
+
+ceiling = [ADE20K.ceiling]
 on_ceiling = [ADE20K.light, ADE20K.chandelier]
+
 lights = [ADE20K.light, ADE20K.lamp]
 box_like = [ADE20K.cabinet, ADE20K.dishwasher, ADE20K.oven, ADE20K.fireplace, ADE20K.kitchen]
 legged_objects = [ADE20K.table, ADE20K.chair, ADE20K.bed, ADE20K.cabinet, ADE20K.chest, ADE20K.coffee_table, ADE20K.stool, ADE20K.bench, ADE20K.ottoman, ADE20K.armchair, ADE20K.chest]
@@ -31,28 +37,34 @@ class LF():
         except:
             return -1
 
-def isolate_masks(data, output):
+def isolate_masks(data, semantic_probs, semantic_labels):
 
-    isolated = list([None] * (SurfaceType.max_index() + 1))
-
-    isolated[SurfaceType.Floor] = output[ADE20K.floor.index]
-    isolated[SurfaceType.Wall] = output[ADE20K.wall.index]
-    isolated[SurfaceType.Ceiling] = output[ADE20K.ceiling.index]
+    isolated_probs = list([None] * (SurfaceType.max_index() + 1))
+    isolated_labels = -1 * np.ones_like(semantic_labels)
     
-    def combine_outputs(grouping, labels):
-        isolated[grouping] = np.zeros_like(isolated[SurfaceType.Floor])
-        for label in labels:
-            isolated[grouping] += output[label.index]
+    def combine_outputs(grouping, label_list):
+        isolated_probs[grouping] = np.zeros_like(semantic_probs[ADE20K.floor.index])
+
+        for label in label_list:
+            isolated_probs[grouping.index] += semantic_probs[label.index]
+            isolated_labels[semantic_labels == label.index] = grouping.index
+
 
     #group wall like, floor like, ceiling like
+    combine_outputs(SurfaceType.Floor, floor)
     combine_outputs(SurfaceType.OnFloor, on_floor)
+
+    combine_outputs(SurfaceType.Wall, wall)
     combine_outputs(SurfaceType.OnWall, on_wall)
+
+    combine_outputs(SurfaceType.Ceiling, ceiling)
     combine_outputs(SurfaceType.OnCeiling, on_ceiling)
 
     #label everything else as other
-    isolated[SurfaceType.Other] = 1.0 - sum(isolated[:-1])
+    isolated_probs[SurfaceType.Other] = 1.0 - sum(isolated_probs[:-1])
+    isolated_labels[isolated_labels < 0] = SurfaceType.Other.index
 
-    return isolated
+    return isolated_probs, isolated_labels
 
 class PipelineExtractSurfaces(PipelineStep):
 
@@ -165,22 +177,24 @@ class PipelineExtractSurfaces(PipelineStep):
         self.data = data
 
         #Consolidate types: Include other types as part of floor: rug, earth, grass
-        output = self.data["semantic_probs"]
+        self.data["semantic_labels"] = np.argmax(np.dstack(self.data["semantic_probs"]), -1)
 
-        self.data["semantic_labels"] = np.argmax(np.dstack(output), -1)
-
-        #log_segmentation_image(self.data, "semantic_labels_initial", self.data["semantic_labels"], self.data["downscaled"])
+        if im_logging_enabled(data, LogLevel.Segmentation):
+            log_segmentation_image(self.data, "semantic_labels_raw", self.data["semantic_labels"], self.data["downscaled"])
 
         self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), LF(box_like, 0.03), LF(on_wall, 0.1)], name="barriers_wc")
         self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
                               LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)], name="barriers_floor")
 
         #combine_floor_masks(output)
-        self.data["isolated"] = isolate_masks(data, output) #break masks into surface types
-
+        self.data["isolated_probs"], self.data["isolated_labels"] = isolate_masks(data, self.data["semantic_probs"], self.data["semantic_labels"]) #break masks into surface types
 
         if im_logging_enabled(data, LogLevel.Segmentation):
-            isolated_probs = np.dstack(data["isolated"])
-            log_segmentation_image(self.data, "surface_probs", np.argmax(isolated_probs, -1), self.data["downscaled"], labelset=SurfaceType)
-
             log_segmentation_image(self.data, "semantic_labels", self.data["semantic_labels"], self.data["downscaled"])
+
+            isolated_probs = np.argmax(np.dstack(self.data["isolated_probs"]), -1)
+            log_segmentation_image(self.data, "isolated_probs", isolated_probs, self.data["downscaled"], labelset=SurfaceType)
+
+            log_segmentation_image(self.data, "isolated_labels", self.data["isolated_labels"], self.data["downscaled"], labelset=SurfaceType)
+
+            
