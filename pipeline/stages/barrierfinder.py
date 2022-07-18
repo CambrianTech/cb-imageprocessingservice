@@ -127,16 +127,24 @@ class PipelineBarrierFinder(PipelineStep):
 
         draw_lines(watershed_mask, line_candidates, color=0, thickness=1, lineType=cv2.LINE_4)
 
-
         log_mask(self.data, "%s_mask" % name, watershed_mask)
         log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"], labelset=semantic_key)
 
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
+        markers[watershed_mask == 0] = 0
 
-        # for label in range(1, num_labels):
-        #     mask = np.zeros(image.shape[:2], dtype=np.uint8)
-        #     mask[markers == color] = 1
+        for value in np.unique(markers):
+            
+            markers_mask = markers == value
+
+            mask = np.zeros(image.shape[:2], dtype=np.uint8)
+            mask[markers_mask] = 1
+
+            
+
+            #semantic_label = semantic_key[value] if value in semantic_key else "other"
+            #log_mask(self.data, "%s_%s_mask" % (name, semantic_label), mask)
 
         log_segmentation_image(self.data, "%s_refined" % name, markers, self.data["downscaled"], labelset=semantic_key)
 
@@ -146,6 +154,6 @@ class PipelineBarrierFinder(PipelineStep):
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
 
-        self.refine_semantics([ LabelFreedom([ADE20K.ceiling], 0.2), LabelFreedom([ADE20K.wall], 0.2), LabelFreedom(box_like, 0.03), LabelFreedom(on_wall, 0.1)], name="wall_ceiling")
-        self.refine_semantics([ LabelFreedom([ADE20K.wall], 0.02), LabelFreedom(box_like, 0.03), LabelFreedom([ADE20K.floor], 0.05), LabelFreedom([ADE20K.stairs, ADE20K.stairway], 0.05), LabelFreedom(on_floor, 0.05), LabelFreedom(legged_objects, 0.05)], name="floor")
+        self.refine_semantics([ LabelFreedom([ADE20K.ceiling], 0.2), LabelFreedom([ADE20K.wall], 0.2), LabelFreedom(box_like, 0.03), LabelFreedom(on_wall, 0.1)], name="barriers_wc")
+        self.refine_semantics([ LabelFreedom([ADE20K.wall], 0.02), LabelFreedom(box_like, 0.03), LabelFreedom([ADE20K.floor], 0.05), LabelFreedom([ADE20K.stairs, ADE20K.stairway], 0.05), LabelFreedom(on_floor, 0.05), LabelFreedom(legged_objects, 0.05)], name="barriers_floor")
 
