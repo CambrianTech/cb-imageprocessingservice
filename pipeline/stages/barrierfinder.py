@@ -24,7 +24,7 @@ from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.line import extend_lines
 
 
-class LabelFreedom():
+class LF():
 
     def __init__(self, labels, freedom):
         self.labels = list_flatten(labels)
@@ -49,10 +49,7 @@ class PipelineBarrierFinder(PipelineStep):
     def output_keys(self) -> list:
         return []
 
-    def refine_semantics(self, label_freedoms:list, name="semantic"):
-
-        output = self.data["semantic_probs"]
-        labels = np.argmax(np.dstack(output), -1)
+    def refine_semantics(self, labels, label_freedoms:list, name="semantic"):
 
         image = self.data["downscaled"]
         markers = np.zeros(image.shape[:2], dtype=np.int32)
@@ -135,14 +132,17 @@ class PipelineBarrierFinder(PipelineStep):
         markers[watershed_mask == 0] = 0
 
         for value in np.unique(markers):
+
+            if value == 0: continue
+            
+            label = value - 1
             
             markers_mask = markers == value
 
-            mask = np.zeros(image.shape[:2], dtype=np.uint8)
-            mask[markers_mask] = 1
+            labels[markers_mask] = label
 
-            
-
+            #mask = np.zeros(image.shape[:2], dtype=np.uint8)
+            #mask[markers_mask] = 1
             #semantic_label = semantic_key[value] if value in semantic_key else "other"
             #log_mask(self.data, "%s_%s_mask" % (name, semantic_label), mask)
 
@@ -154,6 +154,10 @@ class PipelineBarrierFinder(PipelineStep):
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
 
-        self.refine_semantics([ LabelFreedom([ADE20K.ceiling], 0.2), LabelFreedom([ADE20K.wall], 0.2), LabelFreedom(box_like, 0.03), LabelFreedom(on_wall, 0.1)], name="barriers_wc")
-        self.refine_semantics([ LabelFreedom([ADE20K.wall], 0.02), LabelFreedom(box_like, 0.03), LabelFreedom([ADE20K.floor], 0.05), LabelFreedom([ADE20K.stairs, ADE20K.stairway], 0.05), LabelFreedom(on_floor, 0.05), LabelFreedom(legged_objects, 0.05)], name="barriers_floor")
+        output = self.data["semantic_probs"]
+        labels = np.argmax(np.dstack(output), -1)
+
+        self.refine_semantics(labels, [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), LF(box_like, 0.03), LF(on_wall, 0.1)], name="barriers_wc")
+        self.refine_semantics(labels, [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
+                                        LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)], name="barriers_floor")
 
