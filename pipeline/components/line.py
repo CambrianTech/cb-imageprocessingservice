@@ -380,7 +380,7 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
 
 
 
-def extend_lines(lines, search_width=1.0, search_length=1.33, orthagonal_threshold=np.radians(30)):
+def extend_lines(lines, search_width=1.0, search_length=1.5, orthagonal_threshold=np.radians(30)):
 
     min_dist_sq = search_width * search_width
 
@@ -417,8 +417,12 @@ def extend_lines(lines, search_width=1.0, search_length=1.33, orthagonal_thresho
 
                 point = np.mean(intersection, axis=0)[0]
 
-                set_closest_point(i, point)
-                set_closest_point(j, point)
+                intersection = get_line_intersection(lines[i].data[0], lines[i].data[1], lines[i].data[2], lines[i].data[3], \
+                                                     lines[j].data[0], lines[j].data[1], lines[j].data[2], lines[j].data[3])
+
+                if intersection is not None:
+                    set_closest_point(i, intersection)
+                    set_closest_point(j, intersection)
 
         for i in range(len(lines)):
             
