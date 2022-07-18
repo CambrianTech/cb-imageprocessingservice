@@ -306,7 +306,6 @@ class PipelineVanishingPointFinder(PipelineStep):
                 
     def run(self, data):
 
-        room = data["room"]
         image = data["downscaled"]
 
         diagonal = math.hypot(image.shape[0], image.shape[1])
@@ -315,8 +314,6 @@ class PipelineVanishingPointFinder(PipelineStep):
         pi_2 = np.pi/2
 
         vp_lines = []
-        room.horizontal_vps = []
-
         vps_horizontal = []
         vertical_vp = None
         all_lines = data["lines"]
@@ -414,8 +411,8 @@ class PipelineVanishingPointFinder(PipelineStep):
             print("consolidated vanishing_points from %d to %d" % (before, after))
 
 
-        room.vertical_vp = vertical_vp
-        room.horizontal_vps = vps_horizontal
+        data["vertical_vp"] = vertical_vp
+        data["horizontal_vps"] = vps_horizontal
         #data["lines"] = vp_lines
         data["vp_lines"] = vp_lines
 
@@ -425,12 +422,14 @@ class PipelineVanishingPointFinder(PipelineStep):
         colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
         for c in range(1000): colors.append(random_color())
 
-        room = data["room"]
         image = data["downscaled"].copy()
-    
-        for cluster_index in range(len(room.vanishing_points)):
+        
+        vps = [data["vertical_vp"]]
+        vps.extend(data["horizontal_vps"])
+
+        for cluster_index in range(len(vps)):
             color = colors[cluster_index]
-            vp = room.vanishing_points[cluster_index]
+            vp = vps[cluster_index]
             draw_lines(image, vp.inliers, color=(color[0], color[1], color[2]), thickness=2,lineType=cv2.LINE_AA)
             
         return image

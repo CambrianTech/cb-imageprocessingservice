@@ -30,6 +30,7 @@ from .stages.surfacerefinement import PipelineSurfaceRefinement
 from .stages.scenegenerator import PipelineSceneGenerator
 from .stages.surfacesolver import PipelineSurfaceSolver
 from .stages.vanishingpointfinder import PipelineVanishingPointFinder
+from .stages.digestdata import PipelineDigestData
 from .stages.barrierfinder import PipelineBarrierFinder
 from .stages.trimfinder import PipelineTrimFinder
 from .stages.legfinder import PipelineLegFinder
@@ -96,6 +97,8 @@ class Pipeline():
         all_steps[PipelineStepIndex.Segmentation] = PipelineSemanticSegmentation
         all_steps[PipelineStepIndex.EdgeDetector] = PipelineEdgeDetector
         all_steps[PipelineStepIndex.ReverseRenderer] = PipelineReverseRenderer
+        
+        all_steps[PipelineStepIndex.DigestData] = PipelineDigestData
         all_steps[PipelineStepIndex.DeterminePrimaryAngles] = PipelineDeterminePrimaryAngles
         all_steps[PipelineStepIndex.ExtractSurfaces] = PipelineExtractSurfaces
         all_steps[PipelineStepIndex.FindLines] = PipelineLineFinder

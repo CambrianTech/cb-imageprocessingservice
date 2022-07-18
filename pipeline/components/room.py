@@ -21,8 +21,8 @@ class Room():
         self._probs = None
         self._index_mask = None
         self._normals = None
-        self.vertical_vp = None
-        self.horizontal_vps = None
+        self.vertical_vp = self.data["vertical_vp"]
+        self.horizontal_vps = self.data["horizontal_vps"]
         self.barrier_lines = None
 
         ade_seg_c = np.dstack(tuple(self.data["isolated"]))

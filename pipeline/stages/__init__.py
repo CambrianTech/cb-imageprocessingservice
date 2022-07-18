@@ -1,3 +1,3 @@
-from . import barrierfinder, combineplanemasks, edgedetector, extractsurfaces, fileinput, fileoutput, fov, \
+from . import barrierfinder, combineplanemasks, digestdata, edgedetector, extractsurfaces, fileinput, fileoutput, fov, \
     input, legfinder, lighting, linefinder, noop, output, planedetector, planegeometry, poseestimator, primaryangle, \
     reverserenderer, scenegenerator, surfacesolver, segmentation, superpixels, surfacerefinement, trimfinder, vanishingpointfinder
