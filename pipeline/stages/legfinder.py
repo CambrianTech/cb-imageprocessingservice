@@ -33,7 +33,7 @@ class PipelineLegFinder(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["room", "downscaled", "isolated", "lines"]
+        return ["room", "downscaled"]
 
     @property
     def output_keys(self) -> list:

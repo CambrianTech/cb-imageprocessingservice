@@ -220,16 +220,16 @@ class PipelinePlaneGeometry(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["image", "normals", "isolated"]
+        return ["image", "normals", "isolated_probs"]
 
     @property
     def output_keys(self) -> list:
-        return ["isolated", "floor_normal", "floor_offset", "floor_index"]
+        return ["floor_normal", "floor_offset", "floor_index"]
 
     def run(self, data):
         img_lr = data["downscaled"]
 
-        plane_geometry = PlaneGeometry(data, data["isolated"], img_lr)
+        plane_geometry = PlaneGeometry(data, data["isolated_probs"], img_lr)
         plane_geometry.process()
 
         #might cut this down:

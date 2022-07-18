@@ -25,9 +25,7 @@ class Room():
         self.horizontal_vps = self.data["horizontal_vps"]
         self.barrier_lines = None
 
-        ade_seg_c = np.dstack(tuple(self.data["isolated"]))
-        self.isolated_labels = np.int32(np.argmax(ade_seg_c, -1))
-
+        self.isolated_labels = self.data["isolated_labels"]
         self.semantic_labels = self.data["semantic_labels"]
 
         self._mask_intersections = {}

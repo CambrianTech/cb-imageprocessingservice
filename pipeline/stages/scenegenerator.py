@@ -45,7 +45,7 @@ class PipelineSceneGenerator(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["planes", "downscaled", "isolated", "dimensions"]
+        return ["planes", "downscaled"]
 
     @property
     def output_keys(self) -> list:

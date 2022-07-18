@@ -74,11 +74,11 @@ class PipelineExtractSurfaces(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["image", "semantic_probs"]
+        return ["downscaled", "semantic_probs"]
 
     @property
     def output_keys(self) -> list:
-        return ["output", "isolated"]
+        return ["semantic_labels", "isolated_probs", "isolated_labels"]
 
     def refine_semantics(self, labels, label_freedoms:list, name="semantic"):
 

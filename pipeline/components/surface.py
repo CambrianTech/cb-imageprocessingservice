@@ -530,7 +530,7 @@ class Surface():
 
     def determine_surface_type(self, K, angle_threshold=np.radians(20)):
 
-        isolated = self.data["isolated"]
+        isolated = self.data["isolated_probs"]
 
         prob_mask = self.probs.copy()
         prob_mask[self.plane_mask == 0] = 0

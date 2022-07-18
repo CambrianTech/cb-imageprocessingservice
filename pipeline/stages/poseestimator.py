@@ -667,7 +667,7 @@ class PipelinePoseEstimator(PipelineStep):
 
     @property
     def required_keys(self) -> list:
-        return ["image", "lines", "fov", "isolated", "floor_normal", "floor_offset"]
+        return ["image", "lines", "fov", "floor_normal", "floor_offset"]
 
     @property
     def output_keys(self) -> list:
@@ -675,7 +675,7 @@ class PipelinePoseEstimator(PipelineStep):
 
     def run(self, data):
 
-        pose_estimator = PoseEstimator(data, data["image"], data["lines"], data["fov"], data["isolated"][SurfaceType.Floor], data["floor_normal"], data["floor_offset"])
+        pose_estimator = PoseEstimator(data, data["image"], data["lines"], data["fov"], data["isolated_probs"][SurfaceType.Floor], data["floor_normal"], data["floor_offset"])
         pose_estimator.estimate()
 
         data["fov"] = pose_estimator.fov
