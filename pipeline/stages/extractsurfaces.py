@@ -143,8 +143,8 @@ class PipelineExtractSurfaces(PipelineStep):
 
         draw_lines(watershed_mask, line_candidates, color=0, thickness=1, lineType=cv2.LINE_4)
 
-        log_mask(self.data, "%s_mask" % name, watershed_mask)
-        log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"], labelset=semantic_key)
+        #log_mask(self.data, "%s_mask" % name, watershed_mask)
+        #log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"], labelset=semantic_key)
 
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
@@ -155,17 +155,10 @@ class PipelineExtractSurfaces(PipelineStep):
             if value == 0: continue
             
             label = value - 1
-            
             markers_mask = markers == value
-
             labels[markers_mask] = label
 
-            #mask = np.zeros(image.shape[:2], dtype=np.uint8)
-            #mask[markers_mask] = 1
-            #semantic_label = semantic_key[value] if value in semantic_key else "other"
-            #log_mask(self.data, "%s_%s_mask" % (name, semantic_label), mask)
-
-        log_segmentation_image(self.data, "%s_refined" % name, markers, self.data["downscaled"], labelset=semantic_key)
+        #log_segmentation_image(self.data, "%s_refined" % name, markers, self.data["downscaled"], labelset=semantic_key)
 
 
     def run(self, data):
@@ -176,6 +169,8 @@ class PipelineExtractSurfaces(PipelineStep):
 
         self.data["semantic_labels"] = np.argmax(np.dstack(output), -1)
 
+        #log_segmentation_image(self.data, "semantic_labels_initial", self.data["semantic_labels"], self.data["downscaled"])
+
         self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), LF(box_like, 0.03), LF(on_wall, 0.1)], name="barriers_wc")
         self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
                               LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)], name="barriers_floor")
@@ -183,10 +178,9 @@ class PipelineExtractSurfaces(PipelineStep):
         #combine_floor_masks(output)
         self.data["isolated"] = isolate_masks(data, output) #break masks into surface types
 
-        labels = np.argmax(np.dstack(output), -1)
 
         if im_logging_enabled(data, LogLevel.Segmentation):
             isolated_probs = np.dstack(data["isolated"])
-            log_segmentation_image(data, "surface_probs", np.argmax(isolated_probs, -1), data["downscaled"], labelset=SurfaceType)
+            log_segmentation_image(self.data, "surface_probs", np.argmax(isolated_probs, -1), self.data["downscaled"], labelset=SurfaceType)
 
-            log_segmentation_image(data, "everything", labels, data["downscaled"])
+            log_segmentation_image(self.data, "semantic_labels", self.data["semantic_labels"], self.data["downscaled"])
