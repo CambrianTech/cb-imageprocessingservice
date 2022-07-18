@@ -35,8 +35,6 @@ class SurfaceSolver():
         if ignore_rugs:
             self.room.isolated_labels[self.room.isolated_labels == SurfaceType.OnFloor.value] = SurfaceType.Floor.value
 
-        log_segmentation_image(self.data, "room_labels_start", self.room.isolated_labels, self.room.image.copy(), get_image=False, labelset=SurfaceType,opacity=.9, avg=False)
-
         #prepare
         self.lines_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
         draw_lines(self.lines_mask, self.data["vp_lines"], color=255, thickness=3, lineType=cv2.LINE_4)
@@ -858,7 +856,7 @@ class SurfaceSolver():
 
                                 new_surface = surface.clone()
                                 new_surface.surfaceType = surface.surfaceType
-                                new_surface,mask = new_mask
+                                new_surface.mask = new_mask
 
                                 self.room.add_surface(new_surface)
 
