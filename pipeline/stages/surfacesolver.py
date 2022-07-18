@@ -196,7 +196,7 @@ class SurfaceSolver():
                 continue
 
             type_surface = Surface(self.data)
-            type_surface.set_mask(mask)
+            type_surface.mask = mask
 
             type_lines = type_surface.lines
 
@@ -312,7 +312,7 @@ class SurfaceSolver():
 
                                 # slice_surface = Surface(self.data, None, surfaceType)
                                 slice_surface = surface.clone()
-                                slice_surface.set_mask(slice_mask)
+                                slice_surface.mask = slice_mask
 
                                 if len(slice_surface.contours):
                                     self.room.add_surface(slice_surface)
@@ -728,7 +728,7 @@ class SurfaceSolver():
                             reference_surface = surface
                             new_surface = reference_surface.clone()
                             new_surface.surfaceType = surfaceType
-                            new_surface.set_mask(mask)
+                            new_surface.mask = mask
                             break
 
                     elif not surface.bestLabel:
@@ -750,7 +750,7 @@ class SurfaceSolver():
                     if reference_surface is not None:
                         new_surface = reference_surface.clone()
                         new_surface.surfaceType = surfaceType
-                        new_surface.set_mask(contour_mask)
+                        new_surface.mask = contour_mask
                         #print("Reference_surface", reference_surface.name, indexes, counts)
                     elif surfaceType in (SurfaceType.Floor, SurfaceType.OnFloor, SurfaceType.Ceiling):
                         opposing_type = SurfaceType.Floor if surfaceType == SurfaceType.Ceiling else SurfaceType.Ceiling
@@ -771,7 +771,7 @@ class SurfaceSolver():
                             
                             new_surface = reference_surface.clone()
                             new_surface.surfaceType = surfaceType
-                            new_surface.set_mask(contour_mask)
+                            new_surface.mask = contour_mask
                             new_surface.normal = normal
                             new_surface.offset = offset
 
@@ -858,7 +858,7 @@ class SurfaceSolver():
 
                                 new_surface = surface.clone()
                                 new_surface.surfaceType = surface.surfaceType
-                                new_surface.set_mask(new_mask)
+                                new_surface,mask = new_mask
 
                                 self.room.add_surface(new_surface)
 
@@ -866,7 +866,7 @@ class SurfaceSolver():
 
                     new_surface = surface.clone()
                     new_surface.surfaceType = surface.surfaceType
-                    new_surface.set_mask(mask)
+                    new_surface.mask = mask
 
                     self.room.add_surface(new_surface)
 
@@ -945,7 +945,7 @@ class SurfaceSolver():
                 print(colored("Removing %d contours from surface %s" % (len(invalid_contours), surface.name), "yellow"))
                 mask = surface.mask.copy()
                 cv2.drawContours(mask, np.array(invalid_contours), -1, 0, cv2.FILLED)
-                surface.set_mask(mask)
+                surface.mask = mask
 
                 #todo: look inside contour for validity
 

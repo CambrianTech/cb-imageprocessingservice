@@ -327,10 +327,11 @@ class Surface():
     @property
     def mask(self) -> ndimage:
         if self._mask is None:
-            self.set_mask(self.get_surface_mask(self.surfaceType, self.confidence))
+            self.mask = self.get_surface_mask(self.surfaceType, self.confidence)
         return self._mask
 
-    def set_mask(self, mask):
+    @mask.setter
+    def mask(self, mask):
         self._mask = mask
         self.mask_changed()
 
