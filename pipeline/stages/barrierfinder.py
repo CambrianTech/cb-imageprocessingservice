@@ -79,9 +79,8 @@ class PipelineBarrierFinder(PipelineStep):
 
                 index = match.index_of(value)
                 semantic_label = match.labels[index]
-                color = semantic_label.value + 1
 
-                semantic_key[color] = semantic_label.name
+                semantic_key[value] = semantic_label.name
 
                 mask = np.zeros(image.shape[:2], dtype=np.uint8)
                 mask[label_mask] = 1
@@ -96,7 +95,7 @@ class PipelineBarrierFinder(PipelineStep):
 
                     sub_mask = np.zeros(image.shape[:2], dtype=np.uint8)
                     cv2.drawContours(sub_mask, [contour], -1, 1, thickness=cv2.FILLED)
-                    cv2.drawContours(markers, [contour], -1, color, thickness=cv2.FILLED)
+                    cv2.drawContours(markers, [contour], -1, value, thickness=cv2.FILLED)
 
                     thickness = int(np.sqrt(cv2.contourArea(contour)) / 15)
                     cv2.drawContours(markers, [contour], -1, 0, thickness=thickness)
@@ -106,7 +105,7 @@ class PipelineBarrierFinder(PipelineStep):
                     dist_transform = cv2.distanceTransform(mask_padded, cv2.DIST_L2, 5)
                     dist_transform = dist_transform[1:-1,1:-1]
 
-                    markers[dist_transform > freedom * dist_transform.max()] = color
+                    markers[dist_transform > freedom * dist_transform.max()] = value
 
 
         def is_barrier_line(line, mask, num_points=7, num_matches=3):
@@ -132,9 +131,12 @@ class PipelineBarrierFinder(PipelineStep):
         log_mask(self.data, "%s_mask" % name, watershed_mask)
         log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"], labelset=semantic_key)
 
-
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
+
+        # for label in range(1, num_labels):
+        #     mask = np.zeros(image.shape[:2], dtype=np.uint8)
+        #     mask[markers == color] = 1
 
         log_segmentation_image(self.data, "%s_refined" % name, markers, self.data["downscaled"], labelset=semantic_key)
 
