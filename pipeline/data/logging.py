@@ -7,8 +7,8 @@ from termcolor import colored
 from time import time
 import sys
 
+from pipeline.misc.utils import random_color
 from .ade20k import ADE20K
-from pipeline.misc.utils import get_segmentation_image
 
 class Timer():
 
@@ -208,6 +208,36 @@ def log_markers(data:dict, name, markers, mask=None, num_labels=None, primary=Fa
     if im_logging_enabled(data, LogLevel.Markers) or (primary and im_logging_enabled(data)):
         debug = get_markers_image(data, markers, mask, num_labels)
         _log_image(data, name, debug)
+
+def get_segmentation_image(labels, image, avg=False, resize=True, min_matches=100, labelset=None):
+    if resize:
+        img_seg = cv2.resize(image, (labels.shape[1], labels.shape[0]))
+    else:
+        img_seg = image.copy()
+
+    legend = []
+
+    colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
+
+    for label in range(0, np.amax(labels) + 1):
+        color = colors[label] if label < len(colors) else random_color()
+        
+        if avg: color = np.mean(img_seg[labels == label], axis=0)
+        img_seg[labels == label] = color
+
+        if labelset is not None and len(img_seg[labels == label]) > min_matches:
+            color_value =  (int(color[0]), int(color[1]), int(color[2]))
+            if type(labelset) == dict or type(labelset) == list:
+                text = labelset[label] if label in labelset else "other"
+                legend.append((text, color_value))
+            elif type(labelset) == list:
+                legend.append((labelset[label], (int(color[0]), int(color[1]), int(color[2]))))
+            elif label <= labelset.max_index():
+                legend.append((labelset(label+labelset.value_offset()).name, (int(color[0]), int(color[1]), int(color[2]))))
+
+    if len(legend) > 0:
+        return img_seg, legend
+    return img_seg
 
 def log_segmentation_image(data:dict, name, segmentation, image, avg=False, extension=".jpg", labelset=ADE20K,  opacity=0.5, get_image=False, min_matches=100, primary=False):
     

@@ -13,7 +13,7 @@ from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
 from pipeline.components.line import Line, draw_lines
 from .planegeometry import Dimension
-from pipeline.misc.utils import get_segmentation_image, random_color
+from pipeline.misc.utils import random_color
 from pipeline.data.logging import log_segmentation_image, im_logging_enabled, log_image, LogLevel, log_markers, Timer
 
 

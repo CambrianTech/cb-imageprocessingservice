@@ -89,33 +89,6 @@ def sample_at_point(img, point, size=20):
 
     return img[y1:y2, x1:x2]
 
-def get_segmentation_image(labels, image, avg=False, resize=True, min_matches=100, labelset=None):
-    if resize:
-        img_seg = cv2.resize(image, (labels.shape[1], labels.shape[0]))
-    else:
-        img_seg = image.copy()
-
-    legend = []
-
-    colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
-
-
-    for label in range(0, np.amax(labels) + 1):
-        color = colors[label] if label < len(colors) else random_color()
-        
-        if avg: color = np.mean(img_seg[labels == label], axis=0)
-        img_seg[labels == label] = color
-
-        if labelset is not None and len(img_seg[labels == label]) > min_matches:
-            if type(labelset) == list:
-                legend.append((labelset[label], (int(color[0]), int(color[1]), int(color[2]))))
-            elif label <= labelset.max_index():
-                legend.append((labelset(label+labelset.value_offset()).name, (int(color[0]), int(color[1]), int(color[2]))))
-
-    if len(legend) > 0:
-        return img_seg, legend
-    return img_seg
-
 def fov_to_focal(fov, length):
     return length / (2 * np.tan(np.radians(fov) / 2))
 
@@ -281,4 +254,11 @@ def color_to_normal(color):
     
     return normal
 
+
+def list_flatten(S):
+    if S == []:
+        return S
+    if isinstance(S[0], list):
+        return list_flatten(S[0]) + flatten(S[1:])
+    return S[:1] + list_flatten(S[1:])
 

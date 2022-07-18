@@ -7,13 +7,14 @@ import math
 from scipy.spatial import distance
 from operator import attrgetter
 from skimage.segmentation import watershed
+import itertools
 
 from cambrian.LineFunctions import LineFunctions
 
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
 from pipeline.data.logging import log_image, im_logging_enabled, log_markers, log_segmentation_image, log_mask
-from pipeline.misc.utils import convert_color
+from pipeline.misc.utils import convert_color, list_flatten
 from pipeline.components.line import draw_lines
 from .vanishingpointfinder import angle_with_vp
 from pipeline.misc.utils import random_color
@@ -21,6 +22,19 @@ from pipeline.data.ade20k import ADE20K
 from pipeline.stages.extractsurfaces import on_floor, on_wall, on_ceiling, box_like, legged_objects
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.line import extend_lines
+
+
+class LabelFreedom():
+
+    def __init__(self, labels, freedom):
+        self.labels = list_flatten(labels)
+        self.freedom = freedom
+
+    def index_of(self, label):
+        try:
+            return self.labels.index(label)
+        except:
+            return -1
 
 class PipelineBarrierFinder(PipelineStep):
     @property
@@ -49,18 +63,25 @@ class PipelineBarrierFinder(PipelineStep):
         min_matches = 100
         num_labels = np.amax(labels) + 1
 
-        color = 2
+        semantic_key = {}
+
         for label in range(0, num_labels):
 
             label_mask = labels == label
 
             value = label + 1
 
-            match = next(filter(lambda x: value in x[0], label_freedoms), None)
+            match = next(filter(lambda x: x.index_of(value) >= 0, label_freedoms), None)
 
-            freedom = match[1] if match is not None else None
+            freedom = match.freedom if match is not None else None
 
             if freedom is not None and len(labels[label_mask]) > min_matches:
+
+                index = match.index_of(value)
+                semantic_label = match.labels[index]
+                color = semantic_label.value + 1
+
+                semantic_key[color] = semantic_label.name
 
                 mask = np.zeros(image.shape[:2], dtype=np.uint8)
                 mask[label_mask] = 1
@@ -87,8 +108,6 @@ class PipelineBarrierFinder(PipelineStep):
 
                     markers[dist_transform > freedom * dist_transform.max()] = color
 
-                color += 1
-
 
         def is_barrier_line(line, mask, num_points=7, num_matches=3):
             line_points = np.linspace(line.point_a, line.point_b, num_points)
@@ -111,15 +130,13 @@ class PipelineBarrierFinder(PipelineStep):
 
 
         log_mask(self.data, "%s_mask" % name, watershed_mask)
-        log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"])
+        log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"], labelset=semantic_key)
 
 
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
 
-
-
-        log_segmentation_image(self.data, "%s_refined" % name, markers, self.data["downscaled"])
+        log_segmentation_image(self.data, "%s_refined" % name, markers, self.data["downscaled"], labelset=semantic_key)
 
     def run(self, data):
 
@@ -127,6 +144,6 @@ class PipelineBarrierFinder(PipelineStep):
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
 
-        self.refine_semantics([ ([ADE20K.ceiling], 0.2), ([ADE20K.wall], 0.2), (box_like, 0.03), (on_wall, 0.1)], name="wall_ceiling")
-        self.refine_semantics([ ([ADE20K.wall], 0.02), (box_like, 0.03), ([ADE20K.floor], 0.05), ([ADE20K.stairs, ADE20K.stairway], 0.05), (on_floor, 0.05), (legged_objects, 0.05)], name="floor")
+        self.refine_semantics([ LabelFreedom([ADE20K.ceiling], 0.2), LabelFreedom([ADE20K.wall], 0.2), LabelFreedom(box_like, 0.03), LabelFreedom(on_wall, 0.1)], name="wall_ceiling")
+        self.refine_semantics([ LabelFreedom([ADE20K.wall], 0.02), LabelFreedom(box_like, 0.03), LabelFreedom([ADE20K.floor], 0.05), LabelFreedom([ADE20K.stairs, ADE20K.stairway], 0.05), LabelFreedom(on_floor, 0.05), LabelFreedom(legged_objects, 0.05)], name="floor")
 
