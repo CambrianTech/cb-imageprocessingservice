@@ -174,11 +174,11 @@ class PipelineExtractSurfaces(PipelineStep):
         #Consolidate types: Include other types as part of floor: rug, earth, grass
         output = self.data["semantic_probs"]
 
-        labels = np.argmax(np.dstack(output), -1)
+        self.data["semantic_labels"] = np.argmax(np.dstack(output), -1)
 
-        self.refine_semantics(labels, [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), LF(box_like, 0.03), LF(on_wall, 0.1)], name="barriers_wc")
-        self.refine_semantics(labels, [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
-                                        LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)], name="barriers_floor")
+        self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), LF(box_like, 0.03), LF(on_wall, 0.1)], name="barriers_wc")
+        self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
+                              LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)], name="barriers_floor")
 
         #combine_floor_masks(output)
         self.data["isolated"] = isolate_masks(data, output) #break masks into surface types

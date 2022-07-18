@@ -327,7 +327,9 @@ class Surface():
     @property
     def mask(self) -> ndimage:
         if self._mask is None:
-            self.mask = self.get_surface_mask(self.surfaceType, self.confidence)
+            self._mask = np.zeros(self.probs.shape, dtype="uint8")
+            self._mask[self.probs >= self.confidence] = 1
+            self._mask[self.geometry.isolated_labels != self.surfaceType.index] = 0
         return self._mask
 
     @mask.setter
@@ -525,12 +527,6 @@ class Surface():
             self._normals_mean = self.normals_accumulated / cv2.countNonZero(self.mask)
 
         return self._normals_mean
-
-    def get_surface_mask(self, label:SurfaceType, confidence):
-        mask = np.zeros(self.probs.shape, dtype="uint8")
-        mask[self.probs >= confidence] = 1
-        mask[self.geometry.isolated_labels != label.index] = 0
-        return mask
 
     def determine_surface_type(self, K, angle_threshold=np.radians(20)):
 
