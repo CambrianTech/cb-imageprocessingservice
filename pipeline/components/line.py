@@ -379,19 +379,25 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
     return list(filter(lambda x: not x.dead, lines))
 
 
+
 def extend_lines(lines, search_width=1.0, search_length=1.33, orthagonal_threshold=np.radians(30)):
 
     min_dist_sq = search_width * search_width
 
     #list(map(lambda x: x.extended(1.05), line_candidates))
 
-    def set_closest_point(line, point):
-        data = line.data.copy()
+    intersections = [[None, None] for line in lines]
 
-        if distance.sqeuclidean(line.point_a, point) < distance.sqeuclidean(line.point_b, point):
-            return Line(point[0], point[1], line.data[2], line.data[3])
+    def set_closest_point(i, point):
+        dist_a = distance.sqeuclidean(lines[i].point_a, point)
+        dist_b = distance.sqeuclidean(lines[i].point_b, point)
+
+        if dist_a < dist_b:
+            if intersections[i][0] is None or dist_a < intersections[i][0][0]:
+                intersections[i][0] = (dist_a, point)
         else:
-            return Line(line.data[0], line.data[1], point[0], point[1])
+            if intersections[i][1] is None or dist_b < intersections[i][1][0]:
+                intersections[i][1] = (dist_b, point)
 
     for i in range(len(lines)):
 
@@ -410,8 +416,16 @@ def extend_lines(lines, search_width=1.0, search_length=1.33, orthagonal_thresho
             if result != 0:
 
                 point = np.mean(intersection, axis=0)[0]
-                
-                lines[i] = set_closest_point(lines[i], point)
-                lines[j] = set_closest_point(lines[j], point)
+
+                set_closest_point(i, point)
+                set_closest_point(j, point)
+
+        for i in range(len(lines)):
+            
+            if intersections[i][0] is not None or intersections[i][1] is not None:
+                point_a = intersections[i][0][1] if intersections[i][0] is not None else lines[i].point_a
+                point_b = intersections[i][1][1] if intersections[i][1] is not None else lines[i].point_b
+
+                lines[i] = Line(point_a[0], point_a[1], point_b[0], point_b[1])
 
     return lines
