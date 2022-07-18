@@ -89,15 +89,16 @@ class PipelineExtractSurfaces(PipelineStep):
         watershed_mask = np.zeros(markers.shape, dtype=np.int32)
 
         min_matches = 100
-        num_labels = np.amax(labels) + 1
+
+        all_labels = np.unique(labels).astype(np.int32)
 
         semantic_key = {}
 
-        for label in range(0, num_labels):
+        for label in all_labels:
 
             label_mask = labels == label
 
-            value = label + 1
+            value = int(label + 1)
 
             match = next(filter(lambda x: x.index_of(value) >= 0, label_freedoms), None)
 
@@ -159,8 +160,12 @@ class PipelineExtractSurfaces(PipelineStep):
         #log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"], labelset=semantic_key)
 
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
-        markers[markers<0] = 0
+        markers[markers < 0] = 0
         markers[watershed_mask == 0] = 0
+
+        #remove lines, gaps
+        markers = markers.astype(np.uint8)
+        markers = cv2.morphologyEx(markers, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
 
         for value in np.unique(markers):
 
@@ -168,6 +173,7 @@ class PipelineExtractSurfaces(PipelineStep):
             
             label = value - 1
             markers_mask = markers == value
+
             labels[markers_mask] = label
 
         #log_segmentation_image(self.data, "%s_refined" % name, markers, self.data["downscaled"], labelset=semantic_key)
