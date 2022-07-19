@@ -203,7 +203,7 @@ class PipelineExtractSurfaces(PipelineStep):
                     if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0], min_distance=3):
                         new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group="semantic_lines"))
 
-        new_lines = list(filter(lambda l: line_within_mask(l, data["vp_mask"]), new_lines))
+        #new_lines = list(filter(lambda l: line_within_mask(l, data["vp_mask"]), new_lines))
 
         valid_vps = [data["vertical_vp"]] + data["horizontal_vps"]
 
@@ -251,6 +251,7 @@ class PipelineExtractSurfaces(PipelineStep):
 
         if im_logging_enabled(data):
             lines_image =  self.image.copy()
+
             draw_lines(lines_image, self.data["vp_lines"])
             draw_lines(lines_image, self.data["semantic_lines"], color=(255,150,0), thickness=2, lineType=cv2.LINE_AA)
 
