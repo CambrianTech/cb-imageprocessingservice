@@ -168,7 +168,7 @@ class PipelineExtractSurfaces(PipelineStep):
         self.data = data
 
         line_candidates, intersections = self.data["vp_lines"], []
-        #line_candidates, intersections = extend_to_intersection(line_candidates, search_length=1.1)  
+        line_candidates, intersections = extend_to_intersection(line_candidates, search_length=1.1)  
 
         #Consolidate types: Include other types as part of floor: rug, earth, grass
         

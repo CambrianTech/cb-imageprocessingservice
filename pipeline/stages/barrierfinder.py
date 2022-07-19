@@ -18,6 +18,7 @@ from pipeline.misc.utils import random_color
 from pipeline.data.ade20k import ADE20K
 from pipeline.stages.extractsurfaces import on_floor, on_wall, on_ceiling, box_like, legged_objects
 from pipeline.components.rotated_rect import RotatedRect
+from pipeline.components.line import extend_to_intersection, draw_lines, line_within_mask
 
 class PipelineBarrierFinder(PipelineStep):
     @property
@@ -37,3 +38,17 @@ class PipelineBarrierFinder(PipelineStep):
         self.data = data
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
+
+        all_lines = self.data["vp_lines"]
+
+        
+
+        line_candidates, intersections = extend_to_intersection(all_lines, search_length=1.1) 
+
+        if im_logging_enabled(data):
+            debug = self.data["downscaled"].copy()
+            draw_lines(debug, line_candidates)
+            for point in intersections:
+                cv2.circle(debug, (int(point[0]), int(point[1])), 3, (255, 255, 0), cv2.FILLED, cv2.LINE_AA)
+
+            log_image(self.data, "barriers", debug)

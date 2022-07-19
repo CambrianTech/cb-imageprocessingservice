@@ -21,7 +21,7 @@ from pipeline.data.ade20k import ADE20K
 
 find_horizontal = True
 
-remove_labels = [ADE20K.vase, ADE20K.chair, ADE20K.plant, ADE20K.stool, ADE20K.pillow, ADE20K.pot, ADE20K.person, ADE20K.lamp]
+remove_labels = [ADE20K.vase, ADE20K.chair, ADE20K.plant, ADE20K.stool, ADE20K.pillow, ADE20K.pot, ADE20K.person]
 reduce_labels = [ADE20K.rug]
 
 def angle_with_vp(model, locations, directions):
@@ -338,6 +338,8 @@ class PipelineVanishingPointFinder(PipelineStep):
 
         if len(all_lines) < len(data["lines"]) / 2 and len(all_lines) < 50:
             all_lines = data["lines"]
+
+        
 
         diagonal = math.hypot(image.shape[0], image.shape[1])
 
