@@ -9,23 +9,11 @@ from scipy.spatial import distance
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
 from pipeline.data.logging import log_image, im_logging_enabled, log_segmentation_image, log_mask, LogLevel
-from pipeline.data.ade20k import ADE20K
+from pipeline.data.ade20k import ADE20K, floor, on_floor, wall, on_wall, ceiling, on_ceiling, legged_objects, box_like
 from pipeline.data.semanticlabel import SemanticLabel
 from pipeline.misc.utils import list_flatten
 from pipeline.components.line import Line, extend_to_intersection, draw_lines, line_within_mask, line_on_image_edge, merge_lines
-
-floor = [ADE20K.floor, ADE20K.grass, ADE20K.earth, ADE20K.sidewalk]
-on_floor = [ADE20K.rug]
-
-wall = [ADE20K.wall]
-on_wall = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.mirror, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen, ADE20K.radiator, ADE20K.sconce, ADE20K.towel]
-
-ceiling = [ADE20K.ceiling]
-on_ceiling = [ADE20K.light, ADE20K.chandelier]
-
-lights = [ADE20K.light, ADE20K.lamp]
-box_like = [ADE20K.cabinet, ADE20K.dishwasher, ADE20K.oven, ADE20K.fireplace, ADE20K.kitchen]
-legged_objects = [ADE20K.table, ADE20K.chair, ADE20K.bed, ADE20K.cabinet, ADE20K.chest, ADE20K.coffee_table, ADE20K.stool, ADE20K.bench, ADE20K.ottoman, ADE20K.armchair, ADE20K.chest]
+from pipeline.stages.vanishingpointfinder import get_inliers
 
 class LF():
 
@@ -172,19 +160,10 @@ class PipelineExtractSurfaces(PipelineStep):
 
         diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
-        line_candidates, intersections = self.data["vp_lines"], []
-        #line_candidates, intersections = extend_to_intersection(line_candidates, search_length=1.1)  
+        line_candidates = self.data["vp_lines"]
 
-        #Consolidate types: Include other types as part of floor: rug, earth, grass
-        
-        if im_logging_enabled(data, LogLevel.Segmentation):
-            lines_image =  self.image.copy()
-            draw_lines(lines_image, line_candidates)
-            for point in intersections:
-                cv2.circle(lines_image, (int(point[0]), int(point[1])), 3, (255, 255, 0), cv2.FILLED, cv2.LINE_AA)
-
-            log_image(self.data, "vp_lines_extended", lines_image)
-
+        #Consolidate types: Include other types as part of floor: rug, earth, grass        
+        if im_logging_enabled(data):
             log_segmentation_image(self.data, "semantic_labels_raw", self.data["semantic_labels"], self.data["downscaled"])
 
         self.refine_semantics(self.data["semantic_labels"], line_candidates, [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), LF(box_like, 0.03), LF(on_wall, 0.1)], name="barriers_wc")
@@ -197,9 +176,9 @@ class PipelineExtractSurfaces(PipelineStep):
 
         #now pull lines and add them to vp_lines and lines
         new_lines = []
-        min_line_length = diagonal / 50
+        min_line_length = diagonal / 60
 
-        for surfaceType in [SurfaceType.Ceiling, SurfaceType.Floor]:
+        for surfaceType in SurfaceType:
             mask = np.zeros( self.image.shape[:2], dtype=np.uint8)
             mask[self.data["isolated_labels"] == surfaceType] = 1
 
@@ -211,7 +190,7 @@ class PipelineExtractSurfaces(PipelineStep):
                 contour = (contour.flatten() - 1).reshape(shape)
                 contour_length = cv2.arcLength(contour, True)
 
-                epsilon = 5
+                epsilon = 3
                 polygon = cv2.approxPolyDP(contour, epsilon, True)
                 num_pts = len(polygon)
 
@@ -224,7 +203,35 @@ class PipelineExtractSurfaces(PipelineStep):
                     if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0], min_distance=3):
                         new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group="semantic_lines"))
 
-        self.data["semantic_lines"] = merge_lines(new_lines, search_width=max(diagonal/300, 3), search_length=1.5, angle_threshold=np.radians(5))
+        new_lines = list(filter(lambda l: line_within_mask(l, data["vp_mask"]), new_lines))
+
+        valid_vps = [data["vertical_vp"]] + data["horizontal_vps"]
+
+        intersections = []
+
+        new_lines = merge_lines(new_lines, search_width=max(diagonal/300, 3), search_length=1.05, angle_threshold=np.radians(5))
+
+        filtered_lines = []
+        for vp in valid_vps:
+            inliers = list(get_inliers(new_lines, vp.model, np.radians(8)))
+            filtered_lines.extend(inliers)
+
+            vp.inliers = np.concatenate((vp.inliers, inliers), axis=0)
+
+        self.data["semantic_lines"] = filtered_lines
+        self.data["vp_lines"].extend(filtered_lines)
+        
+        # combined = self.data["lines"] + self.data["semantic_lines"]
+        # #merge_lines(combined, search_width=max(diagonal/100, 3), remove_matches=False)
+
+        # clusters = list(set(map(lambda x: x.cluster, self.data["semantic_lines"])))
+
+        # for line in [line for line in self.data["lines"] if line.cluster in clusters]:
+        #     line.group = "semantic_lines"
+
+        #self.data["semantic_lines"] = list(filter(lambda x: x.group == "semantic_lines", combined))
+
+        #self.data["semantic_lines"], intersections = extend_to_intersection(self.data["semantic_lines"], search_length=1.5, search_width=3.0, min_angle_difference=np.radians(15))
 
         #self.data["lines"] = merge_lines(self.data["lines"] + self.data["semantic_lines"], search_width=max(diagonal/400, 3))
 
@@ -240,12 +247,15 @@ class PipelineExtractSurfaces(PipelineStep):
 
         #self.data["semantic_lines"] = list(filter(lambda x: x.group == "semantic_lines", self.data["lines"]))
 
-        self.data["lines"], _ = extend_to_intersection(self.data["lines"], search_length=1.1, search_width=3.0, min_angle_difference=0)
+        #self.data["vp_lines"], intersections = extend_to_intersection(self.data["vp_lines"], search_length=1.1, search_width=3.0, min_angle_difference=0)
 
         if im_logging_enabled(data):
             lines_image =  self.image.copy()
-            draw_lines(lines_image, self.data["lines"])
+            draw_lines(lines_image, self.data["vp_lines"])
             draw_lines(lines_image, self.data["semantic_lines"], color=(255,150,0), thickness=2, lineType=cv2.LINE_AA)
+
+            for point in intersections:
+                cv2.circle(lines_image, (int(point[0]), int(point[1])), 5, (255, 255, 0), cv2.FILLED, cv2.LINE_AA)
 
             log_image(self.data, "semantic_lines", lines_image)
 

@@ -309,4 +309,16 @@ class ADE20K(SemanticLabel):
     # clock = 149
     # flag = 150
 
+floor = [ADE20K.floor, ADE20K.grass, ADE20K.earth, ADE20K.sidewalk]
+on_floor = [ADE20K.rug]
+
+wall = [ADE20K.wall]
+on_wall = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.mirror, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen, ADE20K.radiator, ADE20K.sconce, ADE20K.towel]
+
+ceiling = [ADE20K.ceiling]
+on_ceiling = [ADE20K.light, ADE20K.chandelier]
+
+lights = [ADE20K.light, ADE20K.lamp]
+box_like = [ADE20K.cabinet, ADE20K.dishwasher, ADE20K.oven, ADE20K.fireplace, ADE20K.kitchen]
+legged_objects = [ADE20K.table, ADE20K.chair, ADE20K.bed, ADE20K.cabinet, ADE20K.chest, ADE20K.coffee_table, ADE20K.stool, ADE20K.bench, ADE20K.ottoman, ADE20K.armchair, ADE20K.chest]
 

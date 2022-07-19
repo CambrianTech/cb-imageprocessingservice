@@ -17,8 +17,7 @@ from pipeline.data.logging import log_image, im_logging_enabled, log_markers, lo
 from pipeline.components.line import draw_lines
 from .vanishingpointfinder import angle_with_vp
 from pipeline.misc.utils import random_color
-from pipeline.data.ade20k import ADE20K
-from pipeline.stages.extractsurfaces import on_floor, on_wall, on_ceiling, box_like, legged_objects
+from pipeline.data.ade20k import ADE20K, on_floor, on_wall, on_ceiling, box_like, legged_objects
 from pipeline.components.rotated_rect import RotatedRect
 
 class PipelineDigestData(PipelineStep):

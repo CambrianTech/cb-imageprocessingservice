@@ -14,10 +14,9 @@ from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
 from pipeline.misc.utils import resize_array, random_color, overlay_mask, partition
 from .planegeometry import Dimension
-from .extractsurfaces import box_like, legged_objects
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_mask
 from pipeline.components.line import Line, line_on_image_edge, merge_lines, draw_lines, line_within_mask
-from pipeline.data.ade20k import ADE20K
+from pipeline.data.ade20k import ADE20K, box_like, legged_objects
 
 find_horizontal = True
 
@@ -332,14 +331,14 @@ class PipelineVanishingPointFinder(PipelineStep):
         freedom = 0.1
         lines_mask[dist_transform > freedom * dist_transform.max()] = 0
 
-        log_mask(data, "vp_mask", lines_mask, background=image)
+        data["vp_mask"] = lines_mask
 
-        all_lines = list(filter(lambda l: line_within_mask(l, lines_mask), data["lines"]))
+        log_mask(data, "vp_mask", data["vp_mask"], background=image)
+
+        all_lines = list(filter(lambda l: line_within_mask(l, data["vp_mask"]), data["lines"]))
 
         if len(all_lines) < len(data["lines"]) / 2 and len(all_lines) < 50:
             all_lines = data["lines"]
-
-        
 
         diagonal = math.hypot(image.shape[0], image.shape[1])
 
@@ -425,22 +424,22 @@ class PipelineVanishingPointFinder(PipelineStep):
 
             cluster_index+=1
 
-        #consolidate
-        before = len(vps_horizontal)
-        for vpA in vps_horizontal:
-            for vpB in vps_horizontal:
-                if vpA == vpB or vpA.deleted or vpB.deleted: continue
+        # #consolidate
+        # before = len(vps_horizontal)
+        # for vpA in vps_horizontal:
+        #     for vpB in vps_horizontal:
+        #         if vpA == vpB or vpA.deleted or vpB.deleted: continue
 
-                intersection = get_inliers(vpB.inliers, vpA.model, np.radians(8.0))
+        #         intersection = get_inliers(vpB.inliers, vpA.model, np.radians(5.0))
 
-                if len(intersection) > 2 * len(vpB.inliers) / 3:
-                    vpA.merge(vpB)
+        #         if len(intersection) > 2 * len(vpB.inliers) / 3:
+        #             vpA.merge(vpB)
                     
-        vps_horizontal = list(filter(lambda x: not x.deleted, vps_horizontal))
-        after = len(vps_horizontal)
+        # vps_horizontal = list(filter(lambda x: not x.deleted, vps_horizontal))
+        # after = len(vps_horizontal)
 
-        if after < before:
-            print("consolidated vanishing_points from %d to %d" % (before, after))
+        # if after < before:
+        #     print("consolidated vanishing_points from %d to %d" % (before, after))
 
 
         data["vertical_vp"] = vertical_vp
