@@ -224,7 +224,7 @@ class PipelineExtractSurfaces(PipelineStep):
                     if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0], min_distance=3):
                         new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group="semantic_lines"))
 
-        self.data["semantic_lines"] = merge_lines(new_lines, search_width=max(diagonal/300, 3), search_length=1.5, angle_threshold=np.radians(7))
+        self.data["semantic_lines"] = merge_lines(new_lines, search_width=max(diagonal/300, 3), search_length=1.5, angle_threshold=np.radians(5))
 
         #self.data["lines"] = merge_lines(self.data["lines"] + self.data["semantic_lines"], search_width=max(diagonal/400, 3))
 
