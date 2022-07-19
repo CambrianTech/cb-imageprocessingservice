@@ -213,7 +213,7 @@ class PipelineExtractSurfaces(PipelineStep):
                 contour_length = cv2.arcLength(contour, True)
 
                 if contour_length > min_contour_length:
-                    epsilon = 0.001 * contour_length
+                    epsilon = 0.0007 * contour_length
                     polygon = cv2.approxPolyDP(contour, epsilon, True)
                     num_pts = len(polygon)
 
@@ -226,19 +226,26 @@ class PipelineExtractSurfaces(PipelineStep):
                         if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0], min_distance=3):
                             new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group="semantic_lines"))
 
-        self.data["semantic_lines"] = merge_lines(new_lines, search_width=max(diagonal/150, 3))
+        self.data["semantic_lines"] = merge_lines(new_lines, search_width=max(diagonal/100, 3), angle_threshold=np.radians(7))
+
+        # if im_logging_enabled(data):
+        #     lines_image =  self.image.copy()
+        #     draw_lines(lines_image, self.data["semantic_lines"])
+        #     log_image(self.data, "new_lines", lines_image)
 
         self.data["lines"] = merge_lines(self.data["lines"] + self.data["semantic_lines"], search_width=max(diagonal/400, 3))
 
         #filter out after merge, matching passed in group
         self.data["semantic_lines"] = list(filter(lambda x: x.group == "semantic_lines", self.data["lines"]))
 
+        self.data["semantic_lines"], _ = extend_to_intersection(self.data["semantic_lines"], search_length=1.1, search_width=3.0, min_angle_difference=0)
+
         if im_logging_enabled(data):
             lines_image =  self.image.copy()
             draw_lines(lines_image, self.data["lines"])
-            draw_lines(lines_image, self.data["semantic_lines"], color=(255,255,0), thickness=2, lineType=cv2.LINE_AA)
+            draw_lines(lines_image, self.data["semantic_lines"], color=(255,255,0), thickness=1, lineType=cv2.LINE_AA)
 
-            log_image(self.data, "vp_lines_new", lines_image)
+            log_image(self.data, "vp_lines_newest", lines_image)
 
         if im_logging_enabled(data, LogLevel.Segmentation):
             log_segmentation_image(self.data, "semantic_labels", self.data["semantic_labels"], self.data["downscaled"])
