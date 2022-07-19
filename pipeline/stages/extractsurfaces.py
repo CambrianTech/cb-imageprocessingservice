@@ -209,14 +209,14 @@ class PipelineExtractSurfaces(PipelineStep):
 
         intersections = []
 
-        new_lines = merge_lines(new_lines, search_width=max(diagonal/300, 3), search_length=1.05, angle_threshold=np.radians(5))
-
         filtered_lines = []
         for vp in valid_vps:
             inliers = list(get_inliers(new_lines, vp.model, np.radians(8)))
             filtered_lines.extend(inliers)
 
             vp.inliers = np.concatenate((vp.inliers, inliers), axis=0)
+
+        filtered_lines = merge_lines(filtered_lines, search_width=max(diagonal/200, 3), search_length=1.05, angle_threshold=np.radians(10))
 
         self.data["semantic_lines"] = filtered_lines
         self.data["vp_lines"].extend(filtered_lines)
