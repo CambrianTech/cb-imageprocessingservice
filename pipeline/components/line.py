@@ -378,6 +378,20 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
 
     return list(filter(lambda x: not x.dead, lines))
 
+def line_within_mask(line, mask, value=1, num_points=7, num_matches=3):
+    line_points = np.linspace(line.point_a, line.point_b, num_points)
+    count = 0
+    for point in line_points:
+        if point[0] < 0 or point[0] >= mask.shape[1] or point[1] < 0 or point[1] >= mask.shape[0]: continue
+
+        if mask[int(point[1]), int(point[0])] == value:
+            count += 1
+
+        if count > num_matches:
+            return True
+
+    return False
+
 def extend_to_intersection(lines, search_length=1.3, search_width=1.0, min_angle_difference=np.radians(10)):
 
     intersections = [[None, None] for line in lines]

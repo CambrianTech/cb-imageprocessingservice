@@ -15,11 +15,13 @@ from pipeline.data.surface_type import SurfaceType
 from pipeline.misc.utils import resize_array, random_color, overlay_mask, partition
 from .planegeometry import Dimension
 from .extractsurfaces import box_like, legged_objects
-from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled
-from pipeline.components.line import Line, line_on_image_edge, merge_lines, draw_lines
+from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_mask
+from pipeline.components.line import Line, line_on_image_edge, merge_lines, draw_lines, line_within_mask
 from pipeline.data.ade20k import ADE20K
 
 find_horizontal = True
+
+problematic_labels = [ADE20K.rug, ADE20K.vase, ADE20K.chair, ADE20K.plant, ADE20K.stool, ADE20K.pillow, ADE20K.pot, ADE20K.person, ADE20K.lamp]
 
 def angle_with_vp(model, locations, directions):
 
@@ -304,9 +306,26 @@ class PipelineVanishingPointFinder(PipelineStep):
         return ["lines"]
 
                 
-    def run(self, data):
+    def run(self, data, freedom = 0.03):
 
         image = data["downscaled"]
+
+        lines_mask = np.ones(image.shape[:2], dtype=np.uint8)
+
+        for label in problematic_labels:
+            lines_mask[data["semantic_labels"] == label.index] = 0
+
+        dist_transform = cv2.distanceTransform(cv2.copyMakeBorder(lines_mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=1), cv2.DIST_L2, 5)
+        dist_transform = dist_transform[1:-1,1:-1]
+
+        lines_mask[dist_transform < freedom * dist_transform.max()] = 0
+
+        log_mask(data, "vp_mask", lines_mask, background=image)
+
+        all_lines = list(filter(lambda l: line_within_mask(l, lines_mask), data["lines"]))
+
+        if len(all_lines) < len(data["lines"]) / 2 and len(all_lines) < 50:
+            all_lines = data["lines"]
 
         diagonal = math.hypot(image.shape[0], image.shape[1])
 
@@ -316,13 +335,12 @@ class PipelineVanishingPointFinder(PipelineStep):
         vp_lines = []
         vps_horizontal = []
         vertical_vp = None
-        all_lines = data["lines"]
         edgelets = compute_edgelets(all_lines)
 
         current_indices = [True]*len(all_lines)
         current_line_number = len(all_lines)
         current_lines = all_lines.copy()
-        lines_plus = data["lines"].copy()
+        lines_plus = all_lines.copy()
         all_indices = [True]*len(all_lines)
 
         cluster_index = 0
@@ -333,7 +351,7 @@ class PipelineVanishingPointFinder(PipelineStep):
 
             if vertical_vp is None:
                 vertical_threshold = np.radians(20)
-                vertical_lines, _= partition(lambda x: LineFunctions.line_angle_difference(x.angle, pi_2) < vertical_threshold, data["lines"])
+                vertical_lines, _= partition(lambda x: LineFunctions.line_angle_difference(x.angle, pi_2) < vertical_threshold, all_lines)
 
                 vertical_indices = list([all_lines[i] in vertical_lines for i in range(len(all_lines))])
                 current_indices = vertical_indices
@@ -345,7 +363,7 @@ class PipelineVanishingPointFinder(PipelineStep):
                     horizontal_threshold = np.radians(.5)
                     horizontal_indices = [False]
                     while np.count_nonzero(horizontal_indices) < 5:
-                        horizontal_lines, _= partition(lambda x: LineFunctions.line_angle_difference(x.angle, 0) < horizontal_threshold, data["lines"])
+                        horizontal_lines, _= partition(lambda x: LineFunctions.line_angle_difference(x.angle, 0) < horizontal_threshold, all_lines)
 
                         horizontal_indices = list([all_lines[i] in horizontal_lines for i in range(len(all_lines))])
                         horizontal_threshold += np.radians(.5)

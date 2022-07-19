@@ -130,10 +130,12 @@ def log_data(data:dict):
     with open(data_filename, 'wb') as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-def log_mask(data:dict, name:str, mask, extension=".jpg", primary=False):
+def log_mask(data:dict, name:str, mask, background=None, extension=".jpg", primary=False):
     if im_logging_enabled(data, LogLevel.Images) or (im_logging_enabled(data) and primary):
         image = np.zeros_like(mask)
         image[mask > 0] = 255
+        if background is not None:
+            image = overlay_image(image, background)
         _log_image(data, name, image, extension)
                 
 def log_image(data:dict, name:str, image, extension=".jpg", primary=False):

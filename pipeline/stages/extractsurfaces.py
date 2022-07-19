@@ -10,7 +10,7 @@ from pipeline.data.logging import log_image, im_logging_enabled, log_segmentatio
 from pipeline.data.ade20k import ADE20K
 from pipeline.data.semanticlabel import SemanticLabel
 from pipeline.misc.utils import list_flatten
-from pipeline.components.line import extend_to_intersection, draw_lines
+from pipeline.components.line import extend_to_intersection, draw_lines, line_within_mask
 
 floor = [ADE20K.floor, ADE20K.grass, ADE20K.earth, ADE20K.sidewalk]
 on_floor = [ADE20K.rug]
@@ -136,22 +136,7 @@ class PipelineExtractSurfaces(PipelineStep):
 
                     markers[dist_transform > freedom * dist_transform.max()] = value
 
-
-        def is_barrier_line(line, mask, num_points=7, num_matches=3):
-            line_points = np.linspace(line.point_a, line.point_b, num_points)
-            count = 0
-            for point in line_points:
-                if point[0] < 0 or point[0] >= mask.shape[1] or point[1] < 0 or point[1] >= mask.shape[0]: continue
-
-                if mask[int(point[1]), int(point[0])] == 0:
-                    count += 1
-
-                if count > num_matches:
-                    return True
-
-            return False
-        
-        line_candidates = list(filter(lambda line: is_barrier_line(line, markers), lines))
+        line_candidates = list(filter(lambda line: line_within_mask(line, markers, value=0), lines))
 
         draw_lines(watershed_mask, line_candidates, color=0, thickness=1, lineType=cv2.LINE_4)
 
@@ -186,8 +171,7 @@ class PipelineExtractSurfaces(PipelineStep):
         #line_candidates, intersections = extend_to_intersection(line_candidates, search_length=1.1)  
 
         #Consolidate types: Include other types as part of floor: rug, earth, grass
-        self.data["semantic_labels"] = np.argmax(np.dstack(self.data["semantic_probs"]), -1)
-
+        
         if im_logging_enabled(data, LogLevel.Segmentation):
             lines_image = self.data["downscaled"].copy()
             draw_lines(lines_image, line_candidates)

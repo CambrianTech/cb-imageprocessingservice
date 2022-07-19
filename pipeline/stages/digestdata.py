@@ -52,3 +52,6 @@ class PipelineDigestData(PipelineStep):
         else:
             data["downscaled"] = data["image"]
 
+
+        data["semantic_labels"] = np.argmax(np.dstack(data["semantic_probs"]), -1)
+
