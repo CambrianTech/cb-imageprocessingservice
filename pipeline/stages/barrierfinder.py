@@ -41,13 +41,16 @@ class PipelineBarrierFinder(PipelineStep):
 
         all_lines = self.data["vp_lines"]
 
-        
+        for surfaceType in [SurfaceType.Wall]:
+            mask = np.zeros(self.image .shape[:2], dtype=np.uint8)
+            mask[self.data["isolated_labels"] == surfaceType] = 1
+            
 
-        line_candidates, intersections = extend_to_intersection(all_lines, search_length=1.1) 
+        all_lines, intersections = extend_to_intersection(all_lines, search_length=1.1) 
 
         if im_logging_enabled(data):
             debug = self.data["downscaled"].copy()
-            draw_lines(debug, line_candidates)
+            draw_lines(debug, all_lines)
             for point in intersections:
                 cv2.circle(debug, (int(point[0]), int(point[1])), 3, (255, 255, 0), cv2.FILLED, cv2.LINE_AA)
 
