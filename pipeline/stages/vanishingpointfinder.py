@@ -21,7 +21,8 @@ from pipeline.data.ade20k import ADE20K
 
 find_horizontal = True
 
-problematic_labels = [ADE20K.rug, ADE20K.vase, ADE20K.chair, ADE20K.plant, ADE20K.stool, ADE20K.pillow, ADE20K.pot, ADE20K.person, ADE20K.lamp]
+remove_labels = [ADE20K.vase, ADE20K.chair, ADE20K.plant, ADE20K.stool, ADE20K.pillow, ADE20K.pot, ADE20K.person, ADE20K.lamp]
+reduce_labels = [ADE20K.rug]
 
 def angle_with_vp(model, locations, directions):
 
@@ -306,19 +307,30 @@ class PipelineVanishingPointFinder(PipelineStep):
         return ["lines"]
 
                 
-    def run(self, data, freedom = 0.03):
+    def run(self, data):
 
         image = data["downscaled"]
 
         lines_mask = np.ones(image.shape[:2], dtype=np.uint8)
 
-        for label in problematic_labels:
+        for label in remove_labels:
             lines_mask[data["semantic_labels"] == label.index] = 0
 
         dist_transform = cv2.distanceTransform(cv2.copyMakeBorder(lines_mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=1), cv2.DIST_L2, 5)
         dist_transform = dist_transform[1:-1,1:-1]
 
+        freedom = 0.03
         lines_mask[dist_transform < freedom * dist_transform.max()] = 0
+
+        reduce_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+        for label in reduce_labels:
+            reduce_mask[data["semantic_labels"] == label.index] = 1
+
+        dist_transform = cv2.distanceTransform(cv2.copyMakeBorder(reduce_mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=1), cv2.DIST_L2, 5)
+        dist_transform = dist_transform[1:-1,1:-1]
+
+        freedom = 0.1
+        lines_mask[dist_transform > freedom * dist_transform.max()] = 0
 
         log_mask(data, "vp_mask", lines_mask, background=image)
 
