@@ -3,6 +3,8 @@ import numpy as np
 import cv2
 from skimage.segmentation import watershed
 import itertools
+import math
+from scipy.spatial import distance
 
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
@@ -10,7 +12,7 @@ from pipeline.data.logging import log_image, im_logging_enabled, log_segmentatio
 from pipeline.data.ade20k import ADE20K
 from pipeline.data.semanticlabel import SemanticLabel
 from pipeline.misc.utils import list_flatten
-from pipeline.components.line import extend_to_intersection, draw_lines, line_within_mask
+from pipeline.components.line import Line, extend_to_intersection, draw_lines, line_within_mask, line_on_image_edge, merge_lines
 
 floor = [ADE20K.floor, ADE20K.grass, ADE20K.earth, ADE20K.sidewalk]
 on_floor = [ADE20K.rug]
@@ -166,14 +168,17 @@ class PipelineExtractSurfaces(PipelineStep):
 
     def run(self, data):
         self.data = data
+        self.image = self.data["downscaled"]
+
+        diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
         line_candidates, intersections = self.data["vp_lines"], []
-        line_candidates, intersections = extend_to_intersection(line_candidates, search_length=1.1)  
+        #line_candidates, intersections = extend_to_intersection(line_candidates, search_length=1.1)  
 
         #Consolidate types: Include other types as part of floor: rug, earth, grass
         
         if im_logging_enabled(data, LogLevel.Segmentation):
-            lines_image = self.data["downscaled"].copy()
+            lines_image =  self.image.copy()
             draw_lines(lines_image, line_candidates)
             for point in intersections:
                 cv2.circle(lines_image, (int(point[0]), int(point[1])), 3, (255, 255, 0), cv2.FILLED, cv2.LINE_AA)
@@ -188,6 +193,47 @@ class PipelineExtractSurfaces(PipelineStep):
 
         #combine_floor_masks(output)
         self.data["isolated_probs"], self.data["isolated_labels"] = isolate_masks(data, self.data["semantic_probs"], self.data["semantic_labels"]) #break masks into surface types
+
+
+        #now pull lines and add them to vp_lines and lines
+        new_lines = []
+        min_line_length = diagonal / 50
+        min_contour_length = min_line_length * 4
+
+        for surfaceType in SurfaceType:
+            mask = np.zeros( self.image.shape[:2], dtype=np.uint8)
+            mask[self.data["isolated_labels"] == surfaceType] = 1
+
+            mask = cv2.copyMakeBorder(mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0) 
+            _contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+            for contour in _contours:
+                shape = contour.shape
+                contour = (contour.flatten() - 1).reshape(shape)
+                contour_length = cv2.arcLength(contour, True)
+
+                if contour_length > min_contour_length:
+                    epsilon = 0.001 * contour_length
+                    polygon = cv2.approxPolyDP(contour, epsilon, True)
+                    num_pts = len(polygon)
+
+                    for i in range(num_pts):
+                        point_a = polygon[i][0]
+                        point_b = polygon[(i+1) % num_pts][0]
+
+                        length = distance.euclidean(point_a, point_b)
+
+                        if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0], min_distance=3):
+                            new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1]))
+
+        self.data["surface_lines"] = merge_lines(new_lines, search_width=max(diagonal/150, 3))
+
+        self.data["lines"] = merge_lines(self.data["lines"] + self.data["surface_lines"], search_width=max(diagonal/400, 3))
+
+        if im_logging_enabled(data):
+            lines_image =  self.image.copy()
+            draw_lines(lines_image, self.data["lines"])
+            log_image(self.data, "vp_lines_new", lines_image)
 
         if im_logging_enabled(data, LogLevel.Segmentation):
             log_segmentation_image(self.data, "semantic_labels", self.data["semantic_labels"], self.data["downscaled"])
