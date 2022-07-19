@@ -198,46 +198,49 @@ class PipelineExtractSurfaces(PipelineStep):
         #now pull lines and add them to vp_lines and lines
         new_lines = []
         min_line_length = diagonal / 50
-        min_contour_length = min_line_length * 4
 
-        for surfaceType in [SurfaceType.Wall, SurfaceType.Ceiling]:
+        for surfaceType in [SurfaceType.Ceiling, SurfaceType.Floor]:
             mask = np.zeros( self.image.shape[:2], dtype=np.uint8)
             mask[self.data["isolated_labels"] == surfaceType] = 1
 
             mask = cv2.copyMakeBorder(mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0) 
-            _contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+            _contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
             for contour in _contours:
                 shape = contour.shape
                 contour = (contour.flatten() - 1).reshape(shape)
                 contour_length = cv2.arcLength(contour, True)
 
-                if contour_length > min_contour_length:
-                    epsilon = 0.0007 * contour_length
-                    polygon = cv2.approxPolyDP(contour, epsilon, True)
-                    num_pts = len(polygon)
+                epsilon = 5
+                polygon = cv2.approxPolyDP(contour, epsilon, True)
+                num_pts = len(polygon)
 
-                    for i in range(num_pts):
-                        point_a = polygon[i][0]
-                        point_b = polygon[(i+1) % num_pts][0]
+                for i in range(num_pts):
+                    point_a = polygon[i][0]
+                    point_b = polygon[(i+1) % num_pts][0]
 
-                        length = distance.euclidean(point_a, point_b)
+                    length = distance.euclidean(point_a, point_b)
 
-                        if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0], min_distance=3):
-                            new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group="semantic_lines"))
+                    if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0], min_distance=3):
+                        new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group="semantic_lines"))
 
-        self.data["semantic_lines"] = merge_lines(new_lines, search_width=max(diagonal/100, 3), angle_threshold=np.radians(7))
+        self.data["semantic_lines"] = merge_lines(new_lines, search_width=max(diagonal/300, 3), search_length=1.5, angle_threshold=np.radians(7))
 
-        self.data["lines"] = merge_lines(self.data["lines"] + self.data["semantic_lines"], search_width=max(diagonal/400, 3))
+        #self.data["lines"] = merge_lines(self.data["lines"] + self.data["semantic_lines"], search_width=max(diagonal/400, 3))
 
         #filter out after merge, matching passed in group
-        self.data["semantic_lines"] = list(filter(lambda x: x.group == "semantic_lines", self.data["lines"]))
+        #self.data["semantic_lines"] = list(filter(lambda x: x.group == "semantic_lines", self.data["lines"]))
 
+        #self.data["lines"] = merge_lines(self.data["lines"], search_width=max(diagonal/150, 3), remove_matches=False)
+
+        # clusters = list(set(map(lambda x: x.cluster, self.data["semantic_lines"])))
         
+        # for line in [line for line in self.data["lines"] if line.cluster in clusters]:
+        #     line.group = "semantic_lines"
+
+        #self.data["semantic_lines"] = list(filter(lambda x: x.group == "semantic_lines", self.data["lines"]))
 
         self.data["lines"], _ = extend_to_intersection(self.data["lines"], search_length=1.1, search_width=3.0, min_angle_difference=0)
-
-
 
         if im_logging_enabled(data):
             lines_image =  self.image.copy()
