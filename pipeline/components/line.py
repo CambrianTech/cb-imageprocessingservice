@@ -12,7 +12,7 @@ from cambrian.LineFunctions import LineFunctions
 
 class Line():
 
-    def __init__(self, ax, ay, bx, by, cluster=None):
+    def __init__(self, ax, ay, bx, by, cluster=None, group=None):
         self.data = np.array([ax, ay, bx, by], dtype=np.float32)
         
         self.dx = self.data[2] - self.data[0]
@@ -29,6 +29,7 @@ class Line():
         #for tracking
         self.dead = False
         self.cluster = cluster
+        self.group = group
 
     def __del__(self):
         del self.data
@@ -345,6 +346,8 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
             line_a.cluster = cluster_index
             cluster_index += 1
 
+        group = line_a.group
+
         for line_b in lines:
 
             if LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold or line_b.dead or line_a == line_b:
@@ -363,6 +366,10 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
                     data = LineFunctions.merge_line_pair(data[0], data[1], data[2], data[3], \
                                                          line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], \
                                                          line_b.dx, line_b.dy)
+
+                    if group is None:
+                        group = line_b.group
+
                 else:
                     if line_b.cluster is None:
                         line_b.cluster = line_a.cluster
@@ -373,7 +380,7 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
                             line.cluster = line_a.cluster
 
         if line_a.dead:
-            lines[i] = Line(data[0], data[1], data[2], data[3], cluster=line_a.cluster)
+            lines[i] = Line(data[0], data[1], data[2], data[3], cluster=line_a.cluster, group=group)
 
 
     return list(filter(lambda x: not x.dead, lines))

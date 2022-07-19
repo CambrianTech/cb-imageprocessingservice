@@ -224,15 +224,20 @@ class PipelineExtractSurfaces(PipelineStep):
                         length = distance.euclidean(point_a, point_b)
 
                         if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0], min_distance=3):
-                            new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1]))
+                            new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group="semantic_lines"))
 
-        self.data["surface_lines"] = merge_lines(new_lines, search_width=max(diagonal/150, 3))
+        self.data["semantic_lines"] = merge_lines(new_lines, search_width=max(diagonal/150, 3))
 
-        self.data["lines"] = merge_lines(self.data["lines"] + self.data["surface_lines"], search_width=max(diagonal/400, 3))
+        self.data["lines"] = merge_lines(self.data["lines"] + self.data["semantic_lines"], search_width=max(diagonal/400, 3))
+
+        #filter out after merge, matching passed in group
+        self.data["semantic_lines"] = list(filter(lambda x: x.group == "semantic_lines", self.data["lines"]))
 
         if im_logging_enabled(data):
             lines_image =  self.image.copy()
             draw_lines(lines_image, self.data["lines"])
+            draw_lines(lines_image, self.data["semantic_lines"], color=(255,255,0), thickness=2, lineType=cv2.LINE_AA)
+
             log_image(self.data, "vp_lines_new", lines_image)
 
         if im_logging_enabled(data, LogLevel.Segmentation):
