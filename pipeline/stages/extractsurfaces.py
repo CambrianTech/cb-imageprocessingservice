@@ -10,7 +10,7 @@ from pipeline.data.logging import log_image, im_logging_enabled, log_segmentatio
 from pipeline.data.ade20k import ADE20K
 from pipeline.data.semanticlabel import SemanticLabel
 from pipeline.misc.utils import list_flatten
-from pipeline.components.line import extend_lines, draw_lines
+from pipeline.components.line import extend_to_intersection, draw_lines
 
 floor = [ADE20K.floor, ADE20K.grass, ADE20K.earth, ADE20K.sidewalk]
 on_floor = [ADE20K.rug]
@@ -80,7 +80,7 @@ class PipelineExtractSurfaces(PipelineStep):
     def output_keys(self) -> list:
         return ["semantic_labels", "isolated_probs", "isolated_labels"]
 
-    def refine_semantics(self, labels, label_freedoms:list, name="semantic"):
+    def refine_semantics(self, labels, lines, label_freedoms:list, name="semantic"):
 
         image = self.data["downscaled"]
         markers = np.zeros(image.shape[:2], dtype=np.int32)
@@ -151,10 +151,10 @@ class PipelineExtractSurfaces(PipelineStep):
 
             return False
         
-        line_candidates = list(filter(lambda line: is_barrier_line(line, markers), self.data["vp_lines"]))
-        line_candidates = extend_lines(line_candidates)
+        line_candidates = list(filter(lambda line: is_barrier_line(line, markers), lines))
 
         draw_lines(watershed_mask, line_candidates, color=0, thickness=1, lineType=cv2.LINE_4)
+
 
         #log_mask(self.data, "%s_mask" % name, watershed_mask)
         #log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"], labelset=semantic_key)
@@ -182,14 +182,24 @@ class PipelineExtractSurfaces(PipelineStep):
     def run(self, data):
         self.data = data
 
+        line_candidates, intersections = self.data["vp_lines"], []
+        #line_candidates, intersections = extend_to_intersection(line_candidates, search_length=1.1)  
+
         #Consolidate types: Include other types as part of floor: rug, earth, grass
         self.data["semantic_labels"] = np.argmax(np.dstack(self.data["semantic_probs"]), -1)
 
         if im_logging_enabled(data, LogLevel.Segmentation):
+            lines_image = self.data["downscaled"].copy()
+            draw_lines(lines_image, line_candidates)
+            for point in intersections:
+                cv2.circle(lines_image, (int(point[0]), int(point[1])), 3, (255, 255, 0), cv2.FILLED, cv2.LINE_AA)
+
+            log_image(self.data, "vp_lines_extended", lines_image)
+
             log_segmentation_image(self.data, "semantic_labels_raw", self.data["semantic_labels"], self.data["downscaled"])
 
-        self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), LF(box_like, 0.03), LF(on_wall, 0.1)], name="barriers_wc")
-        self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
+        self.refine_semantics(self.data["semantic_labels"], line_candidates, [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), LF(box_like, 0.03), LF(on_wall, 0.1)], name="barriers_wc")
+        self.refine_semantics(self.data["semantic_labels"], line_candidates, [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
                               LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)], name="barriers_floor")
 
         #combine_floor_masks(output)

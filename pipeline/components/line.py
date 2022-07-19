@@ -378,13 +378,7 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
 
     return list(filter(lambda x: not x.dead, lines))
 
-
-
-def extend_lines(lines, search_width=1.0, search_length=1.5, orthagonal_threshold=np.radians(30)):
-
-    min_dist_sq = search_width * search_width
-
-    #list(map(lambda x: x.extended(1.05), line_candidates))
+def extend_to_intersection(lines, search_length=1.3, search_width=1.0, min_angle_difference=np.radians(10)):
 
     intersections = [[None, None] for line in lines]
 
@@ -403,11 +397,11 @@ def extend_lines(lines, search_width=1.0, search_length=1.5, orthagonal_threshol
 
         rect_a = lines[i].bounding_box(width=search_width, length_multiplier=search_length)
 
-        for j in range(len(lines)):
+        for j in range(i + 1, len(lines)):
 
             if i == j: continue
 
-            if LineFunctions.line_angle_difference(lines[i].angle, lines[j].angle + 0.5 * np.pi) > orthagonal_threshold:
+            if LineFunctions.line_angle_difference(lines[i].angle, lines[j].angle) < min_angle_difference:
                 continue
 
             rect_b = lines[j].bounding_box(width=search_width, length_multiplier=search_length)
@@ -417,19 +411,31 @@ def extend_lines(lines, search_width=1.0, search_length=1.5, orthagonal_threshol
 
                 point = np.mean(intersection, axis=0)[0]
 
-                intersection = get_line_intersection(lines[i].data[0], lines[i].data[1], lines[i].data[2], lines[i].data[3], \
-                                                     lines[j].data[0], lines[j].data[1], lines[j].data[2], lines[j].data[3])
+                set_closest_point(i, point)
+                set_closest_point(j, point)
+    
+    intersection_points = []
+    for i in range(len(lines)):             
+        point_a_terminated = intersections[i][0] is not None
+        point_b_terminated = intersections[i][1] is not None
+        
+        if point_a_terminated or point_b_terminated:
 
-                if intersection is not None:
-                    set_closest_point(i, intersection)
-                    set_closest_point(j, intersection)
-
-        for i in range(len(lines)):
+            if point_a_terminated:
+                point_a = intersections[i][0][1]
+                intersection_points.append(point_a)
+            else:
+                point_a = lines[i].point_a
             
-            if intersections[i][0] is not None or intersections[i][1] is not None:
-                point_a = intersections[i][0][1] if intersections[i][0] is not None else lines[i].point_a
-                point_b = intersections[i][1][1] if intersections[i][1] is not None else lines[i].point_b
+            if point_b_terminated:
+                point_b = intersections[i][1][1]
+                intersection_points.append(point_b)
+            else:
+                point_b = lines[i].point_b
 
-                lines[i] = Line(point_a[0], point_a[1], point_b[0], point_b[1])
+            length = distance.euclidean(point_a, point_b)
+            
+            if length - lines[i].length > -1.0:
+                lines[i] = Line(point_a[0], point_a[1], point_b[0], point_b[1], lines[i].cluster)
 
-    return lines
+    return lines, intersection_points

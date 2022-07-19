@@ -18,7 +18,6 @@ from pipeline.misc.utils import random_color
 from pipeline.data.ade20k import ADE20K
 from pipeline.stages.extractsurfaces import on_floor, on_wall, on_ceiling, box_like, legged_objects
 from pipeline.components.rotated_rect import RotatedRect
-from pipeline.components.line import extend_lines
 
 class PipelineBarrierFinder(PipelineStep):
     @property
