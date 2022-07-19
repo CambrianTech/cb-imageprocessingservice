@@ -318,7 +318,7 @@ class PipelineVanishingPointFinder(PipelineStep):
         dist_transform = cv2.distanceTransform(cv2.copyMakeBorder(lines_mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=1), cv2.DIST_L2, 5)
         dist_transform = dist_transform[1:-1,1:-1]
 
-        freedom = 0.03
+        freedom = 0.01
         lines_mask[dist_transform < freedom * dist_transform.max()] = 0
 
         reduce_mask = np.zeros(image.shape[:2], dtype=np.uint8)
