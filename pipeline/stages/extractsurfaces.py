@@ -200,7 +200,7 @@ class PipelineExtractSurfaces(PipelineStep):
         min_line_length = diagonal / 50
         min_contour_length = min_line_length * 4
 
-        for surfaceType in SurfaceType:
+        for surfaceType in [SurfaceType.Wall, SurfaceType.Ceiling]:
             mask = np.zeros( self.image.shape[:2], dtype=np.uint8)
             mask[self.data["isolated_labels"] == surfaceType] = 1
 
@@ -228,24 +228,23 @@ class PipelineExtractSurfaces(PipelineStep):
 
         self.data["semantic_lines"] = merge_lines(new_lines, search_width=max(diagonal/100, 3), angle_threshold=np.radians(7))
 
-        # if im_logging_enabled(data):
-        #     lines_image =  self.image.copy()
-        #     draw_lines(lines_image, self.data["semantic_lines"])
-        #     log_image(self.data, "new_lines", lines_image)
-
         self.data["lines"] = merge_lines(self.data["lines"] + self.data["semantic_lines"], search_width=max(diagonal/400, 3))
 
         #filter out after merge, matching passed in group
         self.data["semantic_lines"] = list(filter(lambda x: x.group == "semantic_lines", self.data["lines"]))
 
-        self.data["semantic_lines"], _ = extend_to_intersection(self.data["semantic_lines"], search_length=1.1, search_width=3.0, min_angle_difference=0)
+        
+
+        self.data["lines"], _ = extend_to_intersection(self.data["lines"], search_length=1.1, search_width=3.0, min_angle_difference=0)
+
+
 
         if im_logging_enabled(data):
             lines_image =  self.image.copy()
             draw_lines(lines_image, self.data["lines"])
-            draw_lines(lines_image, self.data["semantic_lines"], color=(255,255,0), thickness=1, lineType=cv2.LINE_AA)
+            draw_lines(lines_image, self.data["semantic_lines"], color=(255,150,0), thickness=2, lineType=cv2.LINE_AA)
 
-            log_image(self.data, "vp_lines_newest", lines_image)
+            log_image(self.data, "semantic_lines", lines_image)
 
         if im_logging_enabled(data, LogLevel.Segmentation):
             log_segmentation_image(self.data, "semantic_labels", self.data["semantic_labels"], self.data["downscaled"])
