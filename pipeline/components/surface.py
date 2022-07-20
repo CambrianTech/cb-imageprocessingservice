@@ -33,7 +33,7 @@ class Surface():
         self._index = index
         self.uniqueId = uuid.uuid4()
         self.surfaceType = surfaceType
-        self.geometry = None
+        self.room = None
         self._mask = None
 
         self._mask_edges = None
@@ -103,14 +103,14 @@ class Surface():
 
     @property
     def probs(self) -> ndimage:
-        probs_number = len(self.geometry.probs)
-        return self.geometry.probs[self.index] if self.index in range(probs_number) else self.geometry.probs[self._cloned_from]
+        probs_number = len(self.room.probs)
+        return self.room.probs[self.index] if self.index in range(probs_number) else self.room.probs[self._cloned_from]
 
     @property
     def plane_mask(self) -> ndimage:
         if self._plane_mask is None:
-            self._plane_mask = np.zeros_like(self.geometry.index_mask)
-            self._plane_mask[self.geometry.index_mask == self.index] = 1
+            self._plane_mask = np.zeros_like(self.room.index_mask)
+            self._plane_mask[self.room.index_mask == self.index] = 1
         return self._plane_mask
 
     @property
@@ -167,12 +167,12 @@ class Surface():
         if self._normals_color is None and len(self.mask) > 0:
 
             mask_sample = sample_at_point(self.mask, point=self.center, size=100)
-            sample = sample_at_point(self.geometry.normals, point=self.center, size=100)
+            sample = sample_at_point(self.room.normals, point=self.center, size=100)
 
             if cv2.countNonZero(mask_sample) > 10:
                 self._normals_color = cv2.mean(sample, mask_sample)[:3]
             else:
-                self._normals_color = cv2.mean(self.geometry.normals, self.mask)[:3]
+                self._normals_color = cv2.mean(self.room.normals, self.mask)[:3]
 
         return self._normals_color
 
@@ -285,14 +285,14 @@ class Surface():
 
             #probably many ways this can be optimized: downsized mask, countNonZero, etc.
 
-            for candidate in self.geometry.surfaces:
+            for candidate in self.room.surfaces:
                 if candidate == self: continue
         
                 #check for self in candidate to save time, or check for overlap
                 if (candidate._neighbors is not None and self in candidate._neighbors):
                     self._neighbors.append(candidate)
                 else:
-                    intersection = self.geometry.surface_surface_intersection(self, candidate)
+                    intersection = self.room.surface_surface_intersection(self, candidate)
                   
                     if cv2.countNonZero(intersection) > 10: 
                         # print("intersection:", cv2.countNonZero(intersection))
@@ -305,7 +305,7 @@ class Surface():
         if surface not in self.neighbors:
             return None
 
-        masks_intersection = self.geometry.surface_surface_intersection(self, surface)
+        masks_intersection = self.room.surface_surface_intersection(self, surface)
   
         contours, hierarchy = cv2.findContours(masks_intersection, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -329,7 +329,7 @@ class Surface():
         if self._mask is None:
             self._mask = np.zeros(self.probs.shape, dtype="uint8")
             self._mask[self.probs >= self.confidence] = 1
-            self._mask[self.geometry.isolated_labels != self.surfaceType.index] = 0
+            self._mask[self.room.isolated_labels != self.surfaceType.index] = 0
         return self._mask
 
     @mask.setter
@@ -453,7 +453,7 @@ class Surface():
     def semantic_labels(self) -> ndimage:
         if self._semantic_labels is None:
             # self._semantic_labels = self.get_semantic_labels(self.mask)
-            segments, counts = np.unique(self.geometry.semantic_labels[self.mask > 0], return_counts=True)
+            segments, counts = np.unique(self.room.semantic_labels[self.mask > 0], return_counts=True)
             segmentList = zip(segments.tolist(), counts.tolist())
             self._semantic_labels = sorted(segmentList, key=lambda x:x[1], reverse=True)
 
@@ -498,7 +498,7 @@ class Surface():
         surface.destroy()
 
     def destroy(self):
-        self.geometry.remove_surface(self) 
+        self.room.remove_surface(self) 
         self.destroyed = True
         #Important! do not add code here, add inside remove_surface, and call public methods on this object
 
@@ -530,8 +530,6 @@ class Surface():
 
     def determine_surface_type(self, K, angle_threshold=np.radians(20)):
 
-        isolated = self.data["isolated_probs"]
-
         prob_mask = self.probs.copy()
         prob_mask[self.plane_mask == 0] = 0
         if np.sum(prob_mask) < 10:
@@ -539,8 +537,8 @@ class Surface():
 
         self.isolated_probs = []
         for group in SurfaceType:
-            submask = isolated[group] * prob_mask
-            submask[self.geometry.isolated_labels != group.index] = np.nan #exclude
+            submask = self.room.isolated_labels[group] * prob_mask
+            submask[self.room.isolated_labels != group.index] = np.nan #exclude
             self.isolated_probs.append(submask)
 
         self.category_probs = np.asarray([np.nanmean(prob) for prob in self.isolated_probs])

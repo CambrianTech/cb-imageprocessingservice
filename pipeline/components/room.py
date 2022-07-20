@@ -42,7 +42,7 @@ class Room():
 
     def add_surface(self, surface):
 
-        surface.geometry = self
+        surface.room = self
         
         if not surface.was_added:
             #get next index, expand everything, 
