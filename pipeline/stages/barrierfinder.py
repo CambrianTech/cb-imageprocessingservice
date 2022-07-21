@@ -11,7 +11,7 @@ from cambrian.LineFunctions import LineFunctions
 
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
-from pipeline.data.logging import log_image, im_logging_enabled, log_markers, log_segmentation_image, log_mask
+from pipeline.data.logging import log_image, im_logging_enabled, log_markers, get_segmentation_image, log_segmentation_image
 from pipeline.components.line import draw_lines
 from .vanishingpointfinder import angle_with_vp
 from pipeline.misc.utils import random_color
@@ -48,8 +48,9 @@ class PipelineBarrierFinder(PipelineStep):
         all_lines, intersections = extend_to_intersection(all_lines, search_length=1.1) 
 
         if im_logging_enabled(data):
-            debug = self.data["downscaled"].copy()
-            draw_lines(debug, all_lines)
+            debug = get_segmentation_image(self.room.index_mask, self.data["downscaled"], labelset=None)
+            debug = cv2.addWeighted(debug, 0.5, self.data["downscaled"], 0.5, 0)
+            draw_lines(debug, all_lines, color=(255,0,50), thickness=2)
             for point in intersections:
                 cv2.circle(debug, (int(point[0]), int(point[1])), 3, (255, 255, 0), cv2.FILLED, cv2.LINE_AA)
 

@@ -37,7 +37,7 @@ class SurfaceSolver():
 
         #prepare
         self.lines_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
-        draw_lines(self.lines_mask, self.data["vp_lines"], color=255, thickness=3, lineType=cv2.LINE_4)
+        draw_lines(self.lines_mask, self.data["barrier_lines"], color=255, thickness=3, lineType=cv2.LINE_4)
 
         self.height, self.width = self.room.image.shape[:2]
         self.area = self.height * self.width

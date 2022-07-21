@@ -130,7 +130,6 @@ class PipelineExtractSurfaces(PipelineStep):
 
         draw_lines(watershed_mask, line_candidates, color=0, thickness=1, lineType=cv2.LINE_4)
 
-
         #log_mask(self.data, "%s_mask" % name, watershed_mask)
         #log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"], labelset=semantic_key)
 
@@ -151,6 +150,8 @@ class PipelineExtractSurfaces(PipelineStep):
 
             labels[markers_mask] = label
 
+        return line_candidates
+
         #log_segmentation_image(self.data, "%s_refined" % name, markers, self.data["downscaled"], labelset=semantic_key)
 
 
@@ -166,14 +167,18 @@ class PipelineExtractSurfaces(PipelineStep):
         if im_logging_enabled(data):
             log_segmentation_image(self.data, "semantic_labels_raw", self.data["semantic_labels"], self.data["downscaled"])
 
-        self.refine_semantics(self.data["semantic_labels"], line_candidates, [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), LF(box_like, 0.03), LF(on_wall, 0.1)], name="barriers_wc")
-        self.refine_semantics(self.data["semantic_labels"], line_candidates, [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
-                              LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)], name="barriers_floor")
+        barrier_lines = []
+        barrier_lines.extend( self.refine_semantics(self.data["semantic_labels"], line_candidates, [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), \
+                                LF(box_like, 0.03), LF(on_wall, 0.1)], name="barriers_wc"))
+
+        barrier_lines.extend( self.refine_semantics(self.data["semantic_labels"], line_candidates, [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
+                                LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)], name="barriers_floor"))
 
         #combine_floor_masks(output)
         self.data["isolated_probs"], self.data["isolated_labels"] = isolate_masks(data, self.data["semantic_probs"], self.data["semantic_labels"]) #break masks into surface types
 
-
+        data["barrier_lines"] = barrier_lines
+        
         #now pull lines and add them to vp_lines and lines
         new_lines = []
         min_line_length = diagonal / 60
@@ -251,7 +256,7 @@ class PipelineExtractSurfaces(PipelineStep):
 
         if im_logging_enabled(data):
             lines_image =  self.image.copy()
-            
+
             draw_lines(lines_image, self.data["vp_lines"])
             draw_lines(lines_image, self.data["semantic_lines"], color=(255,150,0), thickness=2, lineType=cv2.LINE_AA)
 

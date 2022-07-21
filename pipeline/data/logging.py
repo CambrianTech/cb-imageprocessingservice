@@ -211,9 +211,10 @@ def log_markers(data:dict, name, markers, mask=None, num_labels=None, primary=Fa
         debug = get_markers_image(data, markers, mask, num_labels)
         _log_image(data, name, debug)
 
-def get_segmentation_image(labels, image, avg=False, resize=True, min_matches=100, labelset=None):
+#segmentation, image, avg=False, extension=".jpg", labelset=ADE20K,  opacity=0.5, get_image=False, min_matches=100, primary=False
+def get_segmentation_image(segmentation, image, avg=False, resize=True, min_matches=100, labelset=None):
     if resize:
-        img_seg = cv2.resize(image, (labels.shape[1], labels.shape[0]))
+        img_seg = cv2.resize(image, (segmentation.shape[1], segmentation.shape[0]))
     else:
         img_seg = image.copy()
 
@@ -221,13 +222,13 @@ def get_segmentation_image(labels, image, avg=False, resize=True, min_matches=10
 
     colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
 
-    for label in range(0, np.amax(labels) + 1):
+    for label in range(0, np.amax(segmentation) + 1):
         color = colors[label] if label < len(colors) else random_color()
         
-        if avg: color = np.mean(img_seg[labels == label], axis=0)
-        img_seg[labels == label] = color
+        if avg: color = np.mean(img_seg[segmentation == label], axis=0)
+        img_seg[segmentation == label] = color
 
-        if labelset is not None and len(img_seg[labels == label]) > min_matches:
+        if labelset is not None and len(img_seg[segmentation == label]) > min_matches:
             color_value =  (int(color[0]), int(color[1]), int(color[2]))
             if type(labelset) == dict or type(labelset) == list:
                 text = labelset[label] if label in labelset else "other"
