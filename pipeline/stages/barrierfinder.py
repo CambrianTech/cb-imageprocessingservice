@@ -77,15 +77,12 @@ class PipelineBarrierFinder(PipelineStep):
 
                     length = distance.euclidean(point_a, point_b)
 
-                    if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0], min_distance=3):
-                        self.room.vertical_vp.model
-
+                    if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0], min_distance=diagonal/50):
                         new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group="plane_lines"))
 
 
-        vertical_lines = list(get_inliers(new_lines, self.data["vertical_vp"].model, np.radians(8)))
-
-        vertical_lines = merge_lines(vertical_lines, search_width=max(diagonal/50, 3), search_length=1.0, angle_threshold=np.radians(20))
+        plane_lines = list(get_inliers(new_lines, self.data["vertical_vp"].model, np.radians(8)))
+        plane_lines = merge_lines(plane_lines, search_width=max(diagonal/50, 3), search_length=1.5, angle_threshold=np.radians(20))
 
         # horizontal_lines = []
         # for vp in self.data["horizontal_vps"]:
@@ -94,26 +91,34 @@ class PipelineBarrierFinder(PipelineStep):
         # horizontal_lines = merge_lines(horizontal_lines, search_width=max(diagonal/50, 3), search_length=0.7, angle_threshold=np.radians(20))
         
 
-        planes_debug = get_segmentation_image(index_mask, self.data["downscaled"])
-        planes_debug = cv2.addWeighted(planes_debug, 0.5, self.data["downscaled"], 0.5, 0)
-        draw_lines(planes_debug, vertical_lines, color=(255,0,0), thickness=2, lineType=cv2.LINE_AA)
+        # planes_debug = get_segmentation_image(index_mask, self.data["downscaled"])
+        # planes_debug = cv2.addWeighted(planes_debug, 0.5, self.data["downscaled"], 0.5, 0)
+        # draw_lines(planes_debug, vertical_lines, color=(255,0,0), thickness=2, lineType=cv2.LINE_AA)
         #draw_lines(planes_debug, horizontal_lines, color=(255,255,0), thickness=2, lineType=cv2.LINE_AA)
+        #log_image(self.data, "barriers_plane_lines", planes_debug)
 
-        log_image(self.data, "barriers_plane_lines", planes_debug)
+        # horizontal_lines = []
+        # for vp in self.data["horizontal_vps"]:
+        #     horizontal_lines.extend(list(get_inliers(new_lines, vp.model, np.radians(15))))
 
-        all_lines = self.data["vp_lines"]
 
         for surfaceType in [SurfaceType.Wall]:
             mask = np.zeros(self.image .shape[:2], dtype=np.uint8)
             mask[self.data["isolated_labels"] == surfaceType] = 1
 
+        vertical_lines = self.data["vertical_vp"].inliers
+        horizontal_lines = list(filter(lambda x: x not in vertical_lines, data["vp_lines"]))
 
-        all_lines, intersections = extend_to_intersection(all_lines, search_length=1.1) 
+        all_lines, intersections = extend_to_intersection(horizontal_lines, search_length=1.1) 
 
         if im_logging_enabled(data):
-            debug = get_segmentation_image(self.room.index_mask, self.data["downscaled"], labelset=None)
+            debug = get_segmentation_image(self.data["isolated_labels"], self.data["downscaled"], labelset=None)
+            
             debug = cv2.addWeighted(debug, 0.5, self.data["downscaled"], 0.5, 0)
+
+            draw_lines(debug, plane_lines, color=(0,255,0), thickness=3, lineType=cv2.LINE_AA)
             draw_lines(debug, all_lines, color=(255,0,50), thickness=2)
+
             for point in intersections:
                 cv2.circle(debug, (int(point[0]), int(point[1])), 3, (255, 255, 0), cv2.FILLED, cv2.LINE_AA)
 

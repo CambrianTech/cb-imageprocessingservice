@@ -207,6 +207,7 @@ class PipelineExtractSurfaces(PipelineStep):
                         new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group="semantic_lines"))
 
         new_lines = list(filter(lambda l: line_within_mask(l, data["vp_mask"]), new_lines))
+        new_lines = merge_lines(new_lines, search_width=max(diagonal/200, 3), search_length=1.05, angle_threshold=np.radians(10))
 
         valid_vps = [data["vertical_vp"]] + data["horizontal_vps"]
 
@@ -214,12 +215,16 @@ class PipelineExtractSurfaces(PipelineStep):
 
         filtered_lines = []
         for vp in valid_vps:
+            if len(new_lines) < 1: break
+
             inliers = list(get_inliers(new_lines, vp.model, np.radians(8)))
+            
+            vp.inliers = np.concatenate((vp.inliers, inliers), axis=0)
             filtered_lines.extend(inliers)
 
-            vp.inliers = np.concatenate((vp.inliers, inliers), axis=0)
+            #get remaining
+            new_lines = list(set(new_lines).difference(set(inliers)))
 
-        filtered_lines = merge_lines(filtered_lines, search_width=max(diagonal/200, 3), search_length=1.05, angle_threshold=np.radians(10))
 
         self.data["semantic_lines"] = filtered_lines
         self.data["vp_lines"].extend(filtered_lines)
