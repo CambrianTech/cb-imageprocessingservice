@@ -70,7 +70,7 @@ class PipelineExtractSurfaces(PipelineStep):
     def output_keys(self) -> list:
         return ["semantic_labels", "isolated_probs", "isolated_labels"]
 
-    def refine_semantics(self, segmentation, label_freedoms:list, mask=None):
+    def refine_semantics(self, segmentation, label_freedoms:list=None, mask=None, freedom=None):
 
         lines = self.data["vp_lines"]
         image = self.data["downscaled"]
@@ -92,13 +92,11 @@ class PipelineExtractSurfaces(PipelineStep):
 
             value = int(label + 1)
 
-            match = next(filter(lambda x: x.index_of(value) >= 0, label_freedoms), None)
-
-            freedom = match.freedom if match is not None else None
+            if label_freedoms is not None:
+                match = next(filter(lambda x: x.index_of(value) >= 0, label_freedoms), None)
+                freedom = match.freedom if match is not None else None
 
             if freedom is not None and len(segmentation[label_mask]) > min_matches:
-
-                index = match.index_of(value)
 
                 seg_mask = np.zeros(image.shape[:2], dtype=np.uint8)
                 seg_mask[label_mask] = 1
@@ -146,7 +144,7 @@ class PipelineExtractSurfaces(PipelineStep):
 
             segmentation[markers_mask] = label
 
-        return line_candidates
+        
 
     def run(self, data):
         self.data = data
@@ -159,20 +157,14 @@ class PipelineExtractSurfaces(PipelineStep):
         if im_logging_enabled(data):
             log_segmentation_image(self.data, "semantic_labels_raw", self.data["semantic_labels"], self.data["downscaled"])
 
-        barrier_lines = []
-        barrier_lines.extend( self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), \
-                                LF(box_like, 0.03), LF(on_wall, 0.1)]))
+        self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), \
+                                LF(box_like, 0.03), LF(on_wall, 0.1)])
 
-        barrier_lines.extend( self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
-                                LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)]))
+        self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
+                                LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)])
 
         #combine_floor_masks(output)
         self.data["isolated_probs"], self.data["isolated_labels"] = isolate_masks(data, self.data["semantic_probs"], self.data["semantic_labels"]) #break masks into surface types
-
-        data["barrier_lines"] = barrier_lines
-
-
-
 
         #now pull lines and add them to vp_lines and lines
         new_lines = []
