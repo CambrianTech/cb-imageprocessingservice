@@ -11,7 +11,7 @@ from pipeline.data.surface_type import SurfaceType
 from pipeline.data.logging import log_image, im_logging_enabled, log_segmentation_image, log_mask, LogLevel
 from pipeline.data.ade20k import ADE20K, floor, on_floor, wall, on_wall, ceiling, on_ceiling, legged_objects, box_like
 from pipeline.data.semanticlabel import SemanticLabel
-from pipeline.misc.utils import list_flatten
+from pipeline.misc.utils import list_flatten, resize_array
 from pipeline.components.line import Line, extend_to_intersection, draw_lines, line_within_mask, line_on_image_edge, merge_lines
 from pipeline.stages.vanishingpointfinder import get_inliers
 
@@ -165,6 +165,18 @@ class PipelineExtractSurfaces(PipelineStep):
         #combine_floor_masks(output)
         self.data["isolated_probs"], self.data["isolated_labels"] = isolate_masks(data, self.data["semantic_probs"], self.data["semantic_labels"]) #break masks into surface types
 
+        # shape = (self.image.shape[1], self.image.shape[0])
+        # probs = resize_array(self.data["planes"]["masks"], shape)
+
+        # index_mask = np.dstack(tuple(probs))
+        # index_mask = np.int32(np.argmax(index_mask, -1))
+
+        # self.refine_semantics(index_mask, freedom=0.1)
+
+        # log_segmentation_image(self.data, "index_mask", index_mask, self.data["downscaled"])
+
+        # data["index_mask"] = index_mask
+
         #now pull lines and add them to vp_lines and lines
         new_lines = []
         min_line_length = diagonal / 60
@@ -181,7 +193,7 @@ class PipelineExtractSurfaces(PipelineStep):
                 contour = (contour.flatten() - 1).reshape(shape)
                 contour_length = cv2.arcLength(contour, True)
 
-                epsilon = 3
+                epsilon = 1.5
                 polygon = cv2.approxPolyDP(contour, epsilon, True)
                 num_pts = len(polygon)
 
