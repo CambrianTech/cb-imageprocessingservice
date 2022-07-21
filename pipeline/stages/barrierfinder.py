@@ -32,6 +32,7 @@ class PipelineBarrierFinder(PipelineStep):
     def output_keys(self) -> list:
         return []
 
+
     def run(self, data):
 
         self.data = data

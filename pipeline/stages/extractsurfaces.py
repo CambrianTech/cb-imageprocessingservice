@@ -70,8 +70,9 @@ class PipelineExtractSurfaces(PipelineStep):
     def output_keys(self) -> list:
         return ["semantic_labels", "isolated_probs", "isolated_labels"]
 
-    def refine_semantics(self, labels, lines, label_freedoms:list, name="semantic"):
+    def refine_semantics(self, segmentation, label_freedoms:list):
 
+        lines = self.data["vp_lines"]
         image = self.data["downscaled"]
         markers = np.zeros(image.shape[:2], dtype=np.int32)
 
@@ -80,13 +81,11 @@ class PipelineExtractSurfaces(PipelineStep):
 
         min_matches = 100
 
-        all_labels = np.unique(labels).astype(np.int32)
-
-        semantic_key = {}
+        all_labels = np.unique(segmentation).astype(np.int32)
 
         for label in all_labels:
 
-            label_mask = labels == label
+            label_mask = segmentation == label
 
             value = int(label + 1)
 
@@ -94,12 +93,9 @@ class PipelineExtractSurfaces(PipelineStep):
 
             freedom = match.freedom if match is not None else None
 
-            if freedom is not None and len(labels[label_mask]) > min_matches:
+            if freedom is not None and len(segmentation[label_mask]) > min_matches:
 
                 index = match.index_of(value)
-                semantic_label = match.labels[index]
-
-                semantic_key[value] = semantic_label.name
 
                 mask = np.zeros(image.shape[:2], dtype=np.uint8)
                 mask[label_mask] = 1
@@ -130,9 +126,6 @@ class PipelineExtractSurfaces(PipelineStep):
 
         draw_lines(watershed_mask, line_candidates, color=0, thickness=1, lineType=cv2.LINE_4)
 
-        #log_mask(self.data, "%s_mask" % name, watershed_mask)
-        #log_segmentation_image(self.data, "%s_markers" % name, markers, self.data["downscaled"], labelset=semantic_key)
-
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers < 0] = 0
         markers[watershed_mask == 0] = 0
@@ -148,12 +141,9 @@ class PipelineExtractSurfaces(PipelineStep):
             label = value - 1
             markers_mask = markers == value
 
-            labels[markers_mask] = label
+            segmentation[markers_mask] = label
 
         return line_candidates
-
-        #log_segmentation_image(self.data, "%s_refined" % name, markers, self.data["downscaled"], labelset=semantic_key)
-
 
     def run(self, data):
         self.data = data
@@ -161,24 +151,27 @@ class PipelineExtractSurfaces(PipelineStep):
 
         diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
 
-        line_candidates = self.data["vp_lines"]
 
         #Consolidate types: Include other types as part of floor: rug, earth, grass        
         if im_logging_enabled(data):
             log_segmentation_image(self.data, "semantic_labels_raw", self.data["semantic_labels"], self.data["downscaled"])
 
         barrier_lines = []
-        barrier_lines.extend( self.refine_semantics(self.data["semantic_labels"], line_candidates, [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), \
-                                LF(box_like, 0.03), LF(on_wall, 0.1)], name="barriers_wc"))
+        barrier_lines.extend( self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), \
+                                LF(box_like, 0.03), LF(on_wall, 0.1)]))
 
-        barrier_lines.extend( self.refine_semantics(self.data["semantic_labels"], line_candidates, [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
-                                LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)], name="barriers_floor"))
+        barrier_lines.extend( self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
+                                LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)]))
+
+
+        # barrier_lines.extend( self.refine_semantics(self.room.index_mask, line_candidates, [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), \
+        #                         LF(box_like, 0.03), LF(on_wall, 0.1)]))
 
         #combine_floor_masks(output)
         self.data["isolated_probs"], self.data["isolated_labels"] = isolate_masks(data, self.data["semantic_probs"], self.data["semantic_labels"]) #break masks into surface types
 
         data["barrier_lines"] = barrier_lines
-        
+
         #now pull lines and add them to vp_lines and lines
         new_lines = []
         min_line_length = diagonal / 60
@@ -226,33 +219,6 @@ class PipelineExtractSurfaces(PipelineStep):
         self.data["semantic_lines"] = filtered_lines
         self.data["vp_lines"].extend(filtered_lines)
         
-        # combined = self.data["lines"] + self.data["semantic_lines"]
-        # #merge_lines(combined, search_width=max(diagonal/100, 3), remove_matches=False)
-
-        # clusters = list(set(map(lambda x: x.cluster, self.data["semantic_lines"])))
-
-        # for line in [line for line in self.data["lines"] if line.cluster in clusters]:
-        #     line.group = "semantic_lines"
-
-        #self.data["semantic_lines"] = list(filter(lambda x: x.group == "semantic_lines", combined))
-
-        #self.data["semantic_lines"], intersections = extend_to_intersection(self.data["semantic_lines"], search_length=1.5, search_width=3.0, min_angle_difference=np.radians(15))
-
-        #self.data["lines"] = merge_lines(self.data["lines"] + self.data["semantic_lines"], search_width=max(diagonal/400, 3))
-
-        #filter out after merge, matching passed in group
-        #self.data["semantic_lines"] = list(filter(lambda x: x.group == "semantic_lines", self.data["lines"]))
-
-        #self.data["lines"] = merge_lines(self.data["lines"], search_width=max(diagonal/150, 3), remove_matches=False)
-
-        # clusters = list(set(map(lambda x: x.cluster, self.data["semantic_lines"])))
-        
-        # for line in [line for line in self.data["lines"] if line.cluster in clusters]:
-        #     line.group = "semantic_lines"
-
-        #self.data["semantic_lines"] = list(filter(lambda x: x.group == "semantic_lines", self.data["lines"]))
-
-        #self.data["vp_lines"], intersections = extend_to_intersection(self.data["vp_lines"], search_length=1.1, search_width=3.0, min_angle_difference=0)
 
         if im_logging_enabled(data):
             lines_image =  self.image.copy()
