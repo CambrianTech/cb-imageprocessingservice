@@ -94,8 +94,12 @@ class PipelineBarrierFinder(PipelineStep):
         floor[self.data["isolated_labels"] == SurfaceType.OnFloor] = 1
 
 
-        horizontal_lines = self.data["semantic_lines"].copy()
-        horizontal_lines = merge_lines(horizontal_lines, search_width=max(diagonal/200, 3), search_length=1.1, angle_threshold=np.radians(7))
+        horizontal_lines = self.data["semantic_lines"]
+
+        vertical_lines = list(get_inliers(self.data["semantic_lines"], data["vertical_vp"].model, np.radians(8)))
+        horizontal_lines = list(set(self.data["semantic_lines"]).difference(vertical_lines))
+
+        horizontal_lines = merge_lines(horizontal_lines.copy(), search_width=max(diagonal/200, 3), search_length_offset=diagonal/40, angle_threshold=np.radians(5))
 
 
         all_lines, intersections = extend_to_intersection(horizontal_lines, search_length=2.0, modify=False)

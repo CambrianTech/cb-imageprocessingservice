@@ -71,8 +71,8 @@ class Line():
     def draw(self, img, color=(255,50,255,255), thickness=1, scale=1.0, lineType=cv2.LINE_8):
         draw_line(line, img, (int(self.data[0] * sx), int(self.data[1] * scale)), (int(self.data[2] * sx), int(self.data[3] * scale)), color, thickness=thickness, lineType=lineType)
 
-    def bounding_box(self, width, length_multiplier=1.0):
-        return ((self.midpoint[0], self.midpoint[1]), [self.length * length_multiplier, width], self.degrees)
+    def bounding_box(self, width, length_multiplier=1.0, length_offset=0):
+        return ((self.midpoint[0], self.midpoint[1]), [self.length * length_multiplier + length_offset, width], self.degrees)
 
     def extended(self, ratio=1.1, from_a=True, from_b=True, vanishing_point=None):
 
@@ -327,7 +327,7 @@ def draw_lines(img, lines, color=(255,50,255,255), thickness=1, scale=1.0, lineT
 #             delta2xg * cos_thr + xg, \
 #             delta2xg * sin_thr + yg
 
-def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.radians(3), remove_matches=True):
+def merge_lines(lines, search_width, search_length=1.05, search_length_offset=0, angle_threshold=math.radians(3), remove_matches=True):
 
     min_dist_sq = search_width * search_width
 
@@ -338,7 +338,7 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
         line_a = lines[i]
         if line_a.dead: continue
 
-        rect_a = line_a.bounding_box(width=search_width, length_multiplier=search_length)
+        rect_a = line_a.bounding_box(width=search_width, length_multiplier=search_length, length_offset=search_length_offset)
 
         if remove_matches:
             data = line_a.data.copy()
@@ -356,7 +356,7 @@ def merge_lines(lines, search_width, search_length=1.05, angle_threshold=math.ra
             if distance.sqeuclidean(line_a.midpoint, line_b.midpoint) <= min_dist_sq:
                 result = 1
             else:
-                rect_b = line_b.bounding_box(width=search_width, length_multiplier=search_length)
+                rect_b = line_b.bounding_box(width=search_width, length_multiplier=search_length, length_offset=search_length_offset)
                 result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
 
             if result != 0:
