@@ -399,7 +399,7 @@ def line_within_mask(line, mask, value=1, num_points=7, num_matches=3):
 
     return False
 
-def extend_to_intersection(lines, search_length=1.3, search_width=1.0, min_angle_difference=np.radians(10)):
+def extend_to_intersection(lines, search_length=1.3, search_width=1.0, min_angle_difference=np.radians(10), modify=True):
 
     intersections = [[None, None] for line in lines]
 
@@ -456,7 +456,7 @@ def extend_to_intersection(lines, search_length=1.3, search_width=1.0, min_angle
 
             length = distance.euclidean(point_a, point_b)
             
-            if length - lines[i].length > -1.0:
+            if modify and length - lines[i].length > -1.0:
                 lines[i] = Line(point_a[0], point_a[1], point_b[0], point_b[1], lines[i].cluster, lines[i].group)
 
     return lines, intersection_points
