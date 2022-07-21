@@ -70,7 +70,7 @@ class PipelineExtractSurfaces(PipelineStep):
     def output_keys(self) -> list:
         return ["semantic_labels", "isolated_probs", "isolated_labels"]
 
-    def refine_semantics(self, segmentation, label_freedoms:list):
+    def refine_semantics(self, segmentation, label_freedoms:list, mask=None):
 
         lines = self.data["vp_lines"]
         image = self.data["downscaled"]
@@ -87,6 +87,9 @@ class PipelineExtractSurfaces(PipelineStep):
 
             label_mask = segmentation == label
 
+            if mask is not None:
+                label_mask = np.where(label_mask & (mask > 0))
+
             value = int(label + 1)
 
             match = next(filter(lambda x: x.index_of(value) >= 0, label_freedoms), None)
@@ -97,12 +100,12 @@ class PipelineExtractSurfaces(PipelineStep):
 
                 index = match.index_of(value)
 
-                mask = np.zeros(image.shape[:2], dtype=np.uint8)
-                mask[label_mask] = 1
+                seg_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+                seg_mask[label_mask] = 1
                 watershed_mask[label_mask] = 1
 
-                mask_padded = cv2.copyMakeBorder(mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
-                contours, _ = cv2.findContours(mask_padded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                seg_mask = cv2.copyMakeBorder(seg_mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
+                contours, _ = cv2.findContours(seg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
                 for contour in contours:
                     shape = contour.shape
@@ -163,14 +166,13 @@ class PipelineExtractSurfaces(PipelineStep):
         barrier_lines.extend( self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
                                 LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)]))
 
-
-        # barrier_lines.extend( self.refine_semantics(self.room.index_mask, line_candidates, [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), \
-        #                         LF(box_like, 0.03), LF(on_wall, 0.1)]))
-
         #combine_floor_masks(output)
         self.data["isolated_probs"], self.data["isolated_labels"] = isolate_masks(data, self.data["semantic_probs"], self.data["semantic_labels"]) #break masks into surface types
 
         data["barrier_lines"] = barrier_lines
+
+
+
 
         #now pull lines and add them to vp_lines and lines
         new_lines = []
