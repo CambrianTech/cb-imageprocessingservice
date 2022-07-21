@@ -14,7 +14,7 @@ from pipeline.data.surface_type import SurfaceType
 from pipeline.data.logging import log_image, im_logging_enabled, log_markers, get_segmentation_image, log_segmentation_image
 from pipeline.components.line import draw_lines
 from .vanishingpointfinder import angle_with_vp
-from pipeline.misc.utils import random_color
+from pipeline.misc.utils import random_color, resize_array
 from pipeline.data.ade20k import ADE20K, on_floor, on_wall, on_ceiling, box_like, legged_objects
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.line import extend_to_intersection, draw_lines, line_within_mask
@@ -38,6 +38,14 @@ class PipelineBarrierFinder(PipelineStep):
         self.data = data
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
+
+        shape = (self.image.shape[1], self.image.shape[0])
+        probs = resize_array(self.data["planes"]["masks"], shape)
+
+        index_mask = np.dstack(tuple(probs))
+        index_mask = np.int32(np.argmax(index_mask, -1))
+
+        log_segmentation_image(self.data, "index_mask", index_mask, self.data["downscaled"])
 
         all_lines = self.data["vp_lines"]
 

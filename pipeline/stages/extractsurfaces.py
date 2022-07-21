@@ -157,10 +157,9 @@ class PipelineExtractSurfaces(PipelineStep):
         if im_logging_enabled(data):
             log_segmentation_image(self.data, "semantic_labels_raw", self.data["semantic_labels"], self.data["downscaled"])
 
-        self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), \
-                                LF(box_like, 0.03), LF(on_wall, 0.1)])
+        self.refine_semantics(self.data["semantic_labels"], label_freedoms=[ LF([ADE20K.ceiling], 0.2), LF([ADE20K.wall], 0.2), LF(box_like, 0.03), LF(on_wall, 0.1)])
 
-        self.refine_semantics(self.data["semantic_labels"], [ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
+        self.refine_semantics(self.data["semantic_labels"], label_freedoms=[ LF([ADE20K.wall], 0.02), LF(box_like, 0.03), LF([ADE20K.floor], 0.05), \
                                 LF([ADE20K.stairs, ADE20K.stairway], 0.05), LF(on_floor, 0.05), LF(legged_objects, 0.05)])
 
         #combine_floor_masks(output)

@@ -30,9 +30,6 @@ class SceneGenerator():
 
         timer.time_event("analyze_surfaces")
 
-        if im_logging_enabled(self.data):
-            log_segmentation_image(self.data, "room_masks", self.room.index_mask, self.room.image, labelset=None)
-
         return self.room
             
 
