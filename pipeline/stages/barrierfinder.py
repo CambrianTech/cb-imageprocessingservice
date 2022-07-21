@@ -84,32 +84,22 @@ class PipelineBarrierFinder(PipelineStep):
         plane_lines = list(get_inliers(new_lines, self.data["vertical_vp"].model, np.radians(8)))
         plane_lines = merge_lines(plane_lines, search_width=max(diagonal/50, 3), search_length=1.5, angle_threshold=np.radians(20))
 
-        # horizontal_lines = []
-        # for vp in self.data["horizontal_vps"]:
-        #     horizontal_lines.extend(list(get_inliers(new_lines, vp.model, np.radians(15))))
 
-        # horizontal_lines = merge_lines(horizontal_lines, search_width=max(diagonal/50, 3), search_length=0.7, angle_threshold=np.radians(20))
-        
+        ceiling = np.zeros(self.image .shape[:2], dtype=np.uint8)
+        ceiling[self.data["isolated_labels"] == SurfaceType.Ceiling] = 1
+        ceiling[self.data["isolated_labels"] == SurfaceType.OnCeiling] = 1
 
-        # planes_debug = get_segmentation_image(index_mask, self.data["downscaled"])
-        # planes_debug = cv2.addWeighted(planes_debug, 0.5, self.data["downscaled"], 0.5, 0)
-        # draw_lines(planes_debug, vertical_lines, color=(255,0,0), thickness=2, lineType=cv2.LINE_AA)
-        #draw_lines(planes_debug, horizontal_lines, color=(255,255,0), thickness=2, lineType=cv2.LINE_AA)
-        #log_image(self.data, "barriers_plane_lines", planes_debug)
-
-        # horizontal_lines = []
-        # for vp in self.data["horizontal_vps"]:
-        #     horizontal_lines.extend(list(get_inliers(new_lines, vp.model, np.radians(15))))
+        floor = np.zeros(self.image .shape[:2], dtype=np.uint8)
+        floor[self.data["isolated_labels"] == SurfaceType.Floor] = 1
+        floor[self.data["isolated_labels"] == SurfaceType.OnFloor] = 1
 
 
-        for surfaceType in [SurfaceType.Wall]:
-            mask = np.zeros(self.image .shape[:2], dtype=np.uint8)
-            mask[self.data["isolated_labels"] == surfaceType] = 1
+        horizontal_lines = self.data["semantic_lines"].copy()
+        horizontal_lines = merge_lines(horizontal_lines, search_width=max(diagonal/200, 3), search_length=1.1, angle_threshold=np.radians(7))
 
-        vertical_lines = self.data["vertical_vp"].inliers
-        horizontal_lines = list(filter(lambda x: x not in vertical_lines, data["vp_lines"]))
 
-        all_lines, intersections = extend_to_intersection(horizontal_lines, search_length=1.1) 
+        all_lines, intersections = extend_to_intersection(horizontal_lines, search_length=2.0, modify=False)
+
 
         if im_logging_enabled(data):
             debug = get_segmentation_image(self.data["isolated_labels"], self.data["downscaled"], labelset=None)
@@ -120,6 +110,9 @@ class PipelineBarrierFinder(PipelineStep):
             draw_lines(debug, all_lines, color=(255,0,50), thickness=2)
 
             for point in intersections:
-                cv2.circle(debug, (int(point[0]), int(point[1])), 3, (255, 255, 0), cv2.FILLED, cv2.LINE_AA)
+                x = int(max(point[0], 0))
+                y = int(max(point[1], 0))
+
+                cv2.circle(debug, (x, y), 3, (255, 255, 0), cv2.FILLED, cv2.LINE_AA)
 
             log_image(self.data, "barriers", debug)
