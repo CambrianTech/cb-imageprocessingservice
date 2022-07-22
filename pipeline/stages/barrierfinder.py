@@ -46,6 +46,7 @@ class PipelineBarrierFinder(PipelineStep):
         shape = (self.image.shape[1], self.image.shape[0])
         probs = resize_array(self.data["planes"]["masks"], shape)
 
+        #obtain plane vertical lines, major barriers between original planes:
         wall = np.zeros(self.image .shape[:2], dtype=np.uint8)
         wall[self.data["isolated_labels"] == SurfaceType.Wall.index] = 1
         wall[self.data["isolated_labels"] == SurfaceType.OnWall.index] = 1
@@ -56,8 +57,6 @@ class PipelineBarrierFinder(PipelineStep):
 
         index_mask = np.dstack(tuple(probs))
         index_mask = np.int32(np.argmax(index_mask, -1))
-
-        # index_mask = self.data["index_mask"]
 
         all_planes = np.unique(index_mask).astype(np.int32)
 
@@ -90,9 +89,7 @@ class PipelineBarrierFinder(PipelineStep):
 
 
         plane_lines = list(get_inliers(new_lines, self.data["vertical_vp"].model, np.radians(15)))
-        #plane_lines = new_lines
         plane_lines = list(filter(lambda line: line_within_mask(line, wall_mask), plane_lines))
-
         plane_lines = merge_lines(plane_lines, search_width=max(diagonal/50, 3), search_length=1.5, angle_threshold=np.radians(20))
 
 
@@ -118,33 +115,53 @@ class PipelineBarrierFinder(PipelineStep):
 
         log_mask(self.data, "barriers_mask", search_mask, self.data["downscaled"])
 
-        def filter_horizontal_lines(lines):
+        def partition_horizontal_lines(lines):
 
             vertical_lines = list(get_inliers(lines, data["vertical_vp"].model, np.radians(8)))
             horizontal_lines = list(set(lines).difference(vertical_lines))
 
             horizontal_lines = list(filter(lambda line: line_within_mask(line, search_mask), horizontal_lines))
 
-            return horizontal_lines
+            return horizontal_lines, vertical_lines
 
+        #grab all horizontal lines from semantic lines, which is approximately the edges of surfaces, but not between walls.
+        #then also combine these with nearby horizontal lines
+        horizontal_semantic_lines, vertical_semantic_lines = partition_horizontal_lines(self.data["semantic_lines"]) 
+        horizontal_vp_lines, vertical_vp_lines = partition_horizontal_lines(self.data["vp_lines"]) 
 
-        horizontal_semantic_lines = filter_horizontal_lines(self.data["semantic_lines"]) 
-        horizontal_vp_lines = filter_horizontal_lines(self.data["vp_lines"]) 
-
+        #all meaningful horizontal lines
         horizontal_lines = horizontal_semantic_lines + horizontal_vp_lines
-        horizontal_lines = merge_lines(horizontal_lines.copy(), search_width=max(diagonal/80, 3), search_length_offset=diagonal/40, angle_threshold=np.radians(5))
+        vertical_lines = vertical_semantic_lines + vertical_vp_lines
 
-        all_lines, intersections = extend_to_intersection(horizontal_lines, search_length=2.0, modify=False)
+        #find intersections of grouped lines, being careful not to corrupt originals (copy)
+        horizontal_lines_merged = merge_lines(horizontal_lines.copy(), search_width=max(diagonal/80, 3), search_length_offset=diagonal/40, angle_threshold=np.radians(5))
+
+        #extend these merged horizontal lines together to find intersections 
+        horizontal_guide_lines, intersections = extend_to_intersection(horizontal_lines_merged, search_length=2.0, modify=False)
+
+        #re-cluster the original horizontal lines and plane vertical lines + vertical lines (remove_matches=False):
+        for line in horizontal_lines + vertical_lines:
+            line.cluster = None
+
+        merge_lines(horizontal_lines, search_width=max(diagonal/80, 3), search_length=1.2, angle_threshold=np.radians(8), remove_matches=False)
+        merge_lines(vertical_lines + plane_lines, search_width=max(diagonal/50, 3), search_length=1.2, angle_threshold=np.radians(20), remove_matches=False)
 
 
         if im_logging_enabled(data):
-            debug = get_segmentation_image(self.data["isolated_labels"], self.data["downscaled"], labelset=None)
-            debug = cv2.addWeighted(debug, 0.3, self.data["downscaled"], 0.7, 0)
+            #debug = get_segmentation_image(self.data["isolated_labels"], self.data["downscaled"], labelset=None)\
+            debug = self.data["downscaled"].copy()
 
-            draw_lines(debug, plane_lines, color=(0,255,0), thickness=3, lineType=cv2.LINE_AA)
-            draw_lines(debug, all_lines, color=(255,0,50), thickness=3, lineType=cv2.LINE_AA)
+            draw_lines(debug, plane_lines, color=(0,255,0), thickness=5, lineType=cv2.LINE_AA)
+            draw_lines(debug, horizontal_guide_lines, color=(255,0,50), thickness=5, lineType=cv2.LINE_AA)
 
-            draw_lines(debug, self.data["vp_lines"], color=(50,50,50), thickness=1)
+            debug = cv2.addWeighted(debug, 0.7, self.data["downscaled"], 0.3, 0)
+
+            draw_lines(debug, vertical_lines, color=(50,50,50), thickness=1, lineType=cv2.LINE_AA)
+            draw_lines(debug, horizontal_lines, color=(50,50,50), thickness=1, lineType=cv2.LINE_AA)
+
+            
+
+            # draw_lines(debug, self.data["vp_lines"], color=(50,50,50), thickness=1)
 
             for point in intersections:
                 x = int(max(point[0], 0))

@@ -12,7 +12,7 @@ from pipeline.data.logging import log_image, im_logging_enabled, log_segmentatio
 from pipeline.data.ade20k import ADE20K, floor, on_floor, wall, on_wall, ceiling, on_ceiling, legged_objects, box_like
 from pipeline.data.semanticlabel import SemanticLabel
 from pipeline.misc.utils import list_flatten, resize_array
-from pipeline.components.line import Line, extend_to_intersection, draw_lines, line_within_mask, line_on_image_edge, merge_lines
+from pipeline.components.line import Line, draw_lines, line_within_mask, line_on_image_edge, merge_lines
 from pipeline.stages.vanishingpointfinder import get_inliers
 
 class LF():
