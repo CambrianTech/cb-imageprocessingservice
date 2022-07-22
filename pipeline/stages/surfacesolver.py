@@ -623,6 +623,9 @@ class SurfaceSolver():
     def find_best_surface(self, surfaceType, mask, mask_center=None):
 
         candidates = self.room.get_surfaces([surfaceType])
+
+        if len(candidates) == 0 and surfaceType.complement is not None:
+            candidates = self.room.get_surfaces([surfaceType.complement])
         
         if len(candidates) == 0:
             return None
