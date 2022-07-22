@@ -12,7 +12,7 @@ from scipy.spatial import distance
 
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
-from pipeline.misc.utils import resize_array, random_color, overlay_mask, sample_at_point, scale_contour, color_to_normal
+from pipeline.misc.utils import resize_array, random_color, overlay_mask, sample_at_point, scale_contour, color_to_normal, standard_colors
 from .planegeometry import Dimension
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers, Timer
 from pipeline.components.line import Line, draw_lines, line_on_image_edge, merge_lines
@@ -151,8 +151,6 @@ class SurfaceSolver():
 
 
     def debug_vps(self):
-        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
-        for c in range(1000): colors.append(random_color())
 
         for surface in self.room.get_surfaces([SurfaceType.Wall]):
 
@@ -165,7 +163,7 @@ class SurfaceSolver():
 
             for vp in surface.horizontal_vps:
                 index = self.room.horizontal_vps.index(vp) + 1
-                color = colors[index]
+                color = standard_colors[index]
                 draw_lines(debug, vp.inliers, color=(color[0], color[1], color[2]), thickness=2, lineType=cv2.LINE_AA)
 
             log_image(self.data, "vanishing_pts_%s" % surface.name, debug)
@@ -460,9 +458,6 @@ class SurfaceSolver():
             surfaces.extend(self.data["room"].get_surfaces([surfaceType]))
 
         cluster_index = 0
-        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
-        for c in range(100):
-            colors.append(random_color())
 
         if len(self.room.horizontal_vps) > 0:
             vps = self.room.horizontal_vps
@@ -528,7 +523,7 @@ class SurfaceSolver():
             mask_coor = np.nonzero(surface.mask>0)
 
             if best_lines_1 is not None :
-                color2 = colors[vp_index_1]
+                color2 = standard_colors[vp_index_1]
                 vp_pt = vps[vp_index_1].model
                 vp_pt = vp_pt[:2]/vp_pt[2]
                 mask_coor_vp_x = mask_coor[1] - vp_pt[0]
@@ -558,7 +553,7 @@ class SurfaceSolver():
                 draw_lines(surface_img, best_lines_1, color=color2, thickness=2)
             
             if best_lines_2 is not None:
-                color3 = colors[vp_index_2]
+                color3 = standard_colors[vp_index_2]
                 vp_pt = vps[vp_index_2].model
                 vp_pt = vp_pt[:2]/vp_pt[2]
                 mask_coor_vp_x = mask_coor[1] - vp_pt[0]

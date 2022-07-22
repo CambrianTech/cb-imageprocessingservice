@@ -55,6 +55,9 @@ def random_color():
     random.shuffle(haystack)
     return (int(haystack[0]), int(haystack[1]), int(haystack[2]))
 
+standard_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
+for c in range(1000): standard_colors.append(random_color())
+
 def resize_array(array, shape):
     length = len(array)
 

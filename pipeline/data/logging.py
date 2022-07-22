@@ -7,7 +7,7 @@ from termcolor import colored
 from time import time
 import sys
 
-from pipeline.misc.utils import random_color
+from pipeline.misc.utils import random_color, standard_colors
 from .ade20k import ADE20K
 
 class Timer():
@@ -220,10 +220,8 @@ def get_segmentation_image(segmentation, image, avg=False, resize=True, min_matc
 
     legend = []
 
-    colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
-
     for label in range(0, np.amax(segmentation) + 1):
-        color = colors[label] if label < len(colors) else random_color()
+        color = standard_colors[label] if label < len(standard_colors) else random_color()
         
         if avg: color = np.mean(img_seg[segmentation == label], axis=0)
         img_seg[segmentation == label] = color

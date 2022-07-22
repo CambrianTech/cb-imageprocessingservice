@@ -12,7 +12,7 @@ from cambrian.LineFunctions import LineFunctions
 from sklearn import cluster
 from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
-from pipeline.misc.utils import resize_array, random_color, overlay_mask, partition
+from pipeline.misc.utils import resize_array, random_color, overlay_mask, partition, standard_colors
 from .planegeometry import Dimension
 from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_mask
 from pipeline.components.line import Line, line_on_image_edge, merge_lines, draw_lines, line_within_mask
@@ -450,8 +450,6 @@ class PipelineVanishingPointFinder(PipelineStep):
         log_image(data, "vanishing_pts", self.get_debug_image(data))
 
     def get_debug_image(self, data):
-        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
-        for c in range(1000): colors.append(random_color())
 
         image = data["downscaled"].copy()
         
@@ -459,7 +457,7 @@ class PipelineVanishingPointFinder(PipelineStep):
         vps.extend(data["horizontal_vps"])
 
         for cluster_index in range(len(vps)):
-            color = colors[cluster_index]
+            color = standard_colors[cluster_index]
             vp = vps[cluster_index]
             draw_lines(image, vp.inliers, color=(color[0], color[1], color[2]), thickness=2,lineType=cv2.LINE_AA)
             

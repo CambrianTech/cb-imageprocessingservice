@@ -6,7 +6,7 @@ import random
 from termcolor import colored
 
 from pipeline.data.surface_type import SurfaceType
-from pipeline.misc.utils import resize_array, multi_filter, convert_color
+from pipeline.misc.utils import resize_array, multi_filter, convert_color, standard_colors
 from pipeline.data.logging import im_logging_enabled
 
 indexed_fields = ["plane_parameters", "plane_normals", "plane_offsets", "plane_clusters"]
@@ -157,28 +157,30 @@ class Room():
 
         image = self.data["image"] if hires else self.data["downscaled"]
         img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV_FULL)
-        hues = random.sample(range(0, 360), len(self.surfaces))
 
         #overlay mask
-        for i in range(len(self.surfaces)):
-            surface = self.surfaces[i]
-            
+        surfaces = sorted(self.surfaces, key=lambda surface: float('inf') if surface.surfaceType == SurfaceType.Floor else surface.max_area, reverse=True)
+
+        for i in range(len(surfaces)):
+            surface = surfaces[i]
+            color = standard_colors[i]
+            hsv = convert_color(color, cv2.COLOR_RGB2HSV_FULL)
+
             mask = surface.hires_mask if hires else surface.mask
         
             query = mask > 0 
             img_hsv[query] = np.mean(img_hsv[query], axis=0)
             max_value = 0.9
             if max_value > 0:
-                img_hsv[:, :, 0][query] = hues[i]
+                img_hsv[:, :, 0][query] = hsv[0]
                 img_hsv[:, :, 1][query] = 255
 
         img = cv2.addWeighted(cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB_FULL), alpha, image, (1.0 - alpha), 0.0)
 
         #let surface do its debug
-        for i in range(len(self.surfaces)):
-            surface = self.surfaces[i]
-            hue = hues[i]
-            color = convert_color((hue, 255, 255), cv2.COLOR_HSV2RGB_FULL)
+        for i in range(len(surfaces)):
+            surface = surfaces[i]
+            color = standard_colors[i]
             surface.debug(img, color)
 
         return img
