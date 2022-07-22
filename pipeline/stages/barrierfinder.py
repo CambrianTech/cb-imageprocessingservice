@@ -103,11 +103,11 @@ class PipelineBarrierFinder(PipelineStep):
         other = np.zeros(self.image .shape[:2], dtype=np.uint8)
         other[self.data["isolated_labels"] == SurfaceType.Other.index] = 1 
 
-        other = adjust_mask(cv2.dilate, other, size=11, scale=0.2)
+        other = adjust_mask(cv2.dilate, other, size=11, scale=0.4)
 
-        wall = adjust_mask(cv2.dilate, wall, size=11, scale=0.2)
+        wall = adjust_mask(cv2.dilate, wall, size=11, scale=0.4)
 
-        floor_ceiling = adjust_mask(cv2.dilate, cv2.bitwise_or(floor, ceiling), size=11, scale=0.2)
+        floor_ceiling = adjust_mask(cv2.dilate, cv2.bitwise_or(floor, ceiling), size=11, scale=0.4)
 
         search_mask = cv2.bitwise_and(floor_ceiling, wall)
 
