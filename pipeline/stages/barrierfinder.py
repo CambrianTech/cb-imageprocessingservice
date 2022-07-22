@@ -89,7 +89,8 @@ class PipelineBarrierFinder(PipelineStep):
                         new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group="plane_lines"))
 
 
-        plane_lines = list(get_inliers(new_lines, self.data["vertical_vp"].model, np.radians(8)))
+        plane_lines = list(get_inliers(new_lines, self.data["vertical_vp"].model, np.radians(15)))
+        #plane_lines = new_lines
         plane_lines = list(filter(lambda line: line_within_mask(line, wall_mask), plane_lines))
 
         plane_lines = merge_lines(plane_lines, search_width=max(diagonal/50, 3), search_length=1.5, angle_threshold=np.radians(20))
@@ -149,7 +150,7 @@ class PipelineBarrierFinder(PipelineStep):
                 x = int(max(point[0], 0))
                 y = int(max(point[1], 0))
 
-                cv2.circle(debug, (x, y), 5, (0, 255, 0), cv2.FILLED, cv2.LINE_AA)
+                cv2.circle(debug, (x, y), 5, (255, 180, 0), cv2.FILLED, cv2.LINE_AA)
 
             log_image(self.data, "barriers", debug)
 

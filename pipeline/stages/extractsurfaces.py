@@ -225,6 +225,7 @@ class PipelineExtractSurfaces(PipelineStep):
             #get remaining
             new_lines = list(set(new_lines).difference(set(inliers)))
 
+        new_lines = merge_lines(new_lines, search_width=max(diagonal/100, 3), search_length=1.1, angle_threshold=np.radians(5))
 
         self.data["semantic_lines"] = filtered_lines
         self.data["vp_lines"].extend(filtered_lines)

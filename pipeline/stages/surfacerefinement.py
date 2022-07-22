@@ -32,45 +32,24 @@ class SurfaceRefinement():
 
         color = 1
         scale = self.image.shape[0] / self.data["downscaled"].shape[0]
-        thickness = 5 + int(scale * 5)
+        thickness = int(scale * 3)
 
         for surface in self.room.surfaces:
             
             contours, hierarchy = cv2.findContours(surface.hires_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
             cv2.drawContours(markers, contours, -1, color, cv2.FILLED)
-            #cv2.drawContours(watershed_mask, contours, -1, 1, cv2.FILLED)
-
             cv2.drawContours(markers, contours, -1, 0, thickness)
-            #cv2.drawContours(watershed_mask, contours, -1, 1, thickness)
-
             color += 1
 
-        vp_lines = []
+        barrier_lines = list(map(lambda line: line.extended(1.1), self.data["semantic_lines"]))
 
-        for vp in self.room.vanishing_points:
-            vp_lines.extend(vp.inliers)
-
-
-        # draw_lines(src, vp_lines, color=(0,0,0), scale=scale)
-        # draw_lines(src, self.data["lines"], color=(255,0,255), scale=scale)
-
-        barrier_lines = list(map(lambda line: line.extended(1.1), self.room.barrier_lines))
         draw_lines(watershed_mask, barrier_lines, color=0, scale=scale, lineType=cv2.LINE_4)
-
-        #watershed_mask = adjust_mask(cv2.dilate, watershed_mask, size=3)
 
         log_markers(self.data, "room_markers", markers, primary=True, num_labels=len(self.room.surfaces))
 
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
-
-        # markers = np.int32(watershed(watershed_image, markers))        
-        # markers[markers<0] = 0
-
-        # watershed_mask = adjust_mask(cv2.dilate, watershed_mask, size=9, scale=0.33)
-        # markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
-        # markers[markers<0] = 0
 
         log_markers(self.data, "room_markers_final", markers, primary=True, num_labels=len(self.room.surfaces))
 

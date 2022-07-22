@@ -37,7 +37,7 @@ class SurfaceSolver():
 
         #prepare
         self.lines_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
-        draw_lines(self.lines_mask, self.data["barrier_lines"], color=255, thickness=3, lineType=cv2.LINE_4)
+        draw_lines(self.lines_mask, self.data["semantic_lines"], color=255, thickness=1, lineType=cv2.LINE_4)
 
         self.height, self.width = self.room.image.shape[:2]
         self.area = self.height * self.width
@@ -76,7 +76,7 @@ class SurfaceSolver():
         if im_logging_enabled(self.data):
             log_image(self.data, "room_solved", self.room.get_debug_image(hires=True))
 
-        self.surface_vp_matching()
+        #self.surface_vp_matching()
 
         timer.log_all_events()
 
