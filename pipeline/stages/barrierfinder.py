@@ -70,7 +70,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         all_planes = np.unique(index_mask).astype(np.int32)
 
-        new_lines = []
+        vertical_plane_lines = []
 
         for plane_index in all_planes:
 
@@ -95,12 +95,12 @@ class PipelineBarrierFinder(PipelineStep):
                     length = distance.euclidean(point_a, point_b)
 
                     if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0], min_distance=diagonal/50):
-                        new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group="plane_lines"))
+                        vertical_plane_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group="plane_lines"))
 
 
-        vertical_plane_lines = list(get_inliers(new_lines, self.data["vertical_vp"].model, np.radians(15)))
-        vertical_plane_lines = list(filter(lambda line: line_within_mask(line, wall_expanded), vertical_plane_lines))
-        vertical_plane_lines = merge_lines(vertical_plane_lines, search_width=max(diagonal/50, 3), search_length=1.5, angle_threshold=np.radians(20))
+        vertical_plane_lines = list(get_inliers(vertical_plane_lines, self.data["vertical_vp"].model, np.radians(15)))
+        #vertical_plane_lines = list(filter(lambda line: line_within_mask(line, wall_expanded), vertical_plane_lines))
+        vertical_plane_lines = merge_lines(vertical_plane_lines, search_width=max(diagonal/50, 3), search_length=0.9, angle_threshold=np.radians(20))
 
         ceiling = np.zeros(self.image .shape[:2], dtype=np.uint8)
         ceiling[self.data["isolated_labels"] == SurfaceType.Ceiling.index] = 1
