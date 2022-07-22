@@ -327,7 +327,7 @@ def draw_lines(img, lines, color=(255,50,255,255), thickness=1, scale=1.0, lineT
 #             delta2xg * cos_thr + xg, \
 #             delta2xg * sin_thr + yg
 
-def merge_lines(lines, search_width, search_length=1.05, search_length_offset=0, angle_threshold=math.radians(3), remove_matches=True):
+def merge_lines(lines, search_width, search_length=1.05, search_length_offset=0, angle_threshold=math.radians(15), remove_matches=True):
 
     min_dist_sq = search_width * search_width
 

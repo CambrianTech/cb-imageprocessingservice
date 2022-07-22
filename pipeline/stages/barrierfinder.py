@@ -11,10 +11,10 @@ from cambrian.LineFunctions import LineFunctions
 
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
-from pipeline.data.logging import log_image, im_logging_enabled, log_markers, get_segmentation_image, log_segmentation_image
+from pipeline.data.logging import log_image, im_logging_enabled, log_markers, get_segmentation_image, log_segmentation_image, log_mask
 from pipeline.components.line import draw_lines
 from .vanishingpointfinder import angle_with_vp
-from pipeline.misc.utils import random_color, resize_array
+from pipeline.misc.utils import random_color, resize_array, adjust_mask
 from pipeline.data.ade20k import ADE20K, on_floor, on_wall, on_ceiling, box_like, legged_objects
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.line import Line, extend_to_intersection, draw_lines, line_within_mask, line_on_image_edge, merge_lines
@@ -86,18 +86,41 @@ class PipelineBarrierFinder(PipelineStep):
 
 
         ceiling = np.zeros(self.image .shape[:2], dtype=np.uint8)
-        ceiling[self.data["isolated_labels"] == SurfaceType.Ceiling] = 1
-        ceiling[self.data["isolated_labels"] == SurfaceType.OnCeiling] = 1
+        ceiling[self.data["isolated_labels"] == SurfaceType.Ceiling.index] = 1
+        ceiling[self.data["isolated_labels"] == SurfaceType.OnCeiling.index] = 1
 
         floor = np.zeros(self.image .shape[:2], dtype=np.uint8)
-        floor[self.data["isolated_labels"] == SurfaceType.Floor] = 1
-        floor[self.data["isolated_labels"] == SurfaceType.OnFloor] = 1
+        floor[self.data["isolated_labels"] == SurfaceType.Floor.index] = 1
+        floor[self.data["isolated_labels"] == SurfaceType.OnFloor.index] = 1
 
+        wall = np.zeros(self.image .shape[:2], dtype=np.uint8)
+        wall[self.data["isolated_labels"] == SurfaceType.Wall.index] = 1
+        wall[self.data["isolated_labels"] == SurfaceType.OnWall.index] = 1
+
+        for label in box_like:
+            wall[self.data["semantic_labels"] == label.index] = 1
+
+        other = np.zeros(self.image .shape[:2], dtype=np.uint8)
+        other[self.data["isolated_labels"] == SurfaceType.Other.index] = 1 
+
+        other = adjust_mask(cv2.dilate, other, size=11, scale=0.2)
+
+        wall = adjust_mask(cv2.dilate, wall, size=11, scale=0.2)
+
+        floor_ceiling = adjust_mask(cv2.dilate, cv2.bitwise_or(floor, ceiling), size=11, scale=0.2)
+
+        search_mask = cv2.bitwise_and(floor_ceiling, wall)
+
+
+
+        log_mask(self.data, "barriers_mask", search_mask, self.data["downscaled"])
 
         horizontal_lines = self.data["semantic_lines"]
 
         vertical_lines = list(get_inliers(self.data["semantic_lines"], data["vertical_vp"].model, np.radians(8)))
         horizontal_lines = list(set(self.data["semantic_lines"]).difference(vertical_lines))
+
+        horizontal_lines = list(filter(lambda line: line_within_mask(line, search_mask), horizontal_lines))
 
         horizontal_lines = merge_lines(horizontal_lines.copy(), search_width=max(diagonal/200, 3), search_length_offset=diagonal/40, angle_threshold=np.radians(5))
 
@@ -120,3 +143,4 @@ class PipelineBarrierFinder(PipelineStep):
                 cv2.circle(debug, (x, y), 3, (255, 255, 0), cv2.FILLED, cv2.LINE_AA)
 
             log_image(self.data, "barriers", debug)
+
