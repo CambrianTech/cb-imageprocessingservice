@@ -88,10 +88,9 @@ class PipelineBarrierFinder(PipelineStep):
                         new_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group="plane_lines"))
 
 
-        plane_lines = list(get_inliers(new_lines, self.data["vertical_vp"].model, np.radians(15)))
-        plane_lines = list(filter(lambda line: line_within_mask(line, wall_mask), plane_lines))
-        plane_lines = merge_lines(plane_lines, search_width=max(diagonal/50, 3), search_length=1.5, angle_threshold=np.radians(20))
-
+        vertical_plane_lines = list(get_inliers(new_lines, self.data["vertical_vp"].model, np.radians(15)))
+        vertical_plane_lines = list(filter(lambda line: line_within_mask(line, wall_mask), vertical_plane_lines))
+        vertical_plane_lines = merge_lines(vertical_plane_lines, search_width=max(diagonal/50, 3), search_length=1.5, angle_threshold=np.radians(20))
 
         ceiling = np.zeros(self.image .shape[:2], dtype=np.uint8)
         ceiling[self.data["isolated_labels"] == SurfaceType.Ceiling.index] = 1
@@ -138,28 +137,31 @@ class PipelineBarrierFinder(PipelineStep):
 
         #extend these merged horizontal lines together to find intersections 
         horizontal_guide_lines, intersections = extend_to_intersection(horizontal_lines_merged, search_length=2.0, modify=False)
-
+        
         #re-cluster the original horizontal lines and plane vertical lines + vertical lines (remove_matches=False):
         for line in horizontal_lines + vertical_lines:
             line.cluster = None
 
-        merge_lines(horizontal_lines, search_width=max(diagonal/80, 3), search_length=1.2, angle_threshold=np.radians(8), remove_matches=False)
-        merge_lines(vertical_lines + plane_lines, search_width=max(diagonal/50, 3), search_length=1.2, angle_threshold=np.radians(20), remove_matches=False)
+        merge_lines(horizontal_lines, search_width=max(diagonal/80, 3), search_length=1.0, angle_threshold=np.radians(8), remove_matches=False)
+        merge_lines(vertical_lines + vertical_plane_lines, search_width=max(diagonal/50, 3), search_length=1.0, angle_threshold=np.radians(20), remove_matches=False)
 
+        horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
+        adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
+
+        vertical_clusters = list(set([line.cluster for line in vertical_plane_lines]))
+        adjacent_vertical_lines = list(filter(lambda line: line.cluster in vertical_clusters, vertical_lines))        
 
         if im_logging_enabled(data):
             #debug = get_segmentation_image(self.data["isolated_labels"], self.data["downscaled"], labelset=None)\
             debug = self.data["downscaled"].copy()
 
-            draw_lines(debug, plane_lines, color=(0,255,0), thickness=5, lineType=cv2.LINE_AA)
+            draw_lines(debug, vertical_plane_lines, color=(0,255,0), thickness=5, lineType=cv2.LINE_AA)
             draw_lines(debug, horizontal_guide_lines, color=(255,0,50), thickness=5, lineType=cv2.LINE_AA)
 
             debug = cv2.addWeighted(debug, 0.7, self.data["downscaled"], 0.3, 0)
 
-            draw_lines(debug, vertical_lines, color=(50,50,50), thickness=1, lineType=cv2.LINE_AA)
-            draw_lines(debug, horizontal_lines, color=(50,50,50), thickness=1, lineType=cv2.LINE_AA)
-
-            
+            draw_lines(debug, adjacent_vertical_lines, color=(50,50,50), thickness=1, lineType=cv2.LINE_AA)
+            draw_lines(debug, adjacent_horizontal_lines, color=(50,50,50), thickness=1, lineType=cv2.LINE_AA)
 
             # draw_lines(debug, self.data["vp_lines"], color=(50,50,50), thickness=1)
 
