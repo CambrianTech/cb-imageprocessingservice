@@ -456,7 +456,14 @@ def extend_to_intersection(lines, search_length=1.3, search_width=1.0, min_angle
 
             length = distance.euclidean(point_a, point_b)
             
-            if modify and length - lines[i].length > -1.0:
-                lines[i] = Line(point_a[0], point_a[1], point_b[0], point_b[1], lines[i].cluster, lines[i].group)
+            if length - lines[i].length > -1.0:
+                # if point_a_terminated:
+                #     intersection_points.append(point_a)
+
+                # if point_b_terminated:
+                #     intersection_points.append(point_b)
+
+                if modify:
+                    lines[i] = Line(point_a[0], point_a[1], point_b[0], point_b[1], lines[i].cluster, lines[i].group)
 
     return lines, intersection_points

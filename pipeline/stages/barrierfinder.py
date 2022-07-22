@@ -111,19 +111,23 @@ class PipelineBarrierFinder(PipelineStep):
 
         search_mask = cv2.bitwise_and(floor_ceiling, wall)
 
-
-
         log_mask(self.data, "barriers_mask", search_mask, self.data["downscaled"])
 
-        horizontal_lines = self.data["semantic_lines"]
+        def filter_horizontal_lines(lines):
 
-        vertical_lines = list(get_inliers(self.data["semantic_lines"], data["vertical_vp"].model, np.radians(8)))
-        horizontal_lines = list(set(self.data["semantic_lines"]).difference(vertical_lines))
+            vertical_lines = list(get_inliers(lines, data["vertical_vp"].model, np.radians(8)))
+            horizontal_lines = list(set(lines).difference(vertical_lines))
 
-        horizontal_lines = list(filter(lambda line: line_within_mask(line, search_mask), horizontal_lines))
+            horizontal_lines = list(filter(lambda line: line_within_mask(line, search_mask), horizontal_lines))
 
-        horizontal_lines = merge_lines(horizontal_lines.copy(), search_width=max(diagonal/200, 3), search_length_offset=diagonal/40, angle_threshold=np.radians(5))
+            return horizontal_lines
 
+
+        horizontal_semantic_lines = filter_horizontal_lines(self.data["semantic_lines"]) 
+        horizontal_vp_lines = filter_horizontal_lines(self.data["vp_lines"]) 
+
+        horizontal_lines = horizontal_semantic_lines + horizontal_vp_lines
+        horizontal_lines = merge_lines(horizontal_lines.copy(), search_width=max(diagonal/80, 3), search_length_offset=diagonal/40, angle_threshold=np.radians(5))
 
         all_lines, intersections = extend_to_intersection(horizontal_lines, search_length=2.0, modify=False)
 
