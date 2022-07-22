@@ -46,6 +46,14 @@ class PipelineBarrierFinder(PipelineStep):
         shape = (self.image.shape[1], self.image.shape[0])
         probs = resize_array(self.data["planes"]["masks"], shape)
 
+        wall = np.zeros(self.image .shape[:2], dtype=np.uint8)
+        wall[self.data["isolated_labels"] == SurfaceType.Wall.index] = 1
+        wall[self.data["isolated_labels"] == SurfaceType.OnWall.index] = 1
+        for label in box_like:
+            wall[self.data["semantic_labels"] == label.index] = 1
+
+        wall_mask = adjust_mask(cv2.dilate, wall, size=5, scale=0.4)
+
         index_mask = np.dstack(tuple(probs))
         index_mask = np.int32(np.argmax(index_mask, -1))
 
@@ -82,6 +90,8 @@ class PipelineBarrierFinder(PipelineStep):
 
 
         plane_lines = list(get_inliers(new_lines, self.data["vertical_vp"].model, np.radians(8)))
+        plane_lines = list(filter(lambda line: line_within_mask(line, wall_mask), plane_lines))
+
         plane_lines = merge_lines(plane_lines, search_width=max(diagonal/50, 3), search_length=1.5, angle_threshold=np.radians(20))
 
 
@@ -93,13 +103,7 @@ class PipelineBarrierFinder(PipelineStep):
         floor[self.data["isolated_labels"] == SurfaceType.Floor.index] = 1
         floor[self.data["isolated_labels"] == SurfaceType.OnFloor.index] = 1
 
-        wall = np.zeros(self.image .shape[:2], dtype=np.uint8)
-        wall[self.data["isolated_labels"] == SurfaceType.Wall.index] = 1
-        wall[self.data["isolated_labels"] == SurfaceType.OnWall.index] = 1
-
-        for label in box_like:
-            wall[self.data["semantic_labels"] == label.index] = 1
-
+        
         other = np.zeros(self.image .shape[:2], dtype=np.uint8)
         other[self.data["isolated_labels"] == SurfaceType.Other.index] = 1 
 
@@ -134,17 +138,18 @@ class PipelineBarrierFinder(PipelineStep):
 
         if im_logging_enabled(data):
             debug = get_segmentation_image(self.data["isolated_labels"], self.data["downscaled"], labelset=None)
-            
-            debug = cv2.addWeighted(debug, 0.5, self.data["downscaled"], 0.5, 0)
+            debug = cv2.addWeighted(debug, 0.3, self.data["downscaled"], 0.7, 0)
 
             draw_lines(debug, plane_lines, color=(0,255,0), thickness=3, lineType=cv2.LINE_AA)
-            draw_lines(debug, all_lines, color=(255,0,50), thickness=2)
+            draw_lines(debug, all_lines, color=(255,0,50), thickness=3, lineType=cv2.LINE_AA)
+
+            draw_lines(debug, self.data["vp_lines"], color=(50,50,50), thickness=1)
 
             for point in intersections:
                 x = int(max(point[0], 0))
                 y = int(max(point[1], 0))
 
-                cv2.circle(debug, (x, y), 3, (255, 255, 0), cv2.FILLED, cv2.LINE_AA)
+                cv2.circle(debug, (x, y), 5, (0, 255, 0), cv2.FILLED, cv2.LINE_AA)
 
             log_image(self.data, "barriers", debug)
 
