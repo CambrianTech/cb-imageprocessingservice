@@ -36,10 +36,11 @@ class SurfaceRefinement():
 
         for surface in self.room.surfaces:
             
-            contours, hierarchy = cv2.findContours(surface.hires_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours, _ = cv2.findContours(surface.hires_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
-            cv2.drawContours(markers, contours, -1, color, cv2.FILLED)
+            markers[surface.hires_mask > 0] = color
             cv2.drawContours(markers, contours, -1, 0, thickness)
+
             color += 1
 
         barrier_lines = list(map(lambda line: line.extended(1.1), self.data["semantic_lines"]))
@@ -64,11 +65,7 @@ class SurfaceRefinement():
             surface.hires_mask = mask
             color += 1
 
-        if im_logging_enabled(self.data):
-            log_image(self.data, "room_final", self.room.get_debug_image(hires=True))
-
-        #log_image(self.data, "room_refined", self.room.get_debug_image(hires=True))
-            
+        log_image(self.data, "room_final", self.room.get_debug_image(hires=True))            
         
         
 class PipelineSurfaceRefinement(PipelineStep):
