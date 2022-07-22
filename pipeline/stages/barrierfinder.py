@@ -48,11 +48,20 @@ class PipelineBarrierFinder(PipelineStep):
 
         #obtain plane vertical lines, major barriers between original planes:
         wall = np.zeros(self.image .shape[:2], dtype=np.uint8)
-        wall[self.data["isolated_labels"] == SurfaceType.Wall.index] = 1
         wall[self.data["isolated_labels"] == SurfaceType.OnWall.index] = 1
-        for label in box_like:
-            wall[self.data["semantic_labels"] == label.index] = 1
 
+        on_wall = np.zeros(self.image .shape[:2], dtype=np.uint8)
+        on_wall[self.data["isolated_labels"] == SurfaceType.OnWall.index] = 1
+        on_wall_expanded = adjust_mask(cv2.dilate, on_wall, size=5)
+
+        wall_like_mask = np.zeros(self.image .shape[:2], dtype=np.uint8)
+        for label in box_like:
+            wall_like_mask[self.data["semantic_labels"] == label.index] = 1
+
+        wall_like_expanded = adjust_mask(cv2.dilate, wall_like_mask, size=5)
+
+        wall[on_wall > 0] = 1
+        wall[wall_like_mask > 0] = 1
         wall_expanded = adjust_mask(cv2.dilate, wall, size=5)
         wall_contracted = adjust_mask(cv2.erode, wall, size=5)
 
@@ -148,6 +157,9 @@ class PipelineBarrierFinder(PipelineStep):
                 src_rect = src_line.bounding_box(width=search_width, length_multiplier=search_length)
 
                 for line in lines:
+
+                    if line_within_mask(line, wall_like_expanded) or line_within_mask(line, on_wall_expanded):
+                        continue
 
                     #maybe use vanishing points instead?
                     if LineFunctions.line_angle_difference(src_line.angle, line.angle) > angle_threshold:
