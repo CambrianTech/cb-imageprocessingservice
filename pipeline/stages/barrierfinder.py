@@ -198,10 +198,15 @@ class PipelineBarrierFinder(PipelineStep):
 
         #extend these merged horizontal lines together to find intersections 
         long_horizontal_lines = list(filter(lambda line: line.length > diagonal / 20, horizontal_semantic_lines))
-        _, intersections = extend_to_intersection(long_horizontal_lines, search_length=2.0, modify=False)
+        linked_horizontal_lines, intersections = extend_to_intersection(long_horizontal_lines, search_length=2.0, modify=False)
 
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
         adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
+
+        # for master_line in linked_horizontal_lines:
+            
+        #     line_clusters = list(filter(lambda line: line.cluster == master_line.cluster, horizontal_lines))
+
 
         cluster_matches(vertical_plane_lines, vertical_lines, diagonal/20, angle_threshold=np.radians(20), func_invalid=vertical_line_invalid)
         vertical_clusters = list(set([line.cluster for line in vertical_plane_lines]))
@@ -222,13 +227,15 @@ class PipelineBarrierFinder(PipelineStep):
             draw_lines(debug, adjacent_vertical_lines, color=(255, 0, 0), thickness=2)
             draw_lines(debug, adjacent_horizontal_lines, color=(255, 0, 0), thickness=1)
 
-            # draw_lines(debug, self.data["vp_lines"], color=(50,50,50), thickness=1)
+            draw_lines(debug, linked_horizontal_lines, color=(50,255,255), thickness=2)
 
-            for point in intersections:
+            for point, line in intersections:
                 x = int(max(point[0], 0))
                 y = int(max(point[1], 0))
 
                 cv2.circle(debug, (x, y), 5, (255, 180, 0), cv2.FILLED, cv2.LINE_AA)
+
+                draw_lines(debug, [line], thickness=2)
 
             log_image(self.data, "barriers", debug)
 

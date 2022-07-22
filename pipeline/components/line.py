@@ -403,16 +403,16 @@ def extend_to_intersection(lines, search_length=1.3, search_width=1.0, min_angle
 
     intersections = [[None, None] for line in lines]
 
-    def set_closest_point(i, point):
+    def set_closest_point(i, j, point):
         dist_a = distance.sqeuclidean(lines[i].point_a, point)
         dist_b = distance.sqeuclidean(lines[i].point_b, point)
 
         if dist_a < dist_b:
             if intersections[i][0] is None or dist_a < intersections[i][0][0]:
-                intersections[i][0] = (dist_a, point)
+                intersections[i][0] = (dist_a, point, j)
         else:
             if intersections[i][1] is None or dist_b < intersections[i][1][0]:
-                intersections[i][1] = (dist_b, point)
+                intersections[i][1] = (dist_b, point, j)
 
     for i in range(len(lines)):
 
@@ -432,9 +432,10 @@ def extend_to_intersection(lines, search_length=1.3, search_width=1.0, min_angle
 
                 point = np.mean(intersection, axis=0)[0]
 
-                set_closest_point(i, point)
-                set_closest_point(j, point)
+                set_closest_point(i, j, point)
+                set_closest_point(j, i, point)
     
+    intersection_lines = []
     intersection_points = []
     for i in range(len(lines)):             
         point_a_terminated = intersections[i][0] is not None
@@ -444,26 +445,30 @@ def extend_to_intersection(lines, search_length=1.3, search_width=1.0, min_angle
 
             if point_a_terminated:
                 point_a = intersections[i][0][1]
-                intersection_points.append(point_a)
+                line_a = intersections[i][0][2]
+                #intersection_points.append(point_a)
             else:
                 point_a = lines[i].point_a
             
             if point_b_terminated:
                 point_b = intersections[i][1][1]
-                intersection_points.append(point_b)
+                line_b = intersections[i][1][2]
+                #intersection_points.append(point_b)
             else:
                 point_b = lines[i].point_b
 
             length = distance.euclidean(point_a, point_b)
             
             if length - lines[i].length > -1.0:
-                # if point_a_terminated:
-                #     intersection_points.append(point_a)
+                if point_a_terminated:
+                    intersection_points.append((point_a, lines[line_a]))
 
-                # if point_b_terminated:
-                #     intersection_points.append(point_b)
+                if point_b_terminated:
+                    intersection_points.append((point_b, lines[line_b]))
 
                 if modify:
                     lines[i] = Line(point_a[0], point_a[1], point_b[0], point_b[1], lines[i].cluster, lines[i].group)
+                else:
+                    intersection_lines.append(lines[i])
 
-    return lines, intersection_points
+    return intersection_lines, intersection_points
