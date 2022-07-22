@@ -15,7 +15,7 @@ from pipeline.data.logging import log_image, im_logging_enabled, log_markers, ge
 from pipeline.components.line import draw_lines
 from .vanishingpointfinder import angle_with_vp
 from pipeline.misc.utils import random_color, resize_array, adjust_mask
-from pipeline.data.ade20k import ADE20K, on_floor, on_wall, on_ceiling, box_like, legged_objects
+from pipeline.data.ade20k import ADE20K, on_floor, on_wall, on_ceiling, box_like, legged_objects, lights
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.line import Line, extend_to_intersection, draw_lines, line_within_mask, line_on_image_edge, merge_lines
 from pipeline.stages.vanishingpointfinder import get_inliers
@@ -53,7 +53,8 @@ class PipelineBarrierFinder(PipelineStep):
         for label in box_like:
             wall[self.data["semantic_labels"] == label.index] = 1
 
-        wall_mask = adjust_mask(cv2.dilate, wall, size=5, scale=0.4)
+        wall_expanded = adjust_mask(cv2.dilate, wall, size=5)
+        wall_contracted = adjust_mask(cv2.erode, wall, size=5)
 
         index_mask = np.dstack(tuple(probs))
         index_mask = np.int32(np.argmax(index_mask, -1))
@@ -89,44 +90,45 @@ class PipelineBarrierFinder(PipelineStep):
 
 
         vertical_plane_lines = list(get_inliers(new_lines, self.data["vertical_vp"].model, np.radians(15)))
-        vertical_plane_lines = list(filter(lambda line: line_within_mask(line, wall_mask), vertical_plane_lines))
+        vertical_plane_lines = list(filter(lambda line: line_within_mask(line, wall_expanded), vertical_plane_lines))
         vertical_plane_lines = merge_lines(vertical_plane_lines, search_width=max(diagonal/50, 3), search_length=1.5, angle_threshold=np.radians(20))
 
         ceiling = np.zeros(self.image .shape[:2], dtype=np.uint8)
         ceiling[self.data["isolated_labels"] == SurfaceType.Ceiling.index] = 1
         ceiling[self.data["isolated_labels"] == SurfaceType.OnCeiling.index] = 1
+        ceiling_expanded = adjust_mask(cv2.dilate, ceiling, size=5, scale=0.5)
+
+        on_ceiling = np.zeros(self.image .shape[:2], dtype=np.uint8)
+        on_ceiling[self.data["isolated_labels"] == SurfaceType.OnCeiling.index] = 1
+        on_ceiling_objects = [ADE20K.chandelier, ADE20K.fan] + lights
+        for label in on_ceiling_objects:
+            on_ceiling[self.data["semantic_labels"] == label.index] = 1
+        on_ceiling = adjust_mask(cv2.dilate, on_ceiling, size=5, scale=0.5)
 
         floor = np.zeros(self.image .shape[:2], dtype=np.uint8)
         floor[self.data["isolated_labels"] == SurfaceType.Floor.index] = 1
         floor[self.data["isolated_labels"] == SurfaceType.OnFloor.index] = 1
 
-        
-        other = np.zeros(self.image .shape[:2], dtype=np.uint8)
-        other[self.data["isolated_labels"] == SurfaceType.Other.index] = 1 
 
-        other = adjust_mask(cv2.dilate, other, size=11, scale=0.4)
+        def partition_lines(lines, mask=None):
 
-        wall = adjust_mask(cv2.dilate, wall, size=11, scale=0.4)
-
-        floor_ceiling = adjust_mask(cv2.dilate, cv2.bitwise_or(floor, ceiling), size=11, scale=0.4)
-
-        search_mask = cv2.bitwise_and(floor_ceiling, wall)
-
-        log_mask(self.data, "barriers_mask", search_mask, self.data["downscaled"])
-
-        def partition_horizontal_lines(lines):
-
-            vertical_lines = list(get_inliers(lines, data["vertical_vp"].model, np.radians(8)))
+            vertical_lines = list(get_inliers(lines, self.data["vertical_vp"].model, np.radians(8)))
             horizontal_lines = list(set(lines).difference(vertical_lines))
 
-            horizontal_lines = list(filter(lambda line: line_within_mask(line, search_mask), horizontal_lines))
+            # if mask is not None:
+            #     horizontal_lines = list(filter(lambda line: line_within_mask(line, mask), horizontal_lines))
 
             return horizontal_lines, vertical_lines
 
         #grab all horizontal lines from semantic lines, which is approximately the edges of surfaces, but not between walls.
         #then also combine these with nearby horizontal lines
-        horizontal_semantic_lines, vertical_semantic_lines = partition_horizontal_lines(self.data["semantic_lines"]) 
-        horizontal_vp_lines, vertical_vp_lines = partition_horizontal_lines(self.data["vp_lines"]) 
+        horizontal_semantic_lines, vertical_semantic_lines = partition_lines(self.data["semantic_lines"])
+        horizontal_semantic_lines = list(filter(lambda line: line_within_mask(line, ceiling_expanded) \
+                                    and not line_within_mask(line, on_ceiling) and not line_within_mask(line, wall_contracted), horizontal_semantic_lines))
+
+        horizontal_semantic_lines = merge_lines(horizontal_semantic_lines, search_width=max(diagonal/100, 3), search_length=1.3, angle_threshold=np.radians(5))
+
+        horizontal_vp_lines, vertical_vp_lines = partition_lines(self.data["vp_lines"])
 
         #all meaningful horizontal lines
         horizontal_lines = horizontal_semantic_lines + horizontal_vp_lines
@@ -142,8 +144,8 @@ class PipelineBarrierFinder(PipelineStep):
         for line in horizontal_lines + vertical_lines:
             line.cluster = None
 
-        merge_lines(horizontal_lines, search_width=max(diagonal/80, 3), search_length=1.0, angle_threshold=np.radians(8), remove_matches=False)
-        merge_lines(vertical_lines + vertical_plane_lines, search_width=max(diagonal/50, 3), search_length=1.0, angle_threshold=np.radians(20), remove_matches=False)
+        merge_lines(horizontal_lines, search_width=max(diagonal/50, 3), search_length=1.0, angle_threshold=np.radians(8), remove_matches=False)
+        merge_lines(vertical_lines + vertical_plane_lines, search_width=max(diagonal/40, 3), search_length=1.0, angle_threshold=np.radians(20), remove_matches=False)
 
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
         adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
@@ -155,13 +157,15 @@ class PipelineBarrierFinder(PipelineStep):
             #debug = get_segmentation_image(self.data["isolated_labels"], self.data["downscaled"], labelset=None)\
             debug = self.data["downscaled"].copy()
 
-            draw_lines(debug, vertical_plane_lines, color=(0,255,0), thickness=5, lineType=cv2.LINE_AA)
-            draw_lines(debug, horizontal_guide_lines, color=(255,0,50), thickness=5, lineType=cv2.LINE_AA)
+            #draw_lines(debug, vertical_plane_lines, color=(0,255,0), thickness=5)
+            #draw_lines(debug, horizontal_guide_lines, color=(255,0,50), thickness=5)
 
             debug = cv2.addWeighted(debug, 0.7, self.data["downscaled"], 0.3, 0)
 
-            draw_lines(debug, adjacent_vertical_lines, color=(50,50,50), thickness=1, lineType=cv2.LINE_AA)
-            draw_lines(debug, adjacent_horizontal_lines, color=(50,50,50), thickness=1, lineType=cv2.LINE_AA)
+            draw_lines(debug, self.data["vp_lines"], color=(50, 50, 50), thickness=1)
+
+            #draw_lines(debug, adjacent_vertical_lines, color=(0, 255, 0), thickness=1)
+            draw_lines(debug, horizontal_semantic_lines, color=(255, 0, 0), thickness=2)
 
             # draw_lines(debug, self.data["vp_lines"], color=(50,50,50), thickness=1)
 
