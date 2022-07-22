@@ -76,6 +76,14 @@ class PipelineBarrierFinder(PipelineStep):
             on_ceiling_mask[self.data["semantic_labels"] == label.index] = 1
         on_ceiling_mask = adjust_mask(cv2.dilate, on_ceiling_mask, size=5, scale=0.5)
 
+        invalid_vert_areas = np.zeros(self.image .shape[:2], dtype=np.uint8)
+        on_wall_objects = [ADE20K.painting, ADE20K.shelf, ADE20K.projection_screen, ADE20K.radiator, ADE20K.sconce, ADE20K.towel]
+        for label in on_wall_objects:
+            invalid_vert_areas[self.data["semantic_labels"] == label.index] = 1
+
+        invalid_vert_areas = adjust_mask(cv2.dilate, invalid_vert_areas, size=5, scale=0.5)
+
+
         index_mask = np.dstack(tuple(probs))
         index_mask = np.int32(np.argmax(index_mask, -1))
 
@@ -150,6 +158,9 @@ class PipelineBarrierFinder(PipelineStep):
         def horizontal_line_invalid(line):
             return line_within_mask(line, wall_like_expanded) or line_within_mask(line, on_wall_expanded)
 
+        def vertical_line_invalid(line):
+            return line_within_mask(line, invalid_vert_areas)
+
         #re-cluster the original horizontal lines and plane vertical lines + vertical lines (remove_matches=False):
         def cluster_matches(src_lines, lines, search_width, search_length=1.3, angle_threshold=np.radians(5), func_invalid=None):
 
@@ -181,17 +192,18 @@ class PipelineBarrierFinder(PipelineStep):
 
                 cluster_index += 1
 
-        cluster_matches(horizontal_semantic_lines, horizontal_vp_lines, diagonal/15, search_length=1.3, func_invalid=horizontal_line_invalid)
+        cluster_matches(horizontal_semantic_lines, horizontal_vp_lines, diagonal/15, func_invalid=horizontal_line_invalid)
 
         #find intersections of grouped lines, being careful not to corrupt originals (copy)
 
         #extend these merged horizontal lines together to find intersections 
-        horizontal_guide_lines, intersections = extend_to_intersection(horizontal_semantic_lines, search_length=2.0, modify=False)
+        long_horizontal_lines = list(filter(lambda line: line.length > diagonal / 20, horizontal_semantic_lines))
+        _, intersections = extend_to_intersection(long_horizontal_lines, search_length=2.0, modify=False)
 
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
         adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
 
-        cluster_matches(vertical_plane_lines, vertical_lines, diagonal/20, search_length=0.9, angle_threshold=np.radians(20))
+        cluster_matches(vertical_plane_lines, vertical_lines, diagonal/20, angle_threshold=np.radians(20), func_invalid=vertical_line_invalid)
         vertical_clusters = list(set([line.cluster for line in vertical_plane_lines]))
 
         adjacent_vertical_lines = list(filter(lambda line: line.cluster in vertical_clusters, vertical_lines))        
@@ -201,7 +213,7 @@ class PipelineBarrierFinder(PipelineStep):
             debug = self.data["downscaled"].copy()
 
             draw_lines(debug, vertical_plane_lines, color=(0,255,0), thickness=5)
-            draw_lines(debug, horizontal_guide_lines, color=(255,0,50), thickness=3)
+            draw_lines(debug, horizontal_semantic_lines, color=(255,0,50), thickness=3)
 
             debug = cv2.addWeighted(debug, 0.7, self.data["downscaled"], 0.3, 0)
 
