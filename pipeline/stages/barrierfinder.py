@@ -147,8 +147,11 @@ class PipelineBarrierFinder(PipelineStep):
         horizontal_lines = horizontal_semantic_lines + horizontal_vp_lines
         vertical_lines = vertical_semantic_lines + vertical_vp_lines
 
+        def horizontal_line_invalid(line):
+            return line_within_mask(line, wall_like_expanded) or line_within_mask(line, on_wall_expanded)
+
         #re-cluster the original horizontal lines and plane vertical lines + vertical lines (remove_matches=False):
-        def cluster_matches(src_lines, lines, search_width, search_length=1.3, angle_threshold=np.radians(5)):
+        def cluster_matches(src_lines, lines, search_width, search_length=1.3, angle_threshold=np.radians(5), func_invalid=None):
 
             for line in src_lines + lines:
                 line.cluster = None
@@ -162,7 +165,7 @@ class PipelineBarrierFinder(PipelineStep):
 
                 for line in lines:
 
-                    if line_within_mask(line, wall_like_expanded) or line_within_mask(line, on_wall_expanded):
+                    if func_invalid is not None and func_invalid(line):
                         continue
 
                     #maybe use vanishing points instead?
@@ -178,7 +181,7 @@ class PipelineBarrierFinder(PipelineStep):
 
                 cluster_index += 1
 
-        cluster_matches(horizontal_semantic_lines, horizontal_vp_lines, diagonal/15)
+        cluster_matches(horizontal_semantic_lines, horizontal_vp_lines, diagonal/15, search_length=1.3, func_invalid=horizontal_line_invalid)
 
         #find intersections of grouped lines, being careful not to corrupt originals (copy)
 
@@ -188,6 +191,7 @@ class PipelineBarrierFinder(PipelineStep):
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
         adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
 
+        cluster_matches(vertical_plane_lines, vertical_lines, diagonal/20, search_length=0.9, angle_threshold=np.radians(20))
         vertical_clusters = list(set([line.cluster for line in vertical_plane_lines]))
 
         adjacent_vertical_lines = list(filter(lambda line: line.cluster in vertical_clusters, vertical_lines))        
@@ -203,7 +207,7 @@ class PipelineBarrierFinder(PipelineStep):
 
             draw_lines(debug, self.data["vp_lines"], color=(50, 50, 50), thickness=1)
 
-            draw_lines(debug, adjacent_vertical_lines, color=(0, 255, 0), thickness=1)
+            draw_lines(debug, adjacent_vertical_lines, color=(255, 0, 0), thickness=2)
             draw_lines(debug, adjacent_horizontal_lines, color=(255, 0, 0), thickness=1)
 
             # draw_lines(debug, self.data["vp_lines"], color=(50,50,50), thickness=1)
