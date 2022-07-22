@@ -46,6 +46,12 @@ class PipelineDigestData(PipelineStep):
 
         log_image(data, "hed", data["hed"])
 
+        max_size_hw = (1280, 1280)
+
+        if data["image"].shape[0] > max_size_hw[0] or data["image"].shape[1] > max_size_hw[1]:
+            scale = min(max_size_hw[0] / data["image"].shape[0], max_size_hw[1] / data["image"].shape[1])
+            data["image"] = cv2.resize(data["image"], (int(scale * data["image"].shape[1]), int(scale * data["image"].shape[0])))
+
         if data["image"].shape[0] > shape[0] or data["image"].shape[1] > shape[1]:
             data["downscaled"] = cv2.resize(data["image"], shape)
         else:
