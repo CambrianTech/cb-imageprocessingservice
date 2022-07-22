@@ -134,18 +134,41 @@ class PipelineBarrierFinder(PipelineStep):
         horizontal_lines = horizontal_semantic_lines + horizontal_vp_lines
         vertical_lines = vertical_semantic_lines + vertical_vp_lines
 
+        #re-cluster the original horizontal lines and plane vertical lines + vertical lines (remove_matches=False):
+        def cluster_matches(src_lines, lines, search_width, search_length=1.3, angle_threshold=np.radians(5)):
+
+            for line in src_lines + lines:
+                line.cluster = None
+
+            cluster_index = 0
+
+            for src_line in src_lines:
+                src_line.cluster = cluster_index
+
+                src_rect = src_line.bounding_box(width=search_width, length_multiplier=search_length)
+
+                for line in lines:
+
+                    #maybe use vanishing points instead?
+                    if LineFunctions.line_angle_difference(src_line.angle, line.angle) > angle_threshold:
+                        continue
+
+                    rect = line.bounding_box(width=3)
+
+                    result, _ = cv2.rotatedRectangleIntersection(src_rect, rect)
+
+                    if result != 0:
+                        line.cluster = cluster_index
+
+                cluster_index += 1
+
+        cluster_matches(horizontal_semantic_lines, horizontal_vp_lines, diagonal/15)
+
         #find intersections of grouped lines, being careful not to corrupt originals (copy)
-        horizontal_lines_merged = merge_lines(horizontal_lines.copy(), search_width=max(diagonal/80, 3), search_length_offset=diagonal/40, angle_threshold=np.radians(5))
+        #horizontal_lines_merged = merge_lines(horizontal_lines.copy(), search_width=max(diagonal/150, 3), angle_threshold=np.radians(5), modify=False)
 
         #extend these merged horizontal lines together to find intersections 
-        horizontal_guide_lines, intersections = extend_to_intersection(horizontal_lines_merged, search_length=2.0, modify=False)
-        
-        #re-cluster the original horizontal lines and plane vertical lines + vertical lines (remove_matches=False):
-        for line in horizontal_lines + vertical_lines:
-            line.cluster = None
-
-        merge_lines(horizontal_lines, search_width=max(diagonal/50, 3), search_length=1.0, angle_threshold=np.radians(8), remove_matches=False)
-        merge_lines(vertical_lines + vertical_plane_lines, search_width=max(diagonal/40, 3), search_length=1.0, angle_threshold=np.radians(20), remove_matches=False)
+        horizontal_guide_lines, intersections = extend_to_intersection(horizontal_semantic_lines, search_length=2.0, modify=False)
 
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
         adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
@@ -157,15 +180,15 @@ class PipelineBarrierFinder(PipelineStep):
             #debug = get_segmentation_image(self.data["isolated_labels"], self.data["downscaled"], labelset=None)\
             debug = self.data["downscaled"].copy()
 
-            #draw_lines(debug, vertical_plane_lines, color=(0,255,0), thickness=5)
-            #draw_lines(debug, horizontal_guide_lines, color=(255,0,50), thickness=5)
+            draw_lines(debug, vertical_plane_lines, color=(0,255,0), thickness=5)
+            draw_lines(debug, horizontal_guide_lines, color=(255,0,50), thickness=3)
 
             debug = cv2.addWeighted(debug, 0.7, self.data["downscaled"], 0.3, 0)
 
             draw_lines(debug, self.data["vp_lines"], color=(50, 50, 50), thickness=1)
 
-            #draw_lines(debug, adjacent_vertical_lines, color=(0, 255, 0), thickness=1)
-            draw_lines(debug, horizontal_semantic_lines, color=(255, 0, 0), thickness=2)
+            draw_lines(debug, adjacent_vertical_lines, color=(0, 255, 0), thickness=1)
+            draw_lines(debug, adjacent_horizontal_lines, color=(255, 0, 0), thickness=1)
 
             # draw_lines(debug, self.data["vp_lines"], color=(50,50,50), thickness=1)
 
