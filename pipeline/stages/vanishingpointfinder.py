@@ -46,6 +46,8 @@ def compute_votes(edgelets, model, threshold_inlier):
     return (cosine_theta > theta_thresh) * edgelets.strengths
 
 def get_votes(lines, model, angle_threshold=np.radians(3)):
+
+    if len(lines) == 0: return []
     
     locations = np.array(list(map(lambda x: x.midpoint, lines)))
     directions = np.array(list(map(lambda x: x.direction, lines)))
@@ -59,6 +61,8 @@ def get_votes(lines, model, angle_threshold=np.radians(3)):
     return (cosine_thetas > theta_thresh) * strengths
 
 def get_angles(lines, model):
+
+    if len(lines) == 0: return []
     
     locations = np.array(list(map(lambda x: x.midpoint, lines)))
     directions = np.array(list(map(lambda x: x.direction, lines)))
@@ -70,6 +74,8 @@ def get_angles(lines, model):
     return cosine_thetas
 
 def get_inliers(lines, model, angle_threshold=np.radians(3)):
+
+    if len(lines) == 0: return []
     
     locations = np.array(list(map(lambda x: x.midpoint, lines)))
     directions = np.array(list(map(lambda x: x.direction, lines)))
