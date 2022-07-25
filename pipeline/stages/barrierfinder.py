@@ -7,6 +7,7 @@ import math
 from scipy.spatial import distance
 from operator import attrgetter
 from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 
 from cambrian.LineFunctions import LineFunctions
 
@@ -235,15 +236,13 @@ class PipelineBarrierFinder(PipelineStep):
             #todo: return better elevation
             return horizontal_line.midpoint[1], horizontal_line.angle
 
-        min_distance = 8
-
         filtered_lines = []
         for master_line in horizontal_semantic_lines:
 
             valid_lines = [master_line]
             siblings = list(filter(lambda line: line.cluster == master_line.cluster and line != master_line, adjacent_horizontal_lines))
 
-            if len(siblings) > 0:
+            if len(siblings) > 1:
                 samples = np.zeros((len(siblings) + 1, 2))
                 samples[0] = get_sample(master_line)
                 
@@ -252,23 +251,39 @@ class PipelineBarrierFinder(PipelineStep):
 
                 print("samples", samples)
 
-                for k in range(1, len(samples)):
+                min_distance = 0
+                coeffs = []
+                results = []
+
+                for k in range(2, len(samples)):
                     kmeans = KMeans(n_clusters=k, random_state=0).fit(samples)
                     avg_distance = np.sqrt(kmeans.inertia_ / len(samples))
 
-                    print("k=%d" % k, kmeans.labels_, avg_distance)
-
                     labels = kmeans.labels_
 
-                    if avg_distance < min_distance:
-                        print("Found working k values of %d" % k)
-                        break
+                    sil_coeff = silhouette_score(samples, labels, metric='euclidean')
 
-                key_label = labels[0]
+                    print("k=%d" % k, labels, avg_distance, sil_coeff)
 
-                for i in range(1, len(labels)):
-                    if labels[i] == key_label:
-                        valid_lines.append(siblings[i-1])
+                    results.append(labels)
+                    coeffs.append(sil_coeff)
+
+                index = np.argmax(np.array(coeffs))
+
+                if index == 0 and False:
+                    valid_lines.extend(siblings)
+                    print("Best is all lines" )
+                else:
+                    best_labels = results[index]
+                    best_k = index + 2
+
+                    print("Best k=%d coeff=%.3f" % (best_k, coeffs[index]), best_labels)
+
+                    key_label = best_labels[0]
+
+                    for i in range(1, len(best_labels)):
+                        if best_labels[i] == key_label:
+                            valid_lines.append(siblings[i-1])
 
             else:
                 valid_lines.extend(siblings)
