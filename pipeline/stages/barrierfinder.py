@@ -254,6 +254,7 @@ class PipelineBarrierFinder(PipelineStep):
                 min_distance = 0
                 coeffs = []
                 results = []
+                distances = []
 
                 for k in range(2, len(samples)):
                     kmeans = KMeans(n_clusters=k, random_state=0).fit(samples)
@@ -267,18 +268,21 @@ class PipelineBarrierFinder(PipelineStep):
 
                     results.append(labels)
                     coeffs.append(sil_coeff)
+                    distances.append(avg_distance)
 
-                k_drop = 0
-                index = np.argmax(np.array(coeffs)) - k_drop
+                index = np.argmax(np.array(coeffs))
+                dist = distances[index]
 
-                if index < 0:
+                #if dist < 5: index -= 1
+
+                best_labels = results[index]
+                    
+                if dist < 5:
                     valid_lines.extend(siblings)
-                    print("Best is all lines" )
+                    print("Best is all lines")
                 else:
-                    best_labels = results[index]
                     best_k = index + 2
-
-                    print("Best k=%d coeff=%.3f, dropping back %d" % (best_k, coeffs[index], k_drop), best_labels)
+                    print("Best k=%d coeff=%.3f" % (best_k, coeffs[index]), best_labels)
 
                     key_label = best_labels[0]
 
