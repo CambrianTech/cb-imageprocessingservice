@@ -6,6 +6,7 @@ import time
 import math
 from scipy.spatial import distance
 from operator import attrgetter
+from sklearn.cluster import KMeans
 
 from cambrian.LineFunctions import LineFunctions
 
@@ -19,6 +20,33 @@ from pipeline.data.ade20k import ADE20K, on_floor, on_wall, on_ceiling, box_like
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.line import Line, extend_to_intersection, draw_lines, line_within_mask, line_on_image_edge, merge_lines
 from pipeline.stages.vanishingpointfinder import get_inliers
+
+class RansacTrim():
+    def __init__(self, lines_a, lines_b, first_prob=0.3):
+    
+        def get_probs(lines):
+            
+            num_lines = len(lines)
+            if num_lines > 1:
+                remainder = (1.0 - first_prob) / num_lines
+                p.extend([remainder] * num_lines)
+            else:
+                return [1.0]
+
+        self.lines_a = lines_a
+        self.p_a = get_probs(lines_a)
+
+        self.lines_b = lines_b
+        self.p_b = get_probs(lines_b)
+
+        self.max_iterations = 50
+
+    def solve(self):
+
+        for i in range(self.max_iterations):
+            line_a = np.random.choice(self.lines_a, 2)
+            line_b = np.random.choice(self.lines_b, 2)
+
 
 class PipelineBarrierFinder(PipelineStep):
     @property
@@ -203,9 +231,53 @@ class PipelineBarrierFinder(PipelineStep):
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
         adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
 
-        # for master_line in linked_horizontal_lines:
-            
-        #     line_clusters = list(filter(lambda line: line.cluster == master_line.cluster, horizontal_lines))
+        def get_elevation(horizontal_line):
+            #todo: return better elevation
+            return horizontal_line.midpoint[1]
+
+        min_distance = diagonal / 10
+
+        filtered_lines = []
+        for master_line in linked_horizontal_lines:
+
+            valid_lines = [master_line]
+            siblings = list(filter(lambda line: line.cluster == master_line.cluster and line != master_line, adjacent_horizontal_lines))
+
+            if len(siblings) > 100000:
+                elevations = np.zeros(len(siblings) + 1)
+                elevations[0] = get_elevation(master_line)
+                
+                for i in range(len(siblings)):
+                    elevations[i+1] = get_elevation(siblings[i])
+
+                print("elevations", elevations)
+                elevations = elevations.reshape(-1,1)
+
+                for k in range(1, len(siblings)):
+                    kmeans = KMeans(n_clusters=k, random_state=0).fit(elevations)
+                    avg_distance = np.sqrt(kmeans.inertia_ / len(elevations))
+
+                    print("k=%d" % k, kmeans.labels_, avg_distance)
+
+                    labels = kmeans.labels_
+
+                    if avg_distance < min_distance:
+                        print("Found working k values of %d" % k)
+                        break
+
+                key_label = labels[0]
+
+                for i in range(1, len(labels)):
+                    if labels[i] == key_label:
+                        valid_lines.append(siblings[i-1])
+
+            else:
+                valid_lines.extend(siblings)
+
+
+            filtered_lines.extend(valid_lines)
+
+        #exit()
 
 
         cluster_matches(vertical_plane_lines, vertical_lines, diagonal/20, angle_threshold=np.radians(20), func_invalid=vertical_line_invalid)
@@ -224,7 +296,7 @@ class PipelineBarrierFinder(PipelineStep):
 
             draw_lines(debug, self.data["vp_lines"], color=(50, 50, 50), thickness=1)
 
-            draw_lines(debug, adjacent_vertical_lines, color=(255, 0, 0), thickness=2)
+            draw_lines(debug, adjacent_vertical_lines, color=(255, 0, 0), thickness=1)
             draw_lines(debug, adjacent_horizontal_lines, color=(255, 0, 0), thickness=1)
 
             draw_lines(debug, linked_horizontal_lines, color=(50,255,255), thickness=2)
