@@ -231,31 +231,30 @@ class PipelineBarrierFinder(PipelineStep):
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
         adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
 
-        def get_elevation(horizontal_line):
+        def get_sample(horizontal_line):
             #todo: return better elevation
-            return horizontal_line.midpoint[1]
+            return horizontal_line.midpoint[1], horizontal_line.angle
 
-        min_distance = diagonal / 10
+        min_distance = 8
 
         filtered_lines = []
-        for master_line in linked_horizontal_lines:
+        for master_line in horizontal_semantic_lines:
 
             valid_lines = [master_line]
             siblings = list(filter(lambda line: line.cluster == master_line.cluster and line != master_line, adjacent_horizontal_lines))
 
-            if len(siblings) > 100000:
-                elevations = np.zeros(len(siblings) + 1)
-                elevations[0] = get_elevation(master_line)
+            if len(siblings) > 0:
+                samples = np.zeros((len(siblings) + 1, 2))
+                samples[0] = get_sample(master_line)
                 
                 for i in range(len(siblings)):
-                    elevations[i+1] = get_elevation(siblings[i])
+                    samples[i+1] = get_sample(siblings[i])
 
-                print("elevations", elevations)
-                elevations = elevations.reshape(-1,1)
+                print("samples", samples)
 
-                for k in range(1, len(siblings)):
-                    kmeans = KMeans(n_clusters=k, random_state=0).fit(elevations)
-                    avg_distance = np.sqrt(kmeans.inertia_ / len(elevations))
+                for k in range(1, len(samples)):
+                    kmeans = KMeans(n_clusters=k, random_state=0).fit(samples)
+                    avg_distance = np.sqrt(kmeans.inertia_ / len(samples))
 
                     print("k=%d" % k, kmeans.labels_, avg_distance)
 
@@ -274,10 +273,9 @@ class PipelineBarrierFinder(PipelineStep):
             else:
                 valid_lines.extend(siblings)
 
+            
 
             filtered_lines.extend(valid_lines)
-
-        #exit()
 
 
         cluster_matches(vertical_plane_lines, vertical_lines, diagonal/20, angle_threshold=np.radians(20), func_invalid=vertical_line_invalid)
@@ -289,17 +287,18 @@ class PipelineBarrierFinder(PipelineStep):
             #debug = get_segmentation_image(self.room.index_mask, self.data["downscaled"], labelset=None)\
             debug = self.data["downscaled"].copy()
 
-            draw_lines(debug, vertical_plane_lines, color=(0,255,0), thickness=5)
-            draw_lines(debug, horizontal_semantic_lines, color=(255,0,50), thickness=3)
+            # draw_lines(debug, vertical_plane_lines, color=(0,255,0), thickness=5)
+            # draw_lines(debug, horizontal_semantic_lines, color=(255,0,50), thickness=3)
 
             debug = cv2.addWeighted(debug, 0.7, self.data["downscaled"], 0.3, 0)
 
             draw_lines(debug, self.data["vp_lines"], color=(50, 50, 50), thickness=1)
 
-            draw_lines(debug, adjacent_vertical_lines, color=(255, 0, 0), thickness=1)
-            draw_lines(debug, adjacent_horizontal_lines, color=(255, 0, 0), thickness=1)
+            #draw_lines(debug, adjacent_vertical_lines, color=(255, 0, 0), thickness=1)
+            
+            draw_lines(debug, filtered_lines, color=(0, 255, 255), thickness=1)
 
-            draw_lines(debug, linked_horizontal_lines, color=(50,255,255), thickness=2)
+            #draw_lines(debug, linked_horizontal_lines, color=(50,255,255), thickness=2)
 
             for point, line in intersections:
                 x = int(max(point[0], 0))
@@ -307,7 +306,7 @@ class PipelineBarrierFinder(PipelineStep):
 
                 cv2.circle(debug, (x, y), 5, (255, 180, 0), cv2.FILLED, cv2.LINE_AA)
 
-                draw_lines(debug, [line], thickness=2)
+                #draw_lines(debug, [line], thickness=2)
 
             log_image(self.data, "barriers", debug)
 
