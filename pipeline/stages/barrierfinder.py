@@ -268,16 +268,17 @@ class PipelineBarrierFinder(PipelineStep):
                     results.append(labels)
                     coeffs.append(sil_coeff)
 
-                index = np.argmax(np.array(coeffs))
+                k_drop = 0
+                index = np.argmax(np.array(coeffs)) - k_drop
 
-                if index == 0 and False:
+                if index < 0:
                     valid_lines.extend(siblings)
                     print("Best is all lines" )
                 else:
                     best_labels = results[index]
                     best_k = index + 2
 
-                    print("Best k=%d coeff=%.3f" % (best_k, coeffs[index]), best_labels)
+                    print("Best k=%d coeff=%.3f, dropping back %d" % (best_k, coeffs[index], k_drop), best_labels)
 
                     key_label = best_labels[0]
 
