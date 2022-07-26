@@ -271,17 +271,15 @@ class PipelineBarrierFinder(PipelineStep):
                     distances.append(avg_distance)
 
                 index = np.argmax(np.array(coeffs))
-                dist = distances[index]
-
-                #if dist < 5: index -= 1
-
-                best_labels = results[index]
+                dist = distances[index]       
                     
-                if dist < 5:
+                if dist < 5 and (index==0 or abs(coeffs[0] - coeffs[index]) < 0.05):
                     valid_lines.extend(siblings)
                     print("Best is all lines")
                 else:
                     best_k = index + 2
+                    best_labels = results[index]
+
                     print("Best k=%d coeff=%.3f" % (best_k, coeffs[index]), best_labels)
 
                     key_label = best_labels[0]
