@@ -283,7 +283,7 @@ class PipelineBarrierFinder(PipelineStep):
                 index = np.argmax(np.array(coeffs))
                 dist = distances[index]       
                     
-                if False and dist < 5 and (index==0 or abs(coeffs[0] - coeffs[index]) < 0.05):
+                if dist < 5 and (index==0 or abs(coeffs[0] - coeffs[index]) < 0.05):
                     valid_lines.extend(siblings)
                     print("Best is all lines")
                 else:
