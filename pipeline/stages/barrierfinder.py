@@ -241,15 +241,39 @@ class PipelineBarrierFinder(PipelineStep):
 
         adjacent_vertical_lines = list(filter(lambda line: line.cluster in vertical_clusters, vertical_lines))
 
-        points = []
+        samples = []
         for intersection in intersections:
             if intersection.term_a:
-                points.append(intersection.term_a)
+                samples.append(intersection.term_a.point)
 
             if intersection.term_b:
-                points.append(intersection.term_b)
+                samples.append(intersection.term_b.point)
 
+        samples = np.unique(np.array(samples), axis=0)
         
+
+        results = []
+
+        for k in range(2, len(samples)):
+            kmeans = KMeans(n_clusters=k, random_state=0).fit(samples)
+            avg_distance = np.sqrt(kmeans.inertia_ / len(samples))
+
+            labels = kmeans.labels_
+            centers = kmeans.cluster_centers_
+
+            sil_coeff = silhouette_score(samples, labels, metric='euclidean')
+
+            print("k=%d" % k, labels, avg_distance, sil_coeff)
+
+            results.append((sil_coeff, avg_distance, labels, centers))
+
+        if len(results) > 1:
+            index = np.argmax(np.array(results)[:,0])
+            best_result = results[index]
+            print("BEST", best_result)
+            centers = best_result[3]
+        else:
+            centers = samples
 
         if im_logging_enabled(data):
             #debug = get_segmentation_image(self.room.index_mask, self.data["downscaled"], labelset=None)\
@@ -268,21 +292,25 @@ class PipelineBarrierFinder(PipelineStep):
 
             #draw_lines(debug, linked_horizontal_lines, color=(50,255,255), thickness=2)
 
+            def constrain_point(point):
+                x = int(min(max(point[0], 0), debug.shape[1]))
+                y = int(min(max(point[1], 0), debug.shape[0]))
+                return x, y
+
             for intersection in intersections:
 
                 def debug_term(term):
                     if term is None: return
-                    x = int(max(term.point[0], 0))
-                    y = int(max(term.point[1], 0))
-                    cv2.circle(debug, (x, y), 5, (255, 180, 0), cv2.FILLED, cv2.LINE_AA)
-
+                    cv2.circle(debug, constrain_point(term.point), 5, (255, 180, 0), cv2.FILLED, cv2.LINE_AA)
                     draw_lines(debug, [term.line], thickness=2)
                 
                 draw_lines(debug, [intersection.line], thickness=2)
 
                 debug_term(intersection.term_a)
                 debug_term(intersection.term_b)
-                
 
+            for center in centers:
+                cv2.circle(debug, constrain_point(center), 8, (0, 255, 0), 2)
+                
             log_image(self.data, "barriers", debug)
 
