@@ -399,6 +399,18 @@ def line_within_mask(line, mask, value=1, num_points=7, num_matches=3):
 
     return False
 
+class LineTermination():
+    def __init__(self, point, line):
+        self.point = point
+        self.line = line
+
+class LineIntersection():
+    def __init__(self, line, term_a:LineTermination, term_b:LineTermination):
+        self.line = line
+
+        self.term_a = term_a
+        self.term_b = term_b
+
 def extend_to_intersection(lines, search_length=1.3, search_width=1.0, min_angle_difference=np.radians(10), modify=True):
 
     intersections = [[None, None] for line in lines]
@@ -435,8 +447,8 @@ def extend_to_intersection(lines, search_length=1.3, search_width=1.0, min_angle
                 set_closest_point(i, j, point)
                 set_closest_point(j, i, point)
     
-    intersection_lines = []
-    intersection_points = []
+    results = []
+    
     for i in range(len(lines)):             
         point_a_terminated = intersections[i][0] is not None
         point_b_terminated = intersections[i][1] is not None
@@ -446,29 +458,31 @@ def extend_to_intersection(lines, search_length=1.3, search_width=1.0, min_angle
             if point_a_terminated:
                 point_a = intersections[i][0][1]
                 line_a = intersections[i][0][2]
-                #intersection_points.append(point_a)
             else:
                 point_a = lines[i].point_a
             
             if point_b_terminated:
                 point_b = intersections[i][1][1]
                 line_b = intersections[i][1][2]
-                #intersection_points.append(point_b)
             else:
                 point_b = lines[i].point_b
 
             length = distance.euclidean(point_a, point_b)
             
             if length - lines[i].length > -1.0:
-                if point_a_terminated:
-                    intersection_points.append((point_a, lines[line_a]))
-
-                if point_b_terminated:
-                    intersection_points.append((point_b, lines[line_b]))
-
+                
                 if modify:
                     lines[i] = Line(point_a[0], point_a[1], point_b[0], point_b[1], lines[i].cluster, lines[i].group)
-                else:
-                    intersection_lines.append(lines[i])
+                
+                term_a = None
+                term_b = None
 
-    return intersection_lines, intersection_points
+                if point_a_terminated:
+                    term_a = LineTermination(point_a, lines[line_a])
+
+                if point_b_terminated:
+                    term_b = LineTermination(point_b, lines[line_b])
+
+                results.append(LineIntersection(lines[i], term_a, term_b))
+
+    return results
