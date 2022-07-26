@@ -234,7 +234,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         test_contours, _ = cv2.findContours(ceiling, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        def get_sample(line, offsets=[-2]):
+        def get_sample(line, offsets=range(-1,0)):
             #todo: return better elevation
 
             min_distance = None
@@ -251,11 +251,13 @@ class PipelineBarrierFinder(PipelineStep):
             else:
                 data.append(line.midpoint[1])
 
-            color_data = []
-            for i in offsets:
-                colors = LineFunctions.get_line_samples((line.point_a[0], line.point_a[1] + i), (line.point_b[0], line.point_b[1] + i), self.room.normals, int(line.length / 5) + 1)
-                color = np.mean(colors, axis=0)
-                data.extend(color)
+            for image in [self.room.normals, self.image]:
+                color_data = []
+                for i in offsets:
+                    colors = LineFunctions.get_line_samples((line.point_a[0], line.point_a[1] + i), (line.point_b[0], line.point_b[1] + i), image, int(line.length / 5) + 1)
+                    color_data.extend(colors)
+
+                data.extend(np.mean(color_data, axis=0))           
 
                 # hsv = convert_color(color, conversion=cv2.COLOR_RGB2HSV_FULL)
                 # data.extend(hsv[:1])
