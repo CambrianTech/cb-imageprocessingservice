@@ -16,7 +16,7 @@ from pipeline.data.surface_type import SurfaceType
 from pipeline.data.logging import log_image, im_logging_enabled, log_markers, get_segmentation_image, log_segmentation_image, log_mask
 from pipeline.components.line import draw_lines
 from .vanishingpointfinder import angle_with_vp
-from pipeline.misc.utils import random_color, resize_array, adjust_mask
+from pipeline.misc.utils import random_color, resize_array, adjust_mask, convert_color
 from pipeline.data.ade20k import ADE20K, on_floor, on_wall, on_ceiling, box_like, legged_objects, lights
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.line import Line, extend_to_intersection, draw_lines, line_within_mask, line_on_image_edge, merge_lines
@@ -232,9 +232,18 @@ class PipelineBarrierFinder(PipelineStep):
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
         adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
 
-        def get_sample(horizontal_line):
+        def get_sample(line):
             #todo: return better elevation
-            return horizontal_line.midpoint[1], horizontal_line.angle
+
+            data = [line.midpoint[1]]
+
+            for i in [0, 1]:
+                colors = LineFunctions.get_line_samples((line.point_a[0], line.point_a[1] + i), (line.point_b[0], line.point_b[1] + i), self.image, int(line.length / 5) + 1)
+                color = np.mean(colors, axis=0)
+                hsv = convert_color(color, conversion=cv2.COLOR_RGB2HSV_FULL)
+                data.extend([hsv[0]])
+
+            return data
 
         filtered_lines = []
         for master_line in horizontal_semantic_lines:
@@ -243,8 +252,9 @@ class PipelineBarrierFinder(PipelineStep):
             siblings = list(filter(lambda line: line.cluster == master_line.cluster and line != master_line, adjacent_horizontal_lines))
 
             if len(siblings) > 1:
-                samples = np.zeros((len(siblings) + 1, 2))
-                samples[0] = get_sample(master_line)
+                master_sample = get_sample(master_line)
+                samples = np.zeros((len(siblings) + 1, len(master_sample)))
+                samples[0] = master_sample
                 
                 for i in range(len(siblings)):
                     samples[i+1] = get_sample(siblings[i])
