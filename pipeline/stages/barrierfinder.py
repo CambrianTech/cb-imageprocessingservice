@@ -226,14 +226,15 @@ class PipelineBarrierFinder(PipelineStep):
         #find intersections of grouped lines, being careful not to corrupt originals (copy)
 
         #extend these merged horizontal lines together to find intersections 
-        long_horizontal_lines = list(filter(lambda line: line.length > diagonal / 20, horizontal_semantic_lines))
-        intersections = extend_to_intersection(long_horizontal_lines, search_length=2.0, modify=False)
+        
+        #horizontal_semantic_lines = list(filter(lambda line: line.length > diagonal / 40, horizontal_semantic_lines))
 
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
         adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
 
         #for point, line in intersections:
 
+        intersections = extend_to_intersection(adjacent_horizontal_lines, search_length=2.0, modify=False)
 
         cluster_matches(vertical_plane_lines, vertical_lines, diagonal/20, angle_threshold=np.radians(20), func_invalid=vertical_line_invalid)
         vertical_clusters = list(set([line.cluster for line in vertical_plane_lines]))
@@ -268,7 +269,7 @@ class PipelineBarrierFinder(PipelineStep):
                     draw_lines(debug, [term.line], thickness=2)
                 
                 draw_lines(debug, [intersection.line], thickness=2)
-                
+
                 debug_term(intersection.term_a)
                 debug_term(intersection.term_b)
                 
