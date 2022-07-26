@@ -239,7 +239,17 @@ class PipelineBarrierFinder(PipelineStep):
         cluster_matches(vertical_plane_lines, vertical_lines, diagonal/20, angle_threshold=np.radians(20), func_invalid=vertical_line_invalid)
         vertical_clusters = list(set([line.cluster for line in vertical_plane_lines]))
 
-        adjacent_vertical_lines = list(filter(lambda line: line.cluster in vertical_clusters, vertical_lines))        
+        adjacent_vertical_lines = list(filter(lambda line: line.cluster in vertical_clusters, vertical_lines))
+
+        points = []
+        for intersection in intersections:
+            if intersection.term_a:
+                points.append(intersection.term_a)
+
+            if intersection.term_b:
+                points.append(intersection.term_b)
+
+        
 
         if im_logging_enabled(data):
             #debug = get_segmentation_image(self.room.index_mask, self.data["downscaled"], labelset=None)\
