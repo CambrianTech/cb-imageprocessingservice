@@ -191,7 +191,7 @@ class PipelineBarrierFinder(PipelineStep):
             return line_within_mask(line, invalid_vert_areas)
 
         #re-cluster the original horizontal lines and plane vertical lines + vertical lines (remove_matches=False):
-        def cluster_matches(src_lines, lines, search_width, search_length=1.3, angle_threshold=np.radians(5), func_invalid=None):
+        def cluster_matches(src_lines, lines, search_width, search_length=0.9, angle_threshold=np.radians(5), func_invalid=None):
 
             for line in src_lines + lines:
                 line.cluster = None
@@ -232,16 +232,38 @@ class PipelineBarrierFinder(PipelineStep):
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
         adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
 
-        def get_sample(line, offsets=[1]):
+        test_contours, _ = cv2.findContours(ceiling, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        def get_sample(line, offsets=[-2]):
             #todo: return better elevation
 
-            data = [line.midpoint[1]]
+            min_distance = None
 
+            for contour in test_contours:
+                dist = cv2.pointPolygonTest(contour, line.midpoint, True)
+
+                if min_distance is None or abs(dist) < abs(min_distance):
+                    min_distance = dist
+
+            data = [line.angle]
+            if min_distance is not None:
+                data.append(abs(min_distance))
+            else:
+                data.append(line.midpoint[1])
+
+            color_data = []
             for i in offsets:
-                colors = LineFunctions.get_line_samples((line.point_a[0], line.point_a[1] + i), (line.point_b[0], line.point_b[1] + i), self.image, int(line.length / 5) + 1)
+                colors = LineFunctions.get_line_samples((line.point_a[0], line.point_a[1] + i), (line.point_b[0], line.point_b[1] + i), self.room.normals, int(line.length / 5) + 1)
                 color = np.mean(colors, axis=0)
-                hsv = convert_color(color, conversion=cv2.COLOR_RGB2HSV_FULL)
-                data.extend(hsv[:1])
+                data.extend(color)
+
+                # hsv = convert_color(color, conversion=cv2.COLOR_RGB2HSV_FULL)
+                # data.extend(hsv[:1])
+
+            # color_data = np.array(color_data)
+            
+            # data.extend(np.mean(color_data, axis=0))
+            # data.extend(np.std(color_data, axis=0))
 
             return data
 
