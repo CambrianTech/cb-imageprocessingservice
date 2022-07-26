@@ -232,16 +232,16 @@ class PipelineBarrierFinder(PipelineStep):
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
         adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
 
-        def get_sample(line, values=[1]):
+        def get_sample(line, offsets=[1]):
             #todo: return better elevation
 
             data = [line.midpoint[1]]
 
-            for i in values:
+            for i in offsets:
                 colors = LineFunctions.get_line_samples((line.point_a[0], line.point_a[1] + i), (line.point_b[0], line.point_b[1] + i), self.image, int(line.length / 5) + 1)
                 color = np.mean(colors, axis=0)
                 hsv = convert_color(color, conversion=cv2.COLOR_RGB2HSV_FULL)
-                data.extend([hsv[0]])
+                data.extend(hsv[:1])
 
             return data
 
@@ -259,7 +259,7 @@ class PipelineBarrierFinder(PipelineStep):
                 for i in range(len(siblings)):
                     samples[i+1] = get_sample(siblings[i])
 
-                print("samples", samples)
+                #print("samples", samples)
 
                 min_distance = 0
                 coeffs = []
@@ -283,7 +283,7 @@ class PipelineBarrierFinder(PipelineStep):
                 index = np.argmax(np.array(coeffs))
                 dist = distances[index]       
                     
-                if dist < 5 and (index==0 or abs(coeffs[0] - coeffs[index]) < 0.05):
+                if False and dist < 5 and (index==0 or abs(coeffs[0] - coeffs[index]) < 0.05):
                     valid_lines.extend(siblings)
                     print("Best is all lines")
                 else:
