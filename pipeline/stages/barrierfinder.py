@@ -221,7 +221,7 @@ class PipelineBarrierFinder(PipelineStep):
 
                 cluster_index += 1
 
-        cluster_matches(horizontal_semantic_lines, horizontal_vp_lines, diagonal/15, func_invalid=horizontal_line_invalid)
+        cluster_matches(horizontal_semantic_lines, horizontal_vp_lines, diagonal / 15, func_invalid=horizontal_line_invalid)
 
         #find intersections of grouped lines, being careful not to corrupt originals (copy)
 
@@ -231,104 +231,6 @@ class PipelineBarrierFinder(PipelineStep):
 
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
         adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
-
-        test_contours, _ = cv2.findContours(ceiling, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        def get_sample(line, offsets=range(-1,0)):
-            #todo: return better elevation
-
-            min_distance = None
-
-            for contour in test_contours:
-                dist = cv2.pointPolygonTest(contour, line.midpoint, True)
-
-                if min_distance is None or abs(dist) < abs(min_distance):
-                    min_distance = dist
-
-            data = [line.angle]
-            if min_distance is not None:
-                data.append(abs(min_distance))
-            else:
-                data.append(line.midpoint[1])
-
-            for image in [self.room.normals, self.image]:
-                color_data = []
-                for i in offsets:
-                    colors = LineFunctions.get_line_samples((line.point_a[0], line.point_a[1] + i), (line.point_b[0], line.point_b[1] + i), image, int(line.length / 5) + 1)
-                    color_data.extend(colors)
-
-                data.extend(np.mean(color_data, axis=0))           
-
-                # hsv = convert_color(color, conversion=cv2.COLOR_RGB2HSV_FULL)
-                # data.extend(hsv[:1])
-
-            # color_data = np.array(color_data)
-            
-            # data.extend(np.mean(color_data, axis=0))
-            # data.extend(np.std(color_data, axis=0))
-
-            return data
-
-        filtered_lines = []
-        for master_line in horizontal_semantic_lines:
-
-            valid_lines = [master_line]
-            siblings = list(filter(lambda line: line.cluster == master_line.cluster and line != master_line, adjacent_horizontal_lines))
-
-            if len(siblings) > 1:
-                master_sample = get_sample(master_line)
-                samples = np.zeros((len(siblings) + 1, len(master_sample)))
-                samples[0] = master_sample
-                
-                for i in range(len(siblings)):
-                    samples[i+1] = get_sample(siblings[i])
-
-                #print("samples", samples)
-
-                min_distance = 0
-                coeffs = []
-                results = []
-                distances = []
-
-                for k in range(2, len(samples)):
-                    kmeans = KMeans(n_clusters=k, random_state=0).fit(samples)
-                    avg_distance = np.sqrt(kmeans.inertia_ / len(samples))
-
-                    labels = kmeans.labels_
-
-                    sil_coeff = silhouette_score(samples, labels, metric='euclidean')
-
-                    print("k=%d" % k, labels, avg_distance, sil_coeff)
-
-                    results.append(labels)
-                    coeffs.append(sil_coeff)
-                    distances.append(avg_distance)
-
-                index = np.argmax(np.array(coeffs))
-                dist = distances[index]       
-                    
-                if dist < 5 and (index==0 or abs(coeffs[0] - coeffs[index]) < 0.05):
-                    valid_lines.extend(siblings)
-                    print("Best is all lines")
-                else:
-                    best_k = index + 2
-                    best_labels = results[index]
-
-                    print("Best k=%d coeff=%.3f" % (best_k, coeffs[index]), best_labels)
-
-                    key_label = best_labels[0]
-
-                    for i in range(1, len(best_labels)):
-                        if best_labels[i] == key_label:
-                            valid_lines.append(siblings[i-1])
-
-            else:
-                valid_lines.extend(siblings)
-
-            
-
-            filtered_lines.extend(valid_lines)
-
 
         cluster_matches(vertical_plane_lines, vertical_lines, diagonal/20, angle_threshold=np.radians(20), func_invalid=vertical_line_invalid)
         vertical_clusters = list(set([line.cluster for line in vertical_plane_lines]))
@@ -348,7 +250,7 @@ class PipelineBarrierFinder(PipelineStep):
 
             #draw_lines(debug, adjacent_vertical_lines, color=(255, 0, 0), thickness=1)
             
-            draw_lines(debug, filtered_lines, color=(0, 255, 255), thickness=1)
+            draw_lines(debug, adjacent_horizontal_lines, color=(0, 255, 255), thickness=1)
 
             #draw_lines(debug, linked_horizontal_lines, color=(50,255,255), thickness=2)
 
