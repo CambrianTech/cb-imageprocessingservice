@@ -232,12 +232,12 @@ class PipelineBarrierFinder(PipelineStep):
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
         adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
 
-        def get_sample(line):
+        def get_sample(line, values=[1]):
             #todo: return better elevation
 
             data = [line.midpoint[1]]
 
-            for i in [0, 1]:
+            for i in values:
                 colors = LineFunctions.get_line_samples((line.point_a[0], line.point_a[1] + i), (line.point_b[0], line.point_b[1] + i), self.image, int(line.length / 5) + 1)
                 color = np.mean(colors, axis=0)
                 hsv = convert_color(color, conversion=cv2.COLOR_RGB2HSV_FULL)
