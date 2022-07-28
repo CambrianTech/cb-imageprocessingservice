@@ -15,9 +15,10 @@ from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.logging import log_image, im_logging_enabled, LogLevel
 from cambrian.LineFunctions import LineFunctions
 
-def gabor(bw, theta, lambd, gamma = 0.0, psi = 0.0):
+def filter_gabor(bw, theta, lambd, sigma=None, gamma = 0.0, psi = 0.0):
     ksize = lambd
-    sigma = ksize * lambd
+    if sigma is None:
+        sigma = ksize * lambd
     result = cv2.filter2D(bw, cv2.CV_8UC1, cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_32F))
     return result
 
@@ -75,6 +76,8 @@ class PipelineLineFinder(PipelineStep):
 
             lines = list()
 
+            min_length = int(min_length)
+
             if use_lsd:
                 min_length_sq = (sx * min_length) ** 2
                 lsd = cv2.createLineSegmentDetector(refine=refine, scale=scale, sigma_scale=sigma_scale, quant=quant, ang_th=ang_th, log_eps=log_eps, density_th=density_th, n_bins=n_bins)
@@ -93,19 +96,25 @@ class PipelineLineFinder(PipelineStep):
         self.height, self.width = bw.shape[:2]
         diagonal = np.hypot(self.width, self.height)
 
-
-        operating_scale = 1500.0 / diagonal
-        if operating_scale < 1.0:
-            bw = cv2.resize(bw, (int(self.width * operating_scale), int(self.height * operating_scale)), cv2.INTER_CUBIC)
-        
-        self.height, self.width = bw.shape[:2]
-        diagonal = np.hypot(self.width, self.height)
-
         min_length = int(diagonal / 50)
         print("min_length:", min_length)
         print("diagonal:", diagonal, self.width, self.height)
 
         lines = list()
+        
+        v_gabor = filter_gabor(bw, theta=0, lambd=7, psi=np.pi, sigma=21)
+        h_gabor = filter_gabor(bw, theta=np.pi/2.0, lambd=7, psi=np.pi, sigma=21)
+        gabor = cv2.addWeighted(v_gabor, 0.5, h_gabor, 0.5, 0)
+        #log_image(data, "gabor_%d" % sigma, gabor)
+
+        gabor_lines = find_lines(gabor, diagonal / 60)
+        gabor_lines = merge_lines(gabor_lines, search_width=max(diagonal/400, 4), angle_threshold=math.radians(3))
+
+        gabor_lines = list(filter(lambda line: line.length > diagonal/30, gabor_lines))
+
+        log_lines(gabor_lines, "gabor_lines")
+            
+        lines.extend(gabor_lines)
 
         #find lines in BW image
         bw_lines_a = find_lines(bw, min_length)
