@@ -97,8 +97,6 @@ class PipelineLineFinder(PipelineStep):
         diagonal = np.hypot(self.width, self.height)
 
         min_length = int(diagonal / 50)
-        print("min_length:", min_length)
-        print("diagonal:", diagonal, self.width, self.height)
 
         lines = list()
         
