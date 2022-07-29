@@ -65,7 +65,7 @@ RUN dpkg -i nvinfer-runtime-trt-repo-ubuntu1804-5.0.2-ga-cuda10.0_1-1_amd64.deb
 RUN curl -L -O https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/libnvinfer5_5.1.2-1+cuda10.0_amd64.deb
 RUN dpkg -i libnvinfer5_5.1.2-1+cuda10.0_amd64.deb
 
-RUN apt-get clean rm -rf /var/lib/apt/lists/*
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # For CUDA profiling, TensorFlow requires CUPTI.
 ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH
