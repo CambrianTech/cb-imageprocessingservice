@@ -384,6 +384,9 @@ class Surface():
         self._normals_accumulated = None
         self._normals_mean = None
 
+        self._lighting_mean_stddev = None
+        self._background_mean_stddev = None
+
         self._surface_mask = None
         self._mask_transform = None
         self._outer_mask = None
