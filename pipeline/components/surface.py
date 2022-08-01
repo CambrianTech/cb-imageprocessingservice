@@ -179,7 +179,8 @@ class Surface():
     @property
     def background_mean_stddev(self) -> tuple:
         if self._background_mean_stddev is None:
-            self._background_mean_stddev = cv2.meanStdDev(self.data["downscaled"], self.mask)
+            image = self.data["downscaled"] if self.mask.shape == self.data["downscaled"].shape else cv2.resize(self.data["downscaled"], self.mask.shape[::-1])
+            self._background_mean_stddev = cv2.meanStdDev(image, mask=self.mask)
 
         return self._background_mean_stddev
 
@@ -194,7 +195,8 @@ class Surface():
     @property
     def lighting_mean_stddev(self) -> tuple:
         if self._lighting_mean_stddev is None:
-            self._lighting_mean_stddev = cv2.meanStdDev(self.data["lighting"], self.mask)
+            image = self.data["downscaled"] if self.mask.shape == self.data["lighting"].shape else cv2.resize(self.data["lighting"], self.mask.shape[::-1])
+            self._lighting_mean_stddev = cv2.meanStdDev(image, mask=self.mask)
 
         return self._lighting_mean_stddev
 

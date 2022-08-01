@@ -40,7 +40,7 @@ class PipelineOutput(PipelineStep):
     def run(self, data):
         self.unique_id = data["unique_id"]
 
-        data["version"] = self.config.api_level
+        data["version"] = self.config.api_version_string
         data["data_url"] = self.make_url(self.outfile_name)
 
         filename = "background.jpg"
@@ -116,7 +116,7 @@ class PipelineOutput(PipelineStep):
     def make_data_dict(self, data, image_url, lighting_url, index_mask_url):
 
         return {
-            "version": "%d.0" % self.config.api_level,
+            "version": self.config.api_version_string,
             "name": "Room %s" % self.unique_id,
             "id": self.unique_id,
             "floorRotation": -data["floor_rotation"] if self.y_up else data["floor_rotation"],

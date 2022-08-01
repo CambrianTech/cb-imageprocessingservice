@@ -11,6 +11,8 @@ class PipelineMode(IntEnum):
 class PipelineConfig(SimpleNamespace):
     mode:PipelineMode = PipelineMode.Serve
     api_level=4
+    minor_version_string = "0.1"
+    api_version_string = "%d.%s" % (api_level, minor_version_string)
     use_gpu=True
     batch_max_wait_time=1.0
     batch_debounce_time=0.2
