@@ -55,14 +55,19 @@ class SurfaceRefinement():
         log_markers(self.data, "room_markers_final", markers, primary=True, num_labels=len(self.room.surfaces))
 
         color = 1
+        total_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+
         for surface in self.room.surfaces:
             mask = np.zeros_like(surface.hires_mask)
             mask[markers == color] = 1
+            mask[total_mask > 0] = 0
 
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            mask = cv2.dilate(mask, kernel)
+            mask = cv2.erode(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
+            mask = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=2)
 
             surface.hires_mask = mask
+            total_mask[surface.hires_mask > 0] = 1
+
             color += 1
 
         log_image(self.data, "room_final", self.room.get_debug_image(hires=True))            
