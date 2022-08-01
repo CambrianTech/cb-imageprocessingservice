@@ -1,10 +1,11 @@
 from .input import PipelineInput
 
 import os
+
 try:
-    from imageio import imread
+    from imageio import imread, imwrite
 except:
-    from scipy.misc import imread
+    from scipy.misc import imread, imwrite
 
 import pickle
 from pathlib import Path
@@ -24,6 +25,9 @@ class PipelineFileInput(PipelineInput):
                 #todo: maybe there's a deep copy that works instead? 
                 for key in loaded:
                     data[key] = loaded[key]
+
+            imwrite(os.path.join(self.pipeline.config.dest_path, "%s.jpg" % data["unique_id"]), data["image"])
+
         else:
             print("Reading image", data["path"])
             data["image"] = imread(data["path"])
