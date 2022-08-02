@@ -65,7 +65,7 @@ class PipelineBarrierFinder(PipelineStep):
 
     def run(self, data):
 
-        print("Joel version 1.0.0")
+        print("Joel version 1.0.3")
 
         self.data = data
         self.image = self.data["downscaled"]
@@ -114,7 +114,6 @@ class PipelineBarrierFinder(PipelineStep):
 
         invalid_vert_areas = adjust_mask(cv2.dilate, invalid_vert_areas, size=5, scale=0.5)
 
-
         index_mask = np.dstack(tuple(probs))
         index_mask = np.int32(np.argmax(index_mask, -1))
 
@@ -161,8 +160,6 @@ class PipelineBarrierFinder(PipelineStep):
 
                     if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.image.shape[1], self.image.shape[0], min_distance=diagonal/50):
                         vertical_plane_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1], group=plane_index))
-
-
 
         vertical_plane_lines = list(get_inliers(vertical_plane_lines, self.data["vertical_vp"].model, np.radians(15)))
         vertical_plane_lines = merge_lines(vertical_plane_lines, search_width=max(diagonal/50, 3), search_length=1.5, angle_threshold=np.radians(20))
@@ -245,6 +242,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         adjacent_vertical_lines = list(filter(lambda line: line.cluster in vertical_clusters, vertical_lines))
 
+
         samples = []
         for intersection in intersections:
             if intersection.term_a:
@@ -253,14 +251,17 @@ class PipelineBarrierFinder(PipelineStep):
             if intersection.term_b:
                 samples.append(intersection.term_b.point)
 
-        samples = np.unique(np.array(samples), axis=0)
-        
+
+        if len(samples) > 0:
+            samples = np.unique(np.array(samples), axis=0)
 
         results = []
 
         for k in range(2, len(samples)):
+
             kmeans = KMeans(n_clusters=k, random_state=0).fit(samples)
             avg_distance = np.sqrt(kmeans.inertia_ / len(samples))
+
 
             labels = kmeans.labels_
             centers = kmeans.cluster_centers_
@@ -270,6 +271,7 @@ class PipelineBarrierFinder(PipelineStep):
             print("k=%d" % k, labels, avg_distance, sil_coeff)
 
             results.append((sil_coeff, avg_distance, labels, centers))
+
 
         if len(results) > 1:
             index = np.argmax(np.array(results)[:,0])

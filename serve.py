@@ -9,6 +9,7 @@ import dateutil
 from time import time
 import typing
 import functools
+import traceback
 
 import click
 from aiohttp import web
@@ -163,6 +164,8 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
                         data = None
                     except Exception as e:
                         print("Error processing SQS message:", e, msg.body)
+                        traceback.print_exc()
+                        
         print("Starting SQS loop")
         asyncio.ensure_future(sqs_loop())
         
