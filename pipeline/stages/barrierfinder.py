@@ -65,6 +65,8 @@ class PipelineBarrierFinder(PipelineStep):
 
     def run(self, data):
 
+        print("Joel version 1.0.0")
+
         self.data = data
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
@@ -141,8 +143,10 @@ class PipelineBarrierFinder(PipelineStep):
 
             new_plane_lines = []
             for contour in contours:
-                shape = contour.shape
-                contour = (contour.flatten() - 1).reshape(shape)
+
+                if len(contour) == 0:
+                    #this may never occur, but there was a crash
+                    continue
 
                 epsilon = 5
                 polygon = cv2.approxPolyDP(contour, epsilon, True)

@@ -10,4 +10,4 @@ aws s3 cp s3://$FILES_BUCKET . --recursive
 export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 
 echo "Starting python serve script"
-python3 serve.py ./tensorflow_models/ ./gluon_models/ ./sklearn_models/fov_classifier_lc128.joblib ./hed_model/HED_pretrained_bsds.npz $USER_UPLOADS_BUCKET $RESULTS_BUCKET $PLANES_ADDRESS --sqs-queue-name $SQS_QUEUE_NAME
+python3 serve.py ./tensorflow_models/ ./gluon_models/ ./sklearn_models/fov_classifier_lc128.joblib ./hed_model/HED_pretrained_bsds.npz $USER_UPLOADS_BUCKET $RESULTS_BUCKET $PLANES_ADDRESS --sqs-queue-name $SQS_QUEUE_NAME --export=5
