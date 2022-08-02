@@ -73,6 +73,7 @@ default_config = PipelineConfig()
 @click.option('--log_level', type=int, default=LogLevel.Default, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=default_config.logging_step, help='Log only a single step in the pipeline')
 @click.option('--iterations', type=int, default=1, help='How many times to run, for memory debugging')
+
 def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path, hed_model_path, planes_url, \
          api, restore, export, stop, log_dir, log_level, log_step, iterations):
 

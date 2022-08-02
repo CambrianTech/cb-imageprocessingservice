@@ -61,11 +61,13 @@ default_config = PipelineConfig()
 @click.option("--results-local-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--sqs-queue-name", type=click.STRING, default=None)
 @click.option('--api', type=int, default=default_config.api_level, help='api level: 1-4')
+@click.option('--export', type=int, default=None, help='Pipeline step to export')
 @click.option("--log_dir", type=click.Path(exists=False, file_okay=False, dir_okay=True), default=None)
 @click.option('--log_level', type=int, default=default_config.logging_level, help='corresponds to LogLevel inside pipeline/logging, a binary mask: models | segmentation | images, default All')
 @click.option('--log_step', type=int, default=default_config.logging_step, help='Log only a single step in the pipeline')
+
 def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_uploads_bucket, results_bucket, planes_url, 
-        image_local_dir, results_local_dir, sqs_queue_name, api, log_dir, log_level, log_step):
+        image_local_dir, results_local_dir, sqs_queue_name, api, export, log_dir, log_level, log_step):
 
     if results_local_dir is None:
         print("Trying to get instance metadata")
@@ -99,6 +101,8 @@ def main(model_path, semantic_model_path, fov_model_path, hed_model_path, user_u
     config.sqs_queue_name = sqs_queue_name
 
     config.api_level = api
+
+    config.export_step = None if export is None else PipelineStepIndex(export)
     config.logging_dir = log_dir
     config.logging_level = log_level
     config.logging_step = None if log_step is None else PipelineStepIndex(log_step)
