@@ -4,6 +4,7 @@ from enum import IntEnum
 from termcolor import colored
 import asyncio
 import typing
+import pickle
 
 from .config import PipelineMode, PipelineConfig
 from .core import PipelineStep, PipelineStepIndex
@@ -72,7 +73,7 @@ class Pipeline():
         self.start_step = PipelineStepIndex(self.config.restore_step if self.config.restore_step is not None else PipelineStepIndex.Input + 1)
 
         if self.config.stop_step is None:
-            self.stop_step = PipelineStepIndex(self.config.export_step if self.config.export_step is not None else PipelineStepIndex.Output)
+            self.stop_step = PipelineStepIndex(PipelineStepIndex.Output)
         else:
             self.stop_step = PipelineStepIndex(self.config.stop_step)
 
@@ -168,6 +169,20 @@ class Pipeline():
         print("Appending step %s" % step.description)
         self.steps.append(step)
 
+    async def export_data(self, data, filename="data.pickle"):
+
+        pickle_bytes = pickle.dumps(data)
+        relative_path = os.path.join(data["unique_id"], filename)
+
+        print("Pickling data to %s" % relative_path)
+
+        if self.config.mode == PipelineMode.Serve:
+            self.s3_client.upload_bytes_to_s3(pickle_bytes, self.config.dest_path, relative_path)
+        else:
+            with open(os.path.join(self.config.dest_path, relative_path), 'wb') as f: 
+                f.write(pickle_bytes)
+
+
     async def process(self, data, step_callback=None):
 
         if (len(self.steps) == 0): return
@@ -201,8 +216,8 @@ class Pipeline():
             print("%s took %.2f seconds" % (step.description, time.time() - step_start))
             print(colored("Current memory at %.2f MB" % get_memory_usage_mb(), attrs=['bold']))
 
-            if step.index == self.config.export_step and logging_dir is not None:
-                log_data(data)
+            if step.index == self.config.export_step:
+                await self.export_data(data)
 
         print(colored("All stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
 
