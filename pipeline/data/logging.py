@@ -1,3 +1,4 @@
+from html.entities import name2codepoint
 import cv2
 import os.path
 import numpy as np
@@ -124,6 +125,12 @@ def get_logging_level(data:dict):
 def set_logging_level(data:dict, level:int):
     data["logging_level"] = level
 
+def get_logging_index(data:dict):
+    return data["logging_index"] if "logging_index" in data else 0
+
+def set_logging_index(data:dict, index:int):
+    data["logging_index"] = index
+
 def log_data(data:dict):
     data_filename = os.path.join(get_logging_dir(data), 'data.pickle')
     print("Saving data pickle to " + data_filename)
@@ -144,14 +151,26 @@ def log_image(data:dict, name:str, image, extension=".jpg", primary=False):
 
 def _log_image(data:dict, name:str, image, extension=".jpg", quality=95):
     parts = os.path.splitext(name)
+    step = str(data["step"])  if "step" in data else "None.None"
+    pipeline_step = os.path.splitext(step)[1][1:]
+
+    logging_index = get_logging_index(data)
+
+    print("logging_index: " + str(logging_index))
+
     if len(parts)==2 and len(parts[1]) > 2:
         name = parts[0]
         extension = parts[1]
+    
+    name = str(logging_index) + ' - ' + pipeline_step + ' - ' + name
+
     path = make_log_path(data, name, extension)
     #print("Save image %s" % path)
     success = cv2.imwrite(path, cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB) if len(image.shape) == 3 else image.astype(np.uint8), [int(cv2.IMWRITE_JPEG_QUALITY), quality])
     if not success:
         print("Could not save image", path)
+    else:
+        set_logging_index(data, logging_index + 1)
 
 def draw_legend(data:dict, debug:np.ndarray, legend:tuple):
     #draw legend
