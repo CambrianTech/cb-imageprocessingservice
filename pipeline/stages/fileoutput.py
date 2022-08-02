@@ -11,12 +11,16 @@ class PipelineFileOutput(PipelineOutput):
         if len(path.parents) > 0:
             path.parents[0].mkdir(parents=True, exist_ok=True)
 
-        if len(image.shape) == 3:
-            cv2.imwrite(str(path), cv2.cvtColor(image, cv2.COLOR_RGB2BGR), [int(cv2.IMWRITE_JPEG_QUALITY), quality])
-        elif len(image.shape) == 4:
-            cv2.imwrite(str(path), cv2.cvtColor(image, cv2.COLOR_RGBA2BGRA), [int(cv2.IMWRITE_JPEG_QUALITY), quality])
-        else:
-            cv2.imwrite(str(path), image, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
+        print("Writing image %s with shape" % filename, image.shape)
+
+        if len(image.shape) == 2:
+            _image = image
+        elif image.shape[2] == 3:
+            _image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        elif image.shape[2] == 4:
+            _image = cv2.cvtColor(image, cv2.COLOR_RGBA2BGRA)
+            
+        cv2.imwrite(str(path), _image, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
 
     def save_file(self, data, filename, url):
         path = Path(os.path.join(self.config.dest_path, self.unique_id, url))

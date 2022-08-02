@@ -53,7 +53,6 @@ class SurfaceRefinement():
         log_markers(self.data, "room_markers_final", markers, primary=True, num_labels=len(self.room.surfaces))
 
         index_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
-        alpha = np.ones(self.image.shape[:2], dtype=np.uint8)
         num_surfaces = len(self.room.surfaces)
 
         #there's an issue with the shaders causing too close indices to mix up and creating artifacts
@@ -70,19 +69,33 @@ class SurfaceRefinement():
             surface.hires_mask = mask
 
             surface.index = indices[i]
-
             index_mask[surface.hires_mask > 0] = surface.index
 
             log_mask(self.data, "surface_%d" % surface.index, mask, background=self.image)
 
 
-        #index_mask = cv2.dilate(index_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=2)
+        #fill all gaps
+        index_mask = np.uint8(watershed(watershed_image, index_mask))
 
-        index_mask = np.int32(watershed(watershed_image, index_mask))
+        # #USE the alpha if you need transparency (below)
 
+        # alpha = np.ones(self.image.shape[:2], dtype=np.uint8) * 255
+        # for surface in self.room.surfaces:
+
+        #     mask = np.zeros_like(surface.hires_mask)
+        #     mask[index_mask == surface.index] = 1
+
+        #     contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        #     cv2.drawContours(alpha, contours, -1, 220, 1, cv2.LINE_AA)
+
+        # alpha = cv2.GaussianBlur(alpha,(13,13),0)
+
+        # #integrate alpha value, convert to RGBA
         # index_mask = cv2.cvtColor(index_mask, cv2.COLOR_GRAY2RGB)
         # alpha = np.reshape(alpha, (*alpha.shape,1))
         # index_mask = np.concatenate([index_mask, alpha], axis=2)
+
+        print("index shape", index_mask.shape)
 
         self.data["index_mask"] = index_mask
 
