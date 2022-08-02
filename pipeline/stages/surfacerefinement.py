@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import ndimage
 import cv2
+import random
 
 from skimage.morphology import skeletonize, remove_small_objects
 from skimage.segmentation import join_segmentations, watershed
@@ -55,21 +56,35 @@ class SurfaceRefinement():
         log_markers(self.data, "room_markers_final", markers, primary=True, num_labels=len(self.room.surfaces))
 
         index_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+        alpha = np.ones(self.image.shape[:2], dtype=np.uint8)
         num_surfaces = len(self.room.surfaces)
 
-        for color, surface in enumerate(self.room.surfaces, start=1):
+        #there's an issue with the shaders causing too close indices to mix up and creating artifacts
+        #so giving spaced out indices randomly is a temporary solution
+        indices = random.sample(range(1, 255), num_surfaces)
 
+        for i, surface in enumerate(self.room.surfaces):
+
+            color = i + 1
             mask = np.zeros_like(surface.hires_mask)
             mask[markers == color] = 1
             mask[index_mask > 0] = 0
 
-            mask = cv2.erode(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
-            mask = cv2.erode(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=5)
+            #mask = cv2.erode(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
+            mask = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
 
             surface.hires_mask = mask
-            index_mask[surface.hires_mask > 0] = color
 
-            log_mask(self.data, "surface_%d" % color, mask, background=self.image)
+            surface.index = indices[i]
+
+            index_mask[surface.hires_mask > 0] = surface.index
+
+            log_mask(self.data, "surface_%d" % surface.index, mask, background=self.image)
+
+
+        # index_mask = cv2.cvtColor(index_mask, cv2.COLOR_GRAY2RGB)
+        # alpha = np.reshape(alpha, (*alpha.shape,1))
+        # index_mask = np.concatenate([index_mask, alpha], axis=2)
 
         self.data["index_mask"] = index_mask
 

@@ -86,7 +86,7 @@ class PipelineOutput(PipelineStep):
     def save_data(self, data, filename, url):
         return
 
-    def encode_plane_surface(self, plane_index, surface):
+    def encode_plane_surface(self, surface):
         # https://github.com/NVlabs/planercnn#plane-representation
         # In this project, plane parameters are of absolute scale (in terms of meters).
         # Each plane has three parameters, which equal to plane_normal * plane_offset.
@@ -103,7 +103,7 @@ class PipelineOutput(PipelineStep):
             "id": str(surface.uniqueId),
             "type": surface.surfaceType.name,
             "name": surface.name,
-            "maskIndex": plane_index + 1,
+            "maskIndex": surface.index,
             "normal": plane_normal,
             "offset": plane_offset,
             "axisRotation": -surface.axisRotation if self.y_up else surface.axisRotation,
@@ -133,7 +133,7 @@ class PipelineOutput(PipelineStep):
             "geometry": {
                 "verticalAxis": "y" if self.y_up else "z",
                 "surfaces": [
-                    self.encode_plane_surface(i, surface) for i, (surface) in enumerate(data["room"].surfaces)
+                    self.encode_plane_surface(surface) for surface in data["room"].surfaces
                 ]
             },
             "assets": []
