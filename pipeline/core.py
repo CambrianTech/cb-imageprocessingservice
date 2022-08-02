@@ -31,7 +31,6 @@ class PipelineStepIndex(IntEnum):
     EstimatePose = auto()
     Refine = auto()
     Superpixels = auto()
-    CombinePlaneMasks = auto()
     Output = auto()
 
 class PipelineStep(metaclass=ABCMeta):

@@ -21,7 +21,6 @@ from .stages.edgedetector import PipelineEdgeDetector
 from .stages.superpixels import PipelineSuperpixels
 from .stages.planegeometry import PipelinePlaneGeometry
 from .stages.linefinder import PipelineLineFinder
-from .stages.combineplanemasks import PipelineCombinePlaneMasks
 from .stages.planedetector import PipelinePlaneDetector
 from .stages.reverserenderer import PipelineReverseRenderer
 from .stages.poseestimator import PipelinePoseEstimator
@@ -112,7 +111,6 @@ class Pipeline():
         all_steps[PipelineStepIndex.EstimatePose] = PipelinePoseEstimator
         all_steps[PipelineStepIndex.Refine] = PipelineSurfaceRefinement
         all_steps[PipelineStepIndex.Superpixels] = None
-        all_steps[PipelineStepIndex.CombinePlaneMasks] = PipelineCombinePlaneMasks
         all_steps[PipelineStepIndex.Output] = output_step
         
 

@@ -14,7 +14,7 @@ from pipeline.data.surface_type import SurfaceType
 from pipeline.components.line import Line, draw_lines
 from .planegeometry import Dimension
 from pipeline.misc.utils import random_color
-from pipeline.data.logging import log_segmentation_image, im_logging_enabled, log_image, LogLevel, log_markers, Timer
+from pipeline.data.logging import log_segmentation_image, im_logging_enabled, log_image, LogLevel, log_markers, log_mask
 
 
 class SurfaceRefinement():
@@ -54,21 +54,24 @@ class SurfaceRefinement():
 
         log_markers(self.data, "room_markers_final", markers, primary=True, num_labels=len(self.room.surfaces))
 
-        color = 1
-        total_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+        index_mask = np.zeros(self.image.shape[:2], dtype=np.uint8)
+        num_surfaces = len(self.room.surfaces)
 
-        for surface in self.room.surfaces:
+        for color, surface in enumerate(self.room.surfaces, start=1):
+
             mask = np.zeros_like(surface.hires_mask)
             mask[markers == color] = 1
-            mask[total_mask > 0] = 0
+            mask[index_mask > 0] = 0
 
             mask = cv2.erode(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
-            mask = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=2)
+            mask = cv2.erode(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=5)
 
             surface.hires_mask = mask
-            total_mask[surface.hires_mask > 0] = 1
+            index_mask[surface.hires_mask > 0] = color
 
-            color += 1
+            log_mask(self.data, "surface_%d" % color, mask, background=self.image)
+
+        self.data["index_mask"] = index_mask
 
         log_image(self.data, "room_final", self.room.get_debug_image(hires=True))            
         
