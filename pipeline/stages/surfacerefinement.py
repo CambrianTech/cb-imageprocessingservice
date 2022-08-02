@@ -3,10 +3,7 @@ from scipy import ndimage
 import cv2
 import random
 
-from skimage.morphology import skeletonize, remove_small_objects
-from skimage.segmentation import join_segmentations, watershed
-from skimage.morphology import disk
-from skimage.filters import rank
+from skimage.segmentation import watershed
 
 import cambrian.image_processing as ip
 
@@ -70,9 +67,6 @@ class SurfaceRefinement():
             mask[markers == color] = 1
             mask[index_mask > 0] = 0
 
-            #mask = cv2.erode(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
-            mask = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
-
             surface.hires_mask = mask
 
             surface.index = indices[i]
@@ -81,6 +75,10 @@ class SurfaceRefinement():
 
             log_mask(self.data, "surface_%d" % surface.index, mask, background=self.image)
 
+
+        #index_mask = cv2.dilate(index_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=2)
+
+        index_mask = np.int32(watershed(watershed_image, index_mask))
 
         # index_mask = cv2.cvtColor(index_mask, cv2.COLOR_GRAY2RGB)
         # alpha = np.reshape(alpha, (*alpha.shape,1))
