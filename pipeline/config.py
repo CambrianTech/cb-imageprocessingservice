@@ -3,6 +3,8 @@ import typing
 from enum import IntEnum
 from types import SimpleNamespace
 
+BUILD_NUMBER = 1000
+
 class PipelineMode(IntEnum):
     Serve = 0
     Process = 1
@@ -12,7 +14,10 @@ class PipelineConfig(SimpleNamespace):
     mode:PipelineMode = PipelineMode.Serve
     api_level=4
     minor_version_string = "0.2"
+
     api_version_string = "%d.%s" % (api_level, minor_version_string)
+    api_long_version_string = "%s.%d" % (api_version_string, BUILD_NUMBER)
+
     use_gpu=True
     batch_max_wait_time=1.0
     batch_debounce_time=0.2

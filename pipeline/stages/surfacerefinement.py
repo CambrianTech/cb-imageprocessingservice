@@ -100,12 +100,23 @@ class SurfaceRefinement():
         self.data["index_mask"] = index_mask
         log_image(self.data, "room_final", self.room.get_debug_image(hires=True)) 
 
+        bw = cv2.cvtColor(self.data["downscaled"], cv2.COLOR_RGB2GRAY)
+        bw = cv2.bilateralFilter(bw, d=15, sigmaColor=15, sigmaSpace=20)
+
+        walls_mask = np.zeros_like(bw)
+        walls_mask[self.data["isolated_labels"] == SurfaceType.Wall] = 1
+        if cv2.countNonZero(walls_mask) < 500:
+            walls_mask = None
 
         lighting = self.data["lighting"].astype(np.uint8)
+        lighting = cv2.resize(lighting, (bw.shape[1], bw.shape[0]))
+
         log_image(self.data, 'lighting', lighting)
 
-        def scale_lighting(img, scale=1.0, mid=127.0, gamma=10.0):
-            img = (img.astype(float) - mid) * scale + mid + gamma
+        def scale_lighting(img, scale=1.0, center=127.0, gamma=10.0):
+
+            img = (img.astype(float) - center) * scale + center + gamma
+
             img[img > 255.0] = 255.0
             img[img < 0.0] = 0.0
             return img.astype(np.uint8)
@@ -115,13 +126,16 @@ class SurfaceRefinement():
         # smoothed = cv2.pyrMeanShiftFiltering(scale_lighting(lighting), 5, 5)
         # lighting = cv2.addWeighted(smoothed, smooth_opacity, scale_lighting(lighting), 1 - smooth_opacity, gamma)
 
-        lighting = scale_lighting(cv2.cvtColor(lighting, cv2.COLOR_RGB2GRAY), scale=1.1, gamma=40.0)
+        mean, std = cv2.meanStdDev(lighting, mask=walls_mask)
+        max_scale = max(20.0 / (1 + std[0]), 0.5)
+        scale = min(max_scale, 1.1)
+        center = 127.0 * scale / 1.1
+
+        #print("std", std[0])
+        lighting = scale_lighting(cv2.cvtColor(lighting, cv2.COLOR_RGB2GRAY), scale=scale, center=center, gamma=40.0)
         lighting = cv2.bilateralFilter(lighting, d=15, sigmaColor=30, sigmaSpace=30)
+        
 
-        bw = cv2.cvtColor(self.data["downscaled"], cv2.COLOR_RGB2GRAY)
-        bw = cv2.bilateralFilter(bw, d=15, sigmaColor=15, sigmaSpace=20)
-
-        lighting = cv2.resize(lighting, (bw.shape[1], bw.shape[0]))
         log_image(self.data, 'lighting_smooth', lighting)
 
         opacity = 0.8

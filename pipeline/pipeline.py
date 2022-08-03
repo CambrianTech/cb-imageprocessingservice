@@ -119,6 +119,7 @@ class Pipeline():
         #all_steps[PipelineStepIndex.EstimatePose] = None
         #all_steps[PipelineStepIndex.Geometry] = None
         
+        print("Pipeline version %s" % self.config.api_long_version_string)
         print("Initializing steps %d through %d" % (self.start_step, self.stop_step))
 
         self.steps = []

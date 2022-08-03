@@ -65,8 +65,6 @@ class PipelineBarrierFinder(PipelineStep):
 
     def run(self, data):
 
-        print("Joel version 1.0.3")
-
         self.data = data
         self.image = self.data["downscaled"]
         self.room = self.data["room"]
