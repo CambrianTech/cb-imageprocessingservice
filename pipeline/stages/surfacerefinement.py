@@ -108,8 +108,15 @@ class SurfaceRefinement():
         if cv2.countNonZero(walls_mask) < 500:
             walls_mask = None
 
+        floor_mask = np.zeros_like(bw)
+        floor_mask[self.data["isolated_labels"] == SurfaceType.Floor] = 1
+        floor_mask[self.data["isolated_labels"] == SurfaceType.OnFloor] = 1
+        if cv2.countNonZero(floor_mask) < 500:
+            floor_mask = None
+
         lighting = self.data["lighting"].astype(np.uint8)
         lighting = cv2.resize(lighting, (bw.shape[1], bw.shape[0]))
+        lighting = cv2.cvtColor(lighting, cv2.COLOR_RGB2GRAY)
 
         log_image(self.data, 'lighting', lighting)
 
@@ -132,9 +139,9 @@ class SurfaceRefinement():
         center = 127.0 * scale / 1.1
 
         #print("std", std[0])
-        lighting = scale_lighting(cv2.cvtColor(lighting, cv2.COLOR_RGB2GRAY), scale=scale, center=center, gamma=40.0)
+        lighting = scale_lighting(lighting, scale=scale, center=center, gamma=40.0)
         lighting = cv2.bilateralFilter(lighting, d=15, sigmaColor=30, sigmaSpace=30)
-        
+        lighting_smoothed = lighting.copy()
 
         log_image(self.data, 'lighting_smooth', lighting)
 
@@ -148,6 +155,13 @@ class SurfaceRefinement():
 
         #merge lighting with background
         lighting = cv2.addWeighted(lighting.astype(np.uint8), opacity, bw, 1.0 - opacity, gamma)
+
+        if floor_mask is not None:
+            _msk = floor_mask > 0
+            lighting[_msk] = lighting_smoothed[_msk]
+            floor_lighting = lighting.copy()
+            floor_lighting = scale_lighting(floor_lighting, scale=scale, center=center, gamma=80.0)
+            lighting[_msk] = floor_lighting[_msk]
         
         self.data["lighting"] = lighting
 
