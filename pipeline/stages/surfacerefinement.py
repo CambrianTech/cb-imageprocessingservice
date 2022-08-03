@@ -141,18 +141,20 @@ class SurfaceRefinement():
         center = 127.0 * lighting_scale
 
         #print("std", std[0])
-        lighting = scale_lighting(lighting, scale=lighting_scale, center=center, gamma=80.0)
+        lighting = scale_lighting(lighting, scale=lighting_scale, center=center, gamma=100.0)
         lighting = cv2.bilateralFilter(lighting, d=15, sigmaColor=30, sigmaSpace=30)
         lighting_smoothed = lighting.copy()
 
         log_image(self.data, 'lighting_smooth', lighting)
 
         opacity = 0.8
-        hed_weight = 0.2
+        hed_weight = 0.15
         gamma = 0.0
         hed = cv2.resize(self.data["hed"], (bw.shape[1], bw.shape[0])).astype(float)
-        hed = cv2.normalize(hed, None, alpha=0, beta=hed_weight * 255.0, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-        lighting = lighting - hed
+        hed = cv2.normalize(hed, None, alpha=0, beta=1.0, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        #hed[bw > 200] = 0 #don't unlighten
+        hed = cv2.medianBlur(hed, 5)
+        lighting = lighting - hed * hed_weight * 255.0
 
         lighting[lighting < 0] = 0
 
