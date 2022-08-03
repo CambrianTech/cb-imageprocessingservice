@@ -150,8 +150,10 @@ class SurfaceRefinement():
         opacity = 0.8
         hed_weight = 0.2
         gamma = 0.0
-        hed = (cv2.resize(self.data["hed"], (bw.shape[1], bw.shape[0])) * hed_weight).astype(np.uint8)
+        hed = cv2.resize(self.data["hed"], (bw.shape[1], bw.shape[0])).astype(float)
+        hed = cv2.normalize(hed, None, alpha=0, beta=hed_weight * 255.0, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
         lighting = lighting - hed
+
         lighting[lighting < 0] = 0
 
         #merge lighting with background
