@@ -124,15 +124,16 @@ class SurfaceRefinement():
         lighting = cv2.resize(lighting, (bw.shape[1], bw.shape[0]))
         log_image(self.data, 'lighting_smooth', lighting)
 
-        hed = (cv2.resize(self.data["hed"], (bw.shape[1], bw.shape[0])) * 0.2).astype(np.uint8)
+        opacity = 0.8
+        gamma = 30.0
+        hed_weight = 0.1
 
+        hed = (cv2.resize(self.data["hed"], (bw.shape[1], bw.shape[0])) * hed_weight).astype(np.uint8)
         lighting = lighting - hed
         lighting[lighting < 0] = 0
 
-        opacity = 0.7
-        gamma = 30.0
+        #merge lighting with background
         lighting = cv2.addWeighted(lighting.astype(np.uint8), opacity, bw, 1.0 - opacity, gamma)
-        lighting = cv2.bilateralFilter(lighting, d=15, sigmaColor=15, sigmaSpace=20)
         
         self.data["lighting"] = lighting
 
