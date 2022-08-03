@@ -98,8 +98,45 @@ class SurfaceRefinement():
         print("index shape", index_mask.shape)
 
         self.data["index_mask"] = index_mask
+        log_image(self.data, "room_final", self.room.get_debug_image(hires=True)) 
 
-        log_image(self.data, "room_final", self.room.get_debug_image(hires=True))            
+
+        lighting = self.data["lighting"].astype(np.uint8)
+        log_image(self.data, 'lighting', lighting)
+
+        def scale_lighting(img, scale=1.0, mid=127.0, gamma=10.0):
+            img = (img.astype(float) - mid) * scale + mid + gamma
+            img[img > 255.0] = 255.0
+            img[img < 0.0] = 0.0
+            return img.astype(np.uint8)
+        
+        # smooth_opacity = 0.3
+        # gamma = 60
+        # smoothed = cv2.pyrMeanShiftFiltering(scale_lighting(lighting), 5, 5)
+        # lighting = cv2.addWeighted(smoothed, smooth_opacity, scale_lighting(lighting), 1 - smooth_opacity, gamma)
+
+        lighting = scale_lighting(cv2.cvtColor(lighting, cv2.COLOR_RGB2GRAY), scale=1.1, gamma=40.0)
+        lighting = cv2.bilateralFilter(lighting, d=15, sigmaColor=30, sigmaSpace=30)
+
+        bw = cv2.cvtColor(self.data["downscaled"], cv2.COLOR_RGB2GRAY)
+        bw = cv2.bilateralFilter(bw, d=15, sigmaColor=15, sigmaSpace=20)
+
+        lighting = cv2.resize(lighting, (bw.shape[1], bw.shape[0]))
+        log_image(self.data, 'lighting_smooth', lighting)
+
+        hed = (cv2.resize(self.data["hed"], (bw.shape[1], bw.shape[0])) * 0.2).astype(np.uint8)
+
+        lighting = lighting - hed
+        lighting[lighting < 0] = 0
+
+        opacity = 0.7
+        gamma = 30.0
+        lighting = cv2.addWeighted(lighting.astype(np.uint8), opacity, bw, 1.0 - opacity, gamma)
+        lighting = cv2.bilateralFilter(lighting, d=15, sigmaColor=15, sigmaSpace=20)
+        
+        self.data["lighting"] = lighting
+
+        log_image(self.data, 'lighting_final', self.data["lighting"])
         
         
 class PipelineSurfaceRefinement(PipelineStep):
