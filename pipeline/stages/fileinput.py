@@ -21,7 +21,7 @@ class PipelineFileInput(PipelineInput):
         if path.suffix == ".pickle":
             print("Reading data from", colored(path, 'cyan', attrs=['bold']))
             with open(path, 'rb') as handle:
-                data = pickle.load(handle)
+                loaded = pickle.load(handle)
                 #todo: maybe there's a deep copy that works instead? 
                 for key in loaded:
                     if key == "unique_id" and "unique_id" in data:
