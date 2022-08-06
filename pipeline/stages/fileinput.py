@@ -21,9 +21,11 @@ class PipelineFileInput(PipelineInput):
         if path.suffix == ".pickle":
             print("Reading data from", colored(path, 'cyan', attrs=['bold']))
             with open(path, 'rb') as handle:
-                loaded = pickle.load(handle)
+                data = pickle.load(handle)
                 #todo: maybe there's a deep copy that works instead? 
                 for key in loaded:
+                    if key == "unique_id" and "unique_id" in data:
+                        continue
                     data[key] = loaded[key]
 
             imwrite(os.path.join(self.pipeline.config.dest_path, "%s.jpg" % data["unique_id"]), data["image"])
