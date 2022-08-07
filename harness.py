@@ -96,6 +96,9 @@ def main(input_dir, output_dir, model_path, semantic_model_path, fov_model_path,
 
     if len(files) == 0:
         raise Exception('No files found at path {}'.format(input_dir)) 
+
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
     
     config = PipelineConfig()
     config.mode = PipelineMode.Restore if restore is not None else PipelineMode.Process
