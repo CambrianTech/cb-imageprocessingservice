@@ -98,7 +98,10 @@ class Room():
 
     def invalidate(self):
         self._probs = None
-        self._index_mask = None        
+        self._index_mask = None  
+
+    def recalculate_lighting(self):
+        [surface.recalculate_lighting() for surface in self.surfaces]      
 
     def refresh_surfaces(self):
         num_before = len(self._surfaces)

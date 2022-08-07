@@ -175,6 +175,8 @@ class SurfaceRefinement():
         
         self.data["lighting"] = lighting
 
+        self.data["room"].recalculate_lighting()
+
         log_image(self.data, 'lighting_final', self.data["lighting"])
         
         

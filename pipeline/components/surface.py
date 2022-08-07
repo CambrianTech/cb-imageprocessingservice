@@ -195,7 +195,7 @@ class Surface():
     @property
     def lighting_mean_stddev(self) -> tuple:
         if self._lighting_mean_stddev is None:
-            image = self.data["downscaled"] if self.mask.shape == self.data["lighting"].shape else cv2.resize(self.data["lighting"], self.mask.shape[::-1])
+            image = self.data["lighting"] if self.mask.shape == self.data["lighting"].shape else cv2.resize(self.data["lighting"], self.mask.shape[::-1])
             self._lighting_mean_stddev = cv2.meanStdDev(image, mask=self.mask)
 
         return self._lighting_mean_stddev
@@ -207,6 +207,10 @@ class Surface():
     @property
     def lighting_stddev(self) -> tuple:
         return tuple(self.lighting_mean_stddev[1].flatten())
+
+    def recalculate_lighting(self):
+        self._lighting_mean_stddev = None
+        self._background_mean_stddev = None
 
     @property
     def lines(self) -> list:
@@ -386,9 +390,6 @@ class Surface():
         self._normals_accumulated = None
         self._normals_mean = None
 
-        self._lighting_mean_stddev = None
-        self._background_mean_stddev = None
-
         self._surface_mask = None
         self._mask_transform = None
         self._outer_mask = None
@@ -396,6 +397,8 @@ class Surface():
         self._hires_mask = None
 
         self._hvps = None
+
+        self.recalculate_lighting()
 
     @property
     def contours(self):
