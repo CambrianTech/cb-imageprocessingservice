@@ -116,7 +116,7 @@ class PipelineOutput(PipelineStep):
     def make_data_dict(self, data, image_url, lighting_url, index_mask_url):
 
         return {
-            "version": self.config.api_version_string,
+            "version": self.config.api_long_version_string,
             "name": "Room %s" % self.unique_id,
             "id": self.unique_id,
             "floorRotation": -data["floor_rotation"] if self.y_up else data["floor_rotation"],
