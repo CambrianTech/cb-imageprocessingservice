@@ -141,7 +141,7 @@ class SurfaceRefinement():
         center = 127.0 * lighting_scale
 
         #print("std", std[0])
-        lighting = scale_lighting(lighting, scale=lighting_scale, center=center, gamma=100.0)
+        lighting = scale_lighting(lighting, scale=lighting_scale, center=center, gamma=80.0)
         lighting = cv2.bilateralFilter(lighting, d=15, sigmaColor=30, sigmaSpace=30)
         lighting_smoothed = lighting.copy()
 
