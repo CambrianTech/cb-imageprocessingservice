@@ -57,7 +57,8 @@ class SurfaceRefinement():
 
         #there's an issue with the shaders causing too close indices to mix up and creating artifacts
         #so giving spaced out indices randomly is a temporary solution
-        indices = random.sample(range(1, 255), num_surfaces)
+        
+        indices = random.sample(range(1, 254), num_surfaces) #255 is off limits for internal use
 
         for i, surface in enumerate(self.room.surfaces):
 
