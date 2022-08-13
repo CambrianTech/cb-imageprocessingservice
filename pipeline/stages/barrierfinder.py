@@ -229,7 +229,49 @@ class PipelineBarrierFinder(PipelineStep):
         #horizontal_semantic_lines = list(filter(lambda line: line.length > diagonal / 40, horizontal_semantic_lines))
 
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
-        adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
+        adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters and line not in horizontal_semantic_lines, horizontal_vp_lines))
+
+        #extend into adjacent lines
+        search_width = diagonal / 400
+        angle_threshold = np.radians(3)
+        line_candidates = horizontal_semantic_lines + adjacent_horizontal_lines
+
+        for i, line_a in enumerate(line_candidates):
+
+            if line_a.dead: continue
+
+            line_data = line_a.data.copy()
+            rect_a = line_a.bounding_box(width=1, length_offset=diagonal)
+
+            for line_b in line_candidates:
+
+                if LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold or line_b.dead or line_a == line_b:
+                    continue
+
+                rect_b = line_b.bounding_box(width=1, length_offset=diagonal)
+
+                result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+
+                if result == 0: continue
+
+                line_a.dead = True
+                line_b.dead = True
+
+                line_data = LineFunctions.merge_line_pair(line_data[0], line_data[1], line_data[2], line_data[3], \
+                                                         line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], \
+                                                         line_b.dx, line_b.dy)
+
+            if line_a.dead:
+                line_candidates[i] = Line(line_data[0], line_data[1], line_data[2], line_data[3], cluster=line_a.cluster)
+
+        horizontal_semantic_lines = line_candidates[:len(horizontal_semantic_lines)]
+        adjacent_horizontal_lines = line_candidates[len(horizontal_semantic_lines):]
+
+
+        debug = self.data["downscaled"].copy()
+        draw_lines(debug, line_candidates, thickness=2)
+        log_image(self.data, "barriers_filtered", debug)
+
 
         #for point, line in intersections:
 
