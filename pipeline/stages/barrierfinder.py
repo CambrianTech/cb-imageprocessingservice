@@ -283,18 +283,16 @@ class PipelineBarrierFinder(PipelineStep):
             #debug = get_segmentation_image(self.room.index_mask, self.data["downscaled"], labelset=None)\
             debug = self.data["downscaled"].copy()
 
-            
-            # draw_lines(debug, horizontal_semantic_lines, color=(255,0,50), thickness=3)
 
             #debug = cv2.addWeighted(debug, 0.7, self.data["downscaled"], 0.3, 0)
 
             draw_lines(debug, self.data["vp_lines"], color=(50, 50, 50), thickness=1)
 
             draw_lines(debug, vertical_plane_lines, color=(0,255,0), thickness=3)
-
             draw_lines(debug, adjacent_vertical_lines, color=(255, 0, 0), thickness=1)
             
-            draw_lines(debug, adjacent_horizontal_lines, color=(0, 255, 255), thickness=1)
+            draw_lines(debug, adjacent_horizontal_lines, color=(0, 255, 255), thickness=2)
+            draw_lines(debug, horizontal_semantic_lines, color=(255,255,0), thickness=2)
 
             #draw_lines(debug, linked_horizontal_lines, color=(50,255,255), thickness=2)
 
@@ -308,9 +306,9 @@ class PipelineBarrierFinder(PipelineStep):
                 def debug_term(term):
                     if term is None: return
                     cv2.circle(debug, constrain_point(term.point), 5, (255, 180, 0), cv2.FILLED, cv2.LINE_AA)
-                    draw_lines(debug, [term.line], thickness=2)
+                    #draw_lines(debug, [term.line], thickness=2)
                 
-                draw_lines(debug, [intersection.line], thickness=2)
+                #draw_lines(debug, [intersection.line], thickness=2)
 
                 debug_term(intersection.term_a)
                 debug_term(intersection.term_b)

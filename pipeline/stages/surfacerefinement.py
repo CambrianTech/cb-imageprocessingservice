@@ -57,7 +57,7 @@ class SurfaceRefinement():
 
         #there's an issue with the shaders causing too close indices to mix up and creating artifacts
         #so giving spaced out indices randomly is a temporary solution
-        
+
         indices = random.sample(range(1, 254), num_surfaces) #255 is off limits for internal use
 
         for i, surface in enumerate(self.room.surfaces):
@@ -72,7 +72,7 @@ class SurfaceRefinement():
             surface.index = indices[i]
             index_mask[surface.hires_mask > 0] = surface.index
 
-            log_mask(self.data, "surface_%d" % surface.index, mask, background=self.image)
+            #log_mask(self.data, "surface_%d" % surface.index, mask, background=self.image)
 
 
         #fill all gaps
