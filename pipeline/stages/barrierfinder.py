@@ -283,20 +283,27 @@ class PipelineBarrierFinder(PipelineStep):
                 line_candidates[min_index] = Line(line_data[0], line_data[1], line_data[2], line_data[3], cluster=line_a.cluster)
 
         #merge conventionally, do not filter out .dead
-        line_candidates = merge_lines(line_candidates, search_width=diagonal/250, search_length=1.1, angle_threshold=np.radians(5), do_filter=False)
+        line_candidates = merge_lines(line_candidates, search_width=diagonal/300, search_length=1.1, angle_threshold=np.radians(5), do_filter=False)
 
         split_index = len(horizontal_semantic_lines)
 
         horizontal_semantic_lines = list(filter(lambda x: not x.dead, line_candidates[:split_index]))
         adjacent_horizontal_lines = list(filter(lambda x: not x.dead, line_candidates[split_index:]))
 
-        intersections = extend_to_intersection(adjacent_horizontal_lines + horizontal_semantic_lines, search_length=2.0, modify=False)
+        split_index = len(horizontal_semantic_lines)
+
+        line_candidates = adjacent_horizontal_lines + horizontal_semantic_lines
+        intersections = extend_to_intersection(line_candidates, search_length=2.0, modify=True)
+
+        horizontal_semantic_lines = line_candidates[:split_index]
+        adjacent_horizontal_lines = line_candidates[split_index:]
 
         cluster_matches(vertical_plane_lines, vertical_lines, diagonal/20, angle_threshold=np.radians(20), func_invalid=vertical_line_invalid)
         vertical_clusters = list(set([line.cluster for line in vertical_plane_lines]))
 
         adjacent_vertical_lines = list(filter(lambda line: line.cluster in vertical_clusters, vertical_lines))
 
+        self.data["horizontal_barriers"] = horizontal_semantic_lines + adjacent_horizontal_lines
 
         samples = []
         for intersection in intersections:
@@ -365,7 +372,7 @@ class PipelineBarrierFinder(PipelineStep):
                     cv2.circle(debug, constrain_point(term.point), 5, (255, 180, 0), cv2.FILLED, cv2.LINE_AA)
                     draw_lines(debug, [term.line], thickness=2)
                 
-                #draw_lines(debug, [intersection.line], thickness=2)
+                draw_lines(debug, [intersection.line], thickness=2)
 
                 debug_term(intersection.term_a)
                 debug_term(intersection.term_b)
