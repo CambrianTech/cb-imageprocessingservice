@@ -290,11 +290,7 @@ class PipelineBarrierFinder(PipelineStep):
         horizontal_semantic_lines = list(filter(lambda x: not x.dead, line_candidates[:split_index]))
         adjacent_horizontal_lines = list(filter(lambda x: not x.dead, line_candidates[split_index:]))
 
-        
-        
-
-
-        intersections = extend_to_intersection(adjacent_horizontal_lines, search_length=2.0, modify=False)
+        intersections = extend_to_intersection(adjacent_horizontal_lines + horizontal_semantic_lines, search_length=2.0, modify=False)
 
         cluster_matches(vertical_plane_lines, vertical_lines, diagonal/20, angle_threshold=np.radians(20), func_invalid=vertical_line_invalid)
         vertical_clusters = list(set([line.cluster for line in vertical_plane_lines]))
@@ -350,7 +346,7 @@ class PipelineBarrierFinder(PipelineStep):
             draw_lines(debug, self.data["vp_lines"], color=(50, 50, 50), thickness=1)
 
             draw_lines(debug, vertical_plane_lines, color=(0,255,0), thickness=3)
-            draw_lines(debug, adjacent_vertical_lines, color=(255, 0, 0), thickness=1)
+            draw_lines(debug, adjacent_vertical_lines, color=(255, 0, 0), thickness=2)
             
             draw_lines(debug, adjacent_horizontal_lines, color=(0, 255, 255), thickness=2)
             draw_lines(debug, horizontal_semantic_lines, color=(255,255,0), thickness=2)
