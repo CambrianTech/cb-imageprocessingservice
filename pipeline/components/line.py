@@ -327,7 +327,8 @@ def draw_lines(img, lines, color=(255,50,255,255), thickness=1, scale=1.0, lineT
 #             delta2xg * cos_thr + xg, \
 #             delta2xg * sin_thr + yg
 
-def merge_lines(lines, search_width, search_length=1.05, search_length_offset=0, angle_threshold=math.radians(15), remove_matches=True):
+
+def merge_lines(lines, search_width, search_length=1.05, search_length_offset=0, angle_threshold=math.radians(15), do_merge=True, do_filter=True):
 
     min_dist_sq = search_width * search_width
 
@@ -340,13 +341,14 @@ def merge_lines(lines, search_width, search_length=1.05, search_length_offset=0,
 
         rect_a = line_a.bounding_box(width=search_width, length_multiplier=search_length, length_offset=search_length_offset)
 
-        if remove_matches:
+        if do_merge:
             data = line_a.data.copy()
         elif line_a.cluster is None:
             line_a.cluster = cluster_index
             cluster_index += 1
 
         group = line_a.group
+
 
         for line_b in lines:
 
@@ -360,7 +362,7 @@ def merge_lines(lines, search_width, search_length=1.05, search_length_offset=0,
                 result, _ = cv2.rotatedRectangleIntersection(rect_a, rect_b)
 
             if result != 0:
-                if remove_matches:
+                if do_merge:
                     line_a.dead = True
                     line_b.dead = True
                     data = LineFunctions.merge_line_pair(data[0], data[1], data[2], data[3], \
@@ -382,8 +384,10 @@ def merge_lines(lines, search_width, search_length=1.05, search_length_offset=0,
         if line_a.dead:
             lines[i] = Line(data[0], data[1], data[2], data[3], cluster=line_a.cluster, group=group)
 
+    if do_filter:
+        lines = list(filter(lambda x: not x.dead, lines))
 
-    return list(filter(lambda x: not x.dead, lines))
+    return lines
 
 def line_within_mask(line, mask, value=1, num_points=7, num_matches=3):
     line_points = np.linspace(line.point_a, line.point_b, num_points)

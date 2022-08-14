@@ -189,7 +189,7 @@ class PipelineBarrierFinder(PipelineStep):
         def vertical_line_invalid(line):
             return line_within_mask(line, invalid_vert_areas)
 
-        #re-cluster the original horizontal lines and plane vertical lines + vertical lines (remove_matches=False):
+        #re-cluster the original horizontal lines and plane vertical lines + vertical lines (do_merge=False):
         def cluster_matches(src_lines, lines, search_width, search_length=0.9, angle_threshold=np.radians(5), func_invalid=None):
 
             for line in src_lines + lines:
@@ -236,8 +236,8 @@ class PipelineBarrierFinder(PipelineStep):
         draw_lines(debug, horizontal_semantic_lines, thickness=2, color=(255,255,0))
         log_image(self.data, "barriers_unfiltered", debug)
 
-        #extend into adjacent lines
-        search_width = diagonal / 400
+        #extend lines into adjacent lines
+        search_width = diagonal / 300
         angle_threshold = np.radians(3)
         line_candidates = horizontal_semantic_lines + adjacent_horizontal_lines
 
@@ -282,13 +282,17 @@ class PipelineBarrierFinder(PipelineStep):
             if line_a.dead:
                 line_candidates[min_index] = Line(line_data[0], line_data[1], line_data[2], line_data[3], cluster=line_a.cluster)
 
+        #merge conventionally, do not filter out .dead
+        line_candidates = merge_lines(line_candidates, search_width=diagonal/250, search_length=1.1, angle_threshold=np.radians(5), do_filter=False)
+
         split_index = len(horizontal_semantic_lines)
+
         horizontal_semantic_lines = list(filter(lambda x: not x.dead, line_candidates[:split_index]))
         adjacent_horizontal_lines = list(filter(lambda x: not x.dead, line_candidates[split_index:]))
 
         
+        
 
-        #for point, line in intersections:
 
         intersections = extend_to_intersection(adjacent_horizontal_lines, search_length=2.0, modify=False)
 
