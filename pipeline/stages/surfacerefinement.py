@@ -4,6 +4,7 @@ import cv2
 import random
 
 from skimage.segmentation import watershed
+from skimage.morphology import remove_small_holes
 
 import cambrian.image_processing as ip
 
@@ -21,6 +22,9 @@ class SurfaceRefinement():
         self.data = data
         self.room = self.data["room"]
         self.image = self.data["image"]
+        self.height, self.width = self.image.shape[:2]
+        self.area = self.height * self.width
+        self.diagonal = np.hypot(self.width, self.height)
         
     def refine(self, use_HED=False):
 
@@ -28,6 +32,7 @@ class SurfaceRefinement():
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
         watershed_mask = np.ones(markers.shape, dtype=np.int32)
 
+        
         color = 1
         scale = self.image.shape[0] / self.data["downscaled"].shape[0]
         thickness = int(scale * 3)
@@ -41,10 +46,16 @@ class SurfaceRefinement():
 
             color += 1
 
+        #prepare watershed mask
         barrier_lines = list(map(lambda line: line.extended(1.1), self.data["semantic_lines"]))
-
         draw_lines(watershed_mask, barrier_lines, color=0, scale=scale, lineType=cv2.LINE_4)
 
+        horizontal_barriers = [line.extended(1.3) for line in self.data["horizontal_barriers"]]
+        draw_lines(watershed_mask, horizontal_barriers, color=0, scale=scale, lineType=cv2.LINE_4)
+
+        watershed_mask = 1 - remove_small_holes(1 - watershed_mask, area_threshold=self.area/50).astype(np.uint8)
+
+        log_mask(self.data, "watershed_mask", watershed_mask, self.image)
         log_markers(self.data, "room_markers", markers, primary=True, num_labels=len(self.room.surfaces))
 
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
@@ -67,6 +78,8 @@ class SurfaceRefinement():
             mask[markers == color] = 1
             mask[index_mask > 0] = 0
 
+            mask = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3)), iterations = 1)
+
             surface.hires_mask = mask
 
             surface.index = indices[i]
@@ -75,8 +88,13 @@ class SurfaceRefinement():
             #log_mask(self.data, "surface_%d" % surface.index, mask, background=self.image)
 
 
-        #fill all gaps
-        index_mask = np.uint8(watershed(watershed_image, index_mask))
+        # #fill all gaps
+        # index_mask = np.uint8(watershed(watershed_image, index_mask))
+
+        # for surface in self.room.surfaces:
+        #     mask = np.zeros_like(surface.hires_mask)
+        #     mask[index_mask == surface.index] = 1
+        #     surface.hires_mask = mask
 
         # #USE the alpha if you need transparency (below)
 

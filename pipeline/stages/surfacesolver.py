@@ -14,7 +14,7 @@ from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
 from pipeline.misc.utils import resize_array, random_color, overlay_mask, sample_at_point, scale_contour, color_to_normal, standard_colors
 from .planegeometry import Dimension
-from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers, Timer
+from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_markers, Timer, log_mask
 from pipeline.components.line import Line, draw_lines, line_on_image_edge, merge_lines
 from pipeline.components.surface import Surface, SurfaceBarrier
 from pipeline.data.ade20k import ADE20K
@@ -32,16 +32,26 @@ class SurfaceSolver():
         #add all the applicable surfaces:
         timer = Timer("room")
 
-        if ignore_rugs:
-            self.room.isolated_labels[self.room.isolated_labels == SurfaceType.OnFloor.value] = SurfaceType.Floor.value
-
-        #prepare
-        self.lines_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
-        draw_lines(self.lines_mask, self.data["semantic_lines"], color=255, thickness=1, lineType=cv2.LINE_4)
-
         self.height, self.width = self.room.image.shape[:2]
         self.area = self.height * self.width
         self.diagonal = np.hypot(self.width, self.height)
+
+        if ignore_rugs:
+            self.room.isolated_labels[self.room.isolated_labels == SurfaceType.OnFloor.value] = SurfaceType.Floor.value
+
+        #prepare lines mask
+        self.lines_mask = np.zeros(self.room.image.shape[:2], dtype=np.uint8)
+        draw_lines(self.lines_mask, self.data["semantic_lines"], color=1, thickness=1, lineType=cv2.LINE_4)
+
+        horizontal_barriers = [line.extended(1.3) for line in self.data["horizontal_barriers"]]
+        draw_lines(self.lines_mask, horizontal_barriers, color=1, thickness=3, lineType=cv2.LINE_4)
+
+        self.lines_mask = remove_small_holes(self.lines_mask, area_threshold=self.area/50).astype(np.uint8)
+
+        log_mask(self.data, "lines_mask", self.lines_mask, self.room.image)
+
+        self.data["watershed_mask"] = self.lines_mask
+
         self.refine_surfaces()
 
         #preserve plane context information i.e. probs < min_confidence are ignored
@@ -96,9 +106,9 @@ class SurfaceSolver():
                     best[0].merge(surface)
                 else:
                     candidates = list(filter(lambda s:s != surface, self.room.get_surfaces([surface.surfaceType])))
-                    best = sorted(candidates, key=lambda s: sum(abs(s.normals_mean - surface.normals_mean)))
-                    best[0].merge(surface)
-
+                    if len(candidates) > 0:
+                        best = sorted(candidates, key=lambda s: sum(abs(s.normals_mean - surface.normals_mean)))
+                        best[0].merge(surface)
 
 
     def find_trim(self):
@@ -175,7 +185,7 @@ class SurfaceSolver():
 
         vertical_labels = self.room.isolated_labels.copy()
 
-        # # vertical_labels[self.lines_mask > 0] = np.amax(vertical_labels) + 1
+        vertical_labels[self.lines_mask > 0] = np.amax(vertical_labels) + 1
 
         surface_image = self.room.image.copy()
         surface_probs = np.zeros_like(self.room.image)
@@ -336,7 +346,7 @@ class SurfaceSolver():
                 cv2.drawContours(surface_probs, surface.contours, -1, random_color(), -1)
                 # draw_lines(surface_image, surface.lines, color=random_color(), thickness=2, lineType=cv2.LINE_AA)
 
-        # # vertical_labels[self.lines_mask > 0] = np.amax(vertical_labels) + 1
+        vertical_labels[self.lines_mask > 0] = np.amax(vertical_labels) + 1
 
         log_image(self.data, "room_surface_image", surface_image)
         log_image(self.data, "room_surface_probs", surface_probs)
