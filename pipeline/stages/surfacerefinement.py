@@ -30,8 +30,8 @@ class SurfaceRefinement():
 
         markers = np.zeros(self.image.shape[:2], dtype=np.int32)
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
-        watershed_mask = np.ones(markers.shape, dtype=np.int32)
 
+        watershed_mask = np.ones(markers.shape, dtype=np.int32)
         
         color = 1
         scale = self.image.shape[0] / self.data["downscaled"].shape[0]
@@ -47,17 +47,22 @@ class SurfaceRefinement():
             color += 1
 
         #prepare watershed mask
-        barrier_lines = list(map(lambda line: line.extended(1.1), self.data["semantic_lines"]))
-        draw_lines(watershed_mask, barrier_lines, color=0, scale=scale, lineType=cv2.LINE_4)
-
-        horizontal_barriers = [line.extended(1.3) for line in self.data["horizontal_barriers"]]
-        draw_lines(watershed_mask, horizontal_barriers, color=0, scale=scale, lineType=cv2.LINE_4)
+        draw_lines(watershed_mask, [line.extended(1.1) for line in self.data["semantic_lines"]], color=0, scale=scale, lineType=cv2.LINE_4)
+        draw_lines(watershed_mask, [line.extended(1.3) for line in self.data["horizontal_barriers"]], color=0, scale=scale, lineType=cv2.LINE_4)
 
         watershed_mask = 1 - remove_small_holes(1 - watershed_mask, area_threshold=self.area/50).astype(np.uint8)
+
+        # nothing_mask = self.data["nothing_mask"]
+        # nothing_mask = cv2.erode(nothing_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5)), iterations=3)
+        # nothing_mask = cv2.resize(nothing_mask, (self.image.shape[1], self.image.shape[0]), interpolation=cv2.INTER_NEAREST)
+
+        # log_mask(self.data, "nothing_mask", nothing_mask, self.image)
+        # markers[nothing_mask > 0] = 255
 
         log_mask(self.data, "watershed_mask", watershed_mask, self.image)
         log_markers(self.data, "room_markers", markers, primary=True, num_labels=len(self.room.surfaces))
 
+        #perform watershed
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
 

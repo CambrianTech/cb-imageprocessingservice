@@ -50,7 +50,7 @@ class SurfaceSolver():
 
         log_mask(self.data, "lines_mask", self.lines_mask, self.room.image)
 
-        self.data["watershed_mask"] = self.lines_mask
+        self.data["nothing_mask"] = self.lines_mask
 
         self.refine_surfaces()
 
