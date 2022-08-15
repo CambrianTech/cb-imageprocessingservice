@@ -49,6 +49,7 @@ class SurfaceRefinement():
         #prepare watershed mask
         draw_lines(watershed_mask, [line.extended(1.1) for line in self.data["semantic_lines"]], color=0, scale=scale, lineType=cv2.LINE_4)
         draw_lines(watershed_mask, [line.extended(1.3) for line in self.data["horizontal_barriers"]], color=0, scale=scale, lineType=cv2.LINE_4)
+        draw_lines(watershed_mask, [line.extended(1.1) for line in self.data["vertical_barriers"]], color=0, scale=scale, lineType=cv2.LINE_4)
 
         watershed_mask = 1 - remove_small_holes(1 - watershed_mask, area_threshold=self.area/50).astype(np.uint8)
 

@@ -46,6 +46,9 @@ class SurfaceSolver():
         horizontal_barriers = [line.extended(1.3) for line in self.data["horizontal_barriers"]]
         draw_lines(self.lines_mask, horizontal_barriers, color=1, thickness=3, lineType=cv2.LINE_4)
 
+        vertical_barriers = [line.extended(1.05) for line in self.data["vertical_barriers"]]
+        draw_lines(self.lines_mask, vertical_barriers, color=1, thickness=3, lineType=cv2.LINE_4)
+
         self.lines_mask = remove_small_holes(self.lines_mask, area_threshold=self.area/50).astype(np.uint8)
 
         log_mask(self.data, "lines_mask", self.lines_mask, self.room.image)

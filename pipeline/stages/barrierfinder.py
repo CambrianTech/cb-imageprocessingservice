@@ -306,6 +306,8 @@ class PipelineBarrierFinder(PipelineStep):
 
         self.data["horizontal_barriers"] = horizontal_lines
 
+        self.data["vertical_barriers"] = adjacent_vertical_lines
+
         samples = []
         for intersection in intersections:
             if intersection.term_a:
