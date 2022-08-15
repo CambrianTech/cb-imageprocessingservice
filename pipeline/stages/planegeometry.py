@@ -90,6 +90,16 @@ class PlaneGeometry():
         self.basis_indices = np.int32(np.concatenate([floor_indices, ceiling_indices, wall_indices]))
 
     def find_floor_indices(self):
+
+        #maybe move to HorizontalDimension class:
+        self.floor_normal = [0., 0, -1]
+        self.floor_index = -1
+        self.floor_offset = 0
+
+        self.ceiling_index = [0., 0, 1]
+        self.ceiling_normal = -1
+        self.ceiling_offset = 0
+
         floor_mask = cv2.resize(self.isolated_masks[SurfaceType.Floor] + self.isolated_masks[SurfaceType.OnFloor], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
         ceiling_mask = cv2.resize(self.isolated_masks[SurfaceType.Ceiling] + self.isolated_masks[SurfaceType.OnCeiling], (self.plane_masks[0].shape[1], self.plane_masks[0].shape[0]))
 
@@ -103,35 +113,31 @@ class PlaneGeometry():
 
         scores = np.int32(floor_intersections)
 
-
         floor_indices = np.nonzero(scores > np.mean(scores))[0]
         floor_indices = floor_indices[np.argsort(scores[floor_indices])[::-1]]
-
-        scores = np.int32(ceiling_intersections)
-        ceiling_indices = np.nonzero(scores > np.mean(scores))[0]
-        ceiling_indices = ceiling_indices[np.argsort(scores[ceiling_indices])[::-1]]
-
-        for d in range(len(self.plane_masks)):
-            dots.append(np.dot(self.plane_normals[floor_indices[0]], self.plane_normals[d]))
-
-        angs = np.arccos(np.clip(dots, -1.0, 1.0)) * 180 / np.pi
-
-        horiz_indices = np.nonzero(np.abs(angs) < 15)[0]
-
-        #maybe move to HorizontalDimension class:
-        self.floor_normal = [0., 0, -1]
-        self.floor_index = -1
 
         if len(floor_indices) > 0:
             self.floor_index = floor_indices[0]
             self.floor_normal = self.plane_normals[self.floor_index]
             self.floor_offset = self.plane_offsets[self.floor_index]
 
-        ceiling_index = -1
+
+        scores = np.int32(ceiling_intersections)
+        ceiling_indices = np.nonzero(scores > np.mean(scores))[0]
+        ceiling_indices = ceiling_indices[np.argsort(scores[ceiling_indices])[::-1]]
+
         if len(ceiling_indices) > 0:
             self.ceiling_index = ceiling_indices[0]
             self.ceiling_normal = self.plane_normals[self.ceiling_index]
-            self.floor_offset = self.plane_offsets[self.floor_index]
+            self.ceiling_offset = self.plane_offsets[self.ceiling_index]
+
+        for d in range(len(self.plane_masks)):
+            dots.append(np.dot(self.floor_normal, self.plane_normals[d]))
+
+        angs = np.arccos(np.clip(dots, -1.0, 1.0)) * 180 / np.pi
+
+        horiz_indices = np.nonzero(np.abs(angs) < 15)[0]
+
 
         return HorizontalDimension(floor_indices, ceiling_indices, horiz_indices, angs)
 
