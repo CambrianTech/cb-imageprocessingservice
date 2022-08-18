@@ -63,12 +63,20 @@ class PipelineOutput(PipelineStep):
         lighting_url = self.make_url(filename)
         self.save_image(data["lighting"], filename, lighting_url)
         data["lighting_url"] = lighting_url
-        
-        filename = "index_mask.png"
-        index_mask_url = self.make_url(filename)
-        self.save_image(data["index_mask"], filename, index_mask_url)    
 
-        results = self.make_data_dict(data, image_url, lighting_url, index_mask_url)
+        index_mask_url = None
+        surfaces = data["room"].get_surfaces(surfaceTypes=self.config.surface_type_whitelist)
+
+        if self.config.multi_mask:
+            for index, surface in enumerate(surfaces):
+                mask_url = self.make_url(surface.filename)
+                self.save_image(surface.hires_mask, surface.filename, mask_url)
+        else:
+            filename = "index_mask.png"
+            index_mask_url = self.make_url(filename)
+            self.save_image(data["index_mask"], filename, index_mask_url)
+
+        results = self.make_data_dict(data, surfaces, image_url, lighting_url, index_mask_url)
 
         results["data_url"] = data["data_url"]
 
@@ -99,7 +107,7 @@ class PipelineOutput(PipelineStep):
         plane_normal = [-plane_normal[0], -plane_normal[2], plane_normal[1]] if self.y_up else list(plane_normal)
         plane_offset = float(surface.offset)
 
-        return {
+        json = {
             "id": str(surface.uniqueId),
             "type": surface.surfaceType.name,
             "name": surface.name,
@@ -113,18 +121,27 @@ class PipelineOutput(PipelineStep):
             "lightingStdDev": surface.lighting_stddev
         }
 
-    def make_data_dict(self, data, image_url, lighting_url, index_mask_url):
+        if self.config.multi_mask:
+            json["images"] = {"mask": self.make_url(surface.filename)}
+
+        return json
+
+    def make_data_dict(self, data, surfaces, image_url, lighting_url, index_mask_url):
+
+        images_json = {
+            "main": image_url,
+            "lighting": lighting_url
+        }
+
+        if index_mask_url is not None:
+            images_json["index_mask"] = index_mask_url
 
         return {
             "version": self.config.api_long_version_string,
             "name": "Room %s" % self.unique_id,
             "id": self.unique_id,
             "floorRotation": -data["floor_rotation"] if self.y_up else data["floor_rotation"],
-            "images": {
-                "main": image_url,
-                "lighting": lighting_url,
-                "index_mask": index_mask_url
-            },
+            "images": images_json,
             "camera": {
                 "fov": data["fov"],
                 "position": [0, 0, 0],  # Planes are relative to camera so the
@@ -133,8 +150,10 @@ class PipelineOutput(PipelineStep):
             "geometry": {
                 "verticalAxis": "y" if self.y_up else "z",
                 "surfaces": [
-                    self.encode_plane_surface(surface) for surface in data["room"].surfaces
+                    self.encode_plane_surface(surface) for surface in surfaces
                 ]
             },
             "assets": []
         }
+
+        

@@ -93,6 +93,10 @@ class Surface():
     def index(self) -> int:
         return self._index if self.was_added else self._cloned_from
 
+    @property #protected or private
+    def filename(self) -> str:
+        return "plane_masks/%s_%d.png" % (self.surfaceType.name.lower(), self.index)
+
     @index.setter
     def index(self, value:int):
         self._index = value

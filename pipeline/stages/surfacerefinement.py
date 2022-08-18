@@ -17,9 +17,10 @@ from pipeline.data.logging import log_segmentation_image, im_logging_enabled, lo
 
 
 class SurfaceRefinement():
-    def __init__(self, data):
+    def __init__(self, data, config):
         super().__init__()
         self.data = data
+        self.config = config
         self.room = self.data["room"]
         self.image = self.data["image"]
         self.height, self.width = self.image.shape[:2]
@@ -75,21 +76,28 @@ class SurfaceRefinement():
         #there's an issue with the shaders causing too close indices to mix up and creating artifacts
         #so giving spaced out indices randomly is a temporary solution
 
-        indices = random.sample(range(1, 254), num_surfaces) #255 is off limits for internal use
+        surfaces = self.room.get_surfaces(surfaceTypes=self.config.surface_type_whitelist)
+        num_surfaces = len(surfaces)
 
-        for i, surface in enumerate(self.room.surfaces):
+        for index, surface in enumerate(surfaces):
 
-            color = i + 1
+            color = index + 1
+
+            maskIndex = color if self.config.multi_mask else int((1 + index) * 255 / (1 + num_surfaces)) #evenly spaced
+
             mask = np.zeros_like(surface.hires_mask)
             mask[markers == color] = 1
             mask[index_mask > 0] = 0
 
             mask = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3)), iterations = 1)
-
             surface.hires_mask = mask
 
-            surface.index = indices[i]
-            index_mask[surface.hires_mask > 0] = surface.index
+            if self.config.multi_mask:
+                surface.hires_mask[surface.hires_mask > 0] = 255
+                surface.hires_mask = cv2.GaussianBlur(surface.hires_mask, (5, 5), cv2.BORDER_DEFAULT)
+
+            surface.index = maskIndex
+            index_mask[surface.hires_mask > 0] = maskIndex
 
             #log_mask(self.data, "surface_%d" % surface.index, mask, background=self.image)
 
@@ -220,7 +228,7 @@ class PipelineSurfaceRefinement(PipelineStep):
         return ["segmentation", "masks"]
 
     def run(self, data):
-        refiner = SurfaceRefinement(data)
+        refiner = SurfaceRefinement(data, self.pipeline.config)
         refiner.refine()
 
         
