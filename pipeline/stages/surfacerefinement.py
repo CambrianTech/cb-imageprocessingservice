@@ -89,7 +89,8 @@ class SurfaceRefinement():
 
             if self.config.multi_mask:
                 surface.hires_mask[surface.hires_mask > 0] = 255
-                surface.hires_mask = cv2.GaussianBlur(surface.hires_mask, (3, 3), cv2.BORDER_DEFAULT)
+                # mask = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3)))
+                # surface.hires_mask = cv2.GaussianBlur(surface.hires_mask, (3, 3), cv2.BORDER_DEFAULT)
 
             surface.index = maskIndex
             index_mask[surface.hires_mask > 0] = maskIndex
