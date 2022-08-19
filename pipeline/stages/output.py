@@ -9,8 +9,17 @@ import zlib
 import cv2
 
 from pipeline.core import PipelineStep, PipelineStepIndex
+from pipeline.data.surface_type import SurfaceType
 
-surface_types = ["unknown", "floor", "wall", "horizontal", "vertical"]
+ # threejs (y-up)      planercnn (z-up)
+ #
+ #   Y                 Z / Y 
+ #   |__ X      =>     |/__ X
+ #  /              
+ # Z   
+ #
+ # planercnn => threejs: [x, y, z] => [x, z, -y]
+
 
 class PipelineOutput(PipelineStep):
     def __init__(self, pipeline, outfile_name="data.json", preview_size=1024, thumbnail_size=320):
@@ -104,7 +113,19 @@ class PipelineOutput(PipelineStep):
         # we can extract plane_normal and plane_offset from their multiplication.
 
         plane_normal = surface.normal.astype(float)
-        plane_normal = [-plane_normal[0], -plane_normal[2], plane_normal[1]] if self.y_up else list(plane_normal)
+        # planercnn => threejs: [x, y, z] => [x, z, -y]
+
+        #JOEL IMPORTANT hack coordinate axis messed up! This will only work temporarily and NOT FOR FLOORS or anything textured!
+        if surface.surfaceType in [SurfaceType.Floor, SurfaceType.OnFloor]:
+            plane_normal = [0,1,0]
+        elif surface.surfaceType in [SurfaceType.Ceiling, SurfaceType.OnCeiling]:
+            plane_normal = [0,-1,0]
+        else:
+            plane_normal = [0,0,1]
+
+        # if self.y_up:
+        #     plane_normal = [-plane_normal[0], -plane_normal[2], plane_normal[1]]
+        
         plane_offset = float(surface.offset)
 
         json = {
@@ -112,7 +133,7 @@ class PipelineOutput(PipelineStep):
             "type": surface.surfaceType.name,
             "name": surface.name,
             "maskIndex": surface.index,
-            "normal": plane_normal,
+            "normal": list(plane_normal),
             "offset": plane_offset,
             "axisRotation": -surface.axisRotation if self.y_up else surface.axisRotation,
             "backgroundMean": surface.background_mean,

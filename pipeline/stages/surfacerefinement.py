@@ -34,7 +34,6 @@ class SurfaceRefinement():
 
         watershed_mask = np.ones(markers.shape, dtype=np.int32)
         
-        color = 1
         scale = self.image.shape[0] / self.data["downscaled"].shape[0]
         thickness = int(scale * 3)
 
@@ -42,10 +41,8 @@ class SurfaceRefinement():
             
             contours, _ = cv2.findContours(surface.hires_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
-            markers[surface.hires_mask > 0] = color
+            markers[surface.hires_mask > 0] = surface.index
             cv2.drawContours(markers, contours, -1, 0, thickness)
-
-            color += 1
 
         #prepare watershed mask
         draw_lines(watershed_mask, [line.extended(1.1) for line in self.data["semantic_lines"]], color=0, scale=scale, lineType=cv2.LINE_4)
@@ -81,12 +78,10 @@ class SurfaceRefinement():
 
         for index, surface in enumerate(surfaces):
 
-            color = index + 1
-
-            maskIndex = color if self.config.multi_mask else int((1 + index) * 255 / (1 + num_surfaces)) #evenly spaced
+            maskIndex = (index + 1) if self.config.multi_mask else int((1 + index) * 255 / (1 + num_surfaces)) #evenly spaced
 
             mask = np.zeros_like(surface.hires_mask)
-            mask[markers == color] = 1
+            mask[markers == surface.index] = 1
             mask[index_mask > 0] = 0
 
             mask = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3)), iterations = 1)

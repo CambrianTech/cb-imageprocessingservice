@@ -37,7 +37,9 @@ class PipelineConfig(SimpleNamespace):
     planes_url="http://localhost:8081/"
 
     multi_mask=True
+
     surface_type_whitelist = [SurfaceType.Floor, SurfaceType.Ceiling, SurfaceType.Wall]
+    #surface_type_whitelist = None
 
     restore_step=None
     export_step=None
