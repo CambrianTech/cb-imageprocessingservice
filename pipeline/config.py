@@ -34,6 +34,7 @@ class PipelineConfig(SimpleNamespace):
     semantic_model_path="gluon_models"
     fov_model_path = "sklearn_models/fov_classifier_lc128.joblib"
     hed_model_path = "hed_model/HED_pretrained_bsds.npz"
+    normals_model_path = "surface_normals/scannet.pt"
     planes_url="http://localhost:8081/"
 
     multi_mask=True

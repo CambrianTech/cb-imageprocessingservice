@@ -19,7 +19,7 @@ from .stages.fov import PipelineCalculateFov
 from .stages.primaryangle import PipelineDeterminePrimaryAngles
 from .stages.segmentation import PipelineSemanticSegmentation
 from .stages.edgedetector import PipelineEdgeDetector
-from .stages.superpixels import PipelineSuperpixels
+from .stages.normalsestimator import PipelineNormalsEstimator
 from .stages.planegeometry import PipelinePlaneGeometry
 from .stages.linefinder import PipelineLineFinder
 from .stages.planedetector import PipelinePlaneDetector
@@ -101,6 +101,7 @@ class Pipeline():
         all_steps[PipelineStepIndex.DigestData] = PipelineDigestData
         all_steps[PipelineStepIndex.DeterminePrimaryAngles] = PipelineDeterminePrimaryAngles
         all_steps[PipelineStepIndex.ExtractSurfaces] = PipelineExtractSurfaces
+        all_steps[PipelineStepIndex.NormalsEstimator] = PipelineNormalsEstimator
         all_steps[PipelineStepIndex.FindLines] = PipelineLineFinder
         all_steps[PipelineStepIndex.VanishingPoints] = PipelineVanishingPointFinder
         all_steps[PipelineStepIndex.FindBarriers] = PipelineBarrierFinder
