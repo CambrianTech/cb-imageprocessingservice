@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
-import tensorflow as tf
 
+import tensorflow as tf
 
 def get_session_config(use_gpu=True, dynamic_gpu_memory=True):
     # Allow GPU memory growth so tensorflow doesn't allocate all memory
@@ -136,10 +136,15 @@ def feed_image(model, image: np.ndarray) -> np.ndarray:
 
 def load_model(model_path: str, session_config=None):
     print("Loading model from", model_path)
-    model = tf.contrib.predictor.from_saved_model(model_path, config=session_config)
-    input_keys = ", ".join(model.feed_tensors.keys())
-    output_keys = ", ".join(model.fetch_tensors.keys())
-    print("Loaded model with inputs", input_keys, "and outputs", output_keys)
+    try:
+        model = tf.contrib.predictor.from_saved_model(model_path, config=session_config)
+        input_keys = ", ".join(model.feed_tensors.keys())
+        output_keys = ", ".join(model.fetch_tensors.keys())
+        print("Loaded model %s with inputs" % model_path, input_keys, "and outputs", output_keys)
+    except:
+        model = tf.saved_model.load(model_path)
+        print("Loaded model %s" % model_path)
+    
     return model
 
 
