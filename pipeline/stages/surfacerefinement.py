@@ -198,7 +198,7 @@ class SurfaceRefinement():
             floor_lighting = lighting.copy()
             floor_lighting[floor_mask_blurred > 0] = lighting_smoothed[floor_mask_blurred > 0]
 
-            #floor_lighting = scale_lighting(floor_lighting, scale=1.1, gamma=10.0) #gamma is scale_lighting above plus this
+            floor_lighting = scale_lighting(floor_lighting, scale=1.1, gamma=-30.0) #gamma is scale_lighting above plus this
 
             lighting = floor_lighting * floor_mask_blurred + lighting * (1.0 - floor_mask_blurred)
         
