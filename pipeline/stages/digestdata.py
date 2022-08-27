@@ -57,3 +57,6 @@ class PipelineDigestData(PipelineStep):
 
         data["semantic_labels"] = np.argmax(np.dstack(data["semantic_probs"]), -1)
 
+        if "surface_normals" in data:
+            log_image(data, "surface_normals", data["surface_normals"])
+

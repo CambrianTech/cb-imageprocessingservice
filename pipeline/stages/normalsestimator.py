@@ -108,10 +108,9 @@ class PipelineNormalsEstimator(PipelineStep):
             # 2. predicted normal
             pred_norm_rgb = ((pred_norm + 1) * 0.5) * 255
             pred_norm_rgb = np.clip(pred_norm_rgb, a_min=0, a_max=255)
-            pred_norm_rgb = pred_norm_rgb[0].astype(np.uint8)                  # (B, H, W, 3)
+            pred_norm_rgb = pred_norm_rgb[0].astype(np.uint8)                  # (H, W, 3)
 
-            print("surface normals shape", pred_norm_rgb.shape)
-            log_image(data, "surface_normals", pred_norm_rgb)
+            data["surface_normals"] = pred_norm_rgb
 
         # norm_out_list, _, _ = self.model(img)
         # norm_out = norm_out_list[-1]
