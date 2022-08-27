@@ -151,7 +151,7 @@ class PipelineLineFinder(PipelineStep):
 
         #find lines in normals
         min_length = int(diagonal / 20)
-        normals = np.uint8(data["normals"])
+        normals = np.uint8(data["surface_normals"])
         normals = cv2.split(normals)
         normals_lines = []
         for i in range(0, 3):

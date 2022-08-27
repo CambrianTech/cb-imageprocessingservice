@@ -62,7 +62,7 @@ class PlaneGeometry():
         XYZ = planes_data["XYZ"][:, 80:-80, :].transpose(1, 2, 0)
         self.XYZ = cv2.resize(XYZ, shape)
 
-        normals = cv2.resize(self.data["normals"], shape)
+        normals = cv2.resize(self.data["surface_normals"], shape)
 
         if im_logging_enabled(self.data, LogLevel.Images):
             log_image(self.data, "xyz", 255. * self.XYZ / np.amax(self.XYZ))
