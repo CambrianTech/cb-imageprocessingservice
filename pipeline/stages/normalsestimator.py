@@ -71,7 +71,21 @@ class PipelineNormalsEstimator(PipelineStep):
     def run(self, data):
         print("Normals")
         
-        img = cv2.resize(data["image"], (640, 480))
+        #img = cv2.resize(data["image"], (640, 480))
+    
+
+        # if "downscaled" not in data:
+        #     output = data["semantic_probs"]
+        #     h, w = output[0].shape
+        #     shape = (w, h)
+        #     if data["image"].shape[0] > shape[0] or data["image"].shape[1] > shape[1]:
+        #         data["downscaled"] = cv2.resize(data["image"], shape)
+        #     else:
+        #         data["downscaled"] = data["image"]
+
+        # img = data["downscaled"]
+
+        img = cv2.resize(data["image"], (1024, 768))
         img = img.astype(np.float32) / 255.0
         img = torch.from_numpy(img).permute(2, 0, 1)
         img = self.normalize(img)
