@@ -51,20 +51,46 @@ class RansacTrimFinder():
             line_b = np.random.choice(self.lines_b, 2)
 
 class VerticalBarrierSet():
-    def __init__(self, surface_normals):
+    def __init__(self, surface_normals, mask):
         self.surface_normals = surface_normals
-
+        self.mask = mask
 
     def find_initial(self, k):
         self.k_means_constant = k
         self.normals_clustered, self.normals_labels, self.normals_centers = kmeans_image(self.surface_normals, self.k_means_constant)
 
+        self.normals_labels = self.normals_labels.astype(np.uint8)
+
+        results = []
+
+        for i in range(0, self.k_means_constant):
+            mask = np.zeros_like(self.normals_labels)
+            mask[self.normals_labels == i] = 1
+            #could create artificial lines mask[self.mask == 0] = 0 
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            test_mask = np.zeros_like(self.mask)
+            cv2.drawContours(test_mask, contours, -1, 1, thickness=cv2.FILLED)
+            test_mask[self.mask == 0] = 0
+
+            results.append((cv2.countNonZero(test_mask), contours))
+
+        best = sorted(results, key=lambda x: x[0], reverse=True)[0]
+
+        # print("Best count", best[0])
+
+        self.contours = best[1]
+
     def debug(self, data):
 
-        log_segmentation_image(data, "normals_clustered_%d" % self.k_means_constant, self.normals_labels, data["downscaled"])
+        image = get_segmentation_image(self.normals_labels, data["downscaled"], labelset=None)
 
-        #log_image(data, "normals_labels_%d" % self.k_means_constant, self.normals_labels * 255 / self.k_means_constant)
-        #log_image(data, "normals_clustered_%d" % self.k_means_constant, self.normals_clustered)
+        opacity = 0.25
+        image = cv2.addWeighted(image, opacity, data["downscaled"], 1.0 - opacity, 0)
+
+        cv2.drawContours(image, self.contours, -1, random_color(), thickness=2)
+
+        log_image(data, "normals_clustered_%d" % self.k_means_constant, image)
 
 
 class PipelineBarrierFinder(PipelineStep):
@@ -145,7 +171,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         for k in range(3, 10):
 
-            vbs = VerticalBarrierSet(self.data["surface_normals"])
+            vbs = VerticalBarrierSet(self.data["surface_normals"], wall)
 
             barrier_sets.append(vbs)
 
