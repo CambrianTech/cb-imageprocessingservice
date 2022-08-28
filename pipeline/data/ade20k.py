@@ -312,7 +312,7 @@ class ADE20K(SemanticLabel):
 floor = [ADE20K.floor, ADE20K.grass, ADE20K.earth, ADE20K.sidewalk]
 on_floor = [ADE20K.rug]
 
-wall = [ADE20K.wall]
+wall = [ADE20K.wall, ADE20K.building]
 on_wall = [ADE20K.windowpane, ADE20K.door, ADE20K.curtain, ADE20K.mirror, ADE20K.painting, ADE20K.shelf, ADE20K.column, ADE20K.screen_door, ADE20K.blind, ADE20K.projection_screen, ADE20K.radiator, ADE20K.sconce, ADE20K.towel]
 
 ceiling = [ADE20K.ceiling]
