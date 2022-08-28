@@ -814,6 +814,8 @@ def kmeans_image(rgb, k=8):
     res = centers[labels.flatten()]
     res = res.reshape((img.shape))
 
+    labels = labels.reshape((img.shape[:2]))
+
     return res, labels, centers
 
 

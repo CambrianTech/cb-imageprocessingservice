@@ -17,7 +17,7 @@ from pipeline.data.surface_type import SurfaceType
 from pipeline.data.logging import log_image, im_logging_enabled, log_markers, get_segmentation_image, log_segmentation_image, log_mask
 from pipeline.components.line import draw_lines
 from .vanishingpointfinder import angle_with_vp
-from pipeline.misc.utils import random_color, resize_array, adjust_mask, convert_color
+from pipeline.misc.utils import random_color, resize_array, adjust_mask, convert_color, put_text
 from pipeline.data.ade20k import ADE20K, on_floor, on_wall, on_ceiling, box_like, legged_objects, lights
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.line import Line, extend_to_intersection, draw_lines, line_within_mask, line_on_image_edge, merge_lines
@@ -72,10 +72,7 @@ class PipelineBarrierFinder(PipelineStep):
         self.room = self.data["room"]
 
         diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
-
-        normals_clustered, normals_labels, normals_centers = kmeans_image(self.data["surface_normals"], k=5)
-
-        log_image(self.data, "normals_clustered", normals_clustered)
+        area = self.image.shape[0] * self.image.shape[1]
 
         min_line_length = diagonal / 30
 
@@ -84,7 +81,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         #obtain plane vertical lines, major barriers between original planes:
         wall = np.zeros(self.image .shape[:2], dtype=np.uint8)
-        wall[self.data["isolated_labels"] == SurfaceType.OnWall.index] = 1
+        wall[self.data["isolated_labels"] == SurfaceType.Wall.index] = 1
 
         on_wall = np.zeros(self.image .shape[:2], dtype=np.uint8)
         on_wall[self.data["isolated_labels"] == SurfaceType.OnWall.index] = 1
@@ -125,6 +122,20 @@ class PipelineBarrierFinder(PipelineStep):
         all_planes = np.unique(index_mask).astype(np.int32)
 
         vertical_plane_lines = []
+
+        #normals
+        normals_wall = self.data["surface_normals"]
+        #normals_wall[wall == 0] = -255
+
+        for k in range(3, 9):
+            normals_clustered, normals_labels, normals_centers = kmeans_image(normals_wall, k)
+            
+
+            #shapes (480, 719, 3) (345120, 1) (3, 3)
+            
+            log_image(self.data, "normals_labels_%d" % k, normals_labels * 255 / k)
+            log_image(self.data, "normals_clustered_%d" % k, normals_clustered)
+                
 
         for plane_index in all_planes:
 
