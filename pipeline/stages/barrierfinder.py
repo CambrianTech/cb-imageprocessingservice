@@ -50,6 +50,22 @@ class RansacTrimFinder():
             line_a = np.random.choice(self.lines_a, 2)
             line_b = np.random.choice(self.lines_b, 2)
 
+class VerticalBarrierSet():
+    def __init__(self, surface_normals):
+        self.surface_normals = surface_normals
+
+
+    def find_initial(self, k):
+        self.k_means_constant = k
+        self.normals_clustered, self.normals_labels, self.normals_centers = kmeans_image(self.surface_normals, self.k_means_constant)
+
+    def debug(self, data):
+
+        log_segmentation_image(data, "normals_clustered_%d" % self.k_means_constant, self.normals_labels, data["downscaled"])
+
+        #log_image(data, "normals_labels_%d" % self.k_means_constant, self.normals_labels * 255 / self.k_means_constant)
+        #log_image(data, "normals_clustered_%d" % self.k_means_constant, self.normals_clustered)
+
 
 class PipelineBarrierFinder(PipelineStep):
     @property
@@ -124,17 +140,19 @@ class PipelineBarrierFinder(PipelineStep):
         vertical_plane_lines = []
 
         #normals
-        normals_wall = self.data["surface_normals"]
-        #normals_wall[wall == 0] = -255
 
-        for k in range(3, 9):
-            normals_clustered, normals_labels, normals_centers = kmeans_image(normals_wall, k)
-            
+        barrier_sets = []
 
-            #shapes (480, 719, 3) (345120, 1) (3, 3)
+        for k in range(3, 10):
+
+            vbs = VerticalBarrierSet(self.data["surface_normals"])
+
+            barrier_sets.append(vbs)
+
+            vbs.find_initial(k)
+
+            vbs.debug(self.data)
             
-            log_image(self.data, "normals_labels_%d" % k, normals_labels * 255 / k)
-            log_image(self.data, "normals_clustered_%d" % k, normals_clustered)
                 
 
         for plane_index in all_planes:
