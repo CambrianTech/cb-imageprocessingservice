@@ -10,6 +10,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
 from cambrian.LineFunctions import LineFunctions
+from cambrian.image_processing import kmeans_image
 
 from pipeline.core import PipelineStep, PipelineStepIndex 
 from pipeline.data.surface_type import SurfaceType
@@ -21,6 +22,7 @@ from pipeline.data.ade20k import ADE20K, on_floor, on_wall, on_ceiling, box_like
 from pipeline.components.rotated_rect import RotatedRect
 from pipeline.components.line import Line, extend_to_intersection, draw_lines, line_within_mask, line_on_image_edge, merge_lines
 from pipeline.stages.vanishingpointfinder import get_inliers
+
 
 class RansacTrimFinder():
     def __init__(self, lines_a, lines_b, first_prob=0.3):
@@ -70,6 +72,11 @@ class PipelineBarrierFinder(PipelineStep):
         self.room = self.data["room"]
 
         diagonal = math.hypot(self.image.shape[0], self.image.shape[1])
+
+        normals_clustered, normals_labels, normals_centers = kmeans_image(self.data["surface_normals"], k=5)
+
+        log_image(self.data, "normals_clustered", normals_clustered)
+
         min_line_length = diagonal / 30
 
         shape = (self.image.shape[1], self.image.shape[0])
