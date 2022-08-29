@@ -63,11 +63,15 @@ class VerticalBarrierSet():
 
         results = []
 
+        pad=10
+
         for i in range(0, self.k_means_constant):
             mask = np.zeros_like(self.normals_labels)
             mask[self.normals_labels == i] = 1
             #could create artificial lines mask[self.mask == 0] = 0 
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            mask_bordered = cv2.copyMakeBorder(mask, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=0) 
+            contours, _ = cv2.findContours(image=mask_bordered, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE, offset=(-pad,-pad))
 
             test_mask = np.zeros_like(self.mask)
             cv2.drawContours(test_mask, contours, -1, 1, thickness=cv2.FILLED)
@@ -87,6 +91,8 @@ class VerticalBarrierSet():
         good_lines = []
         bad_lines = []
 
+        self.total_contour_points = sum(len(polygon) for polygon in self.polygons)
+
         for polygon in self.polygons:
 
             if len(polygon) == 0:
@@ -101,11 +107,14 @@ class VerticalBarrierSet():
                 point_a = polygon[i][0]
                 point_b = polygon[(i+1) % num_pts][0]
 
+                if line_on_image_edge(point_a, point_b, self.mask.shape[1], self.mask.shape[0], min_distance=10+pad):
+                    continue
+
                 line = Line(point_a[0], point_a[1], point_b[0], point_b[1])
 
                 length = distance.euclidean(point_a, point_b)
 
-                if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.mask.shape[1], self.mask.shape[0], min_distance=5):
+                if length >= min_line_length:
 
                     dist_a = cv2.pointPolygonTest(hull, (int(point_a[0]), int(point_a[1])), True)
                     dist_b = cv2.pointPolygonTest(hull, (int(point_b[0]), int(point_b[1])), True)
@@ -120,8 +129,8 @@ class VerticalBarrierSet():
 
         self.total_line_length = sum(line.length for line in self.vertical_lines)
 
-        self.total_bad_line_length = sum(line.length for line in bad_lines)
-        self.bad_lines = bad_lines
+        self.bad_lines = list(get_inliers(bad_lines, self.data["vertical_vp"].model, angle_diff))
+        self.total_bad_line_length = sum(line.length for line in self.bad_lines)
 
         # for poly in self.polygons:
         #     for point in poly
@@ -141,12 +150,13 @@ class VerticalBarrierSet():
 
         put_text(debug, "score: %.5f" % self.score, (100,100), (255, 0, 0))
 
-        log_image(data, name, debug)
+        log_image(data, "%s_%d" % (name, self.k_means_constant), debug)
 
     @property
     def score(self) -> float:
 
-        return 100.0 * (self.total_line_length - self.total_bad_line_length) / self.contour_length
+        return self.total_line_length / self.total_contour_points
+        #return 100.0 * (self.total_line_length - self.total_bad_line_length) / self.contour_length
 
 
 
@@ -234,7 +244,7 @@ class PipelineBarrierFinder(PipelineStep):
 
             vbs.find_initial(k)
 
-            vbs.debug(self.data, "normals_clustered_%d" % k)
+            vbs.debug(self.data, "normals_clustered")
             
         barriers = sorted(barrier_sets, key=lambda x: x.score, reverse=True)[0]
 
