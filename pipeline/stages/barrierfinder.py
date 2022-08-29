@@ -54,20 +54,15 @@ class VerticalBarrierSet():
     def __init__(self, data, mask):
         self.data = data
         self.mask = mask
+        self.vp_angle_diff = np.radians(8)
 
-    def find_initial(self, k, poly_epsilon=3, angle_diff=np.radians(8)):
-        self.k_means_constant = k
-        self.normals_clustered, self.normals_labels, self.normals_centers = kmeans_image(self.data["surface_normals"], self.k_means_constant)
-
-        self.normals_labels = self.normals_labels.astype(np.uint8)
+    def find_polygons(self, labels, poly_epsilon=3, pad=10):
 
         results = []
 
-        pad=10
-
         for i in range(0, self.k_means_constant):
-            mask = np.zeros_like(self.normals_labels)
-            mask[self.normals_labels == i] = 1
+            mask = np.zeros_like(labels)
+            mask[labels == i] = 1
             #could create artificial lines mask[self.mask == 0] = 0 
 
             mask_bordered = cv2.copyMakeBorder(mask, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=0) 
@@ -80,16 +75,24 @@ class VerticalBarrierSet():
             results.append((cv2.countNonZero(test_mask), contours))
 
         results = sorted(results, key=lambda x: x[0], reverse=True)
+
         best_count, _ = results[0]
 
-        self.polygons = []
+        polygons = []
         for result in results:
             if result[0] > best_count / 3:
                 contours = result[1]
-                self.polygons.extend(list(map(lambda contour: cv2.approxPolyDP(contour, poly_epsilon, True), contours)))
+                polygons.extend(list(map(lambda contour: cv2.approxPolyDP(contour, poly_epsilon, True), contours)))
 
-        #calc epsilon?
-        #self.polygons = list(map(lambda contour: cv2.approxPolyDP(contour, poly_epsilon, True), self.contours))
+        return polygons
+
+    def find_initial(self, k):
+        self.k_means_constant = k
+        self.normals_clustered, self.normals_labels, self.normals_centers = kmeans_image(self.data["surface_normals"], self.k_means_constant)
+
+        self.normals_labels = self.normals_labels.astype(np.uint8)
+
+        polygons = self.find_polygons(self.normals_labels)
 
         diagonal = math.hypot(self.mask.shape[0], self.mask.shape[1])
         area = self.mask.shape[0] * self.mask.shape[1]
@@ -98,13 +101,9 @@ class VerticalBarrierSet():
         good_lines = []
         bad_lines = []
 
-        self.total_contour_points = sum(len(polygon) for polygon in self.polygons)
+        self.total_contour_points = sum(len(polygon) for polygon in polygons)
 
-        for polygon in self.polygons:
-
-            if len(polygon) == 0:
-                #this may never occur, but there was a crash
-                continue
+        for polygon in polygons:
 
             num_pts = len(polygon)
 
@@ -114,7 +113,7 @@ class VerticalBarrierSet():
                 point_a = polygon[i][0]
                 point_b = polygon[(i+1) % num_pts][0]
 
-                if line_on_image_edge(point_a, point_b, self.mask.shape[1], self.mask.shape[0], min_distance=10+pad):
+                if line_on_image_edge(point_a, point_b, self.mask.shape[1], self.mask.shape[0], min_distance=15):
                     continue
 
                 line = Line(point_a[0], point_a[1], point_b[0], point_b[1])
@@ -132,28 +131,75 @@ class VerticalBarrierSet():
                         
                 bad_lines.append(line)
 
-        self.vertical_lines = list(get_inliers(good_lines, self.data["vertical_vp"].model, angle_diff))
+        good_lines = list(get_inliers(good_lines, self.data["vertical_vp"].model, self.vp_angle_diff))
 
-        self.total_line_length = sum(line.length for line in self.vertical_lines)
+        self.total_line_length = sum(line.length for line in good_lines)
 
-        self.bad_lines = list(get_inliers(bad_lines, self.data["vertical_vp"].model, angle_diff))
+        self.bad_lines = list(get_inliers(bad_lines, self.data["vertical_vp"].model, self.vp_angle_diff))
         self.total_bad_line_length = sum(line.length for line in self.bad_lines)
 
         # for poly in self.polygons:
         #     for point in poly
 
+    _polygons = None
+
+    @property
+    def polygons(self):
+        if self._polygons is None:
+            self._polygons = self.find_polygons(self.normals_labels, poly_epsilon=5)
+
+        return self._polygons
+
+    _vertical_lines = None
+
+    @property
+    def vertical_lines(self):
+        if self._vertical_lines is None:
+            good_lines = []
+
+            diagonal = math.hypot(self.normals_labels.shape[0], self.normals_labels.shape[1])
+            min_line_length = diagonal / 200
+
+            for polygon in self.polygons:
+
+                num_pts = len(polygon)
+
+                for i in range(num_pts):
+                    point_a = polygon[i][0]
+                    point_b = polygon[(i+1) % num_pts][0]
+
+                    if line_on_image_edge(point_a, point_b, self.normals_labels.shape[1], self.normals_labels.shape[0], min_distance=15):
+                        continue
+
+                    line = Line(point_a[0], point_a[1], point_b[0], point_b[1])
+
+                    length = distance.euclidean(point_a, point_b)
+
+                    if length >= min_line_length:
+                        samples = LineFunctions.get_line_samples(point_a, point_b, self.mask, int(line.length / 3))
+                        is_within_mask = np.mean(samples) > 0.5
+                        
+                        if is_within_mask:
+                            good_lines.append(line)
+                        
+            self._vertical_lines = list(get_inliers(good_lines, self.data["vertical_vp"].model, self.vp_angle_diff))
+
+            self._vertical_lines = merge_lines(self._vertical_lines, search_width=max(diagonal/150, 3), search_length=1.05, angle_threshold=self.vp_angle_diff)
+
+
+        return self._vertical_lines
+
     def debug(self, data, name):
 
         debug = get_segmentation_image(self.normals_labels, data["downscaled"], labelset=None)
 
-        opacity = 0.25
+        opacity = 0.4
         debug = cv2.addWeighted(debug, opacity, data["downscaled"], 1.0 - opacity, 0)
 
-        cv2.drawContours(debug, self.polygons, -1, (255,255,255), thickness=1)
+        # cv2.drawContours(debug, self.polygons, -1, (255,255,255), thickness=1)
 
+        # draw_lines(debug, self.bad_lines, thickness=2)
         draw_lines(debug, self.vertical_lines, thickness=2, color=(255,255,0))
-
-        draw_lines(debug, self.bad_lines, thickness=2)
 
         put_text(debug, "score: %.5f" % self.score, (100,100), (255, 0, 0))
 
@@ -212,6 +258,7 @@ class PipelineBarrierFinder(PipelineStep):
         wall[on_wall > 0] = 1
         wall[wall_like_mask > 0] = 1
         wall_contracted = adjust_mask(cv2.erode, wall, size=5)
+        wall_expanded = adjust_mask(cv2.dilate, wall, size=5, scale=0.5)
 
         ceiling = np.zeros(self.image .shape[:2], dtype=np.uint8)
         ceiling[self.data["isolated_labels"] == SurfaceType.Ceiling.index] = 1
@@ -245,7 +292,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         for k in range(3, 10):
 
-            vbs = VerticalBarrierSet(self.data, wall)
+            vbs = VerticalBarrierSet(self.data, wall_expanded)
 
             barrier_sets.append(vbs)
 
