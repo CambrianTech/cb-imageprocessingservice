@@ -80,11 +80,12 @@ class VerticalBarrierSet():
         #calc epsilon?
         self.polygons = list(map(lambda contour: cv2.approxPolyDP(contour, poly_epsilon, True), self.contours))
 
-        self.vertical_lines = []
-
         diagonal = math.hypot(self.mask.shape[0], self.mask.shape[1])
         area = self.mask.shape[0] * self.mask.shape[1]
         min_line_length = diagonal / 30
+
+        good_lines = []
+        bad_lines = []
 
         for polygon in self.polygons:
 
@@ -100,20 +101,32 @@ class VerticalBarrierSet():
                 point_a = polygon[i][0]
                 point_b = polygon[(i+1) % num_pts][0]
 
+                line = Line(point_a[0], point_a[1], point_b[0], point_b[1])
+
                 length = distance.euclidean(point_a, point_b)
 
                 if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.mask.shape[1], self.mask.shape[0], min_distance=5):
-                    self.vertical_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1]))
 
+                    dist_a = cv2.pointPolygonTest(hull, (int(point_a[0]), int(point_a[1])), True)
+                    dist_b = cv2.pointPolygonTest(hull, (int(point_b[0]), int(point_b[1])), True)
 
-        self.vertical_lines = list(get_inliers(self.vertical_lines, self.data["vertical_vp"].model, angle_diff))
+                    if dist_a < 20 and dist_b < 20:
+                        good_lines.append(line)
+                        continue
+                        
+                bad_lines.append(line)
+
+        self.vertical_lines = list(get_inliers(good_lines, self.data["vertical_vp"].model, angle_diff))
 
         self.total_line_length = sum(line.length for line in self.vertical_lines)
+
+        self.total_bad_line_length = sum(line.length for line in bad_lines)
+        self.bad_lines = bad_lines
 
         # for poly in self.polygons:
         #     for point in poly
 
-    def debug(self, data):
+    def debug(self, data, name):
 
         debug = get_segmentation_image(self.normals_labels, data["downscaled"], labelset=None)
 
@@ -122,15 +135,18 @@ class VerticalBarrierSet():
 
         # cv2.drawContours(debug, self.polygons, -1, random_color(), thickness=2)
 
-        draw_lines(debug, self.vertical_lines, thickness=2)
+        draw_lines(debug, self.vertical_lines, thickness=2, color=(255,255,0))
+
+        draw_lines(debug, self.bad_lines, thickness=2)
 
         put_text(debug, "score: %.5f" % self.score, (100,100), (255, 0, 0))
 
-        log_image(data, "normals_clustered_%d" % self.k_means_constant, debug)
+        log_image(data, name, debug)
 
     @property
     def score(self) -> float:
-        return self.total_line_length / self.contour_length
+
+        return 100.0 * (self.total_line_length - self.total_bad_line_length) / self.contour_length
 
 
 
@@ -218,9 +234,11 @@ class PipelineBarrierFinder(PipelineStep):
 
             vbs.find_initial(k)
 
-            vbs.debug(self.data)
+            vbs.debug(self.data, "normals_clustered_%d" % k)
             
-                
+        barriers = sorted(barrier_sets, key=lambda x: x.score, reverse=True)[0]
+
+        barriers.debug(self.data, "normals_clustered_best")
 
         for plane_index in all_planes:
 
