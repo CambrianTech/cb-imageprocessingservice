@@ -51,13 +51,13 @@ class RansacTrimFinder():
             line_b = np.random.choice(self.lines_b, 2)
 
 class VerticalBarrierSet():
-    def __init__(self, surface_normals, mask):
-        self.surface_normals = surface_normals
+    def __init__(self, data, mask):
+        self.data = data
         self.mask = mask
 
-    def find_initial(self, k):
+    def find_initial(self, k, poly_epsilon=3, angle_diff=np.radians(8)):
         self.k_means_constant = k
-        self.normals_clustered, self.normals_labels, self.normals_centers = kmeans_image(self.surface_normals, self.k_means_constant)
+        self.normals_clustered, self.normals_labels, self.normals_centers = kmeans_image(self.data["surface_normals"], self.k_means_constant)
 
         self.normals_labels = self.normals_labels.astype(np.uint8)
 
@@ -75,22 +75,63 @@ class VerticalBarrierSet():
 
             results.append((cv2.countNonZero(test_mask), contours))
 
-        best = sorted(results, key=lambda x: x[0], reverse=True)[0]
+        self.contour_length, self.contours = sorted(results, key=lambda x: x[0], reverse=True)[0]
 
-        # print("Best count", best[0])
+        #calc epsilon?
+        self.polygons = list(map(lambda contour: cv2.approxPolyDP(contour, poly_epsilon, True), self.contours))
 
-        self.contours = best[1]
+        self.vertical_lines = []
+
+        diagonal = math.hypot(self.mask.shape[0], self.mask.shape[1])
+        area = self.mask.shape[0] * self.mask.shape[1]
+        min_line_length = diagonal / 30
+
+        for polygon in self.polygons:
+
+            if len(polygon) == 0:
+                #this may never occur, but there was a crash
+                continue
+
+            num_pts = len(polygon)
+
+            hull = cv2.convexHull(polygon)
+
+            for i in range(num_pts):
+                point_a = polygon[i][0]
+                point_b = polygon[(i+1) % num_pts][0]
+
+                length = distance.euclidean(point_a, point_b)
+
+                if length >= min_line_length and not line_on_image_edge(point_a, point_b, self.mask.shape[1], self.mask.shape[0], min_distance=5):
+                    self.vertical_lines.append(Line(point_a[0], point_a[1], point_b[0], point_b[1]))
+
+
+        self.vertical_lines = list(get_inliers(self.vertical_lines, self.data["vertical_vp"].model, angle_diff))
+
+        self.total_line_length = sum(line.length for line in self.vertical_lines)
+
+        # for poly in self.polygons:
+        #     for point in poly
 
     def debug(self, data):
 
-        image = get_segmentation_image(self.normals_labels, data["downscaled"], labelset=None)
+        debug = get_segmentation_image(self.normals_labels, data["downscaled"], labelset=None)
 
         opacity = 0.25
-        image = cv2.addWeighted(image, opacity, data["downscaled"], 1.0 - opacity, 0)
+        debug = cv2.addWeighted(debug, opacity, data["downscaled"], 1.0 - opacity, 0)
 
-        cv2.drawContours(image, self.contours, -1, random_color(), thickness=2)
+        # cv2.drawContours(debug, self.polygons, -1, random_color(), thickness=2)
 
-        log_image(data, "normals_clustered_%d" % self.k_means_constant, image)
+        draw_lines(debug, self.vertical_lines, thickness=2)
+
+        put_text(debug, "score: %.5f" % self.score, (100,100), (255, 0, 0))
+
+        log_image(data, "normals_clustered_%d" % self.k_means_constant, debug)
+
+    @property
+    def score(self) -> float:
+        return self.total_line_length / self.contour_length
+
 
 
 class PipelineBarrierFinder(PipelineStep):
@@ -171,7 +212,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         for k in range(3, 10):
 
-            vbs = VerticalBarrierSet(self.data["surface_normals"], wall)
+            vbs = VerticalBarrierSet(self.data, wall)
 
             barrier_sets.append(vbs)
 
