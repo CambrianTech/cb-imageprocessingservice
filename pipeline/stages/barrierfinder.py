@@ -79,10 +79,17 @@ class VerticalBarrierSet():
 
             results.append((cv2.countNonZero(test_mask), contours))
 
-        self.contour_length, self.contours = sorted(results, key=lambda x: x[0], reverse=True)[0]
+        results = sorted(results, key=lambda x: x[0], reverse=True)
+        best_count, _ = results[0]
+
+        self.polygons = []
+        for result in results:
+            if result[0] > best_count / 3:
+                contours = result[1]
+                self.polygons.extend(list(map(lambda contour: cv2.approxPolyDP(contour, poly_epsilon, True), contours)))
 
         #calc epsilon?
-        self.polygons = list(map(lambda contour: cv2.approxPolyDP(contour, poly_epsilon, True), self.contours))
+        #self.polygons = list(map(lambda contour: cv2.approxPolyDP(contour, poly_epsilon, True), self.contours))
 
         diagonal = math.hypot(self.mask.shape[0], self.mask.shape[1])
         area = self.mask.shape[0] * self.mask.shape[1]
@@ -142,7 +149,7 @@ class VerticalBarrierSet():
         opacity = 0.25
         debug = cv2.addWeighted(debug, opacity, data["downscaled"], 1.0 - opacity, 0)
 
-        # cv2.drawContours(debug, self.polygons, -1, random_color(), thickness=2)
+        cv2.drawContours(debug, self.polygons, -1, (255,255,255), thickness=1)
 
         draw_lines(debug, self.vertical_lines, thickness=2, color=(255,255,0))
 
