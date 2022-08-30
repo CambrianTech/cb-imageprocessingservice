@@ -109,10 +109,12 @@ class VerticalBarrierSet():
 
         return polygons
 
-    def calculate_score(self, k, labels):
+    def calculate_score(self, k, labels, scale=0.25):
         self.k_means_constant = k
-        self.normals_clustered, self.normals_labels, self.normals_centers = kmeans_image(labels, self.k_means_constant)
 
+        _, self.normals_labels, _ = kmeans_image(cv2.resize(labels, (int(scale * labels.shape[1]), int(scale * labels.shape[0]))), self.k_means_constant)
+
+        self.normals_labels = cv2.resize(self.normals_labels, (labels.shape[1], labels.shape[0]), interpolation=cv2.INTER_NEAREST)
         self.normals_labels = self.normals_labels.astype(np.uint8)
 
         polygons = self.find_polygons(self.normals_labels)
@@ -338,7 +340,6 @@ class PipelineBarrierFinder(PipelineStep):
             vbs.debug(self.data, "normals_clustered_%d" % k)
             
         barriers = sorted(barrier_sets, key=lambda x: x.score, reverse=True)[0]
-
         barriers.debug(self.data, "normals_clustered_best")
 
         for plane_index in all_planes:
