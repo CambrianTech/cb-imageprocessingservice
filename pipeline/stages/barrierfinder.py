@@ -109,7 +109,7 @@ class VerticalBarrierSet():
 
         return polygons
 
-    def find_initial(self, k, labels):
+    def calculate_score(self, k, labels):
         self.k_means_constant = k
         self.normals_clustered, self.normals_labels, self.normals_centers = kmeans_image(labels, self.k_means_constant)
 
@@ -332,10 +332,8 @@ class PipelineBarrierFinder(PipelineStep):
         for k in range(3, 10):
 
             vbs = VerticalBarrierSet(self.data, normals_mask)
-
+            vbs.calculate_score(k, self.data["surface_normals"])
             barrier_sets.append(vbs)
-
-            vbs.find_initial(k, self.data["surface_normals"])
 
             vbs.debug(self.data, "normals_clustered_%d" % k)
             
