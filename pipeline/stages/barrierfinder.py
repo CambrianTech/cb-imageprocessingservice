@@ -52,19 +52,12 @@ class RansacTrimFinder():
             line_b = np.random.choice(self.lines_b, 2)
 
 class VerticalBarrierSet():
-    def __init__(self, data, mask):
+    def __init__(self, data, mask, wall_mask, ceiling_mask):
         self.data = data
         self.mask = mask
+        self.wall_mask = wall_mask
+        self.ceiling_mask = ceiling_mask
         self.vp_angle_diff = np.radians(8)
-
-    @property
-    def score(self) -> float:
-
-        if self.total_contour_points == 0:
-            return 0.0
-
-        return self.total_line_length / self.total_contour_points
-        #return 100.0 * (self.total_line_length - self.total_bad_line_length) / self.contour_length
 
     def find_polygons(self, labels, poly_epsilon=3, pad=10):
 
@@ -170,6 +163,8 @@ class VerticalBarrierSet():
 
         self.total_line_length = sum(line.length for line in filtered_lines)
 
+        #cv2.countNonZero(ceiling_mask)
+
         print("good_lines k=%d" % self.k_means_constant, len(filtered_lines))
 
         self.bad_lines = list(get_inliers(bad_lines, self.data["vertical_vp"].model, self.vp_angle_diff))
@@ -177,6 +172,17 @@ class VerticalBarrierSet():
 
         # for poly in self.polygons:
         #     for point in poly
+
+        self.score = 0.0
+
+        if self.total_contour_points > 0:
+            self.score = self.total_line_length / self.total_contour_points
+            
+        #return 100.0 * (self.total_line_length - self.total_bad_line_length) / self.contour_length
+
+
+
+        return self.score
 
     _polygons = None
 
@@ -328,12 +334,16 @@ class PipelineBarrierFinder(PipelineStep):
         normals_mask[self.data["isolated_labels"] == SurfaceType.OnWall.index] = 1
         normals_mask[self.data["isolated_labels"] == SurfaceType.Ceiling.index] = 1
         normals_mask[self.data["isolated_labels"] == SurfaceType.Floor.index] = 1
+        normals_mask[self.data["isolated_labels"] == SurfaceType.OnFloor.index] = 1
+
+        for label in box_like:
+            normals_mask[self.data["semantic_labels"] == label.index] = 1
 
         #log_mask(self.data, "normals_mask", normals_mask, self.data["downscaled"])
 
         for k in range(3, 10):
 
-            vbs = VerticalBarrierSet(self.data, normals_mask)
+            vbs = VerticalBarrierSet(self.data, normals_mask,  wall, ceiling)
             vbs.calculate_score(k, self.data["surface_normals"])
             barrier_sets.append(vbs)
 
