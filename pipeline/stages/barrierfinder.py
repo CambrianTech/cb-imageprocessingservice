@@ -26,11 +26,11 @@ from pipeline.stages.vanishingpointfinder import get_inliers
 
 
 class VerticalBarrierSet():
-    def __init__(self, data, mask, wall_mask, ceiling_mask):
+    def __init__(self, data, mask, wall_mask, invalid_mask):
         self.data = data
         self.mask = mask
         self.wall_mask = wall_mask
-        self.ceiling_mask = ceiling_mask
+        self.invalid_mask = invalid_mask
         self.vp_angle_diff = np.radians(8)
 
     def find_polygons(self, labels, poly_epsilon=3, pad=10):
@@ -103,16 +103,13 @@ class VerticalBarrierSet():
 
             num_pts = len(polygon)
 
-            hull = cv2.convexHull(polygon, returnPoints=False)
-
             try:
+                hull = cv2.convexHull(polygon, returnPoints=False)
                 defects = cv2.convexityDefects(polygon, hull)
-
                 if defects is not None:
                     self.total_defects += defects.shape[0]
             except:
                 pass
-                
 
             for i in range(num_pts):
                 point_a = polygon[i][0]
@@ -125,39 +122,52 @@ class VerticalBarrierSet():
 
                 length = distance.euclidean(point_a, point_b)
 
-                if length >= min_line_length:
-
+                if length >= 5:
                     good_lines.append(line)
-                    continue
-
-                    # dist_a = cv2.pointPolygonTest(hull, (int(point_a[0]), int(point_a[1])), True)
-                    # dist_b = cv2.pointPolygonTest(hull, (int(point_b[0]), int(point_b[1])), True)
-
-                    # if dist_a < 20 and dist_b < 20:
-                    #     good_lines.append(line)
-                    #     continue
                         
                 bad_lines.append(line)
 
         vps = [self.data["vertical_vp"]]
         #vps.extend(self.data["horizontal_vps"])
 
-        filtered_lines = []
+        self.filtered_lines = []
         for vp in vps:
-            filtered_lines.extend(get_inliers(good_lines, vp.model, self.vp_angle_diff))
+            self.filtered_lines.extend(get_inliers(good_lines, vp.model, self.vp_angle_diff))
 
-        self.total_line_length = sum(line.length for line in filtered_lines)
+        self.filtered_lines = merge_lines(self.filtered_lines, search_width=max(diagonal/150, 3), search_length=1.2, angle_threshold=self.vp_angle_diff)
+
+        def line_valid(line):
+
+            if line.length < min_line_length:
+                return False
+
+            test_length = int(line.length * 0.2)
+
+            test_a = line.normal_a * test_length + line.midpoint
+            test_b = line.normal_b * test_length + line.midpoint
+
+            line_samples = LineFunctions.get_line_samples(line.point_a, line.point_b, self.wall_mask, max(3, int(length)))
+            o_samples_a = LineFunctions.get_line_samples(line.midpoint, test_a, self.invalid_mask, max(3, test_length))
+            o_samples_b = LineFunctions.get_line_samples(line.midpoint, test_b, self.invalid_mask, max(3, test_length))
+
+            mean_line = np.mean(line_samples)
+            o_mean_a = np.mean(o_samples_a)
+            o_mean_b = np.mean(o_samples_b)
+
+            return mean_line > 0.5 and o_mean_a < 0.5 and o_mean_b < 0.5
+
+        self.filtered_lines = list(filter(lambda line: line_valid(line), self.filtered_lines))
+
+        self.total_line_length = sum(line.length for line in self.filtered_lines)
 
         #cv2.countNonZero(ceiling_mask)
 
         print("defects k=%d, %d" % (self.k_means_constant, self.total_defects))
-        print("good_lines k=%d" % self.k_means_constant, len(filtered_lines))
+        print("good_lines k=%d" % self.k_means_constant, len(self.filtered_lines))
+
 
         self.bad_lines = list(get_inliers(bad_lines, self.data["vertical_vp"].model, self.vp_angle_diff))
         self.total_bad_line_length = sum(line.length for line in self.bad_lines)
-
-        # for poly in self.polygons:
-        #     for point in poly
 
         self.score = 0.0
 
@@ -228,7 +238,9 @@ class VerticalBarrierSet():
         cv2.drawContours(debug, self.polygons, -1, (0,0,255), thickness=1)
 
         # draw_lines(debug, self.bad_lines, thickness=2)
-        draw_lines(debug, self.vertical_lines, thickness=2, color=(255,255,0))
+        #draw_lines(debug, self.vertical_lines, thickness=2, color=(255,255,0))
+
+        draw_lines(debug, self.filtered_lines, thickness=2, color=(255,255,0))
 
         put_text(debug, "k=%d score: %.5f" % (self.k_means_constant, self.score), (100,100), (255, 0, 0))
 
@@ -269,6 +281,9 @@ class PipelineBarrierFinder(PipelineStep):
         #obtain plane vertical lines, major barriers between original planes:
         wall = np.zeros(self.image .shape[:2], dtype=np.uint8)
         wall[self.data["isolated_labels"] == SurfaceType.Wall.index] = 1
+        wall_only = wall.copy()
+        for label in box_like:
+            wall_only[self.data["semantic_labels"] == label.index] = 1
 
         on_wall = np.zeros(self.image .shape[:2], dtype=np.uint8)
         on_wall[self.data["isolated_labels"] == SurfaceType.OnWall.index] = 1
@@ -329,7 +344,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         for k in range(3, 10):
 
-            vbs = VerticalBarrierSet(self.data, normals_mask,  wall, ceiling)
+            vbs = VerticalBarrierSet(self.data, normals_mask,  wall, invalid_vert_areas)
             vbs.calculate_score(k, self.data["surface_normals"])
             barrier_sets.append(vbs)
 
