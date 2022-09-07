@@ -80,7 +80,7 @@ class LogLevel(IntFlag):
     Lines =         0x1 << 3
     Models =        0x1 << 4
 
-    Default =       Images | Segmentation | Lines
+    Default =       Images | Segmentation | Lines | Models
     All =           0xff
 
 def get_unique_id(data:dict):

@@ -218,7 +218,7 @@ class Pipeline():
             print(colored("Current memory at %.2f MB" % get_memory_usage_mb(), attrs=['bold']))
 
             if step.index == self.config.export_step:
-                await self.export_data(data)
+                asyncio.ensure_future(self.export_data(data)) # fire and forget
 
         print(colored("All stages time: %.2f seconds\n" % (time.time() - start_time), attrs=['bold']))
 

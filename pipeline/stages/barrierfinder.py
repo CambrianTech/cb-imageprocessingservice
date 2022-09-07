@@ -180,7 +180,6 @@ class PipelineBarrierFinder(PipelineStep):
         horizontal_vp_lines, vertical_vp_lines = partition_lines(self.data["vp_lines"])
 
         #all meaningful horizontal lines
-        horizontal_lines = horizontal_semantic_lines + horizontal_vp_lines
         vertical_lines = vertical_semantic_lines + vertical_vp_lines
 
         def horizontal_line_invalid(line):
@@ -189,7 +188,7 @@ class PipelineBarrierFinder(PipelineStep):
         def vertical_line_invalid(line):
             return line_within_mask(line, invalid_vert_areas)
 
-        #re-cluster the original horizontal lines and plane vertical lines + vertical lines (remove_matches=False):
+        #re-cluster the original horizontal lines and plane vertical lines + vertical lines (do_merge=False):
         def cluster_matches(src_lines, lines, search_width, search_length=0.9, angle_threshold=np.radians(5), func_invalid=None):
 
             for line in src_lines + lines:
@@ -229,17 +228,85 @@ class PipelineBarrierFinder(PipelineStep):
         #horizontal_semantic_lines = list(filter(lambda line: line.length > diagonal / 40, horizontal_semantic_lines))
 
         horizontal_clusters = list(set([line.cluster for line in horizontal_semantic_lines]))
-        adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters, horizontal_lines))
+        adjacent_horizontal_lines = list(filter(lambda line: line.cluster in horizontal_clusters and line not in horizontal_semantic_lines, horizontal_vp_lines))
 
-        #for point, line in intersections:
+        debug = self.data["downscaled"].copy()
+        draw_lines(debug, adjacent_horizontal_lines, thickness=2, color=(0,255,255))
+        draw_lines(debug, horizontal_semantic_lines, thickness=2, color=(255,255,0))
+        log_image(self.data, "barriers_unfiltered", debug)
 
-        intersections = extend_to_intersection(adjacent_horizontal_lines, search_length=2.0, modify=False)
+        #extend lines into adjacent lines
+        search_width = diagonal / 300
+        angle_threshold = np.radians(3)
+        horizontal_lines = horizontal_semantic_lines + adjacent_horizontal_lines
+
+        for i, line_a in enumerate(horizontal_lines):
+
+            if line_a.dead: continue
+
+            min_index = i
+
+            line_data = line_a.data.copy()
+            rect_a = line_a.bounding_box(width=search_width, length_offset=diagonal)
+
+            for j, line_b in enumerate(horizontal_lines):
+
+                if line_b.dead or LineFunctions.line_angle_difference(line_a.angle, line_b.angle) > angle_threshold or line_a == line_b:
+                    continue
+
+                rect_b = line_b.bounding_box(width=search_width, length_offset=diagonal)
+
+                result, intersections = cv2.rotatedRectangleIntersection(rect_a, rect_b)
+
+                if result == 0: continue
+
+                point = np.mean(intersections, axis=0)[0]
+
+                distance_between = min(distance.euclidean(line_a.point_a, line_b.point_a), distance.euclidean(line_a.point_b, line_b.point_b), distance.euclidean(line_a.point_a, line_b.point_b))
+                
+                min_distance_a = min(distance.euclidean(point, line_a.point_a), distance.euclidean(point, line_a.point_b))
+                min_distance_b = min(distance.euclidean(point, line_b.point_a), distance.euclidean(point, line_b.point_b))
+
+                #make sure it extends to the point
+                if distance_between < (2 + min(min_distance_a, min_distance_b)): continue
+
+                line_a.dead = True
+                line_b.dead = True
+                min_index = min(min_index, j)
+
+                line_data = LineFunctions.merge_line_pair(line_data[0], line_data[1], line_data[2], line_data[3], \
+                                                         line_b.data[0], line_b.data[1], line_b.data[2], line_b.data[3], \
+                                                         line_b.dx, line_b.dy)
+
+            if line_a.dead:
+                horizontal_lines[min_index] = Line(line_data[0], line_data[1], line_data[2], line_data[3], cluster=line_a.cluster)
+
+        #merge conventionally, do not filter out .dead
+        horizontal_lines = merge_lines(horizontal_lines, search_width=diagonal/300, search_length=1.1, angle_threshold=np.radians(5), do_filter=False)
+
+        split_index = len(horizontal_semantic_lines)
+
+        horizontal_semantic_lines = list(filter(lambda x: not x.dead, horizontal_lines[:split_index]))
+        adjacent_horizontal_lines = list(filter(lambda x: not x.dead, horizontal_lines[split_index:]))
+
+        split_index = len(horizontal_semantic_lines)
+
+        horizontal_lines = adjacent_horizontal_lines + horizontal_semantic_lines
+        intersections = extend_to_intersection(horizontal_lines, search_length=2.0, modify=True)
+
+        horizontal_semantic_lines = horizontal_lines[:split_index]
+        adjacent_horizontal_lines = horizontal_lines[split_index:]
 
         cluster_matches(vertical_plane_lines, vertical_lines, diagonal/20, angle_threshold=np.radians(20), func_invalid=vertical_line_invalid)
         vertical_clusters = list(set([line.cluster for line in vertical_plane_lines]))
 
         adjacent_vertical_lines = list(filter(lambda line: line.cluster in vertical_clusters, vertical_lines))
 
+        horizontal_lines = list(set(horizontal_semantic_lines + adjacent_horizontal_lines))
+
+        self.data["horizontal_barriers"] = horizontal_lines
+
+        self.data["vertical_barriers"] = adjacent_vertical_lines
 
         samples = []
         for intersection in intersections:
@@ -283,18 +350,16 @@ class PipelineBarrierFinder(PipelineStep):
             #debug = get_segmentation_image(self.room.index_mask, self.data["downscaled"], labelset=None)\
             debug = self.data["downscaled"].copy()
 
-            
-            # draw_lines(debug, horizontal_semantic_lines, color=(255,0,50), thickness=3)
 
             #debug = cv2.addWeighted(debug, 0.7, self.data["downscaled"], 0.3, 0)
 
             draw_lines(debug, self.data["vp_lines"], color=(50, 50, 50), thickness=1)
 
             draw_lines(debug, vertical_plane_lines, color=(0,255,0), thickness=3)
-
-            draw_lines(debug, adjacent_vertical_lines, color=(255, 0, 0), thickness=1)
+            draw_lines(debug, adjacent_vertical_lines, color=(255, 0, 0), thickness=2)
             
-            draw_lines(debug, adjacent_horizontal_lines, color=(0, 255, 255), thickness=1)
+            draw_lines(debug, adjacent_horizontal_lines, color=(0, 255, 255), thickness=2)
+            draw_lines(debug, horizontal_semantic_lines, color=(255,255,0), thickness=2)
 
             #draw_lines(debug, linked_horizontal_lines, color=(50,255,255), thickness=2)
 

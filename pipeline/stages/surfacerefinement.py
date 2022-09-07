@@ -4,6 +4,7 @@ import cv2
 import random
 
 from skimage.segmentation import watershed
+from skimage.morphology import remove_small_holes
 
 import cambrian.image_processing as ip
 
@@ -16,19 +17,23 @@ from pipeline.data.logging import log_segmentation_image, im_logging_enabled, lo
 
 
 class SurfaceRefinement():
-    def __init__(self, data):
+    def __init__(self, data, config):
         super().__init__()
         self.data = data
+        self.config = config
         self.room = self.data["room"]
         self.image = self.data["image"]
+        self.height, self.width = self.image.shape[:2]
+        self.area = self.height * self.width
+        self.diagonal = np.hypot(self.width, self.height)
         
     def refine(self, use_HED=False):
 
         markers = np.zeros(self.image.shape[:2], dtype=np.int32)
         watershed_image = cv2.resize(self.data["hed"], (self.image.shape[1], self.image.shape[0]))
-        watershed_mask = np.ones(markers.shape, dtype=np.int32)
 
-        color = 1
+        watershed_mask = np.ones(markers.shape, dtype=np.int32)
+        
         scale = self.image.shape[0] / self.data["downscaled"].shape[0]
         thickness = int(scale * 3)
 
@@ -36,17 +41,27 @@ class SurfaceRefinement():
             
             contours, _ = cv2.findContours(surface.hires_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
-            markers[surface.hires_mask > 0] = color
+            markers[surface.hires_mask > 0] = surface.index
             cv2.drawContours(markers, contours, -1, 0, thickness)
 
-            color += 1
+        #prepare watershed mask
+        draw_lines(watershed_mask, [line.extended(1.1) for line in self.data["semantic_lines"]], color=0, scale=scale, lineType=cv2.LINE_4)
+        draw_lines(watershed_mask, [line.extended(1.3) for line in self.data["horizontal_barriers"]], color=0, scale=scale, lineType=cv2.LINE_4)
+        draw_lines(watershed_mask, [line.extended(1.1) for line in self.data["vertical_barriers"]], color=0, scale=scale, lineType=cv2.LINE_4)
 
-        barrier_lines = list(map(lambda line: line.extended(1.1), self.data["semantic_lines"]))
+        watershed_mask = 1 - remove_small_holes(1 - watershed_mask, area_threshold=self.area/50).astype(np.uint8)
 
-        draw_lines(watershed_mask, barrier_lines, color=0, scale=scale, lineType=cv2.LINE_4)
+        # nothing_mask = self.data["nothing_mask"]
+        # nothing_mask = cv2.erode(nothing_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5)), iterations=3)
+        # nothing_mask = cv2.resize(nothing_mask, (self.image.shape[1], self.image.shape[0]), interpolation=cv2.INTER_NEAREST)
 
+        # log_mask(self.data, "nothing_mask", nothing_mask, self.image)
+        # markers[nothing_mask > 0] = 255
+
+        log_mask(self.data, "watershed_mask", watershed_mask, self.image)
         log_markers(self.data, "room_markers", markers, primary=True, num_labels=len(self.room.surfaces))
 
+        #perform watershed
         markers = np.int32(watershed(watershed_image, markers, mask=watershed_mask))
         markers[markers<0] = 0
 
@@ -57,26 +72,39 @@ class SurfaceRefinement():
 
         #there's an issue with the shaders causing too close indices to mix up and creating artifacts
         #so giving spaced out indices randomly is a temporary solution
-        
-        indices = random.sample(range(1, 254), num_surfaces) #255 is off limits for internal use
 
-        for i, surface in enumerate(self.room.surfaces):
+        surfaces = self.room.get_surfaces(surfaceTypes=self.config.surface_type_whitelist)
+        num_surfaces = len(surfaces)
 
-            color = i + 1
+        for index, surface in enumerate(surfaces):
+
+            maskIndex = (index + 1) if self.config.multi_mask else int((1 + index) * 255 / (1 + num_surfaces)) #evenly spaced
+
             mask = np.zeros_like(surface.hires_mask)
-            mask[markers == color] = 1
+            mask[markers == surface.index] = 1
             mask[index_mask > 0] = 0
 
+            mask = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3)), iterations = 1)
             surface.hires_mask = mask
 
-            surface.index = indices[i]
-            index_mask[surface.hires_mask > 0] = surface.index
+            if self.config.multi_mask:
+                surface.hires_mask[surface.hires_mask > 0] = 255
+                # mask = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3)))
+                # surface.hires_mask = cv2.GaussianBlur(surface.hires_mask, (3, 3), cv2.BORDER_DEFAULT)
 
-            log_mask(self.data, "surface_%d" % surface.index, mask, background=self.image)
+            surface.index = maskIndex
+            index_mask[surface.hires_mask > 0] = maskIndex
+
+            #log_mask(self.data, "surface_%d" % surface.index, mask, background=self.image)
 
 
-        #fill all gaps
-        index_mask = np.uint8(watershed(watershed_image, index_mask))
+        # #fill all gaps
+        # index_mask = np.uint8(watershed(watershed_image, index_mask))
+
+        # for surface in self.room.surfaces:
+        #     mask = np.zeros_like(surface.hires_mask)
+        #     mask[index_mask == surface.index] = 1
+        #     surface.hires_mask = mask
 
         # #USE the alpha if you need transparency (below)
 
@@ -170,7 +198,7 @@ class SurfaceRefinement():
             floor_lighting = lighting.copy()
             floor_lighting[floor_mask_blurred > 0] = lighting_smoothed[floor_mask_blurred > 0]
 
-            #floor_lighting = scale_lighting(floor_lighting, scale=1.1, gamma=10.0) #gamma is scale_lighting above plus this
+            floor_lighting = scale_lighting(floor_lighting, scale=1.1, gamma=-30.0) #gamma is scale_lighting above plus this
 
             lighting = floor_lighting * floor_mask_blurred + lighting * (1.0 - floor_mask_blurred)
         
@@ -196,7 +224,7 @@ class PipelineSurfaceRefinement(PipelineStep):
         return ["segmentation", "masks"]
 
     def run(self, data):
-        refiner = SurfaceRefinement(data)
+        refiner = SurfaceRefinement(data, self.pipeline.config)
         refiner.refine()
 
         

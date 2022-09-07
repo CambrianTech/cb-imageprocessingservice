@@ -9,8 +9,17 @@ import zlib
 import cv2
 
 from pipeline.core import PipelineStep, PipelineStepIndex
+from pipeline.data.surface_type import SurfaceType
 
-surface_types = ["unknown", "floor", "wall", "horizontal", "vertical"]
+ # threejs (y-up)      planercnn (z-up)
+ #
+ #   Y                 Z / Y 
+ #   |__ X      <=>     |/__ X
+ #  /              
+ # Z   
+ #
+ # planercnn => threejs: [x, y, z] => [x, z, -y]
+
 
 class PipelineOutput(PipelineStep):
     def __init__(self, pipeline, outfile_name="data.json", preview_size=1024, thumbnail_size=320):
@@ -63,12 +72,20 @@ class PipelineOutput(PipelineStep):
         lighting_url = self.make_url(filename)
         self.save_image(data["lighting"], filename, lighting_url)
         data["lighting_url"] = lighting_url
-        
-        filename = "index_mask.png"
-        index_mask_url = self.make_url(filename)
-        self.save_image(data["index_mask"], filename, index_mask_url)    
 
-        results = self.make_data_dict(data, image_url, lighting_url, index_mask_url)
+        index_mask_url = None
+        surfaces = data["room"].get_surfaces(surfaceTypes=self.config.surface_type_whitelist)
+
+        if self.config.multi_mask:
+            for index, surface in enumerate(surfaces):
+                mask_url = self.make_url(surface.filename)
+                self.save_image(surface.hires_mask, surface.filename, mask_url)
+        else:
+            filename = "index_mask.png"
+            index_mask_url = self.make_url(filename)
+            self.save_image(data["index_mask"], filename, index_mask_url)
+
+        results = self.make_data_dict(data, surfaces, image_url, lighting_url, index_mask_url)
 
         results["data_url"] = data["data_url"]
 
@@ -96,15 +113,25 @@ class PipelineOutput(PipelineStep):
         # we can extract plane_normal and plane_offset from their multiplication.
 
         plane_normal = surface.normal.astype(float)
-        plane_normal = [-plane_normal[0], -plane_normal[2], plane_normal[1]] if self.y_up else list(plane_normal)
+        # planercnn => threejs: [x, y, z] => [x, z, -y]
+
+        #JOEL IMPORTANT hack coordinate axis messed up! This will only work temporarily and NOT FOR FLOORS or anything textured!
+        if surface.surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
+            plane_normal = [0,0,1]
+        else:
+            plane_normal = [-plane_normal[0], -plane_normal[2], plane_normal[1]]
+
+        # if self.y_up:
+        #     plane_normal = [-plane_normal[0], -plane_normal[2], plane_normal[1]]
+        
         plane_offset = float(surface.offset)
 
-        return {
+        json = {
             "id": str(surface.uniqueId),
             "type": surface.surfaceType.name,
             "name": surface.name,
             "maskIndex": surface.index,
-            "normal": plane_normal,
+            "normal": list(plane_normal),
             "offset": plane_offset,
             "axisRotation": -surface.axisRotation if self.y_up else surface.axisRotation,
             "backgroundMean": surface.background_mean,
@@ -113,18 +140,27 @@ class PipelineOutput(PipelineStep):
             "lightingStdDev": surface.lighting_stddev
         }
 
-    def make_data_dict(self, data, image_url, lighting_url, index_mask_url):
+        if self.config.multi_mask:
+            json["images"] = {"mask": self.make_url(surface.filename)}
+
+        return json
+
+    def make_data_dict(self, data, surfaces, image_url, lighting_url, index_mask_url):
+
+        images_json = {
+            "main": image_url,
+            "lighting": lighting_url
+        }
+
+        if index_mask_url is not None:
+            images_json["index_mask"] = index_mask_url
 
         return {
             "version": self.config.api_long_version_string,
             "name": "Room %s" % self.unique_id,
             "id": self.unique_id,
             "floorRotation": -data["floor_rotation"] if self.y_up else data["floor_rotation"],
-            "images": {
-                "main": image_url,
-                "lighting": lighting_url,
-                "index_mask": index_mask_url
-            },
+            "images": images_json,
             "camera": {
                 "fov": data["fov"],
                 "position": [0, 0, 0],  # Planes are relative to camera so the
@@ -133,8 +169,10 @@ class PipelineOutput(PipelineStep):
             "geometry": {
                 "verticalAxis": "y" if self.y_up else "z",
                 "surfaces": [
-                    self.encode_plane_surface(surface) for surface in data["room"].surfaces
+                    self.encode_plane_surface(surface) for surface in surfaces
                 ]
             },
             "assets": []
         }
+
+        

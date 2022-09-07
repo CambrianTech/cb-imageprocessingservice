@@ -127,7 +127,7 @@ class PipelineLineFinder(PipelineStep):
         
         bw_lines_c, suspect_lines = partition(lambda x: LineFunctions.line_angle_difference(x.angle, 0) > 0.01 and LineFunctions.line_angle_difference(x.angle, math.pi/2) > 0.01, bw_lines_c)
 
-        merge_lines(suspect_lines, search_width=max(diagonal/50, 3), angle_threshold=math.radians(3.0), remove_matches=False)
+        merge_lines(suspect_lines, search_width=max(diagonal/50, 3), angle_threshold=math.radians(3.0), do_merge=False)
         #log_image(data, "bw_lines_c_clusters", line_cluster_image(suspect_lines))
 
         for line in suspect_lines:
@@ -164,7 +164,7 @@ class PipelineLineFinder(PipelineStep):
         lines = merge_lines(lines, search_width=max(diagonal/500, 3), search_length=1.1, angle_threshold=math.radians(5.0))
 
         #assign clusters:
-        merge_lines(lines, search_width=max(diagonal/150, 3), search_length=1.2, angle_threshold=math.radians(5.0), remove_matches=False)
+        merge_lines(lines, search_width=max(diagonal/150, 3), search_length=1.2, angle_threshold=math.radians(5.0), do_merge=False)
         log_lines(lines, "merged_lines", primary=True)
 
         if im_logging_enabled(data):
