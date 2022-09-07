@@ -25,32 +25,6 @@ from pipeline.components.line import Line, extend_to_intersection, draw_lines, l
 from pipeline.stages.vanishingpointfinder import get_inliers
 
 
-class RansacTrimFinder():
-    def __init__(self, lines_a, lines_b, first_prob=0.3):
-    
-        def get_probs(lines):
-            
-            num_lines = len(lines)
-            if num_lines > 1:
-                remainder = (1.0 - first_prob) / num_lines
-                p.extend([remainder] * num_lines)
-            else:
-                return [1.0]
-
-        self.lines_a = lines_a
-        self.p_a = get_probs(lines_a)
-
-        self.lines_b = lines_b
-        self.p_b = get_probs(lines_b)
-
-        self.max_iterations = 50
-
-    def solve(self):
-
-        for i in range(self.max_iterations):
-            line_a = np.random.choice(self.lines_a, 2)
-            line_b = np.random.choice(self.lines_b, 2)
-
 class VerticalBarrierSet():
     def __init__(self, data, mask, wall_mask, ceiling_mask):
         self.data = data
@@ -66,10 +40,12 @@ class VerticalBarrierSet():
 
         self.labels = np.zeros_like(labels)
 
+        total_length = 0
+
         for i in range(0, self.k_means_constant):
             mask = np.zeros_like(labels)
             mask[labels == i] = 1
-            mask[self.mask == 0] = 0 
+            mask[self.wall_mask == 0] = 0 
 
             area = cv2.countNonZero(mask)
 
@@ -84,6 +60,8 @@ class VerticalBarrierSet():
             mask_bordered = cv2.copyMakeBorder(mask, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=0) 
             contours, _ = cv2.findContours(image=mask_bordered, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE, offset=(-pad,-pad))
 
+            total_length += sum(cv2.arcLength(contour, True) for contour in contours)
+
             test_mask = np.zeros_like(self.mask)
             cv2.drawContours(test_mask, contours, -1, 1, thickness=cv2.FILLED)
             test_mask[self.mask == 0] = 0
@@ -96,11 +74,11 @@ class VerticalBarrierSet():
 
         polygons = []
         for result in results:
-            if result[0] > best_count / 10:
+            if result[0] > best_count / 3:
                 contours = result[1]
                 polygons.extend(list(map(lambda contour: cv2.approxPolyDP(contour, poly_epsilon, True), contours)))
 
-        return polygons
+        return polygons, total_length
 
     def calculate_score(self, k, labels, scale=0.25):
         self.k_means_constant = k
@@ -110,7 +88,7 @@ class VerticalBarrierSet():
         self.normals_labels = cv2.resize(self.normals_labels, (labels.shape[1], labels.shape[0]), interpolation=cv2.INTER_NEAREST)
         self.normals_labels = self.normals_labels.astype(np.uint8)
 
-        polygons = self.find_polygons(self.normals_labels)
+        polygons, self.contour_length = self.find_polygons(self.normals_labels)
 
         diagonal = math.hypot(self.mask.shape[0], self.mask.shape[1])
         area = self.mask.shape[0] * self.mask.shape[1]
@@ -119,15 +97,22 @@ class VerticalBarrierSet():
         good_lines = []
         bad_lines = []
 
-        self.total_contour_points = sum(len(polygon) for polygon in polygons)
-
-        print("total_contour_points %d)" % k, self.total_contour_points)
+        self.total_defects = 0
 
         for polygon in polygons:
 
             num_pts = len(polygon)
 
-            hull = cv2.convexHull(polygon)
+            hull = cv2.convexHull(polygon, returnPoints=False)
+
+            try:
+                defects = cv2.convexityDefects(polygon, hull)
+
+                if defects is not None:
+                    self.total_defects += defects.shape[0]
+            except:
+                pass
+                
 
             for i in range(num_pts):
                 point_a = polygon[i][0]
@@ -165,6 +150,7 @@ class VerticalBarrierSet():
 
         #cv2.countNonZero(ceiling_mask)
 
+        print("defects k=%d, %d" % (self.k_means_constant, self.total_defects))
         print("good_lines k=%d" % self.k_means_constant, len(filtered_lines))
 
         self.bad_lines = list(get_inliers(bad_lines, self.data["vertical_vp"].model, self.vp_angle_diff))
@@ -175,8 +161,8 @@ class VerticalBarrierSet():
 
         self.score = 0.0
 
-        if self.total_contour_points > 0:
-            self.score = self.total_line_length / self.total_contour_points
+        if self.contour_length > 0 and self.total_defects > 0:
+            self.score = (self.k_means_constant * self.total_line_length) / (self.contour_length * self.total_defects)
             
         #return 100.0 * (self.total_line_length - self.total_bad_line_length) / self.contour_length
 
@@ -189,7 +175,7 @@ class VerticalBarrierSet():
     @property
     def polygons(self):
         if self._polygons is None:
-            self._polygons = self.find_polygons(self.normals_labels, poly_epsilon=5)
+            self._polygons, _ = self.find_polygons(self.normals_labels, poly_epsilon=5)
 
         return self._polygons
 
