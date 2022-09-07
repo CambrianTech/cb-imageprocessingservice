@@ -431,21 +431,21 @@ class PipelineVanishingPointFinder(PipelineStep):
             cluster_index+=1
 
         # #consolidate
-        # before = len(vps_horizontal)
-        # for vpA in vps_horizontal:
-        #     for vpB in vps_horizontal:
-        #         if vpA == vpB or vpA.deleted or vpB.deleted: continue
+        before = len(vps_horizontal)
+        for vpA in vps_horizontal:
+            for vpB in vps_horizontal:
+                if vpA == vpB or vpA.deleted or vpB.deleted: continue
 
-        #         intersection = get_inliers(vpB.inliers, vpA.model, np.radians(5.0))
+                intersection = get_inliers(vpB.inliers, vpA.model, np.radians(5.0))
 
-        #         if len(intersection) > 2 * len(vpB.inliers) / 3:
-        #             vpA.merge(vpB)
+                if len(intersection) > 0.7 * len(vpB.inliers):
+                    vpA.merge(vpB)
                     
-        # vps_horizontal = list(filter(lambda x: not x.deleted, vps_horizontal))
-        # after = len(vps_horizontal)
+        vps_horizontal = list(filter(lambda x: not x.deleted, vps_horizontal))
+        after = len(vps_horizontal)
 
-        # if after < before:
-        #     print("consolidated vanishing_points from %d to %d" % (before, after))
+        if after < before:
+            print("consolidated vanishing_points from %d to %d" % (before, after))
 
 
         data["vertical_vp"] = vertical_vp
