@@ -14,7 +14,7 @@ from pipeline.data.surface_type import SurfaceType
  # threejs (y-up)      planercnn (z-up)
  #
  #   Y                 Z / Y 
- #   |__ X      =>     |/__ X
+ #   |__ X      <=>     |/__ X
  #  /              
  # Z   
  #
@@ -116,12 +116,10 @@ class PipelineOutput(PipelineStep):
         # planercnn => threejs: [x, y, z] => [x, z, -y]
 
         #JOEL IMPORTANT hack coordinate axis messed up! This will only work temporarily and NOT FOR FLOORS or anything textured!
-        if surface.surfaceType in [SurfaceType.Floor, SurfaceType.OnFloor]:
-            plane_normal = [0,1,0]
-        elif surface.surfaceType in [SurfaceType.Ceiling, SurfaceType.OnCeiling]:
-            plane_normal = [0,-1,0]
-        else:
+        if surface.surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
             plane_normal = [0,0,1]
+        else:
+            plane_normal = [-plane_normal[0], -plane_normal[2], plane_normal[1]]
 
         # if self.y_up:
         #     plane_normal = [-plane_normal[0], -plane_normal[2], plane_normal[1]]
