@@ -26,14 +26,16 @@ from pipeline.stages.vanishingpointfinder import get_inliers
 
 
 class VerticalBarrierSet():
-    def __init__(self, data, mask, wall_mask, invalid_mask):
+    def __init__(self, data, k, mask, wall_mask, invalid_mask):
         self.data = data
+        self.k_means_constant = k
+
         self.mask = mask
         self.wall_mask = wall_mask
         self.invalid_mask = invalid_mask
         self.vp_angle_diff = np.radians(8)
 
-    def find_polygons(self, labels, poly_epsilon=3, pad=10):
+    def find_polygons(self, labels, epsilon=5, pad=10):
 
         results = []
         mask_area = labels.shape[0] * labels.shape[1]
@@ -76,19 +78,22 @@ class VerticalBarrierSet():
         for result in results:
             if result[0] > best_count / 3:
                 contours = result[1]
-                polygons.extend(list(map(lambda contour: cv2.approxPolyDP(contour, poly_epsilon, True), contours)))
+                polygons.extend(list(map(lambda contour: cv2.approxPolyDP(contour, epsilon, True), contours)))
 
         return polygons, total_length
 
-    def calculate_score(self, k, labels, scale=0.25):
-        self.k_means_constant = k
-
+    def recluster(self, scale=1.0):
+        labels = self.data["surface_normals"]
         _, self.normals_labels, _ = kmeans_image(cv2.resize(labels, (int(scale * labels.shape[1]), int(scale * labels.shape[0]))), self.k_means_constant)
 
         self.normals_labels = cv2.resize(self.normals_labels, (labels.shape[1], labels.shape[0]), interpolation=cv2.INTER_NEAREST)
         self.normals_labels = self.normals_labels.astype(np.uint8)
+        self.polygons, self.contour_length = self.find_polygons(self.normals_labels)
 
-        polygons, self.contour_length = self.find_polygons(self.normals_labels)
+
+    def calculate_score(self, scale=0.25):
+        
+        self.recluster(scale)
 
         diagonal = math.hypot(self.mask.shape[0], self.mask.shape[1])
         area = self.mask.shape[0] * self.mask.shape[1]
@@ -99,7 +104,7 @@ class VerticalBarrierSet():
 
         self.total_defects = 0
 
-        for polygon in polygons:
+        for polygon in self.polygons:
 
             num_pts = len(polygon)
 
@@ -176,18 +181,8 @@ class VerticalBarrierSet():
             
         #return 100.0 * (self.total_line_length - self.total_bad_line_length) / self.contour_length
 
-
-
         return self.score
 
-    _polygons = None
-
-    @property
-    def polygons(self):
-        if self._polygons is None:
-            self._polygons, _ = self.find_polygons(self.normals_labels, poly_epsilon=5)
-
-        return self._polygons
 
     _vertical_lines = None
 
@@ -344,13 +339,15 @@ class PipelineBarrierFinder(PipelineStep):
 
         for k in range(3, 10):
 
-            vbs = VerticalBarrierSet(self.data, normals_mask,  wall, invalid_vert_areas)
-            vbs.calculate_score(k, self.data["surface_normals"])
+            vbs = VerticalBarrierSet(self.data, k, normals_mask,  wall, invalid_vert_areas)
+            vbs.calculate_score()
             barrier_sets.append(vbs)
 
             vbs.debug(self.data, "normals_clustered_%d" % k)
             
         barriers = sorted(barrier_sets, key=lambda x: x.score, reverse=True)[0]
+        barriers.recluster()
+
         barriers.debug(self.data, "normals_clustered_best")
 
         for plane_index in all_planes:
