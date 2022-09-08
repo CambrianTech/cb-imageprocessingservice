@@ -142,7 +142,7 @@ class VerticalBarrierSet():
         for vp in vps:
             self.filtered_lines.extend(get_inliers(good_lines, vp.model, self.vp_angle_diff))
 
-        self.filtered_lines = merge_lines(self.filtered_lines, search_width=max(diagonal/150, 3), search_length=1.2, angle_threshold=self.vp_angle_diff)
+        self.filtered_lines = merge_lines(self.filtered_lines, search_width=max(diagonal/150, 3), angle_threshold=self.vp_angle_diff)
 
         def line_valid(line):
 
@@ -354,7 +354,7 @@ class PipelineBarrierFinder(PipelineStep):
         if cv2.countNonZero(floor) > area/50:
             min_k += 1
 
-        max_k = min(max(min_k + 1, 2 + len(vps)), 8)     
+        max_k = min(max(min_k + 1, 2 + len(vps)), 10)     
 
         print("k range %d-%d" % (min_k, max_k))
 
