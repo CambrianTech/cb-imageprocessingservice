@@ -35,8 +35,9 @@ class VerticalBarrierSet():
         self.invalid_mask = invalid_mask
         self.vp_angle_diff = np.radians(8)
 
-    def find_polygons(self, labels, epsilon=5, pad=10):
+    def find_polygons(self, labels, epsilon):
 
+        pad = 10
         results = []
         mask_area = labels.shape[0] * labels.shape[1]
 
@@ -47,15 +48,13 @@ class VerticalBarrierSet():
         for i in range(0, self.k_means_constant):
             mask = np.zeros_like(labels)
             mask[labels == i] = 1
-            mask[self.wall_mask == 0] = 0 
+            #mask[self.wall_mask == 0] = 0 
 
             area = cv2.countNonZero(mask)
 
             area_threshold = mask_area / 50
 
             mask = remove_small_holes(mask, area_threshold=area_threshold).astype(np.uint8)
-
-            #mask = remove_small_objects(mask, min_size=area_threshold).astype(np.uint8)
 
             self.labels[mask > 0] = (i + 1)
 
@@ -82,18 +81,22 @@ class VerticalBarrierSet():
 
         return polygons, total_length
 
-    def recluster(self, scale=1.0):
+    def recluster(self, scale=1.0, epsilon=1.5):
         labels = self.data["surface_normals"]
-        _, self.normals_labels, _ = kmeans_image(cv2.resize(labels, (int(scale * labels.shape[1]), int(scale * labels.shape[0]))), self.k_means_constant)
 
-        self.normals_labels = cv2.resize(self.normals_labels, (labels.shape[1], labels.shape[0]), interpolation=cv2.INTER_NEAREST)
-        self.normals_labels = self.normals_labels.astype(np.uint8)
-        self.polygons, self.contour_length = self.find_polygons(self.normals_labels)
+        if scale != 1.0:
+            _, self.normals_labels, _ = kmeans_image(cv2.resize(labels, (int(scale * labels.shape[1]), int(scale * labels.shape[0]))), self.k_means_constant)
+            self.normals_labels = cv2.resize(self.normals_labels.astype(np.uint8), (labels.shape[1], labels.shape[0]), interpolation=cv2.INTER_LINEAR)
+        else:
+            _, self.normals_labels, _ = kmeans_image(labels, self.k_means_constant)
+            self.normals_labels = self.normals_labels.astype(np.uint8)
+
+        self.polygons, self.contour_length = self.find_polygons(self.normals_labels, epsilon=epsilon)
 
 
-    def calculate_score(self, scale=0.25):
+    def calculate_score(self, scale=0.25, epsilon=3.0):
         
-        self.recluster(scale)
+        self.recluster(scale, epsilon=epsilon)
 
         diagonal = math.hypot(self.mask.shape[0], self.mask.shape[1])
         area = self.mask.shape[0] * self.mask.shape[1]
@@ -133,7 +136,7 @@ class VerticalBarrierSet():
                 bad_lines.append(line)
 
         vps = [self.data["vertical_vp"]]
-        #vps.extend(self.data["horizontal_vps"])
+        vps.extend(self.data["horizontal_vps"])
 
         self.filtered_lines = []
         for vp in vps:
@@ -177,7 +180,7 @@ class VerticalBarrierSet():
         self.score = 0.0
 
         if self.contour_length > 0 and self.total_defects > 0:
-            self.score = (self.k_means_constant * self.total_line_length) / (self.contour_length * self.total_defects)
+            self.score = (self.k_means_constant * math.pow(self.total_line_length, 2.0)) / (self.contour_length * self.total_defects)
             
         #return 100.0 * (self.total_line_length - self.total_bad_line_length) / self.contour_length
 
@@ -295,6 +298,10 @@ class PipelineBarrierFinder(PipelineStep):
         wall[wall_like_mask > 0] = 1
         wall_contracted = adjust_mask(cv2.erode, wall, size=5)
 
+        floor = np.zeros(self.image .shape[:2], dtype=np.uint8)
+        floor[self.data["isolated_labels"] == SurfaceType.Floor.index] = 1
+        floor[self.data["isolated_labels"] == SurfaceType.OnFloor.index] = 1
+
         ceiling = np.zeros(self.image .shape[:2], dtype=np.uint8)
         ceiling[self.data["isolated_labels"] == SurfaceType.Ceiling.index] = 1
         ceiling[self.data["isolated_labels"] == SurfaceType.OnCeiling.index] = 1
@@ -337,7 +344,21 @@ class PipelineBarrierFinder(PipelineStep):
 
         #log_mask(self.data, "normals_mask", normals_mask, self.data["downscaled"])
 
-        for k in range(3, 10):
+        vps = [self.data["vertical_vp"]]
+        vps.extend(self.data["horizontal_vps"])
+
+        min_k = max(3, int(len(vps) / 3))
+        if cv2.countNonZero(ceiling) > area/50:
+            min_k += 1
+
+        if cv2.countNonZero(floor) > area/50:
+            min_k += 1
+
+        max_k = min(max(min_k + 1, 2 + len(vps)), 8)     
+
+        print("k range %d-%d" % (min_k, max_k))
+
+        for k in range(min_k, max_k):
 
             vbs = VerticalBarrierSet(self.data, k, normals_mask,  wall, invalid_vert_areas)
             vbs.calculate_score()
@@ -346,7 +367,7 @@ class PipelineBarrierFinder(PipelineStep):
             vbs.debug(self.data, "normals_clustered_%d" % k)
             
         barriers = sorted(barrier_sets, key=lambda x: x.score, reverse=True)[0]
-        barriers.recluster()
+        barriers.calculate_score(scale=1.0)
 
         barriers.debug(self.data, "normals_clustered_best")
 
