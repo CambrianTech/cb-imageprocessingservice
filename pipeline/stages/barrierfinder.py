@@ -174,7 +174,7 @@ class VerticalBarrierSet():
 
             side = math.sqrt(cv2.contourArea(max_contour))
 
-            return max_distance is not None and max_distance > side / 100 and line.length > side / 5
+            return max_distance is not None and max_distance > side / 100 and line.length > side / 10
 
             # test_length = int(line.length * 0.2)
 
@@ -595,7 +595,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         self.data["horizontal_barriers"] = horizontal_lines
 
-        self.data["vertical_barriers"] = adjacent_vertical_lines
+        self.data["vertical_barriers"] = barriers.vertical_lines
 
         samples = []
         for intersection in intersections:

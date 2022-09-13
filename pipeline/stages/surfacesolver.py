@@ -46,7 +46,7 @@ class SurfaceSolver():
         horizontal_barriers = [line.extended(1.3) for line in self.data["horizontal_barriers"]]
         draw_lines(self.lines_mask, horizontal_barriers, color=1, thickness=3, lineType=cv2.LINE_4)
 
-        vertical_barriers = [line.extended(1.05) for line in self.data["vertical_barriers"]]
+        vertical_barriers = [line.extended(1.5, vanishing_point=self.room.vertical_vp.model[:2]) for line in self.data["vertical_barriers"]]
         draw_lines(self.lines_mask, vertical_barriers, color=1, thickness=3, lineType=cv2.LINE_4)
 
         self.lines_mask = remove_small_holes(self.lines_mask, area_threshold=self.area/50).astype(np.uint8)
@@ -207,7 +207,11 @@ class SurfaceSolver():
             type_surface = Surface(self.data)
             type_surface.mask = mask
 
-            type_lines = type_surface.lines
+            #type_lines = type_surface.lines
+
+            #type_lines = self.data["vertical_barriers"]
+
+            type_lines = list(map(lambda line: line.extended(1.5, vanishing_point=vertical_vp.model[:2]), self.data["vertical_barriers"]))
 
             for surface in surfaces_of_type:
                 #print(np.unique(surface.probs))
@@ -230,7 +234,7 @@ class SurfaceSolver():
                 if len(surface_lines) == 0:
                     continue
 
-                surface_lines = list(map(lambda line: line.extended(.5, vanishing_point=vertical_vp.model[:2]), surface_lines))
+                #surface_lines = list(map(lambda line: line.extended(.5, vanishing_point=vertical_vp.model[:2]), surface_lines))
                          
                 surface_lines.sort(key=lambda x:x.angle%np.pi)
 
