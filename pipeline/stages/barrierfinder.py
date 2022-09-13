@@ -80,7 +80,7 @@ class VerticalBarrierSet():
 
                 for contour in contours:
 
-                    test_mask = np.zeros_like(self.mask)
+                    test_mask = np.zeros_like(self.invalid_mask)
                     cv2.drawContours(test_mask, [contour], -1, 1, thickness=cv2.FILLED)
 
                     contour_area = cv2.countNonZero(test_mask)
@@ -204,40 +204,42 @@ class VerticalBarrierSet():
 
     @property
     def vertical_lines(self):
-        if self._vertical_lines is None:
-            good_lines = []
+        return self.filtered_lines
+        
+        # if self._vertical_lines is None:
+        #     good_lines = []
 
-            diagonal = math.hypot(self.normals_labels.shape[0], self.normals_labels.shape[1])
-            min_line_length = diagonal / 200
+        #     diagonal = math.hypot(self.normals_labels.shape[0], self.normals_labels.shape[1])
+        #     min_line_length = diagonal / 200
 
-            for polygon in self.polygons:
+        #     for polygon in self.polygons:
 
-                num_pts = len(polygon)
+        #         num_pts = len(polygon)
 
-                for i in range(num_pts):
-                    point_a = polygon[i][0]
-                    point_b = polygon[(i+1) % num_pts][0]
+        #         for i in range(num_pts):
+        #             point_a = polygon[i][0]
+        #             point_b = polygon[(i+1) % num_pts][0]
 
-                    if line_on_image_edge(point_a, point_b, self.normals_labels.shape[1], self.normals_labels.shape[0], min_distance=15):
-                        continue
+        #             if line_on_image_edge(point_a, point_b, self.normals_labels.shape[1], self.normals_labels.shape[0], min_distance=15):
+        #                 continue
 
-                    line = Line(point_a[0], point_a[1], point_b[0], point_b[1])
+        #             line = Line(point_a[0], point_a[1], point_b[0], point_b[1])
 
-                    length = distance.euclidean(point_a, point_b)
+        #             length = distance.euclidean(point_a, point_b)
 
-                    if length >= min_line_length:
-                        samples = LineFunctions.get_line_samples(point_a, point_b, self.mask, int(line.length / 3))
-                        is_within_mask = np.mean(samples) > 0.5
+        #             if length >= min_line_length:
+        #                 samples = LineFunctions.get_line_samples(point_a, point_b, self.mask, int(line.length / 3))
+        #                 is_within_mask = np.mean(samples) > 0.5
                         
-                        if is_within_mask:
-                            good_lines.append(line)
+        #                 if is_within_mask:
+        #                     good_lines.append(line)
                         
-            self._vertical_lines = list(get_inliers(good_lines, self.data["vertical_vp"].model, self.vp_angle_diff))
+        #     self._vertical_lines = list(get_inliers(good_lines, self.data["vertical_vp"].model, self.vp_angle_diff))
 
-            self._vertical_lines = merge_lines(self._vertical_lines, search_width=max(diagonal/150, 3), search_length=1.05, angle_threshold=self.vp_angle_diff)
+        #     self._vertical_lines = merge_lines(self._vertical_lines, search_width=max(diagonal/150, 3), search_length=1.05, angle_threshold=self.vp_angle_diff)
 
 
-        return self._vertical_lines
+        # return self._vertical_lines
 
     def debug(self, data, name):
 
