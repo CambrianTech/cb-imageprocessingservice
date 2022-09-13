@@ -26,12 +26,13 @@ from pipeline.stages.vanishingpointfinder import get_inliers
 
 
 class VerticalBarrierSet():
-    def __init__(self, data, k, mask, wall_mask, invalid_mask):
+    def __init__(self, data, k, mask, wall_mask, wall_contours, invalid_mask):
         self.data = data
         self.k_means_constant = k
 
         self.mask = mask
         self.wall_mask = wall_mask
+        self.wall_contours = wall_contours
         self.invalid_mask = invalid_mask
         self.vp_angle_diff = np.radians(8)
 
@@ -162,22 +163,37 @@ class VerticalBarrierSet():
             if line.length < min_line_length:
                 return False
 
-            test_length = int(line.length * 0.2)
+            max_distance = None
+            max_contour = None
 
-            test_a = line.normal_a * test_length + line.midpoint
-            test_b = line.normal_b * test_length + line.midpoint
+            for contour in self.wall_contours:
+                dist = cv2.pointPolygonTest(contour, line.midpoint, True)
+                if max_distance is None or dist > max_distance:
+                    max_distance = dist
+                    max_contour = contour
 
-            line_samples = LineFunctions.get_line_samples(line.point_a, line.point_b, self.wall_mask, max(3, int(length)))
-            o_samples_a = LineFunctions.get_line_samples(line.midpoint, test_a, self.invalid_mask, max(3, test_length))
-            o_samples_b = LineFunctions.get_line_samples(line.midpoint, test_b, self.invalid_mask, max(3, test_length))
+            side = math.sqrt(cv2.contourArea(max_contour))
 
-            mean_line = np.mean(line_samples)
-            o_mean_a = np.mean(o_samples_a)
-            o_mean_b = np.mean(o_samples_b)
+            return max_distance is not None and max_distance > side / 100 and line.length > side / 5
+
+            # test_length = int(line.length * 0.2)
+
+            # test_a = line.normal_a * test_length + line.midpoint
+            # test_b = line.normal_b * test_length + line.midpoint
+
+            # line_samples = LineFunctions.get_line_samples(line.point_a, line.point_b, self.wall_mask, max(3, int(length)))
+            # o_samples_a = LineFunctions.get_line_samples(line.midpoint, test_a, self.invalid_mask, max(3, test_length))
+            # o_samples_b = LineFunctions.get_line_samples(line.midpoint, test_b, self.invalid_mask, max(3, test_length))
+
+            # mean_line = np.mean(line_samples)
+            # o_mean_a = np.mean(o_samples_a)
+            # o_mean_b = np.mean(o_samples_b)
 
             return mean_line > 0.5 and o_mean_a < 0.5 and o_mean_b < 0.5
 
-        #self.filtered_lines = list(filter(lambda line: line_valid(line), self.filtered_lines))
+        self.filtered_lines = merge_lines(self.filtered_lines, search_width=max(diagonal/150, 3), search_length=1.5, angle_threshold=self.vp_angle_diff)
+
+        self.filtered_lines = list(filter(lambda line: line_valid(line), self.filtered_lines))
 
         self.total_line_length = sum(math.pow(line.length, 2) for line in self.filtered_lines)
 
@@ -205,7 +221,7 @@ class VerticalBarrierSet():
     @property
     def vertical_lines(self):
         return self.filtered_lines
-        
+
         # if self._vertical_lines is None:
         #     good_lines = []
 
@@ -345,6 +361,10 @@ class PipelineBarrierFinder(PipelineStep):
 
         vertical_plane_lines = []
 
+        pad=5
+        mask_bordered = cv2.copyMakeBorder(wall, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=0) 
+        wall_contours, _ = cv2.findContours(image=mask_bordered, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE, offset=(-pad,-pad))
+
         #normals
 
         barrier_sets = []
@@ -377,7 +397,7 @@ class PipelineBarrierFinder(PipelineStep):
 
         for k in range(min_k, max_k):
 
-            vbs = VerticalBarrierSet(self.data, k, normals_mask,  wall, invalid_vert_areas)
+            vbs = VerticalBarrierSet(self.data, k, normals_mask,  wall, wall_contours, invalid_vert_areas)
             vbs.calculate_score()
             barrier_sets.append(vbs)
 
