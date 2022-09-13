@@ -63,9 +63,9 @@ class VerticalBarrierSet():
 
             total_length += sum(cv2.arcLength(contour, True) for contour in contours)
 
-            test_mask = np.zeros_like(self.mask)
+            test_mask = np.zeros_like(self.wall_mask)
             cv2.drawContours(test_mask, contours, -1, 1, thickness=cv2.FILLED)
-            test_mask[self.mask == 0] = 0
+            test_mask[self.wall_mask == 0] = 0
 
             results.append((cv2.countNonZero(test_mask), contours))
 
@@ -77,7 +77,20 @@ class VerticalBarrierSet():
         for result in results:
             if result[0] > best_count / 3:
                 contours = result[1]
-                polygons.extend(list(map(lambda contour: cv2.approxPolyDP(contour, epsilon, True), contours)))
+
+                for contour in contours:
+
+                    test_mask = np.zeros_like(self.mask)
+                    cv2.drawContours(test_mask, [contour], -1, 1, thickness=cv2.FILLED)
+
+                    contour_area = cv2.countNonZero(test_mask)
+
+                    invalid = cv2.bitwise_and(test_mask, self.invalid_mask)
+                    invalid_area = cv2.countNonZero(invalid)
+
+                    if invalid_area < contour_area / 2:
+                        polygon = cv2.approxPolyDP(contour, epsilon, True)
+                        polygons.append(polygon)
 
         return polygons, total_length
 
@@ -136,7 +149,7 @@ class VerticalBarrierSet():
                 bad_lines.append(line)
 
         vps = [self.data["vertical_vp"]]
-        vps.extend(self.data["horizontal_vps"])
+        #vps.extend(self.data["horizontal_vps"])
 
         self.filtered_lines = []
         for vp in vps:
@@ -164,9 +177,9 @@ class VerticalBarrierSet():
 
             return mean_line > 0.5 and o_mean_a < 0.5 and o_mean_b < 0.5
 
-        self.filtered_lines = list(filter(lambda line: line_valid(line), self.filtered_lines))
+        #self.filtered_lines = list(filter(lambda line: line_valid(line), self.filtered_lines))
 
-        self.total_line_length = sum(line.length for line in self.filtered_lines)
+        self.total_line_length = sum(math.pow(line.length, 2) for line in self.filtered_lines)
 
         #cv2.countNonZero(ceiling_mask)
 
@@ -230,7 +243,7 @@ class VerticalBarrierSet():
 
         debug = get_segmentation_image(self.labels, data["downscaled"], labelset=None)
 
-        opacity = 0.4
+        opacity = 0.25
         debug = cv2.addWeighted(debug, opacity, data["downscaled"], 1.0 - opacity, 0)
 
         cv2.drawContours(debug, self.polygons, -1, (0,0,255), thickness=1)
@@ -238,7 +251,7 @@ class VerticalBarrierSet():
         # draw_lines(debug, self.bad_lines, thickness=2)
         #draw_lines(debug, self.vertical_lines, thickness=2, color=(255,255,0))
 
-        draw_lines(debug, self.filtered_lines, thickness=2, color=(255,255,0))
+        draw_lines(debug, self.filtered_lines, thickness=3, color=(255,255,0))
 
         put_text(debug, "k=%d score: %.5f" % (self.k_means_constant, self.score), (100,100), (255, 0, 0))
 
@@ -315,11 +328,13 @@ class PipelineBarrierFinder(PipelineStep):
         on_ceiling_mask = adjust_mask(cv2.dilate, on_ceiling_mask, size=5, scale=0.5)
 
         invalid_vert_areas = np.zeros(self.image .shape[:2], dtype=np.uint8)
-        on_wall_objects = [ADE20K.painting, ADE20K.shelf, ADE20K.projection_screen, ADE20K.radiator, ADE20K.sconce, ADE20K.towel]
+        on_wall_objects = [ADE20K.painting, ADE20K.shelf, ADE20K.projection_screen, ADE20K.radiator, ADE20K.sconce, ADE20K.towel, ADE20K.curtain]
         for label in on_wall_objects:
             invalid_vert_areas[self.data["semantic_labels"] == label.index] = 1
 
-        invalid_vert_areas = adjust_mask(cv2.dilate, invalid_vert_areas, size=5, scale=0.5)
+        #invalid_vert_areas = adjust_mask(cv2.dilate, invalid_vert_areas, size=5, scale=0.5)
+
+        log_mask(self.data, "invalid_vert_areas", invalid_vert_areas, self.data["downscaled"])
 
         index_mask = np.dstack(tuple(probs))
         index_mask = np.int32(np.argmax(index_mask, -1))
