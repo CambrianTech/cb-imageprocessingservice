@@ -170,7 +170,7 @@ class SurfaceRefinement():
         center = 127.0 * lighting_scale
 
         #print("std", std[0])
-        lighting = scale_lighting(lighting, scale=lighting_scale, center=center, gamma=100.0)
+        lighting = scale_lighting(lighting, scale=lighting_scale, center=center, gamma=50.0)
         lighting = cv2.bilateralFilter(lighting, d=15, sigmaColor=30, sigmaSpace=30)
         lighting_smoothed = lighting.copy()
 
@@ -198,7 +198,7 @@ class SurfaceRefinement():
             floor_lighting = lighting.copy()
             floor_lighting[floor_mask_blurred > 0] = lighting_smoothed[floor_mask_blurred > 0]
 
-            floor_lighting = scale_lighting(floor_lighting, scale=1.1, gamma=-30.0) #gamma is scale_lighting above plus this
+            floor_lighting = scale_lighting(floor_lighting, scale=1.1) #gamma is scale_lighting above plus this
 
             lighting = floor_lighting * floor_mask_blurred + lighting * (1.0 - floor_mask_blurred)
         
