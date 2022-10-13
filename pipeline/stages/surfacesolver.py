@@ -397,9 +397,9 @@ class SurfaceSolver():
                 return True
             elif angle <= np.radians(45):
 
-                if vps_intersection is not None and len(vps_intersection) == 1:
-                    #print("Merge %s with %s due to matching vanishing points" % (surface_a.name, surface_b.name))
-                    return True
+                # if vps_intersection is not None and len(vps_intersection) == 1:
+                #     print("Merge %s with %s due to matching vanishing points" % (surface_a.name, surface_b.name))
+                #     return True
         
                 #see if there's a line through the intersection
                 contours = surface_a.intersection(surface_b) 
