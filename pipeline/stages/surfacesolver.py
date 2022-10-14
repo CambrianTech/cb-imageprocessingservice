@@ -172,11 +172,12 @@ class SurfaceSolver():
             debug = self.data["downscaled"].copy()
             debug[surface.mask_expanded > 0] = random_color()
 
-            #draw_lines(debug, surface.lines, color=(50, 50, 50), thickness=2,lineType=cv2.LINE_AA)
+            draw_lines(debug, surface.lines, color=(50, 50, 50), thickness=2,lineType=cv2.LINE_AA)
 
             for vp, inliers in surface.horizontal_vps:
                 index = self.room.horizontal_vps.index(vp) + 1
                 color = standard_colors[index]
+                draw_lines(debug, vp.inliers, color=(color[0], color[1], color[2]), thickness=1, lineType=cv2.LINE_AA)
                 draw_lines(debug, inliers, color=(color[0], color[1], color[2]), thickness=2, lineType=cv2.LINE_AA)
 
             log_image(self.data, "vanishing_pts_%s" % surface.name, debug)
@@ -379,7 +380,7 @@ class SurfaceSolver():
                 inliers_a = surface_a.horizontal_vps[0][1]
                 inliers_b = surface_b.horizontal_vps[0][1]
 
-                if surface_a.horizontal_vps[0][0] == surface_a.horizontal_vps[0][0]:
+                if surface_a.horizontal_vps[0][0] == surface_b.horizontal_vps[0][0]:
                     print("vps are the same", surface_a.horizontal_vps[0][0].name, surface_b.horizontal_vps[0][0].name)
 
                 vps_intersection = list(set(inliers_a) & set(inliers_b))

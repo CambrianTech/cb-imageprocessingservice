@@ -229,16 +229,13 @@ class Surface():
 
             for line in self.data["lines"]:
 
-                if line.cluster in self._clusters:
-                    continue
-
                 midpoint_a = ((line.point_a[0] + line.midpoint[0]) / 2, (line.point_a[1] + line.midpoint[1]) / 2)
                 midpoint_b = ((line.point_b[0] + line.midpoint[0]) / 2, (line.point_b[1] + line.midpoint[1]) / 2)                
 
                 if is_inside(line.midpoint) and (is_inside(midpoint_a) or is_inside(midpoint_b)):
                     self._clusters.append(line.cluster)
-
-            self._lines  = [line for line in self.data["lines"] if line.cluster in self._clusters]
+                    self._lines.append(line)
+ 
         return self._lines
 
     @property
