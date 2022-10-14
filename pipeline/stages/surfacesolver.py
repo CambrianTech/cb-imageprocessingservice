@@ -377,19 +377,23 @@ class SurfaceSolver():
             print("Comparing %s to %s" % (surface_a.name, surface_b.name))
 
             if len(surface_a.horizontal_vps) > 0 and len(surface_b.horizontal_vps) > 0:
+                vpa = surface_a.horizontal_vps[0][0]
                 inliers_a = surface_a.horizontal_vps[0][1]
+                vpb = surface_b.horizontal_vps[0][0]
                 inliers_b = surface_b.horizontal_vps[0][1]
 
-                if surface_a.horizontal_vps[0][0] == surface_b.horizontal_vps[0][0]:
-                    print("vps are the same", surface_a.horizontal_vps[0][0].name, surface_b.horizontal_vps[0][0].name)
+                if vpa == vpb:
+                    print("vps are the same", vpa.name, vpb.name)
 
                 vps_intersection = list(set(inliers_a) & set(inliers_b))
 
-                if len(vps_intersection) == 0:
-                    print("Cannot merge surface %s with %s, no matching vp inliers" % (surface_a.name, surface_b.name))
-                    return False
+                # if len(vps_intersection) == 0:
+                #     print("Cannot merge surface %s with %s, no matching vp inliers" % (surface_a.name, surface_b.name))
+                #     return False
             else:
+                vpa = None
                 inliers_a = []
+                vpb = None
                 inliers_b = []
                 vps_intersection = []
 
@@ -407,7 +411,7 @@ class SurfaceSolver():
                 return True
             elif angle <= np.radians(45):
 
-                if len(vps_intersection) > min_inliers / 3:
+                if vpa is not None and vpa == vpb:
                     print("Merge %s with %s due to %d matching vanishing point inliers" % (surface_a.name, surface_b.name, len(vps_intersection)), min_inliers, max_inliers)
                     return True
 
