@@ -400,18 +400,20 @@ class SurfaceSolver():
             min_inliers = min(len(inliers_a), len(inliers_b))
             max_inliers = max(len(inliers_a), len(inliers_b))
 
+            vp_inliers_match = len(vps_intersection) > min_inliers / 3
+
             surface_a_normal = color_to_normal(surface_a.normals_mean)
             surface_b_normal = color_to_normal(surface_b.normals_mean)
 
             cos_normal = np.dot(surface_a_normal, surface_b_normal)
             angle = np.arccos(cos_normal)
 
-            if angle <= np.radians(15) and (vps_intersection is None or len(vps_intersection) > 0):
+            if angle <= np.radians(15) and vpa == vpb:
                 print("Merge %s with %s due to 15 degree normals" % (surface_a.name, surface_b.name), surface_a_normal, surface_b_normal)
                 return True
             elif angle <= np.radians(45):
 
-                if vpa is not None and vpa == vpb:
+                if vpa is not None and vpa == vpb and vp_inliers_match:
                     print("Merge %s with %s due to %d matching vanishing point inliers" % (surface_a.name, surface_b.name, len(vps_intersection)), min_inliers, max_inliers)
                     return True
 
