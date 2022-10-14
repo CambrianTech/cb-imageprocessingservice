@@ -14,7 +14,7 @@ from pipeline.core import PipelineStep, PipelineStepIndex
 from pipeline.data.surface_type import SurfaceType
 from pipeline.misc.utils import resize_array, random_color, overlay_mask, partition, standard_colors
 from .planegeometry import Dimension
-from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_mask
+from pipeline.data.logging import log_image, log_segmentation_image, im_logging_enabled, log_mask, draw_legend
 from pipeline.components.line import Line, line_on_image_edge, merge_lines, draw_lines, line_within_mask
 from pipeline.data.ade20k import ADE20K, box_like, legged_objects
 
@@ -175,6 +175,7 @@ class VanishingPoint:
         self._points = None
 
         self.deleted = False
+        self.name = "vp"
         #cv2.minAreaRect(InputArray  points)
 
     def __lt__(self, other):
@@ -225,6 +226,7 @@ class VanishingPoint:
         self._points = None
 
         other.deleted = True
+
 
         
 class Edgelets:
@@ -447,6 +449,10 @@ class PipelineVanishingPointFinder(PipelineStep):
         if after < before:
             print("consolidated vanishing_points from %d to %d" % (before, after))
 
+        vertical_vp.name = "vertical vp"
+
+        for index, vp in enumerate(vps_horizontal):
+            vp.name = "horizontal vp %d" % index
 
         data["vertical_vp"] = vertical_vp
         data["horizontal_vps"] = vps_horizontal
@@ -462,10 +468,16 @@ class PipelineVanishingPointFinder(PipelineStep):
         vps = [data["vertical_vp"]]
         vps.extend(data["horizontal_vps"])
 
+        legend = list()
+
         for cluster_index in range(len(vps)):
             color = standard_colors[cluster_index]
             vp = vps[cluster_index]
             draw_lines(image, vp.inliers, color=(color[0], color[1], color[2]), thickness=2,lineType=cv2.LINE_AA)
+
+            legend.append((vp.name, color))
+            
+        draw_legend(data, image, legend)
             
         return image
 

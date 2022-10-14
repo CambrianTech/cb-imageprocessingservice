@@ -172,12 +172,13 @@ class SurfaceSolver():
             debug = self.data["downscaled"].copy()
             debug[surface.mask_expanded > 0] = random_color()
 
-            #draw_lines(debug, surface.lines, color=(50, 50, 50), thickness=2,lineType=cv2.LINE_AA)
+            draw_lines(debug, surface.lines, color=(50, 50, 50), thickness=2,lineType=cv2.LINE_AA)
 
-            for vp in surface.horizontal_vps:
+            for vp, inliers in surface.horizontal_vps:
                 index = self.room.horizontal_vps.index(vp) + 1
                 color = standard_colors[index]
-                draw_lines(debug, vp.inliers, color=(color[0], color[1], color[2]), thickness=2, lineType=cv2.LINE_AA)
+                draw_lines(debug, vp.inliers, color=(color[0], color[1], color[2]), thickness=1, lineType=cv2.LINE_AA)
+                draw_lines(debug, inliers, color=(color[0], color[1], color[2]), thickness=2, lineType=cv2.LINE_AA)
 
             log_image(self.data, "vanishing_pts_%s" % surface.name, debug)
 
@@ -373,18 +374,33 @@ class SurfaceSolver():
             if surface_b.surfaceType in [SurfaceType.Floor, SurfaceType.OnFloor, SurfaceType.Ceiling]:
                 return True
 
-            vps_a = surface_a.horizontal_vps
-            vps_b = surface_b.horizontal_vps
-
             print("Comparing %s to %s" % (surface_a.name, surface_b.name))
 
-            if len(vps_a) > 0 and len(vps_b) > 0:
-                vps_intersection = list(set(vps_a) & set(vps_b))
-                if len(vps_intersection) == 0:
-                    #print("Cannot merge surface %s with %s" % (surface_a.name, surface_b.name), vps_a, vps_b)
-                    return False
+            if len(surface_a.horizontal_vps) > 0 and len(surface_b.horizontal_vps) > 0:
+                vpa = surface_a.horizontal_vps[0][0]
+                inliers_a = surface_a.horizontal_vps[0][1]
+                vpb = surface_b.horizontal_vps[0][0]
+                inliers_b = surface_b.horizontal_vps[0][1]
+
+                if vpa == vpb:
+                    print("vps are the same", vpa.name, vpb.name)
+
+                vps_intersection = list(set(inliers_a) & set(inliers_b))
+
+                # if len(vps_intersection) == 0:
+                #     print("Cannot merge surface %s with %s, no matching vp inliers" % (surface_a.name, surface_b.name))
+                #     return False
             else:
-                vps_intersection = None
+                vpa = None
+                inliers_a = []
+                vpb = None
+                inliers_b = []
+                vps_intersection = []
+
+            min_inliers = min(len(inliers_a), len(inliers_b))
+            max_inliers = max(len(inliers_a), len(inliers_b))
+
+            vp_inliers_match = len(vps_intersection) > min_inliers / 5
 
             surface_a_normal = color_to_normal(surface_a.normals_mean)
             surface_b_normal = color_to_normal(surface_b.normals_mean)
@@ -392,14 +408,15 @@ class SurfaceSolver():
             cos_normal = np.dot(surface_a_normal, surface_b_normal)
             angle = np.arccos(cos_normal)
 
-            if angle <= np.radians(15) and (vps_intersection is None or len(vps_intersection) > 0):
+            if angle <= np.radians(15) and vpa == vpb:
                 print("Merge %s with %s due to 15 degree normals" % (surface_a.name, surface_b.name), surface_a_normal, surface_b_normal)
                 return True
             elif angle <= np.radians(45):
 
-                # if vps_intersection is not None and len(vps_intersection) == 1:
-                #     print("Merge %s with %s due to matching vanishing points" % (surface_a.name, surface_b.name))
-                #     return True
+                if vpa is not None and vpa == vpb and vp_inliers_match:
+                    print("Merge %s with %s due to %d matching vanishing point inliers" % (surface_a.name, surface_b.name, len(vps_intersection)), min_inliers, max_inliers)
+                    return True
+
         
                 #see if there's a line through the intersection
                 contours = surface_a.intersection(surface_b) 
@@ -446,7 +463,7 @@ class SurfaceSolver():
 
                 if current_surface.destroyed: continue
 
-                if surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
+                if surfaceType in [SurfaceType.OnWall]:
                     candidates = filter(lambda s: s.surfaceType == current_surface.surfaceType, current_surface.neighbors)
                 else:
                     candidates = surfaces_of_type
