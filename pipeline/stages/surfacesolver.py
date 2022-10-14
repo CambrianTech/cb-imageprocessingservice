@@ -400,7 +400,7 @@ class SurfaceSolver():
             min_inliers = min(len(inliers_a), len(inliers_b))
             max_inliers = max(len(inliers_a), len(inliers_b))
 
-            vp_inliers_match = len(vps_intersection) > min_inliers / 3
+            vp_inliers_match = len(vps_intersection) > min_inliers / 5
 
             surface_a_normal = color_to_normal(surface_a.normals_mean)
             surface_b_normal = color_to_normal(surface_b.normals_mean)
@@ -463,7 +463,7 @@ class SurfaceSolver():
 
                 if current_surface.destroyed: continue
 
-                if surfaceType in [SurfaceType.Wall, SurfaceType.OnWall]:
+                if surfaceType in [SurfaceType.OnWall]:
                     candidates = filter(lambda s: s.surfaceType == current_surface.surfaceType, current_surface.neighbors)
                 else:
                     candidates = surfaces_of_type
