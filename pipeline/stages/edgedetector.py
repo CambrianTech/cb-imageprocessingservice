@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.special import softmax
 import cv2
-import tensorflow as tf
 from pipeline.core import PipelineStep
 import os
 from time import time
@@ -9,6 +8,11 @@ from tensorpack import *
 from tensorpack.tfutils import gradproc, optimizer
 from tensorpack.tfutils.sesscreate import NewSessionCreator
 from tensorpack.tfutils.summary import add_moving_summary, add_param_summary
+
+try:
+    import tensorflow.compat.v1 as tf
+except:
+    import tensorflow as tf
 
 from pipeline.core import PipelineStep, PipelineStepIndex
 

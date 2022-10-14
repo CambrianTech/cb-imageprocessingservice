@@ -16,10 +16,9 @@ from .stages.fileinput import PipelineFileInput
 from .stages.fileoutput import PipelineFileOutput
 
 from .stages.fov import PipelineCalculateFov
-from .stages.primaryangle import PipelineDeterminePrimaryAngles
 from .stages.segmentation import PipelineSemanticSegmentation
 from .stages.edgedetector import PipelineEdgeDetector
-from .stages.superpixels import PipelineSuperpixels
+from .stages.normalsestimator import PipelineNormalsEstimator
 from .stages.planegeometry import PipelinePlaneGeometry
 from .stages.linefinder import PipelineLineFinder
 from .stages.planedetector import PipelinePlaneDetector
@@ -99,8 +98,8 @@ class Pipeline():
         all_steps[PipelineStepIndex.ReverseRenderer] = PipelineReverseRenderer
         
         all_steps[PipelineStepIndex.DigestData] = PipelineDigestData
-        all_steps[PipelineStepIndex.DeterminePrimaryAngles] = PipelineDeterminePrimaryAngles
         all_steps[PipelineStepIndex.ExtractSurfaces] = PipelineExtractSurfaces
+        all_steps[PipelineStepIndex.NormalsEstimator] = PipelineNormalsEstimator
         all_steps[PipelineStepIndex.FindLines] = PipelineLineFinder
         all_steps[PipelineStepIndex.VanishingPoints] = PipelineVanishingPointFinder
         all_steps[PipelineStepIndex.FindBarriers] = PipelineBarrierFinder
@@ -180,7 +179,12 @@ class Pipeline():
         if self.config.mode == PipelineMode.Serve:
             self.s3_client.upload_bytes_to_s3(pickle_bytes, self.config.dest_path, relative_path)
         else:
-            with open(os.path.join(self.config.dest_path, relative_path), 'wb') as f: 
+            project_path = os.path.join(self.config.dest_path, data["unique_id"])
+            if not os.path.exists(project_path):
+                os.makedirs(project_path)
+                
+            file_path = os.path.join(project_path, filename)
+            with open(file_path, 'wb') as f: 
                 f.write(pickle_bytes)
 
 

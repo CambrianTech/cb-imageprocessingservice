@@ -128,3 +128,7 @@ gluon_models/
 /data
 /single
 /test_images
+planercnn/planercnn/checkpoint/planercnn_normal_warping_refine/checkpoint_refine.pth
+planercnn/planercnn/checkpoint/planercnn_normal_warping_refine/checkpoint.pth
+surface_normals/nyu.pt
+surface_normals/scannet.pt

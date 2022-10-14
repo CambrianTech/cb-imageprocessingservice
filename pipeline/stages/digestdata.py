@@ -57,3 +57,8 @@ class PipelineDigestData(PipelineStep):
 
         data["semantic_labels"] = np.argmax(np.dstack(data["semantic_probs"]), -1)
 
+        data["surface_normals"] = cv2.resize(data["surface_normals"], shape)
+
+        # if "surface_normals" in data:
+        #     log_image(data, "surface_normals", data["surface_normals"])
+

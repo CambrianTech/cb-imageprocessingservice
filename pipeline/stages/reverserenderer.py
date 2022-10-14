@@ -38,7 +38,7 @@ class PipelineReverseRenderer(PipelineStep):
 
     @property
     def output_keys(self) -> list:
-        return ["lighting", "normals"]
+        return ["lighting"]
 
     @property
     def is_batched(self) -> bool:
@@ -63,8 +63,6 @@ class PipelineReverseRenderer(PipelineStep):
     def start_networks(self):
         print("Loading models from", self.config.model_path)
         self.model_lighting = load_model(os.path.join(self.config.model_path, "lighting"), session_config=self.config.session_config)
-        self.model_normals = load_model(os.path.join(self.config.model_path, "normals"), session_config=self.config.session_config)
-
         self.models_loaded = True #todo:signal
 
     def start_remote_process(self, timeout=15, success_message = "$SUCCESS"):
@@ -159,9 +157,6 @@ class PipelineReverseRenderer(PipelineStep):
         print('Running lighting network')
         response_dict["lighting"] = feed_image_batched(self.model_lighting, images)
 
-        print('Running normals network')
-        response_dict["normals"] = feed_image_batched(self.model_normals, images)
-
         return response_dict
 
     def run(self, data: dict) -> None:
@@ -177,9 +172,8 @@ class PipelineReverseRenderer(PipelineStep):
         # if response_dict is None:
         #     return
 
-        for datum, lighting, normals in zip(data, response_dict["lighting"], response_dict["normals"]):
+        for datum, lighting in zip(data, response_dict["lighting"]):
             datum["lighting"] = lighting
-            datum["normals"] = normals
 
 
     def stop(self):

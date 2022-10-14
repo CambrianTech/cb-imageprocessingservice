@@ -59,10 +59,15 @@ class PlaneGeometry():
         self.cluster_prob = planes_data["detection"][:, 5]
         self.plane_masks = resize_array(planes_data["masks"], shape)
 
+
         XYZ = planes_data["XYZ"][:, 80:-80, :].transpose(1, 2, 0)
         self.XYZ = cv2.resize(XYZ, shape)
 
-        normals = cv2.resize(self.data["normals"], shape)
+        self.depth = planes_data["depth_np"][0, 80:-80]
+        log_image(self.data, "depth", 255. * (1.0 - self.depth / np.amax(self.depth)))
+
+        normals = cv2.resize(self.data["surface_normals"], shape)
+        self.normals = (normals - 127.5) / 127.5
 
         if im_logging_enabled(self.data, LogLevel.Images):
             log_image(self.data, "xyz", 255. * self.XYZ / np.amax(self.XYZ))
@@ -72,8 +77,6 @@ class PlaneGeometry():
             plane_XYZ = planes_data["plane_XYZ"][:, :, 80:-80, :].transpose(0, 2, 3, 1)
             plane_XYZ = resize_array(plane_XYZ, shape)
             log_model(self.data, "model_initial", self.image, self.plane_masks, np.float32(plane_XYZ), mult=1)
-
-        self.normals = (normals - 127.5) / 127.5
         
 
     def calculate_geometry(self):

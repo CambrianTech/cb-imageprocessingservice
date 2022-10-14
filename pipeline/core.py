@@ -17,6 +17,7 @@ class PipelineStepIndex(IntEnum):
     EdgeDetector = auto()
     Segmentation = auto()
     ReverseRenderer = auto()
+    NormalsEstimator = auto()
     DigestData = auto()
     DeterminePrimaryAngles = auto()
     FindLines = auto()

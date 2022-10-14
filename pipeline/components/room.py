@@ -70,7 +70,7 @@ class Room():
     @property
     def normals(self):
         if self._normals is None:
-            self._normals = cv2.resize(self.data["normals"], (self.image.shape[1], self.image.shape[0]))
+            self._normals = cv2.resize(self.data["surface_normals"], (self.image.shape[1], self.image.shape[0]))
         return self._normals
 
     @property
