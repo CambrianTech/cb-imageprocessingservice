@@ -268,24 +268,32 @@ class Surface():
 
     @property
     def horizontal_vps(self) -> list:
-
         if self._hvps is None:
-            self._hvps = []
 
-            num_matches = []
+            matches = []
+            max_inliers = -1
             if len(self.lines) > 1:
                 for vp in self.data["room"].horizontal_vps:
-                    matches = get_inliers(self.lines, vp.model, angle_threshold=np.radians(5))
-                    num_matches.append(len(matches))
+                    inliers = get_inliers(self.lines, vp.model, angle_threshold=np.radians(5))
+                    num_inliers = len(inliers)
+                    if num_inliers > 1:
+                        max_inliers = max(max_inliers, num_inliers)
+                        matches.append((vp, inliers))
 
-            if len(num_matches) > 0:
-                threshold = max(3, 2 * max(num_matches) / 3)
-                
-                for i in range(0, len(self.data["room"].horizontal_vps)):
-                    if num_matches[i] > threshold:
-                        self._hvps.append(self.data["room"].horizontal_vps[i])
+            inlier_threshold = max(3, 2 * max_inliers / 3)
+
+            matches = list(filter(lambda m: len(m[1]) > inlier_threshold, matches))
+            self._hvps = sorted(matches, key=lambda m:len(m[1]), reverse=True)
 
         return self._hvps
+
+    # @property
+    # def horizontal_vps(self) -> list:
+    #     return zip(*self.vps_and_inliers)[0]
+
+    # @property
+    # def horizontal_inliers(self) -> list:
+    #     return zip(*self.vps_and_inliers)[1]
 
     @property
     def neighbors(self) -> list:

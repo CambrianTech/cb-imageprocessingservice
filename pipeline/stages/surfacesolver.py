@@ -174,10 +174,10 @@ class SurfaceSolver():
 
             #draw_lines(debug, surface.lines, color=(50, 50, 50), thickness=2,lineType=cv2.LINE_AA)
 
-            for vp in surface.horizontal_vps:
+            for vp, inliers in surface.horizontal_vps:
                 index = self.room.horizontal_vps.index(vp) + 1
                 color = standard_colors[index]
-                draw_lines(debug, vp.inliers, color=(color[0], color[1], color[2]), thickness=2, lineType=cv2.LINE_AA)
+                draw_lines(debug, inliers, color=(color[0], color[1], color[2]), thickness=2, lineType=cv2.LINE_AA)
 
             log_image(self.data, "vanishing_pts_%s" % surface.name, debug)
 
@@ -373,18 +373,27 @@ class SurfaceSolver():
             if surface_b.surfaceType in [SurfaceType.Floor, SurfaceType.OnFloor, SurfaceType.Ceiling]:
                 return True
 
-            vps_a = surface_a.horizontal_vps
-            vps_b = surface_b.horizontal_vps
-
             print("Comparing %s to %s" % (surface_a.name, surface_b.name))
 
-            if len(vps_a) > 0 and len(vps_b) > 0:
-                vps_intersection = list(set(vps_a) & set(vps_b))
+            if len(surface_a.horizontal_vps) > 0 and len(surface_b.horizontal_vps) > 0:
+                inliers_a = surface_a.horizontal_vps[0][1]
+                inliers_b = surface_b.horizontal_vps[0][1]
+
+                if surface_a.horizontal_vps[0][0] == surface_a.horizontal_vps[0][0]:
+                    print("vps are the same", surface_a.horizontal_vps[0][0].name, surface_b.horizontal_vps[0][0].name)
+
+                vps_intersection = list(set(inliers_a) & set(inliers_b))
+
                 if len(vps_intersection) == 0:
-                    #print("Cannot merge surface %s with %s" % (surface_a.name, surface_b.name), vps_a, vps_b)
+                    print("Cannot merge surface %s with %s, no matching vp inliers" % (surface_a.name, surface_b.name))
                     return False
             else:
-                vps_intersection = None
+                inliers_a = []
+                inliers_b = []
+                vps_intersection = []
+
+            min_inliers = min(len(inliers_a), len(inliers_b))
+            max_inliers = max(len(inliers_a), len(inliers_b))
 
             surface_a_normal = color_to_normal(surface_a.normals_mean)
             surface_b_normal = color_to_normal(surface_b.normals_mean)
@@ -397,9 +406,10 @@ class SurfaceSolver():
                 return True
             elif angle <= np.radians(45):
 
-                # if vps_intersection is not None and len(vps_intersection) == 1:
-                #     print("Merge %s with %s due to matching vanishing points" % (surface_a.name, surface_b.name))
-                #     return True
+                if len(vps_intersection) > min_inliers / 3:
+                    print("Merge %s with %s due to %d matching vanishing point inliers" % (surface_a.name, surface_b.name, len(vps_intersection)), min_inliers, max_inliers)
+                    return True
+
         
                 #see if there's a line through the intersection
                 contours = surface_a.intersection(surface_b) 
