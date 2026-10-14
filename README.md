@@ -37,8 +37,8 @@ Virtualenv: `pip3 install virtualenv`
 
 Use a virtual environment and utilize the requirements.txt or if OSX darwin-requirements.txt in this package as well as the cb-core repository:
 ```
-virtualenv ~/venv/shaw
-source ~/venv/shaw/bin/activate
+virtualenv ~/venv/cb
+source ~/venv/cb/bin/activate
 pip3 install -r REQ-TXT-FILE
 pip3 install -e PATH_TO_CB_CORE_REPO
 ```
